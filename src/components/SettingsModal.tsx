@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { BackgroundMode } from "../types/dashboard";
+import { resolveThemeSettings } from "../utils/themeConfig";
 import { palette } from "../utils/theme";
 
 type SettingsModalProps = {
@@ -21,6 +22,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const { config, patchConfig, rawJson, resetConfig, updateConfigFromJson } = useDashboardConfig();
   const [draft, setDraft] = useState(rawJson);
   const [error, setError] = useState<string | null>(null);
+  const theme = resolveThemeSettings(config.theme);
 
   useEffect(() => {
     if (visible) {
@@ -160,6 +162,234 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                 />
               </Field>
             </View>
+            <Field label="Widget Verlaeufe">
+              <View style={styles.colorRow}>
+                <Field label="State Start">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) =>
+                      patchConfig({
+                        theme: {
+                          ...theme,
+                          widgetTones: { ...theme.widgetTones, stateStart: value },
+                        },
+                      })
+                    }
+                    style={styles.input}
+                    value={theme.widgetTones.stateStart}
+                  />
+                </Field>
+                <Field label="State Ende">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) =>
+                      patchConfig({
+                        theme: {
+                          ...theme,
+                          widgetTones: { ...theme.widgetTones, stateEnd: value },
+                        },
+                      })
+                    }
+                    style={styles.input}
+                    value={theme.widgetTones.stateEnd}
+                  />
+                </Field>
+              </View>
+              <View style={styles.colorRow}>
+                <Field label="Solar Start">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) =>
+                      patchConfig({
+                        theme: {
+                          ...theme,
+                          widgetTones: { ...theme.widgetTones, solarStart: value },
+                        },
+                      })
+                    }
+                    style={styles.input}
+                    value={theme.widgetTones.solarStart}
+                  />
+                </Field>
+                <Field label="Solar Ende">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) =>
+                      patchConfig({
+                        theme: {
+                          ...theme,
+                          widgetTones: { ...theme.widgetTones, solarEnd: value },
+                        },
+                      })
+                    }
+                    style={styles.input}
+                    value={theme.widgetTones.solarEnd}
+                  />
+                </Field>
+              </View>
+              <View style={styles.colorRow}>
+                <Field label="Energy Start">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) =>
+                      patchConfig({
+                        theme: {
+                          ...theme,
+                          widgetTones: { ...theme.widgetTones, energyStart: value },
+                        },
+                      })
+                    }
+                    style={styles.input}
+                    value={theme.widgetTones.energyStart}
+                  />
+                </Field>
+                <Field label="Energy Ende">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) =>
+                      patchConfig({
+                        theme: {
+                          ...theme,
+                          widgetTones: { ...theme.widgetTones, energyEnd: value },
+                        },
+                      })
+                    }
+                    style={styles.input}
+                    value={theme.widgetTones.energyEnd}
+                  />
+                </Field>
+              </View>
+              <View style={styles.colorRow}>
+                <Field label="Camera Start">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) =>
+                      patchConfig({
+                        theme: {
+                          ...theme,
+                          widgetTones: { ...theme.widgetTones, cameraStart: value },
+                        },
+                      })
+                    }
+                    style={styles.input}
+                    value={theme.widgetTones.cameraStart}
+                  />
+                </Field>
+                <Field label="Camera Ende">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) =>
+                      patchConfig({
+                        theme: {
+                          ...theme,
+                          widgetTones: { ...theme.widgetTones, cameraEnd: value },
+                        },
+                      })
+                    }
+                    style={styles.input}
+                    value={theme.widgetTones.cameraEnd}
+                  />
+                </Field>
+              </View>
+            </Field>
+            <Field label="Solar Cards und Stats">
+              <View style={styles.colorRow}>
+                <Field label="Scene BG">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) =>
+                      patchConfig({
+                        theme: {
+                          ...theme,
+                          solar: { ...theme.solar, sceneCardBackground: value },
+                        },
+                      })
+                    }
+                    style={styles.input}
+                    value={theme.solar.sceneCardBackground}
+                  />
+                </Field>
+                <Field label="Scene Border">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) =>
+                      patchConfig({
+                        theme: {
+                          ...theme,
+                          solar: { ...theme.solar, sceneCardBorder: value },
+                        },
+                      })
+                    }
+                    style={styles.input}
+                    value={theme.solar.sceneCardBorder}
+                  />
+                </Field>
+              </View>
+              <View style={styles.colorRow}>
+                <Field label="Node BG">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) =>
+                      patchConfig({
+                        theme: {
+                          ...theme,
+                          solar: { ...theme.solar, nodeCardBackground: value },
+                        },
+                      })
+                    }
+                    style={styles.input}
+                    value={theme.solar.nodeCardBackground}
+                  />
+                </Field>
+                <Field label="Node Border">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) =>
+                      patchConfig({
+                        theme: {
+                          ...theme,
+                          solar: { ...theme.solar, nodeCardBorder: value },
+                        },
+                      })
+                    }
+                    style={styles.input}
+                    value={theme.solar.nodeCardBorder}
+                  />
+                </Field>
+              </View>
+              <View style={styles.colorRow}>
+                <Field label="Stat BG">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) =>
+                      patchConfig({
+                        theme: {
+                          ...theme,
+                          solar: { ...theme.solar, statCardBackground: value },
+                        },
+                      })
+                    }
+                    style={styles.input}
+                    value={theme.solar.statCardBackground}
+                  />
+                </Field>
+                <Field label="Stat Border">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) =>
+                      patchConfig({
+                        theme: {
+                          ...theme,
+                          solar: { ...theme.solar, statCardBorder: value },
+                        },
+                      })
+                    }
+                    style={styles.input}
+                    value={theme.solar.statCardBorder}
+                  />
+                </Field>
+              </View>
+            </Field>
           </View>
           <ScrollView style={styles.editorWrap}>
             <TextInput

@@ -71,11 +71,33 @@ export type WidgetConfig =
 
 export type BackgroundMode = "gradient" | "mesh" | "solid";
 
+export type ThemeSettings = {
+  widgetTones: {
+    stateStart: string;
+    stateEnd: string;
+    energyStart: string;
+    energyEnd: string;
+    cameraStart: string;
+    cameraEnd: string;
+    solarStart: string;
+    solarEnd: string;
+  };
+  solar: {
+    sceneCardBackground: string;
+    sceneCardBorder: string;
+    nodeCardBackground: string;
+    nodeCardBorder: string;
+    statCardBackground: string;
+    statCardBorder: string;
+  };
+};
+
 export type DashboardSettings = {
   title: string;
   backgroundMode: BackgroundMode;
   backgroundColor: string;
   backgroundAccent: string;
+  theme?: ThemeSettings;
   grid: {
     columns: number;
     rowHeight: number;

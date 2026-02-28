@@ -1,10 +1,12 @@
 import { DashboardSettings } from "../types/dashboard";
+import { defaultThemeSettings } from "./themeConfig";
 
 export const defaultConfig: DashboardSettings = {
   title: "SmartHome Control",
   backgroundMode: "mesh",
   backgroundColor: "#08111f",
   backgroundAccent: "#123a5d",
+  theme: defaultThemeSettings,
   grid: {
     columns: 12,
     rowHeight: 84,

@@ -1,17 +1,20 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
-import { SolarWidgetConfig, StateSnapshot } from "../../types/dashboard";
+import { SolarWidgetConfig, StateSnapshot, ThemeSettings } from "../../types/dashboard";
+import { resolveThemeSettings } from "../../utils/themeConfig";
 import { palette } from "../../utils/theme";
 
 type SolarWidgetProps = {
   config: SolarWidgetConfig;
   states: StateSnapshot;
+  theme?: ThemeSettings;
 };
 
 type FlowDir = "toHome" | "fromHome" | "idle";
 
-export function SolarWidget({ config, states }: SolarWidgetProps) {
+export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
+  const resolvedTheme = resolveThemeSettings(theme);
   const getValue = (key?: string) => {
     if (!key) {
       return null;
@@ -46,7 +49,15 @@ export function SolarWidget({ config, states }: SolarWidgetProps) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.sceneCard}>
+      <View
+        style={[
+          styles.sceneCard,
+          {
+            backgroundColor: resolvedTheme.solar.sceneCardBackground,
+            borderColor: resolvedTheme.solar.sceneCardBorder,
+          },
+        ]}
+      >
         <SolarFlowScene
           battDir={battDir}
           battPower={Math.abs(battSigned)}
@@ -54,6 +65,7 @@ export function SolarWidget({ config, states }: SolarWidgetProps) {
           gridDir={gridDir}
           gridPower={Math.abs(gridSigned)}
           homeNow={homeNow}
+          theme={resolvedTheme}
           pvDir={pvDir}
           pvNow={pvNow}
           soc={soc}
@@ -61,10 +73,14 @@ export function SolarWidget({ config, states }: SolarWidgetProps) {
       </View>
 
       <View style={styles.bottomRow}>
-        <MiniStat label="Eigenverbrauch" value={fmtKWh(daySelfKWh)} />
-        <MiniStat label="Verbraucht" value={fmtKWh(dayConsumedKWh)} />
-        <MiniStat label="Autarkie" value={autarkPct === null ? "—" : `${Math.round(autarkPct)} %`} />
-        <MiniStat label="PV Gesamt" value={fmtKWh(pvTotalKWh)} />
+        <MiniStat label="Eigenverbrauch" theme={resolvedTheme} value={fmtKWh(daySelfKWh)} />
+        <MiniStat label="Verbraucht" theme={resolvedTheme} value={fmtKWh(dayConsumedKWh)} />
+        <MiniStat
+          label="Autarkie"
+          theme={resolvedTheme}
+          value={autarkPct === null ? "—" : `${Math.round(autarkPct)} %`}
+        />
+        <MiniStat label="PV Gesamt" theme={resolvedTheme} value={fmtKWh(pvTotalKWh)} />
       </View>
 
       <Text style={styles.footnote}>
@@ -86,6 +102,7 @@ function SolarFlowScene({
   battTemp,
   gridDir,
   gridPower,
+  theme,
 }: {
   pvDir: FlowDir;
   pvNow: number | null;
@@ -96,6 +113,7 @@ function SolarFlowScene({
   battTemp: number | null;
   gridDir: FlowDir;
   gridPower: number;
+  theme: ThemeSettings;
 }) {
   const progress = useRef(new Animated.Value(0)).current;
   const [sceneLayout, setSceneLayout] = useState({ width: 960, height: 420 });
@@ -175,6 +193,7 @@ function SolarFlowScene({
       <NodeCard
         icon="solar-power"
         label="PV"
+        theme={theme}
         style={{ ...styles.nodePosition, top: topY, left: centerX, width: cardWidth, minHeight: cardHeight }}
         value={fmtW(pvNow)}
         highlight={pvDir !== "idle"}
@@ -182,6 +201,7 @@ function SolarFlowScene({
       <NodeCard
         icon="home-lightning-bolt-outline"
         label="Haus"
+        theme={theme}
         style={{ ...styles.nodePosition, top: centerY, left: centerX, width: cardWidth, minHeight: cardHeight }}
         value={fmtW(homeNow)}
         highlight
@@ -189,6 +209,7 @@ function SolarFlowScene({
       <NodeCard
         icon="battery-high"
         label={soc !== null ? `Akku ${Math.round(soc)}%` : "Akku"}
+        theme={theme}
         style={{ ...styles.nodePosition, top: centerY, left: leftX, width: cardWidth, minHeight: cardHeight }}
         value={fmtW(battPower || null)}
         meta={battTemp !== null ? `${battTemp.toFixed(1)} °C` : undefined}
@@ -197,6 +218,7 @@ function SolarFlowScene({
       <NodeCard
         icon="transmission-tower"
         label="Netz"
+        theme={theme}
         style={{ ...styles.nodePosition, top: centerY, left: rightX, width: cardWidth, minHeight: cardHeight }}
         value={fmtW(gridPower || null)}
         meta={gridDir === "toHome" ? "Bezug" : gridDir === "fromHome" ? "Einspeisung" : "Idle"}
@@ -205,6 +227,7 @@ function SolarFlowScene({
       <NodeCard
         icon="car-electric"
         label="Auto"
+        theme={theme}
         style={{ ...styles.nodePosition, top: bottomY, left: centerX, width: cardWidth, minHeight: cardHeight }}
         value="—"
         meta="Wallbox"
@@ -258,6 +281,7 @@ function NodeCard({
   meta,
   highlight,
   style,
+  theme,
 }: {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   label: string;
@@ -265,9 +289,20 @@ function NodeCard({
   meta?: string;
   highlight?: boolean;
   style?: object;
+  theme: ThemeSettings;
 }) {
   return (
-    <View style={[styles.nodeCard, style, highlight ? styles.nodeCardActive : null]}>
+    <View
+      style={[
+        styles.nodeCard,
+        {
+          backgroundColor: theme.solar.nodeCardBackground,
+          borderColor: theme.solar.nodeCardBorder,
+        },
+        style,
+        highlight ? styles.nodeCardActive : null,
+      ]}
+    >
       <View style={[styles.nodeIcon, highlight ? styles.nodeIconActive : null]}>
         <MaterialCommunityIcons color={highlight ? palette.accent : palette.textMuted} name={icon} size={26} />
       </View>
@@ -278,9 +313,17 @@ function NodeCard({
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: string }) {
+function MiniStat({ label, value, theme }: { label: string; value: string; theme: ThemeSettings }) {
   return (
-    <View style={styles.mini}>
+    <View
+      style={[
+        styles.mini,
+        {
+          backgroundColor: theme.solar.statCardBackground,
+          borderColor: theme.solar.statCardBorder,
+        },
+      ]}
+    >
       <Text style={styles.miniValue}>{value}</Text>
       <Text style={styles.miniLabel}>{label}</Text>
     </View>
@@ -398,9 +441,7 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     aspectRatio: 2.15,
     minHeight: 360,
-    backgroundColor: "rgba(18, 58, 64, 0.16)",
     borderWidth: 1,
-    borderColor: "rgba(90, 188, 177, 0.18)",
     overflow: "hidden",
   },
   scene: {
@@ -450,13 +491,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 12,
     alignItems: "center",
-    backgroundColor: "rgba(226, 232, 240, 0.12)",
     borderWidth: 1,
-    borderColor: "rgba(226, 232, 240, 0.18)",
   },
   nodeCardActive: {
-    backgroundColor: "rgba(226, 232, 240, 0.12)",
-    borderColor: "rgba(226, 232, 240, 0.24)",
   },
   nodeIcon: {
     width: 40,
@@ -498,9 +535,7 @@ const styles = StyleSheet.create({
     flexBasis: 140,
     borderRadius: 16,
     padding: 12,
-    backgroundColor: "rgba(255,255,255,0.03)",
     borderWidth: 1,
-    borderColor: palette.border,
   },
   miniValue: {
     color: palette.text,

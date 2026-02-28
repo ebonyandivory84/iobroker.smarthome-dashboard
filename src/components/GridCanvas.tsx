@@ -4,6 +4,7 @@ import { LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, useWindowDime
 import { IoBrokerClient } from "../services/iobroker";
 import { DashboardSettings, StateSnapshot, WidgetConfig } from "../types/dashboard";
 import { GRID_SNAP } from "../utils/gridLayout";
+import { resolveThemeSettings } from "../utils/themeConfig";
 import { palette } from "../utils/theme";
 import { WidgetFrame } from "./WidgetFrame";
 import { CameraWidget } from "./widgets/CameraWidget";
@@ -118,7 +119,7 @@ export function GridCanvas({
                 rowHeight={config.grid.rowHeight}
                 widget={widget}
               >
-                {renderWidget(widget, states, client, onUpdateWidget)}
+                {renderWidget(widget, states, client, onUpdateWidget, config.theme)}
               </WidgetFrame>
             </View>
           );
@@ -167,6 +168,7 @@ function WebGridCanvas({
 }) {
   const stepX = cellWidth + config.grid.gap;
   const stepY = config.grid.rowHeight + config.grid.gap;
+  const theme = resolveThemeSettings(config.theme);
 
   return (
     <div style={{ ...webCanvasStyle, minHeight: canvasHeight }}>
@@ -194,6 +196,7 @@ function WebGridCanvas({
           cellWidth={cellWidth}
           client={client}
           config={config}
+          theme={theme}
           isLayoutMode={isLayoutMode}
           onEditWidget={onEditWidget}
           onRemoveWidget={onRemoveWidget}
@@ -211,6 +214,7 @@ function WebGridCanvas({
 function WebWidgetShell({
   widget,
   config,
+  theme,
   states,
   client,
   stepX,
@@ -223,6 +227,7 @@ function WebWidgetShell({
 }: {
   widget: WidgetConfig;
   config: DashboardSettings;
+  theme: ReturnType<typeof resolveThemeSettings>;
   states: StateSnapshot;
   client: IoBrokerClient;
   stepX: number;
@@ -302,7 +307,7 @@ function WebWidgetShell({
 
   const shellStyle: CSSProperties = {
     ...webWidgetStyle,
-    ...getWidgetTone(widget.type),
+    ...getWidgetTone(widget.type, theme),
     left: preview.x * stepX,
     top: preview.y * stepY,
     width: preview.w * cellWidth + (preview.w - 1) * config.grid.gap,
@@ -337,7 +342,7 @@ function WebWidgetShell({
         </div>
       </div>
       <View style={styles.webContent}>
-        {renderWidget(widget, states, client, onUpdateWidget)}
+        {renderWidget(widget, states, client, onUpdateWidget, config.theme)}
       </View>
       {isLayoutMode ? (
         <div style={webFooterStyle}>
@@ -353,7 +358,8 @@ function renderWidget(
   widget: WidgetConfig,
   states: StateSnapshot,
   client: IoBrokerClient,
-  onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void
+  onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void,
+  theme?: DashboardSettings["theme"]
 ) {
   if (widget.type === "state") {
     return (
@@ -374,7 +380,7 @@ function renderWidget(
   }
 
   if (widget.type === "solar") {
-    return <SolarWidget config={widget} states={states} />;
+    return <SolarWidget config={widget} states={states} theme={theme} />;
   }
 
   return null;
@@ -568,31 +574,29 @@ const webResizeHandleStyle: CSSProperties = {
   opacity: 0.7,
 };
 
-function getWidgetTone(type: WidgetConfig["type"]): CSSProperties {
+function getWidgetTone(type: WidgetConfig["type"], theme: ReturnType<typeof resolveThemeSettings>): CSSProperties {
   if (type === "state") {
     return {
-      background:
-        "linear-gradient(135deg, rgba(154, 16, 38, 0.98) 0%, rgba(196, 18, 92, 0.94) 52%, rgba(163, 22, 126, 0.92) 100%)",
+      background: `linear-gradient(135deg, ${theme.widgetTones.stateStart} 0%, ${theme.widgetTones.stateEnd} 100%)`,
       border: "1px solid rgba(255,255,255,0.1)",
       boxShadow: "0 18px 30px rgba(98, 10, 46, 0.32)",
     };
   }
   if (type === "energy") {
     return {
-      background: "linear-gradient(180deg, rgba(26, 74, 148, 0.9), rgba(18, 36, 78, 0.96))",
+      background: `linear-gradient(180deg, ${theme.widgetTones.energyStart}, ${theme.widgetTones.energyEnd})`,
       border: "1px solid rgba(90, 150, 255, 0.16)",
     };
   }
   if (type === "camera") {
     return {
-      background: "linear-gradient(180deg, rgba(31, 28, 44, 0.92), rgba(14, 16, 26, 0.96))",
+      background: `linear-gradient(180deg, ${theme.widgetTones.cameraStart}, ${theme.widgetTones.cameraEnd})`,
       border: "1px solid rgba(255,255,255,0.06)",
     };
   }
   if (type === "solar") {
     return {
-      background:
-        "linear-gradient(135deg, rgba(18, 122, 94, 0.98) 0%, rgba(24, 154, 128, 0.94) 34%, rgba(21, 108, 184, 0.94) 72%, rgba(16, 72, 156, 0.96) 100%)",
+      background: `linear-gradient(135deg, ${theme.widgetTones.solarStart} 0%, ${theme.widgetTones.solarEnd} 100%)`,
       border: "1px solid rgba(105, 214, 189, 0.18)",
       boxShadow: "0 18px 30px rgba(10, 62, 82, 0.28)",
     };
