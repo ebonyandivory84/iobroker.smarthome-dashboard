@@ -122,21 +122,24 @@ function SolarFlowScene({
         active={pvDir !== "idle"}
         axis="y"
         progress={progress}
-        range={pvDir === "toHome" ? [0, 40] : [40, 0]}
+        range={pvDir === "toHome" ? [0, 90] : [90, 0]}
+        baseStyle={styles.beamVerticalBase}
         strength={clamp((pvNow || 0) / 8000, 0.2, 1)}
       />
       <AnimatedBeam
         active={battDir !== "idle"}
         axis="x"
         progress={progress}
-        range={battDir === "toHome" ? [-118, -18] : [-18, -118]}
+        range={battDir === "toHome" ? [0, 36] : [36, 0]}
+        baseStyle={styles.beamLeftBase}
         strength={clamp(battPower / 6000, 0.2, 1)}
       />
       <AnimatedBeam
         active={gridDir !== "idle"}
         axis="x"
         progress={progress}
-        range={gridDir === "toHome" ? [118, 18] : [18, 118]}
+        range={gridDir === "toHome" ? [36, 0] : [0, 36]}
+        baseStyle={styles.beamRightBase}
         strength={clamp(gridPower / 12000, 0.2, 1)}
       />
 
@@ -180,12 +183,14 @@ function AnimatedBeam({
   axis,
   range,
   strength,
+  baseStyle,
 }: {
   active: boolean;
   progress: Animated.Value;
   axis: "x" | "y";
   range: [number, number];
   strength: number;
+  baseStyle?: object;
 }) {
   if (!active) {
     return null;
@@ -200,6 +205,7 @@ function AnimatedBeam({
     <Animated.View
       style={[
         axis === "x" ? styles.beamHorizontal : styles.beamVertical,
+        baseStyle,
         {
           opacity: clamp(0.35 + strength * 0.65, 0.35, 1),
           transform,
@@ -358,44 +364,58 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
   },
   scene: {
-    height: 384,
+    height: 444,
     position: "relative",
     alignItems: "center",
     justifyContent: "center",
   },
   lineVerticalTop: {
     position: "absolute",
-    top: 124,
+    top: 118,
     left: "50%",
     marginLeft: -2,
     width: 4,
-    height: 44,
+    height: 110,
     borderRadius: 99,
     backgroundColor: "rgba(255,255,255,0.16)",
   },
   lineHorizontalLeft: {
     position: "absolute",
-    top: 216,
-    left: "25%",
-    width: "21%",
+    top: 286,
+    left: "50%",
+    marginLeft: -116,
+    width: 54,
     height: 4,
     borderRadius: 99,
     backgroundColor: "rgba(255,255,255,0.16)",
   },
   lineHorizontalRight: {
     position: "absolute",
-    top: 216,
-    right: "25%",
-    width: "21%",
+    top: 286,
+    left: "50%",
+    marginLeft: 62,
+    width: 54,
     height: 4,
     borderRadius: 99,
     backgroundColor: "rgba(255,255,255,0.16)",
   },
-  beamVertical: {
-    position: "absolute",
-    top: 126,
+  beamVerticalBase: {
+    top: 118,
     left: "50%",
     marginLeft: -4,
+  },
+  beamLeftBase: {
+    top: 284,
+    left: "50%",
+    marginLeft: -116,
+  },
+  beamRightBase: {
+    top: 284,
+    left: "50%",
+    marginLeft: 62,
+  },
+  beamVertical: {
+    position: "absolute",
     width: 8,
     height: 20,
     borderRadius: 99,
@@ -407,10 +427,7 @@ const styles = StyleSheet.create({
   },
   beamHorizontal: {
     position: "absolute",
-    top: 214,
-    left: "50%",
-    marginLeft: -10,
-    width: 20,
+    width: 18,
     height: 8,
     borderRadius: 99,
     backgroundColor: palette.accentWarm,
@@ -439,17 +456,19 @@ const styles = StyleSheet.create({
     marginLeft: -62,
   },
   nodeCenter: {
-    top: 168,
+    top: 236,
     left: "50%",
     marginLeft: -62,
   },
   nodeLeft: {
-    left: 0,
-    top: 168,
+    top: 236,
+    left: "50%",
+    marginLeft: -240,
   },
   nodeRight: {
-    right: 0,
-    top: 168,
+    top: 236,
+    left: "50%",
+    marginLeft: 116,
   },
   nodeIcon: {
     width: 44,
