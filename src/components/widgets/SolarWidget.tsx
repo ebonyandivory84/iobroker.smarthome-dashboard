@@ -115,6 +115,7 @@ function SolarFlowScene({
   return (
     <View style={styles.scene}>
       <View style={styles.lineVerticalTop} />
+      <View style={styles.lineVerticalBottom} />
       <View style={styles.lineHorizontalLeft} />
       <View style={styles.lineHorizontalRight} />
 
@@ -122,7 +123,7 @@ function SolarFlowScene({
         active={pvDir !== "idle"}
         axis="y"
         progress={progress}
-        range={pvDir === "toHome" ? [0, 90] : [90, 0]}
+        range={pvDir === "toHome" ? [0, 64] : [64, 0]}
         baseStyle={styles.beamVerticalBase}
         strength={clamp((pvNow || 0) / 8000, 0.2, 1)}
       />
@@ -172,6 +173,13 @@ function SolarFlowScene({
         value={fmtW(gridPower || null)}
         meta={gridDir === "toHome" ? "Bezug" : gridDir === "fromHome" ? "Einspeisung" : "Idle"}
         highlight={gridDir !== "idle"}
+      />
+      <NodeCard
+        icon="car-electric"
+        label="Auto"
+        style={styles.nodeBottom}
+        value="—"
+        meta="Wallbox"
       />
     </View>
   );
@@ -364,55 +372,65 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
   },
   scene: {
-    height: 444,
+    height: 520,
     position: "relative",
     alignItems: "center",
     justifyContent: "center",
   },
   lineVerticalTop: {
     position: "absolute",
-    top: 118,
+    top: "29%",
     left: "50%",
     marginLeft: -2,
     width: 4,
-    height: 110,
+    height: "17%",
+    minHeight: 74,
+    borderRadius: 99,
+    backgroundColor: "rgba(255,255,255,0.16)",
+  },
+  lineVerticalBottom: {
+    position: "absolute",
+    top: "66%",
+    left: "50%",
+    marginLeft: -2,
+    width: 4,
+    height: "12%",
+    minHeight: 54,
     borderRadius: 99,
     backgroundColor: "rgba(255,255,255,0.16)",
   },
   lineHorizontalLeft: {
     position: "absolute",
-    top: 286,
-    left: "50%",
-    marginLeft: -116,
-    width: 54,
+    top: "56%",
+    left: "39%",
+    width: "4%",
+    minWidth: 36,
     height: 4,
     borderRadius: 99,
     backgroundColor: "rgba(255,255,255,0.16)",
   },
   lineHorizontalRight: {
     position: "absolute",
-    top: 286,
-    left: "50%",
-    marginLeft: 62,
-    width: 54,
+    top: "56%",
+    left: "57%",
+    width: "4%",
+    minWidth: 36,
     height: 4,
     borderRadius: 99,
     backgroundColor: "rgba(255,255,255,0.16)",
   },
   beamVerticalBase: {
-    top: 118,
+    top: "29%",
     left: "50%",
     marginLeft: -4,
   },
   beamLeftBase: {
-    top: 284,
-    left: "50%",
-    marginLeft: -116,
+    top: "55.2%",
+    left: "39%",
   },
   beamRightBase: {
-    top: 284,
-    left: "50%",
-    marginLeft: 62,
+    top: "55.2%",
+    left: "57%",
   },
   beamVertical: {
     position: "absolute",
@@ -438,10 +456,12 @@ const styles = StyleSheet.create({
   },
   nodeCard: {
     position: "absolute",
-    width: 124,
-    minHeight: 102,
-    borderRadius: 18,
-    padding: 12,
+    width: "14%",
+    minWidth: 120,
+    maxWidth: 168,
+    minHeight: 112,
+    borderRadius: 20,
+    padding: 14,
     alignItems: "center",
     backgroundColor: "rgba(9, 18, 30, 0.9)",
     borderWidth: 1,
@@ -451,24 +471,29 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(77, 226, 177, 0.06)",
   },
   nodeTop: {
-    top: 8,
+    top: "5%",
     left: "50%",
-    marginLeft: -62,
+    transform: [{ translateX: -72 }],
   },
   nodeCenter: {
-    top: 236,
+    top: "43%",
     left: "50%",
-    marginLeft: -62,
+    transform: [{ translateX: -72 }],
   },
   nodeLeft: {
-    top: 236,
-    left: "50%",
-    marginLeft: -240,
+    top: "43%",
+    left: "32%",
+    transform: [{ translateX: -72 }],
   },
   nodeRight: {
-    top: 236,
+    top: "43%",
+    left: "68%",
+    transform: [{ translateX: -72 }],
+  },
+  nodeBottom: {
+    top: "79%",
     left: "50%",
-    marginLeft: 116,
+    transform: [{ translateX: -72 }],
   },
   nodeIcon: {
     width: 44,
