@@ -24,10 +24,6 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
       setDraft({
         title: widget.title,
         stateId: widget.stateId,
-        x: String(widget.position.x),
-        y: String(widget.position.y),
-        w: String(widget.position.w),
-        h: String(widget.position.h),
         onLabel: widget.onLabel || "",
         offLabel: widget.offLabel || "",
         writeable: widget.writeable ? "true" : "false",
@@ -43,10 +39,6 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
         snapshotUrl: widget.snapshotUrl || "",
         rtspUrl: widget.rtspUrl || "",
         refreshMs: String(widget.refreshMs || 2000),
-        x: String(widget.position.x),
-        y: String(widget.position.y),
-        w: String(widget.position.w),
-        h: String(widget.position.h),
         ...appearanceDraft,
       });
       return;
@@ -59,10 +51,6 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
         houseStateId: widget.houseStateId,
         batteryStateId: widget.batteryStateId || "",
         gridStateId: widget.gridStateId || "",
-        x: String(widget.position.x),
-        y: String(widget.position.y),
-        w: String(widget.position.w),
-        h: String(widget.position.h),
         ...appearanceDraft,
       });
       return;
@@ -72,10 +60,6 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
       title: widget.title,
       statePrefix: widget.statePrefix,
       dailyEnergyUnit: widget.dailyEnergyUnit || "auto",
-      x: String(widget.position.x),
-      y: String(widget.position.y),
-      w: String(widget.position.w),
-      h: String(widget.position.h),
       keyPvNow: widget.keys.pvNow,
       keyHomeNow: widget.keys.homeNow,
       keyGridIn: widget.keys.gridIn,
@@ -96,13 +80,6 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
   }
 
   const save = () => {
-    const position = {
-      x: clampInt(draft.x, widget.position.x, 0),
-      y: clampInt(draft.y, widget.position.y, 0),
-      w: clampInt(draft.w, widget.position.w, 1),
-      h: clampInt(draft.h, widget.position.h, 1),
-    };
-
     const appearance = buildAppearance(draft);
 
     if (widget.type === "state") {
@@ -114,7 +91,6 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
         writeable: draft.writeable !== "false",
         format: normalizeStateFormat(draft.format),
         appearance,
-        position,
       });
     } else if (widget.type === "camera") {
       onSave(widget.id, {
@@ -123,7 +99,6 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
         rtspUrl: draft.rtspUrl || undefined,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 250),
         appearance,
-        position,
       });
     } else if (widget.type === "energy") {
       onSave(widget.id, {
@@ -133,7 +108,6 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
         batteryStateId: draft.batteryStateId || undefined,
         gridStateId: draft.gridStateId || undefined,
         appearance,
-        position,
       });
     } else {
       onSave(widget.id, {
@@ -155,7 +129,6 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
           battTemp: draft.keyBattTemp || undefined,
         },
         appearance,
-        position,
       });
     }
 
@@ -179,56 +152,6 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
                 style={styles.input}
                 value={draft.title || ""}
               />
-            </Field>
-            <Field label="Layout">
-              <View style={styles.layoutRow}>
-                <MiniInput
-                  label="X"
-                  onChangeText={(value) => setDraft((current) => ({ ...current, x: value }))}
-                  value={draft.x || ""}
-                />
-                <MiniInput
-                  label="Y"
-                  onChangeText={(value) => setDraft((current) => ({ ...current, y: value }))}
-                  value={draft.y || ""}
-                />
-                <MiniInput
-                  label="Breite"
-                  onChangeText={(value) => setDraft((current) => ({ ...current, w: value }))}
-                  value={draft.w || ""}
-                />
-                <MiniInput
-                  label="Hoehe"
-                  onChangeText={(value) => setDraft((current) => ({ ...current, h: value }))}
-                  value={draft.h || ""}
-                />
-              </View>
-              <View style={styles.layoutStepperGrid}>
-                <LayoutStepper
-                  label="X"
-                  value={draft.x || "0"}
-                  min={0}
-                  onChange={(value) => setDraft((current) => ({ ...current, x: value }))}
-                />
-                <LayoutStepper
-                  label="Y"
-                  value={draft.y || "0"}
-                  min={0}
-                  onChange={(value) => setDraft((current) => ({ ...current, y: value }))}
-                />
-                <LayoutStepper
-                  label="W"
-                  value={draft.w || "1"}
-                  min={1}
-                  onChange={(value) => setDraft((current) => ({ ...current, w: value }))}
-                />
-                <LayoutStepper
-                  label="H"
-                  value={draft.h || "1"}
-                  min={1}
-                  onChange={(value) => setDraft((current) => ({ ...current, h: value }))}
-                />
-              </View>
             </Field>
             <Field label="Darstellung">
               <ColorInputRow
@@ -514,28 +437,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function MiniInput({
-  label,
-  value,
-  onChangeText,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (value: string) => void;
-}) {
-  return (
-    <View style={styles.miniWrap}>
-      <Text style={styles.miniLabel}>{label}</Text>
-      <TextInput
-        keyboardType="numeric"
-        onChangeText={onChangeText}
-        style={styles.miniInput}
-        value={value}
-      />
-    </View>
-  );
-}
-
 function ChoiceRow({
   options,
   value,
@@ -556,38 +457,6 @@ function ChoiceRow({
           <Text style={styles.modeLabel}>{option}</Text>
         </Pressable>
       ))}
-    </View>
-  );
-}
-
-function LayoutStepper({
-  label,
-  value,
-  min,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  min: number;
-  onChange: (value: string) => void;
-}) {
-  const numeric = Number.parseInt(value || "", 10);
-  const safe = Number.isNaN(numeric) ? min : numeric;
-
-  return (
-    <View style={styles.stepperCard}>
-      <Text style={styles.stepperLabel}>{label}</Text>
-      <View style={styles.stepperRow}>
-        <Pressable onPress={() => onChange(String(Math.max(min, safe - 1)))} style={styles.stepperButton}>
-          <Text style={styles.stepperButtonText}>-</Text>
-        </Pressable>
-        <View style={styles.stepperValueWrap}>
-          <Text style={styles.stepperValue}>{safe}</Text>
-        </View>
-        <Pressable onPress={() => onChange(String(safe + 1))} style={styles.stepperButton}>
-          <Text style={styles.stepperButtonText}>+</Text>
-        </Pressable>
-      </View>
     </View>
   );
 }
@@ -785,63 +654,6 @@ const styles = StyleSheet.create({
   },
   colorTextInput: {
     flex: 1,
-  },
-  miniWrap: {
-    width: 72,
-    gap: 4,
-  },
-  miniLabel: {
-    color: palette.textMuted,
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  miniInput: {
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    color: palette.text,
-    backgroundColor: "rgba(6, 12, 20, 0.9)",
-    borderWidth: 1,
-    borderColor: palette.border,
-  },
-  stepperCard: {
-    width: 92,
-    gap: 6,
-  },
-  stepperLabel: {
-    color: palette.textMuted,
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  stepperRow: {
-    flexDirection: "row",
-    gap: 6,
-    alignItems: "center",
-  },
-  stepperButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.07)",
-    borderWidth: 1,
-    borderColor: palette.border,
-  },
-  stepperButtonText: {
-    color: palette.text,
-    fontSize: 16,
-    fontWeight: "800",
-    lineHeight: 18,
-  },
-  stepperValueWrap: {
-    minWidth: 26,
-    alignItems: "center",
-  },
-  stepperValue: {
-    color: palette.text,
-    fontSize: 13,
-    fontWeight: "800",
   },
   modeRow: {
     flexDirection: "row",
