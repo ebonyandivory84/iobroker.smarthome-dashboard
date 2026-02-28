@@ -403,8 +403,7 @@ function NodeCard({
           />
         </View>
       </View>
-      <Text style={[styles.nodeLabel, { color: mutedTextColor }]}>{label}</Text>
-      <Text style={[styles.nodeValue, { color: textColor }]}>{value}</Text>
+      <Text style={[styles.nodeValue, styles.nodeValueCompact, { color: textColor }]}>{value}</Text>
       {meta ? <Text style={[styles.nodeMeta, { color: mutedTextColor }]}>{meta}</Text> : null}
     </View>
   );
@@ -666,10 +665,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
   nodeValue: {
-    marginTop: 6,
+    marginTop: 10,
     color: palette.text,
     fontSize: 18,
     fontWeight: "800",
+  },
+  nodeValueCompact: {
+    marginTop: 12,
   },
   nodeMeta: {
     marginTop: 4,
