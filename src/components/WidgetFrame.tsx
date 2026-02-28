@@ -32,6 +32,7 @@ export function WidgetFrame({
   onRemove,
   children,
 }: WidgetFrameProps) {
+  const showHeaderTitle = widget.showTitle !== false && Boolean(widget.title.trim());
   const interaction = useRef<{
     mode: "drag" | "resize";
     startX: number;
@@ -129,25 +130,28 @@ export function WidgetFrame({
           : null,
       ]}
     >
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>{widget.title}</Text>
-          <Text style={styles.subtitle}>{widget.type.toUpperCase()}</Text>
+      {showHeaderTitle || isLayoutMode ? (
+        <View style={styles.header}>
+          <View>{showHeaderTitle ? <Text style={styles.title}>{widget.title}</Text> : null}</View>
+          {isLayoutMode ? (
+            <View style={styles.headerActions}>
+              <Pressable onPress={() => onEdit(widget.id)} style={styles.editButton}>
+                <MaterialCommunityIcons color={palette.text} name="tune-variant" size={16} />
+                <Text style={styles.editButtonLabel}>Bearbeiten</Text>
+              </Pressable>
+              <Pressable onPress={() => onRemove(widget.id)} style={styles.iconButton}>
+                <MaterialCommunityIcons color={palette.textMuted} name="close" size={18} />
+              </Pressable>
+            </View>
+          ) : null}
         </View>
-        <View style={styles.headerActions}>
-          <Pressable onPress={() => onEdit(widget.id)} style={styles.editButton}>
-            <MaterialCommunityIcons color={palette.text} name="tune-variant" size={16} />
-            <Text style={styles.editButtonLabel}>Bearbeiten</Text>
-          </Pressable>
-          <Pressable onPress={() => onRemove(widget.id)} style={styles.iconButton}>
-            <MaterialCommunityIcons color={palette.textMuted} name="close" size={18} />
-          </Pressable>
+      ) : null}
+      {isLayoutMode ? (
+        <View style={styles.dragStrip}>
+          <MaterialCommunityIcons color={palette.textMuted} name="drag-horizontal-variant" size={18} />
+          <Text style={styles.dragStripText}>Ziehen zum Verschieben</Text>
         </View>
-      </View>
-      <View style={styles.dragStrip}>
-        <MaterialCommunityIcons color={palette.textMuted} name="drag-horizontal-variant" size={18} />
-        <Text style={styles.dragStripText}>Ziehen zum Verschieben</Text>
-      </View>
+      ) : null}
       {Platform.OS === "web" ? (
         <div
           draggable={false}
@@ -158,7 +162,7 @@ export function WidgetFrame({
       ) : null}
       <View style={styles.content}>{children}</View>
       <View style={styles.footerRow}>
-        <Text style={styles.layoutHint}>Snap: 0.5 Raster</Text>
+        {isLayoutMode ? <Text style={styles.layoutHint}>Snap: 0.5 Raster</Text> : <View />}
         {isLayoutMode ? (
           <View style={styles.resizeHandle}>
             <MaterialCommunityIcons color={palette.textMuted} name="resize-bottom-right" size={18} />
@@ -214,13 +218,6 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 17,
     fontWeight: "700",
-  },
-  subtitle: {
-    color: palette.textMuted,
-    fontSize: 11,
-    fontWeight: "700",
-    marginTop: 2,
-    letterSpacing: 0.7,
   },
   content: {
     flex: 1,

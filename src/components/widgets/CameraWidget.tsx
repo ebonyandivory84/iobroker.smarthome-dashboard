@@ -59,7 +59,7 @@ export function CameraWidget({ config }: CameraWidgetProps) {
   }, [displayUrl, snapshotUrl]);
 
   return (
-    <View style={[styles.container, displayUrl ? styles.containerBleed : null]}>
+    <View style={styles.container}>
       <View style={styles.preview}>
         {displayUrl ? (
           <View style={styles.snapshotWrap}>
@@ -124,11 +124,7 @@ function buildWebSnapshotStyle(uri: string) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  containerBleed: {
-    marginHorizontal: -16,
-    marginBottom: -16,
-    marginTop: -6,
+    overflow: "hidden",
   },
   preview: {
     flex: 1,
