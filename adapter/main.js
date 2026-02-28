@@ -92,7 +92,7 @@ async function main(adapter) {
         );
       });
 
-    const limitedEntries = entries.slice(0, 100000);
+    const limitedEntries = entries.slice(0, 50000);
 
     res.json(limitedEntries);
   });
