@@ -139,7 +139,7 @@ function TreeBranch({
   depth?: number;
   onSelect: (entry: IoBrokerObjectEntry) => void;
 }) {
-  const [expanded, setExpanded] = useState(depth < 1);
+  const [expanded, setExpanded] = useState(false);
   const hasChildren = node.children.length > 0;
 
   if (!hasChildren && node.fullId) {
