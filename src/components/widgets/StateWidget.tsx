@@ -12,7 +12,7 @@ type StateWidgetProps = {
 export function StateWidget({ config, value, onToggle }: StateWidgetProps) {
   const hasValue = value !== null && value !== undefined;
   const active = Boolean(value);
-  const iconName = active ? config.iconPair?.active : config.iconPair?.inactive;
+  const iconName = resolveIconName(config, value);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
 
@@ -37,6 +37,69 @@ export function StateWidget({ config, value, onToggle }: StateWidgetProps) {
       ) : null}
     </View>
   );
+}
+
+function resolveIconName(config: StateWidgetConfig, value: unknown) {
+  const numericValue = asNumber(value);
+  const activeIcon = config.iconPair?.active || "toggle-switch";
+  const inactiveIcon = config.iconPair?.inactive || "toggle-switch-off-outline";
+
+  if (numericValue !== null && shouldUseBatteryScale(config)) {
+    return resolveBatteryIcon(numericValue);
+  }
+
+  return Boolean(value) ? activeIcon : inactiveIcon;
+}
+
+function shouldUseBatteryScale(config: StateWidgetConfig) {
+  const iconNames = `${config.iconPair?.active || ""} ${config.iconPair?.inactive || ""}`.toLowerCase();
+  const descriptor = `${config.title} ${config.stateId}`.toLowerCase();
+  return (
+    iconNames.includes("battery") ||
+    descriptor.includes("akku") ||
+    descriptor.includes("battery") ||
+    descriptor.includes("soc")
+  );
+}
+
+function resolveBatteryIcon(value: number): keyof typeof MaterialCommunityIcons.glyphMap {
+  const percent = Math.max(0, Math.min(100, Math.round(value)));
+
+  if (percent >= 95) {
+    return "battery";
+  }
+  if (percent >= 75) {
+    return "battery-80";
+  }
+  if (percent >= 50) {
+    return "battery-50";
+  }
+  if (percent >= 25) {
+    return "battery-30";
+  }
+  if (percent > 0) {
+    return "battery-10";
+  }
+  return "battery-outline";
+}
+
+function asNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.replace(",", ".");
+    const match = normalized.match(/-?\d+(\.\d+)?/);
+    if (!match) {
+      return null;
+    }
+
+    const parsed = Number(match[0]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
 }
 
 const styles = StyleSheet.create({

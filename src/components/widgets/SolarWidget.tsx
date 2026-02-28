@@ -254,7 +254,7 @@ function SolarFlowScene({
         highlight
       />
       <NodeCard
-        icon="battery-high"
+        icon={resolveBatteryIcon(soc)}
         label={soc !== null ? `Akku ${Math.round(soc)}%` : "Akku"}
         nodeColor={widgetAppearance?.batteryCardColor}
         theme={theme}
@@ -509,6 +509,30 @@ function fmtKWh(n: number | null) {
     return `${(n / 1000).toFixed(2)} MWh`;
   }
   return `${n.toFixed(1)} kWh`;
+}
+
+function resolveBatteryIcon(soc: number | null): keyof typeof MaterialCommunityIcons.glyphMap {
+  if (soc === null) {
+    return "battery-outline";
+  }
+
+  const percent = clamp(Math.round(soc), 0, 100);
+  if (percent >= 95) {
+    return "battery";
+  }
+  if (percent >= 75) {
+    return "battery-80";
+  }
+  if (percent >= 50) {
+    return "battery-50";
+  }
+  if (percent >= 25) {
+    return "battery-30";
+  }
+  if (percent > 0) {
+    return "battery-10";
+  }
+  return "battery-outline";
 }
 
 const styles = StyleSheet.create({

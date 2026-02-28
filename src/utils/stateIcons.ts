@@ -19,4 +19,5 @@ export const stateIconOptions: StateIconOption[] = [
   { label: "Heizung", active: "radiator", inactive: "radiator-disabled" },
   { label: "Musik", active: "speaker-wireless", inactive: "speaker-off" },
   { label: "Kamera", active: "cctv", inactive: "cctv-off" },
+  { label: "Akku", active: "battery-high", inactive: "battery-outline" },
 ];

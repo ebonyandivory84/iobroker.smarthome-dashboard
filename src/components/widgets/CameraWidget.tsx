@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { CameraWidgetConfig } from "../../types/dashboard";
 import { palette } from "../../utils/theme";
 
@@ -9,6 +9,7 @@ type CameraWidgetProps = {
 
 export function CameraWidget({ config }: CameraWidgetProps) {
   const [tick, setTick] = useState(0);
+  const [displayUrl, setDisplayUrl] = useState<string | null>(null);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
 
@@ -25,12 +26,44 @@ export function CameraWidget({ config }: CameraWidgetProps) {
     return `${config.snapshotUrl}${separator}t=${tick}`;
   }, [config.snapshotUrl, tick]);
 
+  useEffect(() => {
+    if (!snapshotUrl) {
+      setDisplayUrl(null);
+      return;
+    }
+
+    let active = true;
+
+    if (!displayUrl) {
+      setDisplayUrl(snapshotUrl);
+      return () => {
+        active = false;
+      };
+    }
+
+    preloadSnapshot(snapshotUrl)
+      .then(() => {
+        if (active) {
+          setDisplayUrl(snapshotUrl);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setDisplayUrl(snapshotUrl);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [displayUrl, snapshotUrl]);
+
   return (
     <View style={styles.container}>
       <View style={styles.preview}>
-        {snapshotUrl ? (
+        {displayUrl ? (
           <View style={styles.snapshotWrap}>
-            <Image resizeMode="cover" source={{ uri: snapshotUrl }} style={styles.image} />
+            <Image resizeMode="contain" source={{ uri: displayUrl }} style={styles.image} />
           </View>
         ) : (
           <View style={styles.empty}>
@@ -50,6 +83,20 @@ export function CameraWidget({ config }: CameraWidgetProps) {
   );
 }
 
+async function preloadSnapshot(uri: string) {
+  if (Platform.OS === "web" && typeof window !== "undefined" && typeof window.Image === "function") {
+    await new Promise<void>((resolve, reject) => {
+      const img = new window.Image();
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("Snapshot preload failed"));
+      img.src = uri;
+    });
+    return;
+  }
+
+  await Image.prefetch(uri);
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -59,10 +106,12 @@ const styles = StyleSheet.create({
     minHeight: 120,
     borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    backgroundColor: "rgba(2,6,12,0.55)",
   },
   snapshotWrap: {
     flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   image: {
     width: "100%",
