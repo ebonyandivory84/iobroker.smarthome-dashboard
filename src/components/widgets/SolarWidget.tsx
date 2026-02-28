@@ -152,7 +152,7 @@ function SolarFlowScene({
   widgetAppearance?: SolarWidgetConfig["appearance"];
 }) {
   const progress = useRef(new Animated.Value(0)).current;
-  const [sceneLayout, setSceneLayout] = useState({ width: 960, height: 420 });
+  const [sceneLayout, setSceneLayout] = useState({ width: 960, height: 520 });
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -167,22 +167,19 @@ function SolarFlowScene({
     return () => loop.stop();
   }, [progress]);
 
-  const cardWidth = clamp(sceneLayout.width * 0.14, 108, 152);
-  const cardHeight = 102;
+  const cardWidth = clamp(sceneLayout.width * 0.12, 112, 170);
+  const cardHeight = clamp(sceneLayout.height * 0.2, 104, 132);
   const beamLength = 18;
+  const sidePadding = clamp(sceneLayout.width * 0.08, 26, 120);
+  const verticalGap = clamp((sceneLayout.height - cardHeight * 3) / 4, 24, 84);
+  const topY = verticalGap;
+  const centerY = topY + cardHeight + verticalGap;
+  const bottomY = centerY + cardHeight + verticalGap;
   const centerX = sceneLayout.width / 2 - cardWidth / 2;
-  const horizontalGap = clamp(sceneLayout.width * 0.11, 52, 124);
-  const verticalGap = clamp(sceneLayout.height * 0.16, 84, 156);
-  const centerY = clamp(
-    sceneLayout.height * 0.42,
-    24 + cardHeight + verticalGap,
-    sceneLayout.height - (24 + cardHeight * 2 + verticalGap)
-  );
-
-  const topY = Math.max(12, centerY - cardHeight - verticalGap);
-  const leftX = Math.max(0, centerX - cardWidth - horizontalGap);
-  const rightX = Math.min(sceneLayout.width - cardWidth, centerX + cardWidth + horizontalGap);
-  const bottomY = Math.min(sceneLayout.height - cardHeight - 12, centerY + cardHeight + verticalGap);
+  const leftCenter = clamp(sceneLayout.width * 0.22, cardWidth / 2 + sidePadding, sceneLayout.width / 2 - cardWidth - 40);
+  const rightCenter = sceneLayout.width - leftCenter;
+  const leftX = leftCenter - cardWidth / 2;
+  const rightX = rightCenter - cardWidth / 2;
 
   const topLineStart = topY + cardHeight;
   const topLineHeight = Math.max(12, centerY - topLineStart);
@@ -571,7 +568,7 @@ const styles = StyleSheet.create({
     padding: 14,
     alignSelf: "stretch",
     aspectRatio: 2.15,
-    minHeight: 360,
+    minHeight: 440,
     borderWidth: 1,
     overflow: "hidden",
   },
@@ -676,6 +673,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     flexWrap: "wrap",
+    marginTop: 10,
   },
   mini: {
     flexGrow: 1,
