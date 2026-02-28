@@ -1,0 +1,45 @@
+{
+  "common": {
+    "name": "smarthome-dashboard",
+    "version": "0.1.0",
+    "news": {
+      "0.1.0": {
+        "en": "Initial SmartHome dashboard adapter skeleton.",
+        "de": "Erstes SmartHome-Dashboard-Adapter-Skelett."
+      }
+    },
+    "titleLang": {
+      "en": "SmartHome Dashboard",
+      "de": "SmartHome Dashboard"
+    },
+    "desc": {
+      "en": "Modular dashboard frontend for ioBroker state control and visualization.",
+      "de": "Modulares Dashboard-Frontend fuer ioBroker Zustandssteuerung und Visualisierung."
+    },
+    "authors": [
+      "Sebastian"
+    ],
+    "license": "MIT",
+    "platform": "Javascript/Node.js",
+    "mode": "daemon",
+    "icon": "smarthome-dashboard.svg",
+    "enabled": true,
+    "type": "visualization",
+    "compact": true,
+    "connectionType": "local",
+    "dataSource": "poll",
+    "adminUI": {
+      "config": "json"
+    },
+    "dependencies": [
+      {
+        "js-controller": ">=5.0.0"
+      }
+    ]
+  },
+  "native": {
+    "port": 8099,
+    "webDir": "adapter/www"
+  },
+  "objects": []
+}

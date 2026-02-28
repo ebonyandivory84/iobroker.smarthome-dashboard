@@ -1,0 +1,47 @@
+{
+  "common": {
+    "name": "smarthome-dashboard",
+    "version": "0.1.0",
+    "news": {
+      "0.1.0": {
+        "en": "Initial GitHub-installable SmartHome dashboard adapter.",
+        "de": "Erster direkt von GitHub installierbarer SmartHome-Dashboard-Adapter."
+      }
+    },
+    "titleLang": {
+      "en": "SmartHome Dashboard",
+      "de": "SmartHome Dashboard"
+    },
+    "desc": {
+      "en": "Modular dashboard frontend for ioBroker state control, cameras and energy flows.",
+      "de": "Modulares Dashboard-Frontend fuer ioBroker Zustandssteuerung, Kameras und Energiefluesse."
+    },
+    "authors": [
+      "Sebastian"
+    ],
+    "license": "MIT",
+    "platform": "Javascript/Node.js",
+    "main": "main.js",
+    "mode": "daemon",
+    "icon": "smarthome-dashboard.svg",
+    "enabled": true,
+    "type": "visualization",
+    "compact": true,
+    "connectionType": "local",
+    "dataSource": "poll",
+    "adminUI": {
+      "config": "json"
+    },
+    "dependencies": [
+      {
+        "js-controller": ">=5.0.0"
+      }
+    ]
+  },
+  "native": {
+    "port": 8099,
+    "webDir": "adapter/www",
+    "devServerUrl": ""
+  },
+  "objects": []
+}

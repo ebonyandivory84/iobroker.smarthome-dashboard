@@ -1,0 +1,82 @@
+import { GridPosition, WidgetConfig } from "../types/dashboard";
+
+export const GRID_SNAP = 0.5;
+
+export function resolveWidgetPosition(
+  widgets: WidgetConfig[],
+  widgetId: string,
+  proposed: GridPosition,
+  columns: number
+): GridPosition {
+  const sanitized = sanitizePosition(proposed, columns);
+  const others = widgets.filter((widget) => widget.id !== widgetId);
+  if (!others.some((widget) => overlaps(sanitized, widget.position))) {
+    return sanitized;
+  }
+
+  return findNearestFreeSlot(others, sanitized, columns);
+}
+
+export function normalizeWidgetLayout(widgets: WidgetConfig[], columns: number): WidgetConfig[] {
+  const placed: WidgetConfig[] = [];
+
+  for (const widget of widgets) {
+    const nextPosition = resolveWidgetPosition(placed, widget.id, widget.position, columns);
+    placed.push({
+      ...widget,
+      position: nextPosition,
+    });
+  }
+
+  return placed;
+}
+
+function sanitizePosition(position: GridPosition, columns: number): GridPosition {
+  const w = clamp(snap(position.w), 1, columns);
+  const h = Math.max(1, snap(position.h));
+  const x = clamp(snap(position.x), 0, Math.max(0, columns - w));
+  const y = Math.max(0, snap(position.y));
+
+  return { x, y, w, h };
+}
+
+function overlaps(a: GridPosition, b: GridPosition) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function findNearestFreeSlot(
+  widgets: WidgetConfig[],
+  proposed: GridPosition,
+  columns: number
+): GridPosition {
+  const maxX = Math.max(0, columns - proposed.w);
+  const startY = proposed.y;
+  const scanDepth = Math.max(startY + 40, getMaxRow(widgets) + 20);
+
+  for (let y = startY; y <= scanDepth; y += GRID_SNAP) {
+    for (let x = 0; x <= maxX; x += GRID_SNAP) {
+      const candidate = { ...proposed, x, y };
+      if (!widgets.some((widget) => overlaps(candidate, widget.position))) {
+        return candidate;
+      }
+    }
+  }
+
+  return {
+    ...proposed,
+    x: 0,
+    y: scanDepth + 1,
+  };
+}
+
+function getMaxRow(widgets: WidgetConfig[]) {
+  return widgets.reduce((max, widget) => Math.max(max, widget.position.y + widget.position.h), 0);
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function snap(value: number) {
+  return Math.round(value / GRID_SNAP) * GRID_SNAP;
+}

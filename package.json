@@ -1,0 +1,44 @@
+{
+  "name": "iobroker.smarthome-dashboard",
+  "version": "0.1.0",
+  "description": "ioBroker SmartHome dashboard adapter with hosted React Native web UI",
+  "main": "node_modules/expo/AppEntry.js",
+  "license": "MIT",
+  "keywords": [
+    "iobroker",
+    "adapter",
+    "dashboard",
+    "smarthome"
+  ],
+  "scripts": {
+    "start": "expo start",
+    "web": "expo start --web",
+    "export:web": "expo export --platform web --output-dir adapter/www",
+    "adapter:start": "node main.js",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@iobroker/adapter-core": "^3.2.3",
+    "@expo/metro-runtime": "~5.0.5",
+    "@expo/vector-icons": "~14.1.0",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "express": "^4.21.2",
+    "expo": "~53.0.0",
+    "expo-status-bar": "~2.2.3",
+    "http-proxy-middleware": "^3.0.3",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-native": "0.79.0",
+    "react-native-web": "~0.20.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.0.10",
+    "babel-preset-expo": "~13.0.0",
+    "typescript": "~5.8.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
