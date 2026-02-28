@@ -171,8 +171,10 @@ function SolarFlowScene({
   const cardHeight = clamp(sceneLayout.height * 0.2, 104, 132);
   const beamLength = 18;
   const sidePadding = clamp(sceneLayout.width * 0.08, 26, 120);
-  const verticalGap = clamp((sceneLayout.height - cardHeight * 3) / 4, 24, 84);
-  const topY = verticalGap;
+  const outerMargin = clamp(sceneLayout.height * 0.07, 18, 34);
+  const verticalGap = clamp((sceneLayout.height - cardHeight * 3 - outerMargin * 2) / 2, 36, 120);
+  const connectorInset = 10;
+  const topY = outerMargin;
   const centerY = topY + cardHeight + verticalGap;
   const bottomY = centerY + cardHeight + verticalGap;
   const centerX = sceneLayout.width / 2 - cardWidth / 2;
@@ -181,15 +183,19 @@ function SolarFlowScene({
   const leftX = leftCenter - cardWidth / 2;
   const rightX = rightCenter - cardWidth / 2;
 
-  const topLineStart = topY + cardHeight;
-  const topLineHeight = Math.max(12, centerY - topLineStart);
+  const topLineStart = topY + cardHeight + connectorInset;
+  const topLineEnd = centerY - connectorInset;
+  const topLineHeight = Math.max(12, topLineEnd - topLineStart);
   const centerLineY = centerY + cardHeight / 2 - 2;
-  const leftLineStart = leftX + cardWidth;
-  const leftLineWidth = Math.max(16, centerX - leftLineStart);
-  const rightLineStart = centerX + cardWidth;
-  const rightLineWidth = Math.max(16, rightX - rightLineStart);
-  const bottomLineStart = centerY + cardHeight;
-  const bottomLineHeight = Math.max(12, bottomY - bottomLineStart);
+  const leftLineStart = leftX + cardWidth + connectorInset;
+  const leftLineEnd = centerX - connectorInset;
+  const leftLineWidth = Math.max(16, leftLineEnd - leftLineStart);
+  const rightLineStart = centerX + cardWidth + connectorInset;
+  const rightLineEnd = rightX - connectorInset;
+  const rightLineWidth = Math.max(16, rightLineEnd - rightLineStart);
+  const bottomLineStart = centerY + cardHeight + connectorInset;
+  const bottomLineEnd = bottomY - connectorInset;
+  const bottomLineHeight = Math.max(12, bottomLineEnd - bottomLineStart);
 
   return (
     <View
