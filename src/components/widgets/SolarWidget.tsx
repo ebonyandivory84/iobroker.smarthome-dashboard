@@ -168,13 +168,13 @@ function SolarFlowScene({
   }, [progress]);
 
   const cardWidth = clamp(sceneLayout.width * 0.12, 112, 170);
-  const cardHeight = clamp(sceneLayout.height * 0.2, 104, 132);
+  const cardHeight = clamp(sceneLayout.height * 0.18, 104, 128);
   const beamLength = 18;
   const sidePadding = clamp(sceneLayout.width * 0.08, 26, 120);
-  const outerMargin = clamp(sceneLayout.height * 0.07, 20, 40);
-  const connectorInset = 14;
+  const outerMargin = clamp(sceneLayout.height * 0.08, 28, 54);
+  const connectorInset = 18;
   const topY = outerMargin;
-  const centerY = sceneLayout.height / 2 - cardHeight / 2;
+  const centerY = sceneLayout.height * 0.5 - cardHeight / 2;
   const bottomY = sceneLayout.height - outerMargin - cardHeight;
   const centerX = sceneLayout.width / 2 - cardWidth / 2;
   const leftCenter = clamp(sceneLayout.width * 0.22, cardWidth / 2 + sidePadding, sceneLayout.width / 2 - cardWidth - 40);
@@ -572,8 +572,8 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     padding: 14,
     alignSelf: "stretch",
-    aspectRatio: 2.15,
-    minHeight: 440,
+    aspectRatio: 1.75,
+    minHeight: 560,
     borderWidth: 1,
     overflow: "hidden",
   },
@@ -678,7 +678,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     flexWrap: "wrap",
-    marginTop: 10,
+    marginTop: 18,
   },
   mini: {
     flexGrow: 1,
