@@ -329,14 +329,14 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   />
                 </Field>
                 <View style={styles.splitRow}>
-                  <Field label="Label aktiv">
+                  <Field label="Anzeigetext aktiv">
                     <TextInput
                       onChangeText={(value) => setDraft((current) => ({ ...current, onLabel: value }))}
                       style={styles.input}
                       value={draft.onLabel || ""}
                     />
                   </Field>
-                  <Field label="Label inaktiv">
+                  <Field label="Anzeigetext inaktiv">
                     <TextInput
                       onChangeText={(value) => setDraft((current) => ({ ...current, offLabel: value }))}
                       style={styles.input}
@@ -345,7 +345,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   </Field>
                 </View>
                 <View style={styles.splitRow}>
-                  <Field label="Wert aktiv">
+                  <Field label="Rohwert aktiv">
                     <TextInput
                       autoCapitalize="none"
                       onChangeText={(value) => setDraft((current) => ({ ...current, activeValue: value }))}
@@ -355,7 +355,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       value={draft.activeValue || ""}
                     />
                   </Field>
-                  <Field label="Wert inaktiv">
+                  <Field label="Rohwert inaktiv">
                     <TextInput
                       autoCapitalize="none"
                       onChangeText={(value) => setDraft((current) => ({ ...current, inactiveValue: value }))}
@@ -366,6 +366,10 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     />
                   </Field>
                 </View>
+                <Text style={styles.mappingHint}>
+                  Beispiel Reedkontakt: `Rohwert aktiv = open`, `Anzeigetext aktiv = Offen`, `Rohwert inaktiv = closed`,
+                  `Anzeigetext inaktiv = Geschlossen`.
+                </Text>
                 <Field label="Schreibzugriff">
                   <ChoiceRow
                     options={["true", "false"]}
@@ -1214,6 +1218,13 @@ const styles = StyleSheet.create({
   },
   iconChipLabelActive: {
     color: "#08111f",
+  },
+  mappingHint: {
+    marginTop: -2,
+    marginBottom: 10,
+    color: palette.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
   },
   blurControlRow: {
     flexDirection: "row",
