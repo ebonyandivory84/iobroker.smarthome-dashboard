@@ -142,6 +142,33 @@ async function main(adapter) {
     }
   });
 
+  app.get("/smarthome-dashboard/api/camera-snapshot", async (req, res) => {
+    const targetUrl = typeof req.query?.url === "string" ? req.query.url : "";
+    if (!targetUrl) {
+      res.status(400).json({ error: "url missing" });
+      return;
+    }
+
+    try {
+      const response = await fetch(targetUrl, {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        res.status(response.status).json({ error: `Snapshot fetch failed (${response.status})` });
+        return;
+      }
+
+      const contentType = response.headers.get("content-type") || "image/jpeg";
+      const buffer = Buffer.from(await response.arrayBuffer());
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.send(buffer);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Snapshot proxy failed" });
+    }
+  });
+
   app.use("/smarthome-dashboard/widget-assets", express.static(widgetAssetsRoot));
 
   if (devServerUrl) {

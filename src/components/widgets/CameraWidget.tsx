@@ -22,6 +22,10 @@ export function CameraWidget({ config }: CameraWidgetProps) {
     if (!config.snapshotUrl) {
       return null;
     }
+    if (Platform.OS === "web" && typeof window !== "undefined" && window.location.pathname.includes("/smarthome-dashboard")) {
+      const proxyBase = `${window.location.origin}/smarthome-dashboard/api/camera-snapshot`;
+      return `${proxyBase}?url=${encodeURIComponent(config.snapshotUrl)}&t=${tick}`;
+    }
     const separator = config.snapshotUrl.includes("?") ? "&" : "?";
     return `${config.snapshotUrl}${separator}t=${tick}`;
   }, [config.snapshotUrl, tick]);
