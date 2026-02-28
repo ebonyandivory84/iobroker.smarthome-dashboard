@@ -33,8 +33,10 @@ export function GridCanvas({
   onLayoutMeasured,
 }: GridCanvasProps) {
   const { width: windowWidth } = useWindowDimensions();
-  const padding = 20;
-  const canvasWidth = Math.max(720, windowWidth - padding * 2);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const canvasInset = Platform.OS === "web" ? 64 : 60;
+  const availableWidth = containerWidth > 0 ? containerWidth : windowWidth;
+  const canvasWidth = Math.max(320, availableWidth - canvasInset);
   const cellWidth = useMemo(() => {
     const totalGap = (config.grid.columns - 1) * config.grid.gap;
     return (canvasWidth - totalGap) / config.grid.columns;
@@ -49,11 +51,13 @@ export function GridCanvas({
   }, [config.grid.gap, config.grid.rowHeight, config.widgets]);
 
   const handleLayout = (event: LayoutChangeEvent) => {
-    onLayoutMeasured?.(event.nativeEvent.layout.width);
+    const nextWidth = event.nativeEvent.layout.width;
+    setContainerWidth(nextWidth);
+    onLayoutMeasured?.(nextWidth);
   };
 
-  if (Platform.OS === "web") {
-    return (
+  const content =
+    Platform.OS === "web" ? (
       <WebGridCanvas
         canvasHeight={canvasHeight}
         cellWidth={cellWidth}
@@ -65,63 +69,66 @@ export function GridCanvas({
         onUpdateWidget={onUpdateWidget}
         states={states}
       />
-    );
-  }
-
-  return (
-    <View onLayout={handleLayout} style={[styles.canvas, { minHeight: canvasHeight }]}>
-      <View pointerEvents="none" style={styles.gridOverlay}>
-        {Array.from({ length: Math.round(config.grid.columns / GRID_SNAP) + 1 }).map((_, index) => (
-          <View
-            key={`col-${index}`}
-            style={[
-              styles.gridLine,
-              {
-                left: fineGridOffset(index, cellWidth, config.grid.gap),
-              },
-            ]}
-          />
-        ))}
-        {Array.from({ length: Math.round(canvasHeight / ((config.grid.rowHeight + config.grid.gap) * GRID_SNAP)) + 1 }).map(
-          (_, index) => (
+    ) : (
+      <View style={[styles.canvas, { minHeight: canvasHeight }]}>
+        <View pointerEvents="none" style={styles.gridOverlay}>
+          {Array.from({ length: Math.round(config.grid.columns / GRID_SNAP) + 1 }).map((_, index) => (
             <View
-              key={`row-${index}`}
+              key={`col-${index}`}
               style={[
-                styles.gridRowLine,
+                styles.gridLine,
                 {
-                  top: fineGridOffset(index, config.grid.rowHeight, config.grid.gap),
+                  left: fineGridOffset(index, cellWidth, config.grid.gap),
                 },
               ]}
             />
-          )
-        )}
-      </View>
-      {config.widgets.map((widget) => {
-        const style = {
-          left: widget.position.x * (cellWidth + config.grid.gap),
-          top: widget.position.y * (config.grid.rowHeight + config.grid.gap),
-          width: widget.position.w * cellWidth + (widget.position.w - 1) * config.grid.gap,
-          height: widget.position.h * config.grid.rowHeight + (widget.position.h - 1) * config.grid.gap,
-        };
+          ))}
+          {Array.from({ length: Math.round(canvasHeight / ((config.grid.rowHeight + config.grid.gap) * GRID_SNAP)) + 1 }).map(
+            (_, index) => (
+              <View
+                key={`row-${index}`}
+                style={[
+                  styles.gridRowLine,
+                  {
+                    top: fineGridOffset(index, config.grid.rowHeight, config.grid.gap),
+                  },
+                ]}
+              />
+            )
+          )}
+        </View>
+        {config.widgets.map((widget) => {
+          const style = {
+            left: widget.position.x * (cellWidth + config.grid.gap),
+            top: widget.position.y * (config.grid.rowHeight + config.grid.gap),
+            width: widget.position.w * cellWidth + (widget.position.w - 1) * config.grid.gap,
+            height: widget.position.h * config.grid.rowHeight + (widget.position.h - 1) * config.grid.gap,
+          };
 
-        return (
-          <View key={widget.id} style={[styles.widget, style]}>
-            <WidgetFrame
-              cellWidth={cellWidth}
-              columns={config.grid.columns}
-              gap={config.grid.gap}
-              isLayoutMode={isLayoutMode}
-              onCommitPosition={(widgetId, position) => onUpdateWidget(widgetId, { position })}
-              onEdit={onEditWidget}
-              onRemove={onRemoveWidget}
-              rowHeight={config.grid.rowHeight}
-              widget={widget}
-            >
-              {renderWidget(widget, states, client, onUpdateWidget)}
-            </WidgetFrame>
-          </View>
-        );
-      })}
+          return (
+            <View key={widget.id} style={[styles.widget, style]}>
+              <WidgetFrame
+                cellWidth={cellWidth}
+                columns={config.grid.columns}
+                gap={config.grid.gap}
+                isLayoutMode={isLayoutMode}
+                onCommitPosition={(widgetId, position) => onUpdateWidget(widgetId, { position })}
+                onEdit={onEditWidget}
+                onRemove={onRemoveWidget}
+                rowHeight={config.grid.rowHeight}
+                widget={widget}
+              >
+                {renderWidget(widget, states, client, onUpdateWidget)}
+              </WidgetFrame>
+            </View>
+          );
+        })}
+      </View>
+    );
+
+  return (
+    <View onLayout={handleLayout} style={styles.host}>
+      {content}
     </View>
   );
 }
@@ -374,6 +381,9 @@ function renderWidget(
 }
 
 const styles = StyleSheet.create({
+  host: {
+    width: "100%",
+  },
   canvas: {
     position: "relative",
     margin: 20,
