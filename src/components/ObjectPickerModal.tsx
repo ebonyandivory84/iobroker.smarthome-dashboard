@@ -22,27 +22,34 @@ type ObjectPickerModalProps = {
   onSelect: (entry: IoBrokerObjectEntry) => void;
 };
 
-type TreeNode = {
-  id: string;
+type IndexedNode = {
+  key: string;
+  prefix: string;
   label: string;
   fullId?: string;
-  children: TreeNode[];
 };
 
-export function ObjectPickerModal({
-  client,
-  visible,
-  title,
-  onClose,
-  onSelect,
-}: ObjectPickerModalProps) {
+type TreeIndex = Map<string, IndexedNode[]>;
+
+const SEARCH_DEBOUNCE_MS = 220;
+const SEARCH_RESULT_LIMIT = 200;
+
+export function ObjectPickerModal({ client, visible, title, onClose, onSelect }: ObjectPickerModalProps) {
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [entries, setEntries] = useState<IoBrokerObjectEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (!visible) {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim().toLowerCase()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    if (!visible || loaded) {
       return;
     }
 
@@ -51,12 +58,13 @@ export function ObjectPickerModal({
     setError(null);
 
     client
-      .listObjects(query)
+      .listObjects("")
       .then((nextEntries) => {
         if (!active) {
           return;
         }
         setEntries(nextEntries);
+        setLoaded(true);
       })
       .catch((loadError) => {
         if (!active) {
@@ -73,9 +81,48 @@ export function ObjectPickerModal({
     return () => {
       active = false;
     };
-  }, [client, query, visible]);
+  }, [client, loaded, visible]);
 
-  const tree = useMemo(() => buildTree(entries), [entries]);
+  const treeIndex = useMemo(() => buildTreeIndex(entries), [entries]);
+  const rootNodes = treeIndex.get("") || [];
+  const searchResults = useMemo(() => filterEntries(entries, debouncedQuery), [debouncedQuery, entries]);
+
+  const renderContent = () => {
+    if (debouncedQuery) {
+      if (!searchResults.length) {
+        return <Text style={styles.emptyText}>{loading ? "Lade Objektliste..." : "Keine Objekte gefunden"}</Text>;
+      }
+
+      return searchResults.map((entry) => (
+        <Pressable key={entry.id} onPress={() => onSelect(entry)} style={styles.leafRow}>
+          <Text style={styles.leafTitle}>{entry.name || entry.id.split(".").pop() || entry.id}</Text>
+          <Text numberOfLines={1} style={styles.leafId}>
+            {entry.id}
+          </Text>
+        </Pressable>
+      ));
+    }
+
+    if (!rootNodes.length) {
+      return <Text style={styles.emptyText}>{loading ? "Lade Objektbaum..." : "Keine Objekte gefunden"}</Text>;
+    }
+
+    return rootNodes.map((node) => (
+      <IndexedTreeBranch
+        key={node.prefix}
+        expanded={expanded}
+        node={node}
+        onSelect={onSelect}
+        onToggle={(prefix) =>
+          setExpanded((current) => ({
+            ...current,
+            [prefix]: !current[prefix],
+          }))
+        }
+        treeIndex={treeIndex}
+      />
+    ));
+  };
 
   return (
     <Modal animationType="fade" transparent visible={visible}>
@@ -96,11 +143,13 @@ export function ObjectPickerModal({
             value={query}
           />
           <View style={styles.metaRow}>
-            <Text style={styles.metaText}>{entries.length} Treffer</Text>
+            <Text style={styles.metaText}>
+              {debouncedQuery ? `${searchResults.length} Treffer` : `${entries.length} Objekte geladen`}
+            </Text>
             {loading ? <ActivityIndicator color={palette.accent} size="small" /> : null}
           </View>
           <Text style={styles.helperText}>
-            Klick auf einen Ordner zum Auf- und Zuklappen. Ein State waehlt die komplette Objekt-ID.
+            Ohne Suche werden nur Ordner geladen und bei Bedarf aufgeklappt. Mit Suche siehst du direkte Treffer.
           </Text>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           {Platform.OS === "web"
@@ -109,19 +158,11 @@ export function ObjectPickerModal({
                 {
                   style: webTreeScrollStyle,
                 },
-                tree.length ? (
-                  tree.map((node) => <TreeBranch key={node.id} node={node} onSelect={onSelect} />)
-                ) : (
-                  <Text style={styles.emptyText}>{loading ? "Lade Objektbaum..." : "Keine Objekte gefunden"}</Text>
-                )
+                renderContent()
               )
             : (
                 <ScrollView nestedScrollEnabled style={styles.treeScroll}>
-                  {tree.length ? (
-                    tree.map((node) => <TreeBranch key={node.id} node={node} onSelect={onSelect} />)
-                  ) : (
-                    <Text style={styles.emptyText}>{loading ? "Lade Objektbaum..." : "Keine Objekte gefunden"}</Text>
-                  )}
+                  {renderContent()}
                 </ScrollView>
               )}
         </View>
@@ -130,28 +171,34 @@ export function ObjectPickerModal({
   );
 }
 
-function TreeBranch({
+function IndexedTreeBranch({
   node,
-  depth = 0,
+  treeIndex,
+  expanded,
+  onToggle,
   onSelect,
+  depth = 0,
 }: {
-  node: TreeNode;
-  depth?: number;
+  node: IndexedNode;
+  treeIndex: TreeIndex;
+  expanded: Record<string, boolean>;
+  onToggle: (prefix: string) => void;
   onSelect: (entry: IoBrokerObjectEntry) => void;
+  depth?: number;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const hasChildren = node.children.length > 0;
+  const children = treeIndex.get(node.prefix) || [];
+  const hasChildren = children.length > 0;
+  const isExpanded = Boolean(expanded[node.prefix]);
 
   if (!hasChildren && node.fullId) {
-    const fullId = node.fullId;
     return (
       <Pressable
-        onPress={() => onSelect({ id: fullId, name: node.label })}
+        onPress={() => onSelect({ id: node.fullId!, name: node.label })}
         style={[styles.leafRow, { paddingLeft: 14 + depth * 16 }]}
       >
         <Text style={styles.leafTitle}>{node.label}</Text>
         <Text numberOfLines={1} style={styles.leafId}>
-          {fullId}
+          {node.fullId}
         </Text>
       </Pressable>
     );
@@ -159,83 +206,96 @@ function TreeBranch({
 
   return (
     <View>
-      <Pressable onPress={() => setExpanded((current) => !current)} style={[styles.branchRow, { paddingLeft: 14 + depth * 16 }]}>
-        <Text style={styles.branchToggle}>{expanded ? "▾" : "▸"}</Text>
+      <Pressable onPress={() => onToggle(node.prefix)} style={[styles.branchRow, { paddingLeft: 14 + depth * 16 }]}>
+        <Text style={styles.branchToggle}>{isExpanded ? "▾" : "▸"}</Text>
         <Text style={styles.branchLabel}>{node.label}</Text>
-        <Text style={styles.branchMeta}>{node.children.length}</Text>
+        <Text style={styles.branchMeta}>{children.length}</Text>
       </Pressable>
-      {expanded
-        ? node.children.map((child) => (
-            <TreeBranch key={child.id} depth={depth + 1} node={child} onSelect={onSelect} />
+      {isExpanded
+        ? children.map((child) => (
+            <IndexedTreeBranch
+              key={child.prefix}
+              depth={depth + 1}
+              expanded={expanded}
+              node={child}
+              onSelect={onSelect}
+              onToggle={onToggle}
+              treeIndex={treeIndex}
+            />
           ))
         : null}
     </View>
   );
 }
 
-function buildTree(entries: IoBrokerObjectEntry[]): TreeNode[] {
-  const root = new Map<string, TreeNode>();
+function buildTreeIndex(entries: IoBrokerObjectEntry[]): TreeIndex {
+  const index: TreeIndex = new Map();
+
+  const pushChild = (parentPrefix: string, node: IndexedNode) => {
+    const bucket = index.get(parentPrefix);
+    if (!bucket) {
+      index.set(parentPrefix, [node]);
+      return;
+    }
+
+    const existing = bucket.find((entry) => entry.key === node.key);
+    if (!existing) {
+      bucket.push(node);
+      return;
+    }
+
+    if (node.fullId) {
+      existing.fullId = node.fullId;
+      existing.label = node.label;
+    }
+  };
 
   entries.forEach((entry) => {
     const parts = entry.id.split(".");
-    let currentLevel = root;
-    let runningId = "";
 
-    parts.forEach((part, index) => {
-      runningId = runningId ? `${runningId}.${part}` : part;
-      let nextNode = currentLevel.get(part);
-      if (!nextNode) {
-        nextNode = {
-          id: runningId,
-          label: part,
-          children: [],
-        };
-        currentLevel.set(part, nextNode);
-      }
-
-      if (index === parts.length - 1) {
-        nextNode.label = entry.name || part;
-        nextNode.fullId = entry.id;
-      }
-
-      currentLevel = toChildMap(nextNode);
+    parts.forEach((part, indexPosition) => {
+      const parentPrefix = parts.slice(0, indexPosition).join(".");
+      const prefix = parts.slice(0, indexPosition + 1).join(".");
+      pushChild(parentPrefix, {
+        key: part,
+        prefix,
+        label: indexPosition === parts.length - 1 ? entry.name || part : part,
+        fullId: indexPosition === parts.length - 1 ? entry.id : undefined,
+      });
     });
   });
 
-  return sortNodes([...root.values()]);
-}
-
-function toChildMap(node: TreeNode) {
-  const map = new Map<string, TreeNode>();
-  node.children.forEach((child) => {
-    map.set(child.id.split(".").pop() || child.id, child);
+  index.forEach((nodes, key) => {
+    index.set(
+      key,
+      [...nodes].sort((a, b) => {
+        const aLeaf = Boolean(a.fullId);
+        const bLeaf = Boolean(b.fullId);
+        if (aLeaf !== bLeaf) {
+          return aLeaf ? 1 : -1;
+        }
+        return a.label.localeCompare(b.label, "de");
+      })
+    );
   });
 
-  const originalSet = map.set.bind(map);
-  map.set = (key: string, value: TreeNode) => {
-    if (!node.children.includes(value)) {
-      node.children.push(value);
-    }
-    return originalSet(key, value);
-  };
-
-  return map;
+  return index;
 }
 
-function sortNodes(nodes: TreeNode[]): TreeNode[] {
-  return nodes
-    .map((node) => ({
-      ...node,
-      children: sortNodes(node.children),
-    }))
-    .sort((a, b) => {
-      const aLeaf = Boolean(a.fullId);
-      const bLeaf = Boolean(b.fullId);
-      if (aLeaf !== bLeaf) {
-        return aLeaf ? 1 : -1;
-      }
-      return a.label.localeCompare(b.label, "de");
-    });
+function filterEntries(entries: IoBrokerObjectEntry[], query: string) {
+  if (!query) {
+    return [];
+  }
+
+  return entries
+    .filter((entry) => {
+      return (
+        entry.id.toLowerCase().includes(query) ||
+        (entry.name && entry.name.toLowerCase().includes(query)) ||
+        (entry.role && entry.role.toLowerCase().includes(query))
+      );
+    })
+    .slice(0, SEARCH_RESULT_LIMIT);
 }
 
 const styles = StyleSheet.create({
@@ -361,4 +421,4 @@ const webTreeScrollStyle = {
   border: `1px solid ${palette.border}`,
   background: "rgba(3, 8, 15, 0.55)",
   padding: "6px 0",
-};
+} as const;
