@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, ImageBackground, LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
 import { SolarWidgetConfig, StateSnapshot, ThemeSettings } from "../../types/dashboard";
 import { resolveThemeSettings } from "../../utils/themeConfig";
@@ -18,24 +18,42 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
   const widgetAppearance = config.appearance;
   const textColor = widgetAppearance?.textColor || palette.text;
   const mutedTextColor = widgetAppearance?.mutedTextColor || palette.textMuted;
-  const getValue = (key?: string) => {
+  const getValue = (snapshot: StateSnapshot, key?: string) => {
     if (!key) {
       return null;
     }
-    return states[`${config.statePrefix}.${key}`];
+    return snapshot[`${config.statePrefix}.${key}`];
   };
 
-  const pvNow = asNumber(getValue(config.keys.pvNow));
-  const homeNow = asNumber(getValue(config.keys.homeNow));
-  const gridIn = asNumber(getValue(config.keys.gridIn));
-  const gridOut = asNumber(getValue(config.keys.gridOut));
-  const soc = asNumber(getValue(config.keys.soc));
-  const battIn = asNumber(getValue(config.keys.battIn));
-  const battOut = asNumber(getValue(config.keys.battOut));
-  const battTemp = asNumber(getValue(config.keys.battTemp));
-  const pvTotalKWh = normalizeEnergyToKWh(getValue(config.keys.pvTotal), config.dailyEnergyUnit);
-  const dayConsumedKWh = normalizeEnergyToKWh(getValue(config.keys.dayConsumed), config.dailyEnergyUnit);
-  const daySelfKWh = normalizeEnergyToKWh(getValue(config.keys.daySelf), config.dailyEnergyUnit);
+  const incomingSnapshot = useMemo(
+    () => ({
+      pvNow: asNumber(getValue(states, config.keys.pvNow)),
+      homeNow: asNumber(getValue(states, config.keys.homeNow)),
+      gridIn: asNumber(getValue(states, config.keys.gridIn)),
+      gridOut: asNumber(getValue(states, config.keys.gridOut)),
+      soc: asNumber(getValue(states, config.keys.soc)),
+      battIn: asNumber(getValue(states, config.keys.battIn)),
+      battOut: asNumber(getValue(states, config.keys.battOut)),
+      battTemp: asNumber(getValue(states, config.keys.battTemp)),
+      pvTotalKWh: normalizeEnergyToKWh(getValue(states, config.keys.pvTotal), config.dailyEnergyUnit),
+      dayConsumedKWh: normalizeEnergyToKWh(getValue(states, config.keys.dayConsumed), config.dailyEnergyUnit),
+      daySelfKWh: normalizeEnergyToKWh(getValue(states, config.keys.daySelf), config.dailyEnergyUnit),
+    }),
+    [config.dailyEnergyUnit, config.keys, config.statePrefix, states]
+  );
+
+  const [displaySnapshot, setDisplaySnapshot] = useState(incomingSnapshot);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDisplaySnapshot(incomingSnapshot);
+    }, 220);
+
+    return () => clearTimeout(timer);
+  }, [incomingSnapshot]);
+
+  const { pvNow, homeNow, gridIn, gridOut, soc, battIn, battOut, battTemp, pvTotalKWh, dayConsumedKWh, daySelfKWh } =
+    displaySnapshot;
   const autarkPct =
     daySelfKWh !== null && dayConsumedKWh !== null && dayConsumedKWh > 0
       ? clamp((daySelfKWh / dayConsumedKWh) * 100, 0, 100)
