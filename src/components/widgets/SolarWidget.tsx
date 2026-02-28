@@ -16,6 +16,8 @@ type FlowDir = "toHome" | "fromHome" | "idle";
 export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
   const resolvedTheme = resolveThemeSettings(theme);
   const widgetAppearance = config.appearance;
+  const textColor = widgetAppearance?.textColor || palette.text;
+  const mutedTextColor = widgetAppearance?.mutedTextColor || palette.textMuted;
   const getValue = (key?: string) => {
     if (!key) {
       return null;
@@ -66,6 +68,8 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
           gridDir={gridDir}
           gridPower={Math.abs(gridSigned)}
           homeNow={homeNow}
+          mutedTextColor={mutedTextColor}
+          textColor={textColor}
           widgetAppearance={widgetAppearance}
           theme={resolvedTheme}
           pvDir={pvDir}
@@ -75,18 +79,41 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
       </View>
 
       <View style={styles.bottomRow}>
-        <MiniStat appearance={widgetAppearance} label="Eigenverbrauch" theme={resolvedTheme} value={fmtKWh(daySelfKWh)} />
-        <MiniStat appearance={widgetAppearance} label="Verbraucht" theme={resolvedTheme} value={fmtKWh(dayConsumedKWh)} />
+        <MiniStat
+          appearance={widgetAppearance}
+          label="Eigenverbrauch"
+          mutedTextColor={mutedTextColor}
+          textColor={textColor}
+          theme={resolvedTheme}
+          value={fmtKWh(daySelfKWh)}
+        />
+        <MiniStat
+          appearance={widgetAppearance}
+          label="Verbraucht"
+          mutedTextColor={mutedTextColor}
+          textColor={textColor}
+          theme={resolvedTheme}
+          value={fmtKWh(dayConsumedKWh)}
+        />
         <MiniStat
           appearance={widgetAppearance}
           label="Autarkie"
+          mutedTextColor={mutedTextColor}
+          textColor={textColor}
           theme={resolvedTheme}
           value={autarkPct === null ? "—" : `${Math.round(autarkPct)} %`}
         />
-        <MiniStat appearance={widgetAppearance} label="PV Gesamt" theme={resolvedTheme} value={fmtKWh(pvTotalKWh)} />
+        <MiniStat
+          appearance={widgetAppearance}
+          label="PV Gesamt"
+          mutedTextColor={mutedTextColor}
+          textColor={textColor}
+          theme={resolvedTheme}
+          value={fmtKWh(pvTotalKWh)}
+        />
       </View>
 
-      <Text style={styles.footnote}>
+      <Text style={[styles.footnote, { color: mutedTextColor }]}>
         Tageswerte nutzen `dailyEnergyUnit={config.dailyEnergyUnit || "auto"}`. `auto` erkennt `Wh`/`kWh` aus Strings
         oder schaetzt nackte Zahlen plausibel.
       </Text>
@@ -106,6 +133,8 @@ function SolarFlowScene({
   gridDir,
   gridPower,
   theme,
+  textColor,
+  mutedTextColor,
   widgetAppearance,
 }: {
   pvDir: FlowDir;
@@ -118,6 +147,8 @@ function SolarFlowScene({
   gridDir: FlowDir;
   gridPower: number;
   theme: ThemeSettings;
+  textColor: string;
+  mutedTextColor: string;
   widgetAppearance?: SolarWidgetConfig["appearance"];
 }) {
   const progress = useRef(new Animated.Value(0)).current;
@@ -203,6 +234,8 @@ function SolarFlowScene({
         label="PV"
         nodeColor={widgetAppearance?.pvCardColor}
         theme={theme}
+        textColor={textColor}
+        mutedTextColor={mutedTextColor}
         widgetAppearance={widgetAppearance}
         style={{ ...styles.nodePosition, top: topY, left: centerX, width: cardWidth, minHeight: cardHeight }}
         value={fmtW(pvNow)}
@@ -213,6 +246,8 @@ function SolarFlowScene({
         label="Haus"
         nodeColor={widgetAppearance?.homeCardColor}
         theme={theme}
+        textColor={textColor}
+        mutedTextColor={mutedTextColor}
         widgetAppearance={widgetAppearance}
         style={{ ...styles.nodePosition, top: centerY, left: centerX, width: cardWidth, minHeight: cardHeight }}
         value={fmtW(homeNow)}
@@ -223,6 +258,8 @@ function SolarFlowScene({
         label={soc !== null ? `Akku ${Math.round(soc)}%` : "Akku"}
         nodeColor={widgetAppearance?.batteryCardColor}
         theme={theme}
+        textColor={textColor}
+        mutedTextColor={mutedTextColor}
         widgetAppearance={widgetAppearance}
         style={{ ...styles.nodePosition, top: centerY, left: leftX, width: cardWidth, minHeight: cardHeight }}
         value={fmtW(battPower || null)}
@@ -234,6 +271,8 @@ function SolarFlowScene({
         label="Netz"
         nodeColor={widgetAppearance?.gridCardColor}
         theme={theme}
+        textColor={textColor}
+        mutedTextColor={mutedTextColor}
         widgetAppearance={widgetAppearance}
         style={{ ...styles.nodePosition, top: centerY, left: rightX, width: cardWidth, minHeight: cardHeight }}
         value={fmtW(gridPower || null)}
@@ -245,6 +284,8 @@ function SolarFlowScene({
         label="Auto"
         nodeColor={widgetAppearance?.carCardColor}
         theme={theme}
+        textColor={textColor}
+        mutedTextColor={mutedTextColor}
         widgetAppearance={widgetAppearance}
         style={{ ...styles.nodePosition, top: bottomY, left: centerX, width: cardWidth, minHeight: cardHeight }}
         value="—"
@@ -300,6 +341,8 @@ function NodeCard({
   highlight,
   style,
   theme,
+  textColor,
+  mutedTextColor,
   widgetAppearance,
   nodeColor,
 }: {
@@ -310,6 +353,8 @@ function NodeCard({
   highlight?: boolean;
   style?: object;
   theme: ThemeSettings;
+  textColor: string;
+  mutedTextColor: string;
   widgetAppearance?: SolarWidgetConfig["appearance"];
   nodeColor?: string;
 }) {
@@ -328,9 +373,9 @@ function NodeCard({
       <View style={[styles.nodeIcon, highlight ? styles.nodeIconActive : null]}>
         <MaterialCommunityIcons color={highlight ? palette.accent : palette.textMuted} name={icon} size={26} />
       </View>
-      <Text style={styles.nodeLabel}>{label}</Text>
-      <Text style={styles.nodeValue}>{value}</Text>
-      {meta ? <Text style={styles.nodeMeta}>{meta}</Text> : null}
+      <Text style={[styles.nodeLabel, { color: mutedTextColor }]}>{label}</Text>
+      <Text style={[styles.nodeValue, { color: textColor }]}>{value}</Text>
+      {meta ? <Text style={[styles.nodeMeta, { color: mutedTextColor }]}>{meta}</Text> : null}
     </View>
   );
 }
@@ -340,11 +385,15 @@ function MiniStat({
   label,
   value,
   theme,
+  textColor,
+  mutedTextColor,
 }: {
   appearance?: SolarWidgetConfig["appearance"];
   label: string;
   value: string;
   theme: ThemeSettings;
+  textColor: string;
+  mutedTextColor: string;
 }) {
   return (
     <View
@@ -356,8 +405,8 @@ function MiniStat({
         },
       ]}
     >
-      <Text style={styles.miniValue}>{value}</Text>
-      <Text style={styles.miniLabel}>{label}</Text>
+      <Text style={[styles.miniValue, { color: textColor }]}>{value}</Text>
+      <Text style={[styles.miniLabel, { color: mutedTextColor }]}>{label}</Text>
     </View>
   );
 }

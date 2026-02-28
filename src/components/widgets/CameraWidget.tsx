@@ -9,6 +9,8 @@ type CameraWidgetProps = {
 
 export function CameraWidget({ config }: CameraWidgetProps) {
   const [tick, setTick] = useState(0);
+  const textColor = config.appearance?.textColor || palette.text;
+  const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
 
   useEffect(() => {
     const timer = setInterval(() => setTick((current) => current + 1), config.refreshMs || 2000);
@@ -32,16 +34,16 @@ export function CameraWidget({ config }: CameraWidgetProps) {
           </View>
         ) : (
           <View style={styles.empty}>
-            <Text style={styles.emptyText}>Kein Snapshot konfiguriert</Text>
+            <Text style={[styles.emptyText, { color: mutedTextColor }]}>Kein Snapshot konfiguriert</Text>
           </View>
         )}
       </View>
       {!config.snapshotUrl && !config.rtspUrl ? (
-        <Text style={styles.hint}>Widget ist noch nicht konfiguriert.</Text>
+        <Text style={[styles.hint, { color: mutedTextColor }]}>Widget ist noch nicht konfiguriert.</Text>
       ) : null}
       {config.rtspUrl ? (
         <Pressable onPress={() => Linking.openURL(config.rtspUrl!)} style={styles.button}>
-          <Text style={styles.buttonLabel}>RTSP Stream oeffnen</Text>
+          <Text style={[styles.buttonLabel, { color: textColor }]}>RTSP Stream oeffnen</Text>
         </Pressable>
       ) : null}
     </View>

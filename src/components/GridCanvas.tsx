@@ -321,8 +321,10 @@ function WebWidgetShell({
     <div style={shellStyle}>
       <div style={webHeaderStyle}>
         <div>
-          <div style={webTitleStyle}>{widget.title}</div>
-          <div style={webSubtitleStyle}>{widget.type.toUpperCase()}</div>
+          <div style={{ ...webTitleStyle, color: widget.appearance?.textColor || palette.text }}>{widget.title}</div>
+          <div style={{ ...webSubtitleStyle, color: widget.appearance?.mutedTextColor || palette.textMuted }}>
+            {widget.type.toUpperCase()}
+          </div>
         </div>
         <div style={webHeaderActionsStyle}>
           {isLayoutMode ? (

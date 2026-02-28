@@ -166,6 +166,14 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
                 values={draft}
                 onChange={setDraft}
               />
+              <ColorInputRow
+                firstKey="textColor"
+                firstLabel="Text"
+                secondKey="mutedTextColor"
+                secondLabel="Sekundaer"
+                values={draft}
+                onChange={setDraft}
+              />
               {widget.type === "energy" || widget.type === "solar" ? (
                 <ColorInputRow
                   firstKey="cardColor"
@@ -509,6 +517,8 @@ function buildAppearanceDraft(
   return {
     widgetColor: appearance?.widgetColor || widgetDefaults.widgetColor || "",
     widgetColor2: appearance?.widgetColor2 || widgetDefaults.widgetColor2 || "",
+    textColor: appearance?.textColor || "",
+    mutedTextColor: appearance?.mutedTextColor || "",
     cardColor: appearance?.cardColor || widgetDefaults.cardColor || "",
     cardColor2: appearance?.cardColor2 || widgetDefaults.cardColor2 || "",
     statColor: appearance?.statColor || widgetDefaults.statColor || "",
@@ -525,6 +535,8 @@ function buildAppearance(draft: Record<string, string>): WidgetAppearance | unde
   const appearance: WidgetAppearance = {
     widgetColor: normalizeColor(draft.widgetColor),
     widgetColor2: normalizeColor(draft.widgetColor2),
+    textColor: normalizeColor(draft.textColor),
+    mutedTextColor: normalizeColor(draft.mutedTextColor),
     cardColor: normalizeColor(draft.cardColor),
     cardColor2: normalizeColor(draft.cardColor2),
     statColor: normalizeColor(draft.statColor),

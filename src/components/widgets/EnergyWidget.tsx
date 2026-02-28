@@ -16,20 +16,50 @@ export function EnergyWidget({ config, states }: EnergyWidgetProps) {
   const grid = config.gridStateId ? states[config.gridStateId] : 0;
   const missingCore = pv === undefined || house === undefined;
   const cardColor = config.appearance?.cardColor;
+  const textColor = config.appearance?.textColor || palette.text;
+  const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
 
   return (
     <View style={styles.container}>
       <View style={styles.row}>
-        <EnergyNode backgroundColor={cardColor} label="PV" value={watts(pv)} accent={palette.accent} />
-        <Text style={styles.arrow}>→</Text>
-        <EnergyNode backgroundColor={cardColor} label="Haus" value={watts(house)} accent={palette.text} />
+        <EnergyNode
+          backgroundColor={cardColor}
+          label="PV"
+          value={watts(pv)}
+          accent={palette.accent}
+          mutedTextColor={mutedTextColor}
+          textColor={textColor}
+        />
+        <Text style={[styles.arrow, { color: mutedTextColor }]}>→</Text>
+        <EnergyNode
+          backgroundColor={cardColor}
+          label="Haus"
+          value={watts(house)}
+          accent={palette.text}
+          mutedTextColor={mutedTextColor}
+          textColor={textColor}
+        />
       </View>
       <View style={styles.row}>
-        <EnergyNode backgroundColor={cardColor} label="Batterie" value={watts(battery)} accent={palette.accentWarm} />
-        <Text style={styles.arrow}>↔</Text>
-        <EnergyNode backgroundColor={cardColor} label="Netz" value={watts(grid)} accent={palette.textMuted} />
+        <EnergyNode
+          backgroundColor={cardColor}
+          label="Batterie"
+          value={watts(battery)}
+          accent={palette.accentWarm}
+          mutedTextColor={mutedTextColor}
+          textColor={textColor}
+        />
+        <Text style={[styles.arrow, { color: mutedTextColor }]}>↔</Text>
+        <EnergyNode
+          backgroundColor={cardColor}
+          label="Netz"
+          value={watts(grid)}
+          accent={palette.textMuted}
+          mutedTextColor={mutedTextColor}
+          textColor={textColor}
+        />
       </View>
-      {missingCore ? <Text style={styles.hint}>Pruefe PV- und Haus-State-ID im Widget-Editor.</Text> : null}
+      {missingCore ? <Text style={[styles.hint, { color: mutedTextColor }]}>Pruefe PV- und Haus-State-ID im Widget-Editor.</Text> : null}
     </View>
   );
 }
@@ -39,17 +69,21 @@ function EnergyNode({
   value,
   accent,
   backgroundColor,
+  textColor,
+  mutedTextColor,
 }: {
   label: string;
   value: string;
   accent: string;
   backgroundColor?: string;
+  textColor: string;
+  mutedTextColor: string;
 }) {
   return (
     <View style={[styles.node, backgroundColor ? { backgroundColor } : null]}>
       <View style={[styles.dot, { backgroundColor: accent }]} />
-      <Text style={styles.nodeLabel}>{label}</Text>
-      <Text style={styles.nodeValue}>{value}</Text>
+      <Text style={[styles.nodeLabel, { color: mutedTextColor }]}>{label}</Text>
+      <Text style={[styles.nodeValue, { color: textColor }]}>{value}</Text>
     </View>
   );
 }

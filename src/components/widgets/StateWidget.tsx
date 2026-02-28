@@ -13,6 +13,8 @@ export function StateWidget({ config, value, onToggle }: StateWidgetProps) {
   const hasValue = value !== null && value !== undefined;
   const active = Boolean(value);
   const iconName = active ? config.iconPair?.active : config.iconPair?.inactive;
+  const textColor = config.appearance?.textColor || palette.text;
+  const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
 
   return (
     <View style={styles.container}>
@@ -23,14 +25,14 @@ export function StateWidget({ config, value, onToggle }: StateWidgetProps) {
           size={34}
         />
       </View>
-      <Text style={styles.title}>{config.title}</Text>
-      <Text style={styles.value}>
+      <Text style={[styles.title, { color: textColor }]}>{config.title}</Text>
+      <Text style={[styles.value, { color: mutedTextColor }]}>
         {hasValue ? (active ? config.onLabel || "Ein" : config.offLabel || "Aus") : "Keine Daten"}
       </Text>
       {!hasValue ? <Text style={styles.hint}>{config.stateId}</Text> : null}
       {config.writeable ? (
         <Pressable onPress={onToggle} style={[styles.button, active ? styles.buttonActive : styles.buttonIdle]}>
-          <Text style={styles.buttonLabel}>{active ? "Ausschalten" : "Schalten"}</Text>
+          <Text style={[styles.buttonLabel, { color: textColor }]}>{active ? "Ausschalten" : "Schalten"}</Text>
         </Pressable>
       ) : null}
     </View>
