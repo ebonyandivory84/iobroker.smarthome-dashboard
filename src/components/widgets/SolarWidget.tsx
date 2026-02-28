@@ -122,21 +122,21 @@ function SolarFlowScene({
         active={pvDir !== "idle"}
         axis="y"
         progress={progress}
-        range={pvDir === "toHome" ? [-82, -24] : [-24, -82]}
+        range={pvDir === "toHome" ? [0, 40] : [40, 0]}
         strength={clamp((pvNow || 0) / 8000, 0.2, 1)}
       />
       <AnimatedBeam
         active={battDir !== "idle"}
         axis="x"
         progress={progress}
-        range={battDir === "toHome" ? [-130, -26] : [-26, -130]}
+        range={battDir === "toHome" ? [-118, -18] : [-18, -118]}
         strength={clamp(battPower / 6000, 0.2, 1)}
       />
       <AnimatedBeam
         active={gridDir !== "idle"}
         axis="x"
         progress={progress}
-        range={gridDir === "toHome" ? [130, 26] : [26, 130]}
+        range={gridDir === "toHome" ? [118, 18] : [18, 118]}
         strength={clamp(gridPower / 12000, 0.2, 1)}
       />
 
@@ -358,42 +358,46 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
   },
   scene: {
-    height: 360,
+    height: 384,
     position: "relative",
     alignItems: "center",
     justifyContent: "center",
   },
   lineVerticalTop: {
     position: "absolute",
-    top: 84,
+    top: 124,
+    left: "50%",
+    marginLeft: -2,
     width: 4,
-    height: 48,
+    height: 44,
     borderRadius: 99,
     backgroundColor: "rgba(255,255,255,0.16)",
   },
   lineHorizontalLeft: {
     position: "absolute",
-    top: 176,
-    left: "14%",
-    width: "27%",
+    top: 216,
+    left: "25%",
+    width: "21%",
     height: 4,
     borderRadius: 99,
     backgroundColor: "rgba(255,255,255,0.16)",
   },
   lineHorizontalRight: {
     position: "absolute",
-    top: 176,
-    right: "14%",
-    width: "27%",
+    top: 216,
+    right: "25%",
+    width: "21%",
     height: 4,
     borderRadius: 99,
     backgroundColor: "rgba(255,255,255,0.16)",
   },
   beamVertical: {
     position: "absolute",
-    top: 170,
+    top: 126,
+    left: "50%",
+    marginLeft: -4,
     width: 8,
-    height: 28,
+    height: 20,
     borderRadius: 99,
     backgroundColor: palette.accentWarm,
     shadowColor: palette.accentWarm,
@@ -403,8 +407,10 @@ const styles = StyleSheet.create({
   },
   beamHorizontal: {
     position: "absolute",
-    top: 174,
-    width: 28,
+    top: 214,
+    left: "50%",
+    marginLeft: -10,
+    width: 20,
     height: 8,
     borderRadius: 99,
     backgroundColor: palette.accentWarm,
@@ -429,17 +435,21 @@ const styles = StyleSheet.create({
   },
   nodeTop: {
     top: 8,
+    left: "50%",
+    marginLeft: -62,
   },
   nodeCenter: {
-    top: 126,
+    top: 168,
+    left: "50%",
+    marginLeft: -62,
   },
   nodeLeft: {
     left: 0,
-    top: 126,
+    top: 168,
   },
   nodeRight: {
     right: 0,
-    top: 126,
+    top: 168,
   },
   nodeIcon: {
     width: 44,
