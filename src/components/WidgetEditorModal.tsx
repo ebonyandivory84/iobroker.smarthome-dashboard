@@ -1,6 +1,8 @@
 import { createElement, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { WidgetAppearance, WidgetConfig } from "../types/dashboard";
+import { useDashboardConfig } from "../context/DashboardConfigContext";
+import { resolveThemeSettings } from "../utils/themeConfig";
 import { palette } from "../utils/theme";
 
 type WidgetEditorModalProps = {
@@ -11,14 +13,16 @@ type WidgetEditorModalProps = {
 };
 
 export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEditorModalProps) {
+  const { config } = useDashboardConfig();
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const theme = resolveThemeSettings(config.theme);
 
   useEffect(() => {
     if (!widget || !visible) {
       return;
     }
 
-    const appearanceDraft = buildAppearanceDraft(widget.appearance);
+    const appearanceDraft = buildAppearanceDraft(widget, theme);
 
     if (widget.type === "state") {
       setDraft({
@@ -469,14 +473,20 @@ function clampInt(raw: string | undefined, fallback: number, min: number) {
   return Math.max(min, parsed);
 }
 
-function buildAppearanceDraft(appearance?: WidgetAppearance) {
+function buildAppearanceDraft(
+  widget: WidgetConfig,
+  theme: ReturnType<typeof resolveThemeSettings>
+) {
+  const appearance = widget.appearance;
+  const widgetDefaults = getWidgetAppearanceDefaults(widget, theme);
+
   return {
-    widgetColor: appearance?.widgetColor || "",
-    widgetColor2: appearance?.widgetColor2 || "",
-    cardColor: appearance?.cardColor || "",
-    cardColor2: appearance?.cardColor2 || "",
-    statColor: appearance?.statColor || "",
-    statColor2: appearance?.statColor2 || "",
+    widgetColor: appearance?.widgetColor || widgetDefaults.widgetColor || "",
+    widgetColor2: appearance?.widgetColor2 || widgetDefaults.widgetColor2 || "",
+    cardColor: appearance?.cardColor || widgetDefaults.cardColor || "",
+    cardColor2: appearance?.cardColor2 || widgetDefaults.cardColor2 || "",
+    statColor: appearance?.statColor || widgetDefaults.statColor || "",
+    statColor2: appearance?.statColor2 || widgetDefaults.statColor2 || "",
   };
 }
 
@@ -496,6 +506,40 @@ function buildAppearance(draft: Record<string, string>): WidgetAppearance | unde
 function normalizeColor(value: string | undefined) {
   const trimmed = (value || "").trim();
   return trimmed || undefined;
+}
+
+function getWidgetAppearanceDefaults(
+  widget: WidgetConfig,
+  theme: ReturnType<typeof resolveThemeSettings>
+): WidgetAppearance {
+  if (widget.type === "state") {
+    return {
+      widgetColor: theme.widgetTones.stateStart,
+      widgetColor2: theme.widgetTones.stateEnd,
+    };
+  }
+
+  if (widget.type === "camera") {
+    return {
+      widgetColor: theme.widgetTones.cameraStart,
+      widgetColor2: theme.widgetTones.cameraEnd,
+    };
+  }
+
+  if (widget.type === "energy") {
+    return {
+      widgetColor: theme.widgetTones.energyStart,
+      widgetColor2: theme.widgetTones.energyEnd,
+      cardColor: "rgba(255,255,255,0.03)",
+    };
+  }
+
+  return {
+    widgetColor: theme.widgetTones.solarStart,
+    widgetColor2: theme.widgetTones.solarEnd,
+    cardColor: theme.solar.nodeCardBackground,
+    statColor: theme.solar.statCardBackground,
+  };
 }
 
 function ColorInputRow({
@@ -538,7 +582,7 @@ function ColorField({
   value: string;
   onChange: (value: string) => void;
 }) {
-  const safeValue = isHexColor(value) ? value : "#8892a6";
+  const previewColor = toColorPreview(value) || "#8892a6";
 
   return (
     <Field label={label}>
@@ -546,11 +590,12 @@ function ColorField({
         {Platform.OS === "web"
           ? createElement("input", {
               type: "color",
-              value: safeValue,
+              value: previewColor,
               onChange: (event: { target: { value: string } }) => onChange(event.target.value),
               style: webColorInputStyle,
             })
           : null}
+        <View style={[styles.colorSwatch, { backgroundColor: value || previewColor }]} />
         <TextInput
           autoCapitalize="none"
           onChangeText={onChange}
@@ -566,6 +611,37 @@ function ColorField({
 
 function isHexColor(value: string) {
   return /^#([0-9a-fA-F]{6})$/.test(value);
+}
+
+function toColorPreview(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (isHexColor(trimmed)) {
+    return trimmed;
+  }
+
+  const rgbMatch = trimmed.match(
+    /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(\d*\.?\d+))?\s*\)$/i
+  );
+  if (!rgbMatch) {
+    return null;
+  }
+
+  const r = clampChannel(Number(rgbMatch[1]));
+  const g = clampChannel(Number(rgbMatch[2]));
+  const b = clampChannel(Number(rgbMatch[3]));
+
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function clampChannel(value: number) {
+  return Math.max(0, Math.min(255, Number.isFinite(value) ? value : 0));
+}
+
+function toHex(value: number) {
+  return value.toString(16).padStart(2, "0");
 }
 
 function normalizeStateFormat(raw: string | undefined) {
@@ -651,6 +727,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  colorSwatch: {
+    width: 18,
+    height: 18,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
   },
   colorTextInput: {
     flex: 1,
