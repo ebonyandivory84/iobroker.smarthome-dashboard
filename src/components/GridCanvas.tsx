@@ -64,6 +64,7 @@ export function GridCanvas({
         cellWidth={cellWidth}
         client={client}
         config={config}
+        theme={resolveThemeSettings(config.theme)}
         isLayoutMode={isLayoutMode}
         onEditWidget={onEditWidget}
         onRemoveWidget={onRemoveWidget}
@@ -147,6 +148,7 @@ function clamp(value: number, min: number, max: number) {
 
 function WebGridCanvas({
   config,
+  theme,
   states,
   client,
   cellWidth,
@@ -157,6 +159,7 @@ function WebGridCanvas({
   onRemoveWidget,
 }: {
   config: DashboardSettings;
+  theme: ReturnType<typeof resolveThemeSettings>;
   states: StateSnapshot;
   client: IoBrokerClient;
   cellWidth: number;
@@ -168,7 +171,6 @@ function WebGridCanvas({
 }) {
   const stepX = cellWidth + config.grid.gap;
   const stepY = config.grid.rowHeight + config.grid.gap;
-  const theme = resolveThemeSettings(config.theme);
 
   return (
     <div style={{ ...webCanvasStyle, minHeight: canvasHeight }}>
@@ -307,7 +309,7 @@ function WebWidgetShell({
 
   const shellStyle: CSSProperties = {
     ...webWidgetStyle,
-    ...getWidgetTone(widget.type, theme),
+    ...getWidgetTone(widget, theme),
     left: preview.x * stepX,
     top: preview.y * stepY,
     width: preview.w * cellWidth + (preview.w - 1) * config.grid.gap,
@@ -574,7 +576,16 @@ const webResizeHandleStyle: CSSProperties = {
   opacity: 0.7,
 };
 
-function getWidgetTone(type: WidgetConfig["type"], theme: ReturnType<typeof resolveThemeSettings>): CSSProperties {
+function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThemeSettings>): CSSProperties {
+  const appearance = widget.appearance;
+  if (appearance?.widgetColor) {
+    return {
+      background: buildGradientBackground(appearance.widgetColor, appearance.widgetColor2),
+      border: "1px solid rgba(255,255,255,0.1)",
+    };
+  }
+
+  const type = widget.type;
   if (type === "state") {
     return {
       background: `linear-gradient(135deg, ${theme.widgetTones.stateStart} 0%, ${theme.widgetTones.stateEnd} 100%)`,
@@ -602,4 +613,11 @@ function getWidgetTone(type: WidgetConfig["type"], theme: ReturnType<typeof reso
     };
   }
   return {};
+}
+
+function buildGradientBackground(start: string, end?: string) {
+  if (end && end.trim()) {
+    return `linear-gradient(135deg, ${start} 0%, ${end} 100%)`;
+  }
+  return start;
 }

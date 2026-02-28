@@ -15,18 +15,19 @@ export function EnergyWidget({ config, states }: EnergyWidgetProps) {
   const battery = config.batteryStateId ? states[config.batteryStateId] : 0;
   const grid = config.gridStateId ? states[config.gridStateId] : 0;
   const missingCore = pv === undefined || house === undefined;
+  const cardColor = config.appearance?.cardColor;
 
   return (
     <View style={styles.container}>
       <View style={styles.row}>
-        <EnergyNode label="PV" value={watts(pv)} accent={palette.accent} />
+        <EnergyNode backgroundColor={cardColor} label="PV" value={watts(pv)} accent={palette.accent} />
         <Text style={styles.arrow}>→</Text>
-        <EnergyNode label="Haus" value={watts(house)} accent={palette.text} />
+        <EnergyNode backgroundColor={cardColor} label="Haus" value={watts(house)} accent={palette.text} />
       </View>
       <View style={styles.row}>
-        <EnergyNode label="Batterie" value={watts(battery)} accent={palette.accentWarm} />
+        <EnergyNode backgroundColor={cardColor} label="Batterie" value={watts(battery)} accent={palette.accentWarm} />
         <Text style={styles.arrow}>↔</Text>
-        <EnergyNode label="Netz" value={watts(grid)} accent={palette.textMuted} />
+        <EnergyNode backgroundColor={cardColor} label="Netz" value={watts(grid)} accent={palette.textMuted} />
       </View>
       {missingCore ? <Text style={styles.hint}>Pruefe PV- und Haus-State-ID im Widget-Editor.</Text> : null}
     </View>
@@ -37,13 +38,15 @@ function EnergyNode({
   label,
   value,
   accent,
+  backgroundColor,
 }: {
   label: string;
   value: string;
   accent: string;
+  backgroundColor?: string;
 }) {
   return (
-    <View style={styles.node}>
+    <View style={[styles.node, backgroundColor ? { backgroundColor } : null]}>
       <View style={[styles.dot, { backgroundColor: accent }]} />
       <Text style={styles.nodeLabel}>{label}</Text>
       <Text style={styles.nodeValue}>{value}</Text>

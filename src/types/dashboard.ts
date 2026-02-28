@@ -12,12 +12,22 @@ export type GridPosition = {
   h: number;
 };
 
+export type WidgetAppearance = {
+  widgetColor?: string;
+  widgetColor2?: string;
+  cardColor?: string;
+  cardColor2?: string;
+  statColor?: string;
+  statColor2?: string;
+};
+
 export type WidgetBase = {
   id: string;
   type: WidgetType;
   title: string;
   iconPair?: IconPair;
   position: GridPosition;
+  appearance?: WidgetAppearance;
 };
 
 export type StateWidgetConfig = WidgetBase & {

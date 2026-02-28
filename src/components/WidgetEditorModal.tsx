@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { WidgetConfig } from "../types/dashboard";
+import { createElement, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { WidgetAppearance, WidgetConfig } from "../types/dashboard";
 import { palette } from "../utils/theme";
 
 type WidgetEditorModalProps = {
@@ -18,6 +18,8 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
       return;
     }
 
+    const appearanceDraft = buildAppearanceDraft(widget.appearance);
+
     if (widget.type === "state") {
       setDraft({
         title: widget.title,
@@ -30,6 +32,7 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
         offLabel: widget.offLabel || "",
         writeable: widget.writeable ? "true" : "false",
         format: widget.format || "boolean",
+        ...appearanceDraft,
       });
       return;
     }
@@ -44,6 +47,7 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
         y: String(widget.position.y),
         w: String(widget.position.w),
         h: String(widget.position.h),
+        ...appearanceDraft,
       });
       return;
     }
@@ -59,6 +63,7 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
         y: String(widget.position.y),
         w: String(widget.position.w),
         h: String(widget.position.h),
+        ...appearanceDraft,
       });
       return;
     }
@@ -82,6 +87,7 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
       keyDaySelf: widget.keys.daySelf,
       keyPvTotal: widget.keys.pvTotal || "",
       keyBattTemp: widget.keys.battTemp || "",
+      ...appearanceDraft,
     });
   }, [visible, widget]);
 
@@ -97,6 +103,8 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
       h: clampInt(draft.h, widget.position.h, 1),
     };
 
+    const appearance = buildAppearance(draft);
+
     if (widget.type === "state") {
       onSave(widget.id, {
         title: draft.title || widget.title,
@@ -105,6 +113,7 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
         offLabel: draft.offLabel || undefined,
         writeable: draft.writeable !== "false",
         format: normalizeStateFormat(draft.format),
+        appearance,
         position,
       });
     } else if (widget.type === "camera") {
@@ -113,6 +122,7 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
         snapshotUrl: draft.snapshotUrl || undefined,
         rtspUrl: draft.rtspUrl || undefined,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 250),
+        appearance,
         position,
       });
     } else if (widget.type === "energy") {
@@ -122,6 +132,7 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
         houseStateId: draft.houseStateId || widget.houseStateId,
         batteryStateId: draft.batteryStateId || undefined,
         gridStateId: draft.gridStateId || undefined,
+        appearance,
         position,
       });
     } else {
@@ -143,6 +154,7 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
           pvTotal: draft.keyPvTotal || undefined,
           battTemp: draft.keyBattTemp || undefined,
         },
+        appearance,
         position,
       });
     }
@@ -217,6 +229,36 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
                   onChange={(value) => setDraft((current) => ({ ...current, h: value }))}
                 />
               </View>
+            </Field>
+            <Field label="Darstellung">
+              <ColorInputRow
+                firstKey="widgetColor"
+                firstLabel="Widget"
+                secondKey="widgetColor2"
+                secondLabel="Verlauf 2"
+                values={draft}
+                onChange={setDraft}
+              />
+              {widget.type === "energy" || widget.type === "solar" ? (
+                <ColorInputRow
+                  firstKey="cardColor"
+                  firstLabel="Cards"
+                  secondKey="cardColor2"
+                  secondLabel="Verlauf 2"
+                  values={draft}
+                  onChange={setDraft}
+                />
+              ) : null}
+              {widget.type === "solar" ? (
+                <ColorInputRow
+                  firstKey="statColor"
+                  firstLabel="Stats"
+                  secondKey="statColor2"
+                  secondLabel="Verlauf 2"
+                  values={draft}
+                  onChange={setDraft}
+                />
+              ) : null}
             </Field>
             {widget.type === "state" ? (
               <>
@@ -558,6 +600,105 @@ function clampInt(raw: string | undefined, fallback: number, min: number) {
   return Math.max(min, parsed);
 }
 
+function buildAppearanceDraft(appearance?: WidgetAppearance) {
+  return {
+    widgetColor: appearance?.widgetColor || "",
+    widgetColor2: appearance?.widgetColor2 || "",
+    cardColor: appearance?.cardColor || "",
+    cardColor2: appearance?.cardColor2 || "",
+    statColor: appearance?.statColor || "",
+    statColor2: appearance?.statColor2 || "",
+  };
+}
+
+function buildAppearance(draft: Record<string, string>): WidgetAppearance | undefined {
+  const appearance: WidgetAppearance = {
+    widgetColor: normalizeColor(draft.widgetColor),
+    widgetColor2: normalizeColor(draft.widgetColor2),
+    cardColor: normalizeColor(draft.cardColor),
+    cardColor2: normalizeColor(draft.cardColor2),
+    statColor: normalizeColor(draft.statColor),
+    statColor2: normalizeColor(draft.statColor2),
+  };
+
+  return Object.values(appearance).some(Boolean) ? appearance : undefined;
+}
+
+function normalizeColor(value: string | undefined) {
+  const trimmed = (value || "").trim();
+  return trimmed || undefined;
+}
+
+function ColorInputRow({
+  firstKey,
+  firstLabel,
+  secondKey,
+  secondLabel,
+  values,
+  onChange,
+}: {
+  firstKey: string;
+  firstLabel: string;
+  secondKey: string;
+  secondLabel: string;
+  values: Record<string, string>;
+  onChange: Dispatch<SetStateAction<Record<string, string>>>;
+}) {
+  return (
+    <View style={styles.splitRow}>
+      <ColorField
+        label={firstLabel}
+        value={values[firstKey] || ""}
+        onChange={(value) => onChange((current) => ({ ...current, [firstKey]: value }))}
+      />
+      <ColorField
+        label={secondLabel}
+        value={values[secondKey] || ""}
+        onChange={(value) => onChange((current) => ({ ...current, [secondKey]: value }))}
+      />
+    </View>
+  );
+}
+
+function ColorField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const safeValue = isHexColor(value) ? value : "#8892a6";
+
+  return (
+    <Field label={label}>
+      <View style={styles.colorFieldWrap}>
+        {Platform.OS === "web"
+          ? createElement("input", {
+              type: "color",
+              value: safeValue,
+              onChange: (event: { target: { value: string } }) => onChange(event.target.value),
+              style: webColorInputStyle,
+            })
+          : null}
+        <TextInput
+          autoCapitalize="none"
+          onChangeText={onChange}
+          placeholder="#4ade80"
+          placeholderTextColor={palette.textMuted}
+          style={[styles.input, styles.colorTextInput]}
+          value={value}
+        />
+      </View>
+    </Field>
+  );
+}
+
+function isHexColor(value: string) {
+  return /^#([0-9a-fA-F]{6})$/.test(value);
+}
+
 function normalizeStateFormat(raw: string | undefined) {
   if (raw === "number" || raw === "text") {
     return raw;
@@ -636,6 +777,14 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(6, 12, 20, 0.9)",
     borderWidth: 1,
     borderColor: palette.border,
+  },
+  colorFieldWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  colorTextInput: {
+    flex: 1,
   },
   miniWrap: {
     width: 72,
@@ -730,3 +879,13 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 });
+
+const webColorInputStyle = {
+  width: 42,
+  height: 42,
+  padding: 0,
+  border: "none",
+  borderRadius: 10,
+  background: "transparent",
+  cursor: "pointer",
+};
