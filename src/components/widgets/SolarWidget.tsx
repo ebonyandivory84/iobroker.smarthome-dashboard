@@ -142,8 +142,6 @@ function SolarFlowScene({
       onLayout={(event: LayoutChangeEvent) => setSceneLayout(event.nativeEvent.layout)}
       style={styles.scene}
     >
-      <View style={styles.sceneGlowGreen} />
-      <View style={styles.sceneGlowBlue} />
       <View style={[styles.lineVertical, { top: topLineStart, left: sceneLayout.width / 2 - 2, height: topLineHeight }]} />
       <View style={[styles.lineVertical, { top: bottomLineStart, left: sceneLayout.width / 2 - 2, height: bottomLineHeight }]} />
       <View style={[styles.lineHorizontal, { top: centerLineY, left: leftLineStart, width: leftLineWidth }]} />
@@ -409,24 +407,6 @@ const styles = StyleSheet.create({
     flex: 1,
     position: "relative",
     backgroundColor: "rgba(0,0,0,0)",
-  },
-  sceneGlowGreen: {
-    position: "absolute",
-    left: "-8%",
-    top: "8%",
-    width: "48%",
-    height: "72%",
-    borderRadius: 999,
-    backgroundColor: "rgba(44, 168, 120, 0.14)",
-  },
-  sceneGlowBlue: {
-    position: "absolute",
-    right: "-6%",
-    top: "14%",
-    width: "52%",
-    height: "70%",
-    borderRadius: 999,
-    backgroundColor: "rgba(38, 92, 196, 0.16)",
   },
   lineVertical: {
     position: "absolute",
