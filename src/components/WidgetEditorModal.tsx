@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { createElement, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ImagePickerModal } from "./ImagePickerModal";
 import { ObjectPickerModal } from "./ObjectPickerModal";
 import { IoBrokerClient } from "../services/iobroker";
 import { WidgetAppearance, WidgetConfig } from "../types/dashboard";
@@ -21,6 +22,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
   const { config } = useDashboardConfig();
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [pickerField, setPickerField] = useState<string | null>(null);
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const theme = resolveThemeSettings(config.theme);
   const iconPreview = useMemo(() => {
     const active = (draft.iconActive || widget?.iconPair?.active || "toggle-switch-outline") as keyof typeof MaterialCommunityIcons.glyphMap;
@@ -86,6 +88,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
 
     setDraft({
       title: widget.title,
+      backgroundMode: widget.backgroundMode || "color",
+      backgroundImage: widget.backgroundImage || "",
       statePrefix: widget.statePrefix,
       dailyEnergyUnit: widget.dailyEnergyUnit || "auto",
       keyPvNow: widget.keys.pvNow,
@@ -152,6 +156,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     } else {
       onSave(widget.id, {
         title: draft.title || widget.title,
+        backgroundMode: draft.backgroundMode === "image" ? "image" : "color",
+        backgroundImage: draft.backgroundImage || undefined,
         statePrefix: draft.statePrefix || widget.statePrefix,
         dailyEnergyUnit:
           draft.dailyEnergyUnit === "Wh" || draft.dailyEnergyUnit === "kWh" ? draft.dailyEnergyUnit : "auto",
@@ -254,6 +260,25 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     values={draft}
                     onChange={setDraft}
                   />
+                  <Field label="Solar Hintergrund">
+                    <ChoiceRow
+                      options={["color", "image"]}
+                      value={draft.backgroundMode || "color"}
+                      onSelect={(value) => setDraft((current) => ({ ...current, backgroundMode: value }))}
+                    />
+                    {draft.backgroundMode === "image" ? (
+                      <View style={styles.stateFieldRow}>
+                        <TextInput
+                          editable={false}
+                          style={[styles.input, styles.stateFieldInput]}
+                          value={draft.backgroundImage || ""}
+                        />
+                        <Pressable onPress={() => setImagePickerOpen(true)} style={styles.stateBrowseButton}>
+                          <Text style={styles.stateBrowseLabel}>Bild waehlen</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+                  </Field>
                 </>
               ) : null}
             </Field>
@@ -551,6 +576,20 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         }}
         title="ioBroker Objektbaum"
         visible={Boolean(pickerField)}
+      />
+      <ImagePickerModal
+        client={client}
+        onClose={() => setImagePickerOpen(false)}
+        onSelect={(entry) => {
+          setDraft((current) => ({
+            ...current,
+            backgroundMode: "image",
+            backgroundImage: entry.name,
+          }));
+          setImagePickerOpen(false);
+        }}
+        selectedName={draft.backgroundImage}
+        visible={imagePickerOpen}
       />
     </Modal>
   );

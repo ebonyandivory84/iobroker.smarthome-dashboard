@@ -1,6 +1,7 @@
 const utils = require("@iobroker/adapter-core");
 const express = require("express");
 const { createProxyMiddleware } = require("http-proxy-middleware");
+const fs = require("fs");
 const path = require("path");
 const { resolveWebRoot } = require("./lib/static");
 
@@ -19,6 +20,7 @@ async function main(adapter) {
   const app = express();
   app.use(express.json());
   const webRoot = resolveWebRoot(adapter);
+  const widgetAssetsRoot = path.resolve(__dirname, "..", "assets");
   const devServerUrl =
     adapter.config && typeof adapter.config.devServerUrl === "string" ? adapter.config.devServerUrl.trim() : "";
 
@@ -96,6 +98,25 @@ async function main(adapter) {
 
     res.json(limitedEntries);
   });
+
+  app.get("/smarthome-dashboard/api/images", async (_req, res) => {
+    try {
+      const files = await fs.promises.readdir(widgetAssetsRoot, { withFileTypes: true });
+      const images = files
+        .filter((entry) => entry.isFile() && /\.(png|jpe?g|webp|gif)$/i.test(entry.name))
+        .map((entry) => ({
+          name: entry.name,
+          url: `/smarthome-dashboard/widget-assets/${encodeURIComponent(entry.name)}`,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name, "de"));
+
+      res.json(images);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Image list failed" });
+    }
+  });
+
+  app.use("/smarthome-dashboard/widget-assets", express.static(widgetAssetsRoot));
 
   if (devServerUrl) {
     const target = devServerUrl.replace(/\/+$/, "");

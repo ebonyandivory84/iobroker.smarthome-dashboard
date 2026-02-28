@@ -70,6 +70,8 @@ export type EnergyWidgetConfig = WidgetBase & {
 
 export type SolarWidgetConfig = WidgetBase & {
   type: "solar";
+  backgroundMode?: "color" | "image";
+  backgroundImage?: string;
   statePrefix: string;
   keys: {
     pvNow: string;
@@ -147,4 +149,9 @@ export type IoBrokerObjectEntry = {
   type?: string;
   role?: string;
   valueType?: string;
+};
+
+export type WidgetImageEntry = {
+  name: string;
+  url: string;
 };

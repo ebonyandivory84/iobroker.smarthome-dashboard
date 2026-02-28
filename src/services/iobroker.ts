@@ -1,4 +1,4 @@
-import { DashboardSettings, IoBrokerObjectEntry, StateSnapshot } from "../types/dashboard";
+import { DashboardSettings, IoBrokerObjectEntry, StateSnapshot, WidgetImageEntry } from "../types/dashboard";
 
 const buildAuthHeader = (settings: DashboardSettings) => {
   const headers: Record<string, string> = {};
@@ -96,5 +96,20 @@ export class IoBrokerClient {
     }
 
     return (await response.json()) as IoBrokerObjectEntry[];
+  }
+
+  async listWidgetImages(): Promise<WidgetImageEntry[]> {
+    const response = await fetch(this.endpoint("/images"), {
+      method: "GET",
+      headers: {
+        ...buildAuthHeader(this.settings),
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Image list failed (${response.status})`);
+    }
+
+    return (await response.json()) as WidgetImageEntry[];
   }
 }

@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
-import { Animated, Easing, LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, ImageBackground, LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
 import { SolarWidgetConfig, StateSnapshot, ThemeSettings } from "../../types/dashboard";
 import { resolveThemeSettings } from "../../utils/themeConfig";
 import { palette } from "../../utils/theme";
@@ -52,31 +52,61 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
 
   return (
     <View style={styles.container}>
-      <View
-        style={[
-          styles.sceneCard,
-          {
-            backgroundColor: widgetAppearance?.cardColor || resolvedTheme.solar.sceneCardBackground,
-            borderColor: resolvedTheme.solar.sceneCardBorder,
-          },
-        ]}
-      >
-        <SolarFlowScene
-          battDir={battDir}
-          battPower={Math.abs(battSigned)}
-          battTemp={battTemp}
-          gridDir={gridDir}
-          gridPower={Math.abs(gridSigned)}
-          homeNow={homeNow}
-          mutedTextColor={mutedTextColor}
-          textColor={textColor}
-          widgetAppearance={widgetAppearance}
-          theme={resolvedTheme}
-          pvDir={pvDir}
-          pvNow={pvNow}
-          soc={soc}
-        />
-      </View>
+      {config.backgroundMode === "image" && config.backgroundImage ? (
+        <ImageBackground
+          imageStyle={styles.sceneBackgroundImage}
+          source={{ uri: `/smarthome-dashboard/widget-assets/${encodeURIComponent(config.backgroundImage)}` }}
+          style={[
+            styles.sceneCard,
+            {
+              borderColor: resolvedTheme.solar.sceneCardBorder,
+            },
+          ]}
+        >
+          <View style={styles.sceneBackgroundOverlay} />
+          <SolarFlowScene
+            battDir={battDir}
+            battPower={Math.abs(battSigned)}
+            battTemp={battTemp}
+            gridDir={gridDir}
+            gridPower={Math.abs(gridSigned)}
+            homeNow={homeNow}
+            mutedTextColor={mutedTextColor}
+            textColor={textColor}
+            widgetAppearance={widgetAppearance}
+            theme={resolvedTheme}
+            pvDir={pvDir}
+            pvNow={pvNow}
+            soc={soc}
+          />
+        </ImageBackground>
+      ) : (
+          <View
+            style={[
+              styles.sceneCard,
+              {
+                backgroundColor: widgetAppearance?.cardColor || resolvedTheme.solar.sceneCardBackground,
+                borderColor: resolvedTheme.solar.sceneCardBorder,
+              },
+            ]}
+          >
+            <SolarFlowScene
+              battDir={battDir}
+              battPower={Math.abs(battSigned)}
+              battTemp={battTemp}
+              gridDir={gridDir}
+              gridPower={Math.abs(gridSigned)}
+              homeNow={homeNow}
+              mutedTextColor={mutedTextColor}
+              textColor={textColor}
+              widgetAppearance={widgetAppearance}
+              theme={resolvedTheme}
+              pvDir={pvDir}
+              pvNow={pvNow}
+              soc={soc}
+            />
+          </View>
+        )}
 
       <View style={styles.bottomRow}>
         <MiniStat
@@ -590,6 +620,15 @@ const styles = StyleSheet.create({
     flex: 1,
     position: "relative",
     backgroundColor: "rgba(0,0,0,0)",
+  },
+  sceneBackgroundImage: {
+    borderRadius: 22,
+    resizeMode: "cover",
+  },
+  sceneBackgroundOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 22,
+    backgroundColor: "rgba(5, 10, 18, 0.3)",
   },
   lineVertical: {
     position: "absolute",
