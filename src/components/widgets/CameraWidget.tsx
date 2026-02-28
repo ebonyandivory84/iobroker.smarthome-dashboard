@@ -23,8 +23,8 @@ export function CameraWidget({ config }: CameraWidgetProps) {
       return null;
     }
     const separator = config.snapshotUrl.includes("?") ? "&" : "?";
-    return `${config.snapshotUrl}${separator}t=${tick}&widget=${encodeURIComponent(config.id)}`;
-  }, [config.id, config.snapshotUrl, tick]);
+    return `${config.snapshotUrl}${separator}t=${tick}`;
+  }, [config.snapshotUrl, tick]);
 
   useEffect(() => {
     if (!snapshotUrl) {
