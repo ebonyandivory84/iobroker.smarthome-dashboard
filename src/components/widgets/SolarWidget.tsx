@@ -140,15 +140,18 @@ function SolarFlowScene({
   const cardHeight = 102;
   const beamLength = 18;
   const centerX = sceneLayout.width / 2 - cardWidth / 2;
-  const centerY = clamp(sceneLayout.height * 0.44, 156, sceneLayout.height - cardHeight * 2 - 52);
   const horizontalGap = clamp(sceneLayout.width * 0.11, 52, 124);
-  const topGap = clamp(sceneLayout.height * 0.16, 84, 156);
-  const bottomGap = clamp(sceneLayout.height * 0.1, 36, 84);
+  const verticalGap = clamp(sceneLayout.height * 0.16, 84, 156);
+  const centerY = clamp(
+    sceneLayout.height * 0.42,
+    24 + cardHeight + verticalGap,
+    sceneLayout.height - (24 + cardHeight * 2 + verticalGap)
+  );
 
-  const topY = Math.max(12, centerY - cardHeight - topGap);
+  const topY = Math.max(12, centerY - cardHeight - verticalGap);
   const leftX = Math.max(0, centerX - cardWidth - horizontalGap);
   const rightX = Math.min(sceneLayout.width - cardWidth, centerX + cardWidth + horizontalGap);
-  const bottomY = Math.min(sceneLayout.height - cardHeight - 12, centerY + cardHeight + bottomGap);
+  const bottomY = Math.min(sceneLayout.height - cardHeight - 12, centerY + cardHeight + verticalGap);
 
   const topLineStart = topY + cardHeight;
   const topLineHeight = Math.max(12, centerY - topLineStart);
