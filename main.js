@@ -1,4 +1,7 @@
-if (typeof navigator !== "undefined" && navigator.product === "ReactNative") {
+const isAppRuntime =
+  typeof document !== "undefined" || (typeof navigator !== "undefined" && navigator.product === "ReactNative");
+
+if (isAppRuntime) {
   require("./index");
 } else {
   const startAdapter = eval("require")("./adapter/main");
