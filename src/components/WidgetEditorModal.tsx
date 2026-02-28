@@ -604,6 +604,12 @@ function ColorField({
           style={[styles.input, styles.colorTextInput]}
           value={value}
         />
+        <Pressable onPress={() => onChange("transparent")} style={styles.colorActionButton}>
+          <Text style={styles.colorActionLabel}>Transparent</Text>
+        </Pressable>
+        <Pressable onPress={() => onChange("")} style={styles.colorActionButton}>
+          <Text style={styles.colorActionLabel}>Reset</Text>
+        </Pressable>
       </View>
     </Field>
   );
@@ -737,6 +743,19 @@ const styles = StyleSheet.create({
   },
   colorTextInput: {
     flex: 1,
+  },
+  colorActionButton: {
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  colorActionLabel: {
+    color: palette.text,
+    fontSize: 12,
+    fontWeight: "700",
   },
   modeRow: {
     flexDirection: "row",
