@@ -24,6 +24,7 @@ type DashboardConfigContextValue = {
 
 const STORAGE_KEY = "smarthome-dashboard-config";
 const LEGACY_DEMO_BASE_URL = "http://127.0.0.1:8087";
+const REMOTE_CONFIG_ENDPOINT = "/smarthome-dashboard/api/config";
 
 const DashboardConfigContext = createContext<DashboardConfigContextValue | null>(null);
 
@@ -56,19 +57,54 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
   const [rawJson, setRawJson] = useState(JSON.stringify(defaultConfig, null, 2));
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((stored) => {
-        if (!stored) {
+    let active = true;
+
+    const hydrate = async () => {
+      let remoteJson = "";
+
+      try {
+        remoteJson = await readRemoteConfig();
+      } catch (error) {
+        console.warn("Remote config load failed", error);
+      }
+
+      if (remoteJson) {
+        try {
+          const parsed = migrateConfig(JSON.parse(remoteJson) as DashboardSettings);
+          if (!active) {
+            return;
+          }
+          setConfig(parsed);
+          setRawJson(JSON.stringify(parsed, null, 2));
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed, null, 2));
+          return;
+        } catch (error) {
+          console.warn("Remote config parse failed", error);
+        }
+      }
+
+      try {
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        const fallbackJson = stored || JSON.stringify(defaultConfig, null, 2);
+        const parsed = migrateConfig(JSON.parse(fallbackJson) as DashboardSettings);
+        const nextJson = JSON.stringify(parsed, null, 2);
+        if (!active) {
           return;
         }
-
-        const parsed = migrateConfig(JSON.parse(stored) as DashboardSettings);
         setConfig(parsed);
-        setRawJson(JSON.stringify(parsed, null, 2));
-      })
-      .catch((error) => {
+        setRawJson(nextJson);
+        await AsyncStorage.setItem(STORAGE_KEY, nextJson);
+        await writeRemoteConfig(nextJson);
+      } catch (error) {
         console.warn("Config load failed", error);
-      });
+      }
+    };
+
+    hydrate();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const persist = async (nextConfig: DashboardSettings) => {
@@ -79,6 +115,11 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
       await AsyncStorage.setItem(STORAGE_KEY, json);
     } catch (error) {
       console.warn("Config save failed", error);
+    }
+    try {
+      await writeRemoteConfig(json);
+    } catch (error) {
+      console.warn("Remote config save failed", error);
     }
   };
 
@@ -140,6 +181,33 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
   );
 
   return <DashboardConfigContext.Provider value={value}>{children}</DashboardConfigContext.Provider>;
+}
+
+async function readRemoteConfig() {
+  const response = await fetch(REMOTE_CONFIG_ENDPOINT, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Remote config read failed (${response.status})`);
+  }
+
+  const payload = (await response.json()) as { configJson?: string };
+  return typeof payload.configJson === "string" ? payload.configJson : "";
+}
+
+async function writeRemoteConfig(configJson: string) {
+  const response = await fetch(REMOTE_CONFIG_ENDPOINT, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ configJson }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Remote config save failed (${response.status})`);
+  }
 }
 
 export function useDashboardConfig() {

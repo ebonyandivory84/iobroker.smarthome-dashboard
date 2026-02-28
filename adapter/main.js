@@ -9,6 +9,7 @@ let objectEntriesCache = [];
 let objectEntriesCacheTimestamp = 0;
 let objectEntriesPromise = null;
 const OBJECT_CACHE_TTL_MS = 5 * 60 * 1000;
+const CONFIG_STATE_ID = "dashboardConfig";
 
 function startAdapter(options) {
   const adapter = new utils.Adapter({
@@ -29,8 +30,56 @@ async function main(adapter) {
   const devServerUrl =
     adapter.config && typeof adapter.config.devServerUrl === "string" ? adapter.config.devServerUrl.trim() : "";
 
+  await adapter.setObjectNotExistsAsync(CONFIG_STATE_ID, {
+    type: "state",
+    common: {
+      name: "Dashboard configuration JSON",
+      type: "string",
+      role: "json",
+      read: true,
+      write: true,
+      def: "",
+    },
+    native: {},
+  });
+
   refreshObjectEntries(adapter).catch((error) => {
     adapter.log.warn(`Object cache warmup failed: ${error instanceof Error ? error.message : String(error)}`);
+  });
+
+  app.get("/smarthome-dashboard/api/config", async (_req, res) => {
+    try {
+      const state = await adapter.getStateAsync(CONFIG_STATE_ID);
+      const configJson = typeof state?.val === "string" ? state.val : "";
+      res.json({ configJson });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Config read failed" });
+    }
+  });
+
+  app.put("/smarthome-dashboard/api/config", async (req, res) => {
+    const configJson = typeof req.body?.configJson === "string" ? req.body.configJson : "";
+    if (!configJson) {
+      res.status(400).json({ error: "configJson missing" });
+      return;
+    }
+
+    try {
+      JSON.parse(configJson);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Invalid JSON" });
+      return;
+    }
+
+    try {
+      await adapter.setStateAsync(CONFIG_STATE_ID, {
+        val: configJson,
+        ack: true,
+      });
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Config save failed" });
+    }
   });
 
   app.post("/smarthome-dashboard/api/states", async (req, res) => {
