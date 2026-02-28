@@ -8,5 +8,9 @@
         "src/*"
       ]
     }
-  }
+  },
+  "exclude": [
+    "adapter/www",
+    "node_modules"
+  ]
 }

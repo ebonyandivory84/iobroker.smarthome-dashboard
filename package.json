@@ -2,7 +2,7 @@
   "name": "iobroker.smarthome-dashboard",
   "version": "0.1.0",
   "description": "ioBroker SmartHome dashboard adapter with hosted React Native web UI",
-  "main": "node_modules/expo/AppEntry.js",
+  "main": "main.js",
   "license": "MIT",
   "keywords": [
     "iobroker",
