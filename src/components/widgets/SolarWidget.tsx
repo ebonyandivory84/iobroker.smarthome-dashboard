@@ -113,14 +113,14 @@ function SolarFlowScene({
     return () => loop.stop();
   }, [progress]);
 
-  const cardWidth = clamp(sceneLayout.width * 0.16, 120, 172);
-  const cardHeight = 116;
+  const cardWidth = clamp(sceneLayout.width * 0.14, 108, 152);
+  const cardHeight = 102;
   const beamLength = 18;
   const centerX = sceneLayout.width / 2 - cardWidth / 2;
   const centerY = clamp(sceneLayout.height * 0.44, 156, sceneLayout.height - cardHeight * 2 - 52);
-  const horizontalGap = clamp(sceneLayout.width * 0.08, 36, 96);
-  const topGap = clamp(sceneLayout.height * 0.12, 64, 132);
-  const bottomGap = clamp(sceneLayout.height * 0.08, 28, 72);
+  const horizontalGap = clamp(sceneLayout.width * 0.11, 52, 124);
+  const topGap = clamp(sceneLayout.height * 0.16, 84, 156);
+  const bottomGap = clamp(sceneLayout.height * 0.1, 36, 84);
 
   const topY = Math.max(12, centerY - cardHeight - topGap);
   const leftX = Math.max(0, centerX - cardWidth - horizontalGap);
@@ -142,6 +142,8 @@ function SolarFlowScene({
       onLayout={(event: LayoutChangeEvent) => setSceneLayout(event.nativeEvent.layout)}
       style={styles.scene}
     >
+      <View style={styles.sceneGlowGreen} />
+      <View style={styles.sceneGlowBlue} />
       <View style={[styles.lineVertical, { top: topLineStart, left: sceneLayout.width / 2 - 2, height: topLineHeight }]} />
       <View style={[styles.lineVertical, { top: bottomLineStart, left: sceneLayout.width / 2 - 2, height: bottomLineHeight }]} />
       <View style={[styles.lineHorizontal, { top: centerLineY, left: leftLineStart, width: leftLineWidth }]} />
@@ -398,14 +400,33 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     aspectRatio: 2.15,
     minHeight: 360,
-    backgroundColor: "rgba(255,255,255,0.03)",
+    backgroundColor: "rgba(18, 58, 64, 0.16)",
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: "rgba(90, 188, 177, 0.18)",
     overflow: "hidden",
   },
   scene: {
     flex: 1,
     position: "relative",
+    backgroundColor: "rgba(0,0,0,0)",
+  },
+  sceneGlowGreen: {
+    position: "absolute",
+    left: "-8%",
+    top: "8%",
+    width: "48%",
+    height: "72%",
+    borderRadius: 999,
+    backgroundColor: "rgba(44, 168, 120, 0.14)",
+  },
+  sceneGlowBlue: {
+    position: "absolute",
+    right: "-6%",
+    top: "14%",
+    width: "52%",
+    height: "70%",
+    borderRadius: 999,
+    backgroundColor: "rgba(38, 92, 196, 0.16)",
   },
   lineVertical: {
     position: "absolute",
@@ -447,22 +468,22 @@ const styles = StyleSheet.create({
   nodeCard: {
     position: "absolute",
     borderRadius: 20,
-    padding: 14,
+    padding: 12,
     alignItems: "center",
-    backgroundColor: "rgba(9, 18, 30, 0.9)",
+    backgroundColor: "rgba(14, 34, 46, 0.88)",
     borderWidth: 1,
-    borderColor: palette.border,
+    borderColor: "rgba(90, 188, 177, 0.18)",
   },
   nodeCardActive: {
-    backgroundColor: "rgba(77, 226, 177, 0.06)",
+    backgroundColor: "rgba(31, 92, 90, 0.28)",
   },
   nodeIcon: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    backgroundColor: "rgba(77, 226, 177, 0.07)",
   },
   nodeIconActive: {
     backgroundColor: "rgba(77, 226, 177, 0.08)",
