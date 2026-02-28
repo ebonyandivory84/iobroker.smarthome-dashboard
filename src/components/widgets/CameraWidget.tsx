@@ -59,7 +59,7 @@ export function CameraWidget({ config }: CameraWidgetProps) {
   }, [displayUrl, snapshotUrl]);
 
   return (
-    <View style={[styles.container, displayUrl ? styles.containerBleed : null]}>
+    <View style={styles.container}>
       <View style={styles.preview}>
         {displayUrl ? (
           <View style={styles.snapshotWrap}>
@@ -70,6 +70,13 @@ export function CameraWidget({ config }: CameraWidgetProps) {
               : (
                   <Image resizeMode="contain" source={{ uri: displayUrl }} style={styles.image} />
                 )}
+            {config.showTitle !== false && config.title ? (
+              <View style={styles.titleBadge}>
+                <Text numberOfLines={1} style={[styles.titleBadgeLabel, { color: textColor }]}>
+                  {config.title}
+                </Text>
+              </View>
+            ) : null}
           </View>
         ) : (
           <View style={styles.empty}>
@@ -118,11 +125,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  containerBleed: {
-    marginHorizontal: -16,
-    marginBottom: -16,
-    marginTop: -6,
-  },
   preview: {
     flex: 1,
     minHeight: 120,
@@ -134,6 +136,21 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  titleBadge: {
+    position: "absolute",
+    left: 14,
+    top: 14,
+    maxWidth: "72%",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    backgroundColor: "rgba(4, 8, 14, 0.44)",
+  },
+  titleBadgeLabel: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: "700",
   },
   image: {
     width: "100%",
