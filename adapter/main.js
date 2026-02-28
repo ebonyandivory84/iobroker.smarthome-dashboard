@@ -5,6 +5,11 @@ const fs = require("fs");
 const path = require("path");
 const { resolveWebRoot } = require("./lib/static");
 
+let objectEntriesCache = [];
+let objectEntriesCacheTimestamp = 0;
+let objectEntriesPromise = null;
+const OBJECT_CACHE_TTL_MS = 5 * 60 * 1000;
+
 function startAdapter(options) {
   const adapter = new utils.Adapter({
     ...options,
@@ -23,6 +28,10 @@ async function main(adapter) {
   const widgetAssetsRoot = path.resolve(__dirname, "..", "assets");
   const devServerUrl =
     adapter.config && typeof adapter.config.devServerUrl === "string" ? adapter.config.devServerUrl.trim() : "";
+
+  refreshObjectEntries(adapter).catch((error) => {
+    adapter.log.warn(`Object cache warmup failed: ${error instanceof Error ? error.message : String(error)}`);
+  });
 
   app.post("/smarthome-dashboard/api/states", async (req, res) => {
     const stateIds = Array.isArray(req.body?.stateIds) ? req.body.stateIds : [];
@@ -49,52 +58,20 @@ async function main(adapter) {
 
   app.post("/smarthome-dashboard/api/objects", async (req, res) => {
     const query = typeof req.body?.query === "string" ? req.body.query.trim().toLowerCase() : "";
-    const view = await adapter.getObjectViewAsync("system", "state", {
-      startkey: "",
-      endkey: "\u9999",
+    const entries = await getCachedObjectEntries(adapter);
+    const filteredEntries = entries.filter((entry) => {
+      if (!query) {
+        return true;
+      }
+
+      return (
+        entry.id.toLowerCase().includes(query) ||
+        (entry.name && entry.name.toLowerCase().includes(query)) ||
+        (entry.role && entry.role.toLowerCase().includes(query))
+      );
     });
 
-    const entries = (view?.rows || [])
-      .map((row) => ({
-        id: row.id,
-        name:
-          row.value &&
-          row.value.common &&
-          typeof row.value.common.name === "string"
-            ? row.value.common.name
-            : undefined,
-        type:
-          row.value &&
-          row.value.common &&
-          typeof row.value.common.type === "string"
-            ? row.value.common.type
-            : undefined,
-        role:
-          row.value &&
-          row.value.common &&
-          typeof row.value.common.role === "string"
-            ? row.value.common.role
-            : undefined,
-        valueType:
-          row.value &&
-          row.value.common &&
-          typeof row.value.common.type === "string"
-            ? row.value.common.type
-            : undefined,
-      }))
-      .filter((entry) => {
-        if (!query) {
-          return true;
-        }
-
-        return (
-          entry.id.toLowerCase().includes(query) ||
-          (entry.name && entry.name.toLowerCase().includes(query)) ||
-          (entry.role && entry.role.toLowerCase().includes(query))
-        );
-      });
-
-    const limitedEntries = entries.slice(0, 60000);
+    const limitedEntries = filteredEntries.slice(0, 60000);
 
     res.json(limitedEntries);
   });
@@ -170,6 +147,63 @@ async function main(adapter) {
     }
     adapter.log.info(`SmartHome Dashboard available on http://0.0.0.0:${port}/smarthome-dashboard`);
   });
+}
+
+async function getCachedObjectEntries(adapter) {
+  const cacheIsFresh = objectEntriesCache.length > 0 && Date.now() - objectEntriesCacheTimestamp < OBJECT_CACHE_TTL_MS;
+  if (cacheIsFresh) {
+    return objectEntriesCache;
+  }
+
+  return refreshObjectEntries(adapter);
+}
+
+async function refreshObjectEntries(adapter) {
+  if (objectEntriesPromise) {
+    return objectEntriesPromise;
+  }
+
+  objectEntriesPromise = adapter
+    .getObjectViewAsync("system", "state", {
+      startkey: "",
+      endkey: "\u9999",
+    })
+    .then((view) => {
+      objectEntriesCache = (view?.rows || []).map((row) => ({
+        id: row.id,
+        name:
+          row.value &&
+          row.value.common &&
+          typeof row.value.common.name === "string"
+            ? row.value.common.name
+            : undefined,
+        type:
+          row.value &&
+          row.value.common &&
+          typeof row.value.common.type === "string"
+            ? row.value.common.type
+            : undefined,
+        role:
+          row.value &&
+          row.value.common &&
+          typeof row.value.common.role === "string"
+            ? row.value.common.role
+            : undefined,
+        valueType:
+          row.value &&
+          row.value.common &&
+          typeof row.value.common.type === "string"
+            ? row.value.common.type
+            : undefined,
+      }));
+      objectEntriesCacheTimestamp = Date.now();
+      return objectEntriesCache;
+    })
+    .finally(() => {
+      objectEntriesPromise = null;
+    });
+
+  return objectEntriesPromise;
 }
 
 if (require.main !== module) {

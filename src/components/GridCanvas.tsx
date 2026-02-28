@@ -11,7 +11,8 @@ import { CameraWidget } from "./widgets/CameraWidget";
 import { EnergyWidget } from "./widgets/EnergyWidget";
 import { GrafanaWidget } from "./widgets/GrafanaWidget";
 import { SolarWidget } from "./widgets/SolarWidget";
-import { StateWidget } from "./widgets/StateWidget";
+import { resolveStateNextValue, StateWidget } from "./widgets/StateWidget";
+import { WeatherWidget } from "./widgets/WeatherWidget";
 
 type GridCanvasProps = {
   config: DashboardSettings;
@@ -371,7 +372,7 @@ function renderWidget(
       <StateWidget
         config={widget}
         value={states[widget.stateId]}
-        onToggle={() => client.writeState(widget.stateId, !Boolean(states[widget.stateId]))}
+        onToggle={() => client.writeState(widget.stateId, resolveStateNextValue(widget, states[widget.stateId]))}
       />
     );
   }
@@ -390,6 +391,10 @@ function renderWidget(
 
   if (widget.type === "grafana") {
     return <GrafanaWidget config={widget} />;
+  }
+
+  if (widget.type === "weather") {
+    return <WeatherWidget config={widget} />;
   }
 
   return null;
@@ -624,6 +629,12 @@ function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThe
     return {
       background: "linear-gradient(180deg, rgba(12,18,30,0.96), rgba(9,13,24,0.98))",
       border: "1px solid rgba(255,255,255,0.06)",
+    };
+  }
+  if (type === "weather") {
+    return {
+      background: "linear-gradient(135deg, rgba(34,128,214,0.92), rgba(21,73,167,0.96))",
+      border: "1px solid rgba(173, 219, 255, 0.18)",
     };
   }
   return {};

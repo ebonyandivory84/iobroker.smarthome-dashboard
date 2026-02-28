@@ -11,7 +11,7 @@ type StateWidgetProps = {
 
 export function StateWidget({ config, value, onToggle }: StateWidgetProps) {
   const hasValue = value !== null && value !== undefined;
-  const active = Boolean(value);
+  const active = resolveStateActive(config, value);
   const iconName = resolveIconName(config, value);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
@@ -27,7 +27,7 @@ export function StateWidget({ config, value, onToggle }: StateWidgetProps) {
       </View>
       <Text style={[styles.title, { color: textColor }]}>{config.title}</Text>
       <Text style={[styles.value, { color: mutedTextColor }]}>
-        {hasValue ? (active ? config.onLabel || "Ein" : config.offLabel || "Aus") : "Keine Daten"}
+        {hasValue ? resolveStateLabel(config, value, active) : "Keine Daten"}
       </Text>
       {!hasValue ? <Text style={styles.hint}>{config.stateId}</Text> : null}
       {config.writeable ? (
@@ -39,7 +39,38 @@ export function StateWidget({ config, value, onToggle }: StateWidgetProps) {
   );
 }
 
+export function resolveStateActive(config: StateWidgetConfig, value: unknown) {
+  const normalizedCurrent = normalizeStateComparisonValue(config, value);
+  const activeMatch = normalizeStateComparisonValue(config, config.activeValue);
+  const inactiveMatch = normalizeStateComparisonValue(config, config.inactiveValue);
+
+  if (activeMatch !== undefined && normalizedCurrent === activeMatch) {
+    return true;
+  }
+
+  if (inactiveMatch !== undefined && normalizedCurrent === inactiveMatch) {
+    return false;
+  }
+
+  if (config.format === "number" || config.format === "text") {
+    return false;
+  }
+
+  return Boolean(value);
+}
+
+export function resolveStateNextValue(config: StateWidgetConfig, currentValue: unknown) {
+  const nextActive = !resolveStateActive(config, currentValue);
+
+  if (nextActive) {
+    return parseStateValue(config, config.activeValue ?? defaultStateValue(config, true));
+  }
+
+  return parseStateValue(config, config.inactiveValue ?? defaultStateValue(config, false));
+}
+
 function resolveIconName(config: StateWidgetConfig, value: unknown) {
+  const active = resolveStateActive(config, value);
   const numericValue = asNumber(value);
   const activeIcon = config.iconPair?.active || "toggle-switch";
   const inactiveIcon = config.iconPair?.inactive || "toggle-switch-off-outline";
@@ -48,7 +79,22 @@ function resolveIconName(config: StateWidgetConfig, value: unknown) {
     return resolveBatteryIcon(numericValue);
   }
 
-  return Boolean(value) ? activeIcon : inactiveIcon;
+  return active ? activeIcon : inactiveIcon;
+}
+
+function resolveStateLabel(config: StateWidgetConfig, value: unknown, active: boolean) {
+  if (active && config.onLabel) {
+    return config.onLabel;
+  }
+  if (!active && config.offLabel) {
+    return config.offLabel;
+  }
+
+  if (config.format === "number" || config.format === "text") {
+    return String(value);
+  }
+
+  return active ? "Ein" : "Aus";
 }
 
 function shouldUseBatteryScale(config: StateWidgetConfig) {
@@ -100,6 +146,66 @@ function asNumber(value: unknown) {
   }
 
   return null;
+}
+
+function normalizeStateComparisonValue(config: StateWidgetConfig, value: unknown) {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return "null";
+  }
+
+  if (config.format === "number") {
+    const numeric = asNumber(value);
+    return numeric === null ? undefined : String(numeric);
+  }
+
+  if (config.format === "text") {
+    return String(value);
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1" || normalized === "on") {
+      return "true";
+    }
+    if (normalized === "false" || normalized === "0" || normalized === "off") {
+      return "false";
+    }
+  }
+
+  return String(Boolean(value));
+}
+
+function parseStateValue(config: StateWidgetConfig, raw: string) {
+  if (config.format === "number") {
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  if (config.format === "text") {
+    return raw;
+  }
+
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "true" || normalized === "1" || normalized === "on") {
+    return true;
+  }
+  if (normalized === "false" || normalized === "0" || normalized === "off") {
+    return false;
+  }
+  return raw;
+}
+
+function defaultStateValue(config: StateWidgetConfig, active: boolean) {
+  if (config.format === "number") {
+    return active ? "1" : "0";
+  }
+  if (config.format === "text") {
+    return active ? "on" : "off";
+  }
+  return active ? "true" : "false";
 }
 
 const styles = StyleSheet.create({

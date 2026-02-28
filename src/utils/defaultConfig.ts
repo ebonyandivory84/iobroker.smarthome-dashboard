@@ -26,6 +26,8 @@ export const defaultConfig: DashboardSettings = {
       writeable: true,
       onLabel: "Offen",
       offLabel: "Geschlossen",
+      activeValue: "open",
+      inactiveValue: "closed",
       iconPair: {
         active: "door-open",
         inactive: "door-closed",
@@ -40,6 +42,8 @@ export const defaultConfig: DashboardSettings = {
       writeable: true,
       onLabel: "Scharf",
       offLabel: "Unscharf",
+      activeValue: "true",
+      inactiveValue: "false",
       iconPair: {
         active: "shield-lock",
         inactive: "shield-off-outline",

@@ -1,4 +1,4 @@
-export type WidgetType = "state" | "camera" | "energy" | "solar" | "grafana";
+export type WidgetType = "state" | "camera" | "energy" | "solar" | "grafana" | "weather";
 
 export type IconPair = {
   active: string;
@@ -43,6 +43,8 @@ export type StateWidgetConfig = WidgetBase & {
   writeable: boolean;
   onLabel?: string;
   offLabel?: string;
+  activeValue?: string;
+  inactiveValue?: string;
   format?: "boolean" | "number" | "text";
 };
 
@@ -58,6 +60,15 @@ export type GrafanaWidgetConfig = WidgetBase & {
   url: string;
   refreshMs?: number;
   allowInteractions?: boolean;
+};
+
+export type WeatherWidgetConfig = WidgetBase & {
+  type: "weather";
+  latitude: number;
+  longitude: number;
+  locationName?: string;
+  timezone?: string;
+  refreshMs?: number;
 };
 
 export type EnergyWidgetConfig = WidgetBase & {
@@ -95,7 +106,8 @@ export type WidgetConfig =
   | CameraWidgetConfig
   | EnergyWidgetConfig
   | SolarWidgetConfig
-  | GrafanaWidgetConfig;
+  | GrafanaWidgetConfig
+  | WeatherWidgetConfig;
 
 export type BackgroundMode = "gradient" | "mesh" | "solid";
 

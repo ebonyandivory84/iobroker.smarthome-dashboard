@@ -43,6 +43,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         stateId: widget.stateId,
         onLabel: widget.onLabel || "",
         offLabel: widget.offLabel || "",
+        activeValue: widget.activeValue || "",
+        inactiveValue: widget.inactiveValue || "",
         writeable: widget.writeable ? "true" : "false",
         format: widget.format || "boolean",
         iconActive: widget.iconPair?.active || "toggle-switch",
@@ -86,6 +88,19 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       return;
     }
 
+    if (widget.type === "weather") {
+      setDraft({
+        title: widget.title,
+        locationName: widget.locationName || "",
+        latitude: String(widget.latitude),
+        longitude: String(widget.longitude),
+        timezone: widget.timezone || "auto",
+        refreshMs: String(widget.refreshMs || 300000),
+        ...appearanceDraft,
+      });
+      return;
+    }
+
     setDraft({
       title: widget.title,
       backgroundMode: widget.backgroundMode || "color",
@@ -121,6 +136,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         stateId: draft.stateId || widget.stateId,
         onLabel: draft.onLabel || undefined,
         offLabel: draft.offLabel || undefined,
+        activeValue: draft.activeValue || undefined,
+        inactiveValue: draft.inactiveValue || undefined,
         writeable: draft.writeable !== "false",
         format: normalizeStateFormat(draft.format),
         iconPair: {
@@ -152,6 +169,16 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         url: draft.url || widget.url,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 10000, 1000),
         allowInteractions: draft.allowInteractions !== "false",
+        appearance,
+      });
+    } else if (widget.type === "weather") {
+      onSave(widget.id, {
+        title: draft.title || widget.title,
+        locationName: draft.locationName || undefined,
+        latitude: clampFloat(draft.latitude, widget.latitude),
+        longitude: clampFloat(draft.longitude, widget.longitude),
+        timezone: draft.timezone || "auto",
+        refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 300000, 60000),
         appearance,
       });
     } else {
@@ -317,6 +344,28 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     />
                   </Field>
                 </View>
+                <View style={styles.splitRow}>
+                  <Field label="Wert aktiv">
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, activeValue: value }))}
+                      placeholder="z. B. open / 1 / true"
+                      placeholderTextColor={palette.textMuted}
+                      style={styles.input}
+                      value={draft.activeValue || ""}
+                    />
+                  </Field>
+                  <Field label="Wert inaktiv">
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, inactiveValue: value }))}
+                      placeholder="z. B. closed / 0 / false"
+                      placeholderTextColor={palette.textMuted}
+                      style={styles.input}
+                      value={draft.inactiveValue || ""}
+                    />
+                  </Field>
+                </View>
                 <Field label="Schreibzugriff">
                   <ChoiceRow
                     options={["true", "false"]}
@@ -438,6 +487,53 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     options={["true", "false"]}
                     value={draft.allowInteractions || "true"}
                     onSelect={(value) => setDraft((current) => ({ ...current, allowInteractions: value }))}
+                  />
+                </Field>
+              </>
+            ) : null}
+            {widget.type === "weather" ? (
+              <>
+                <Field label="Ort">
+                  <TextInput
+                    onChangeText={(value) => setDraft((current) => ({ ...current, locationName: value }))}
+                    style={styles.input}
+                    value={draft.locationName || ""}
+                  />
+                </Field>
+                <View style={styles.splitRow}>
+                  <Field label="Latitude">
+                    <TextInput
+                      autoCapitalize="none"
+                      keyboardType="numeric"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, latitude: value }))}
+                      style={styles.input}
+                      value={draft.latitude || ""}
+                    />
+                  </Field>
+                  <Field label="Longitude">
+                    <TextInput
+                      autoCapitalize="none"
+                      keyboardType="numeric"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, longitude: value }))}
+                      style={styles.input}
+                      value={draft.longitude || ""}
+                    />
+                  </Field>
+                </View>
+                <Field label="Timezone">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) => setDraft((current) => ({ ...current, timezone: value }))}
+                    style={styles.input}
+                    value={draft.timezone || "auto"}
+                  />
+                </Field>
+                <Field label="Refresh (ms)">
+                  <TextInput
+                    keyboardType="numeric"
+                    onChangeText={(value) => setDraft((current) => ({ ...current, refreshMs: value }))}
+                    style={styles.input}
+                    value={draft.refreshMs || ""}
                   />
                 </Field>
               </>
@@ -737,6 +833,14 @@ function clampInt(raw: string | undefined, fallback: number, min: number) {
   return Math.max(min, parsed);
 }
 
+function clampFloat(raw: string | undefined, fallback: number) {
+  const parsed = Number.parseFloat(raw || "");
+  if (Number.isNaN(parsed)) {
+    return fallback;
+  }
+  return parsed;
+}
+
 function buildAppearanceDraft(
   widget: WidgetConfig,
   theme: ReturnType<typeof resolveThemeSettings>
@@ -824,6 +928,15 @@ function getWidgetAppearanceDefaults(
       widgetColor2: "rgba(15, 24, 46, 0.94)",
       textColor: palette.text,
       mutedTextColor: palette.textMuted,
+    };
+  }
+
+  if (widget.type === "weather") {
+    return {
+      widgetColor: "#2a86db",
+      widgetColor2: "#1d4ea9",
+      textColor: palette.text,
+      mutedTextColor: "rgba(230, 243, 255, 0.82)",
     };
   }
 

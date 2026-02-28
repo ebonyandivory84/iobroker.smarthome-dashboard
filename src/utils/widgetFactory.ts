@@ -13,8 +13,19 @@ export function buildWidgetTemplate(
   const basePosition = {
     x: 0,
     y: count + 2,
-    w: type === "camera" ? 6 : type === "solar" ? 8 : type === "grafana" ? 6 : 3,
-    h: type === "camera" ? 4 : type === "solar" ? 4 : type === "energy" ? 3 : type === "grafana" ? 4 : 2,
+    w: type === "camera" ? 6 : type === "solar" ? 8 : type === "grafana" ? 6 : type === "weather" ? 4 : 3,
+    h:
+      type === "camera"
+        ? 4
+        : type === "solar"
+          ? 4
+          : type === "energy"
+            ? 3
+            : type === "grafana"
+              ? 4
+              : type === "weather"
+                ? 3
+                : 2,
   };
 
   if (type === "state") {
@@ -26,6 +37,8 @@ export function buildWidgetTemplate(
       writeable: true,
       onLabel: "Ein",
       offLabel: "Aus",
+      activeValue: "true",
+      inactiveValue: "false",
       iconPair: {
         active: "toggle-switch",
         inactive: "toggle-switch-off-outline",
@@ -76,6 +89,23 @@ export function buildWidgetTemplate(
       position: {
         ...basePosition,
         w: Math.min(6, grid.columns),
+      },
+    };
+  }
+
+  if (type === "weather") {
+    return {
+      id: `weather-${suffix}`,
+      type: "weather",
+      title: `Wetter ${suffix}`,
+      locationName: "Zuhause",
+      latitude: 52.52,
+      longitude: 13.41,
+      timezone: "auto",
+      refreshMs: 300000,
+      position: {
+        ...basePosition,
+        w: Math.min(4, grid.columns),
       },
     };
   }
