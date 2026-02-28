@@ -273,7 +273,15 @@ function SolarFlowScene({
         widgetAppearance={widgetAppearance}
         style={{ ...styles.nodePosition, top: centerY, left: leftX, width: cardWidth, minHeight: cardHeight }}
         value={fmtW(battPower || null)}
-        meta={battTemp !== null ? `${battTemp.toFixed(1)} °C` : undefined}
+        meta={
+          soc !== null && battTemp !== null
+            ? `${Math.round(soc)} % · ${battTemp.toFixed(1)} °C`
+            : soc !== null
+              ? `${Math.round(soc)} %`
+              : battTemp !== null
+                ? `${battTemp.toFixed(1)} °C`
+                : undefined
+        }
         highlight={battDir !== "idle"}
       />
       <NodeCard
@@ -527,7 +535,7 @@ function fmtW(n: number | null) {
   if (n === null) {
     return "—";
   }
-  return `${(n / 1000).toFixed(2)} kW`;
+  return `${(n / 1000).toFixed(1)} kW`;
 }
 
 function fmtKWh(n: number | null) {
