@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { createElement } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, ImageBackground, LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, ImageBackground, LayoutChangeEvent, Platform, StyleSheet, Text, View } from "react-native";
 import { SolarWidgetConfig, StateSnapshot, ThemeSettings } from "../../types/dashboard";
 import { resolveThemeSettings } from "../../utils/themeConfig";
 import { palette } from "../../utils/theme";
@@ -67,37 +68,70 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
   const pvDir: FlowDir = pvNow !== null && pvNow > 20 ? "toHome" : "idle";
   const battDir = dirFromSigned(battSigned);
   const gridDir = dirFromSigned(gridSigned);
+  const backgroundBlur = clamp(config.backgroundImageBlur ?? 8, 0, 24);
 
   return (
     <View style={styles.container}>
       {config.backgroundMode === "image" && config.backgroundImage ? (
-        <ImageBackground
-          imageStyle={styles.sceneBackgroundImage}
-          source={{ uri: `/smarthome-dashboard/widget-assets/${encodeURIComponent(config.backgroundImage)}` }}
-          style={[
-            styles.sceneCard,
-            {
-              borderColor: resolvedTheme.solar.sceneCardBorder,
-            },
-          ]}
-        >
-          <View style={styles.sceneBackgroundOverlay} />
-          <SolarFlowScene
-            battDir={battDir}
-            battPower={Math.abs(battSigned)}
-            battTemp={battTemp}
-            gridDir={gridDir}
-            gridPower={Math.abs(gridSigned)}
-            homeNow={homeNow}
-            mutedTextColor={mutedTextColor}
-            textColor={textColor}
-            widgetAppearance={widgetAppearance}
-            theme={resolvedTheme}
-            pvDir={pvDir}
-            pvNow={pvNow}
-            soc={soc}
-          />
-        </ImageBackground>
+        Platform.OS === "web" ? (
+          <View
+            style={[
+              styles.sceneCard,
+              {
+                borderColor: resolvedTheme.solar.sceneCardBorder,
+              },
+            ]}
+          >
+            {createElement("div", {
+              style: buildBlurredBackgroundStyle(config.backgroundImage, backgroundBlur),
+            })}
+            <View style={styles.sceneBackgroundOverlay} />
+            <SolarFlowScene
+              battDir={battDir}
+              battPower={Math.abs(battSigned)}
+              battTemp={battTemp}
+              gridDir={gridDir}
+              gridPower={Math.abs(gridSigned)}
+              homeNow={homeNow}
+              mutedTextColor={mutedTextColor}
+              textColor={textColor}
+              widgetAppearance={widgetAppearance}
+              theme={resolvedTheme}
+              pvDir={pvDir}
+              pvNow={pvNow}
+              soc={soc}
+            />
+          </View>
+        ) : (
+            <ImageBackground
+              blurRadius={backgroundBlur}
+              imageStyle={styles.sceneBackgroundImage}
+              source={{ uri: `/smarthome-dashboard/widget-assets/${encodeURIComponent(config.backgroundImage)}` }}
+              style={[
+                styles.sceneCard,
+                {
+                  borderColor: resolvedTheme.solar.sceneCardBorder,
+                },
+              ]}
+            >
+              <View style={styles.sceneBackgroundOverlay} />
+              <SolarFlowScene
+                battDir={battDir}
+                battPower={Math.abs(battSigned)}
+                battTemp={battTemp}
+                gridDir={gridDir}
+                gridPower={Math.abs(gridSigned)}
+                homeNow={homeNow}
+                mutedTextColor={mutedTextColor}
+                textColor={textColor}
+                widgetAppearance={widgetAppearance}
+                theme={resolvedTheme}
+                pvDir={pvDir}
+                pvNow={pvNow}
+                soc={soc}
+              />
+            </ImageBackground>
+          )
       ) : (
           <View
             style={[
@@ -618,6 +652,20 @@ function resolveBatteryIcon(soc: number | null): keyof typeof MaterialCommunityI
     return "battery-10";
   }
   return "battery-outline";
+}
+
+function buildBlurredBackgroundStyle(imageName: string, blur: number) {
+  return {
+    position: "absolute",
+    inset: "-18px",
+    borderRadius: "28px",
+    backgroundImage: `url("/smarthome-dashboard/widget-assets/${encodeURIComponent(imageName)}")`,
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
+    backgroundSize: "cover",
+    filter: `blur(${blur}px)`,
+    transform: "scale(1.04)",
+  };
 }
 
 const styles = StyleSheet.create({

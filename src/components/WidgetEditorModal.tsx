@@ -90,6 +90,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       title: widget.title,
       backgroundMode: widget.backgroundMode || "color",
       backgroundImage: widget.backgroundImage || "",
+      backgroundImageBlur: String(widget.backgroundImageBlur ?? 8),
       statePrefix: widget.statePrefix,
       dailyEnergyUnit: widget.dailyEnergyUnit || "auto",
       keyPvNow: widget.keys.pvNow,
@@ -158,6 +159,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         title: draft.title || widget.title,
         backgroundMode: draft.backgroundMode === "image" ? "image" : "color",
         backgroundImage: draft.backgroundImage || undefined,
+        backgroundImageBlur: clampInt(draft.backgroundImageBlur, widget.backgroundImageBlur ?? 8, 0),
         statePrefix: draft.statePrefix || widget.statePrefix,
         dailyEnergyUnit:
           draft.dailyEnergyUnit === "Wh" || draft.dailyEnergyUnit === "kWh" ? draft.dailyEnergyUnit : "auto",
@@ -267,16 +269,24 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       onSelect={(value) => setDraft((current) => ({ ...current, backgroundMode: value }))}
                     />
                     {draft.backgroundMode === "image" ? (
-                      <View style={styles.stateFieldRow}>
-                        <TextInput
-                          editable={false}
-                          style={[styles.input, styles.stateFieldInput]}
-                          value={draft.backgroundImage || ""}
-                        />
-                        <Pressable onPress={() => setImagePickerOpen(true)} style={styles.stateBrowseButton}>
-                          <Text style={styles.stateBrowseLabel}>Bild waehlen</Text>
-                        </Pressable>
-                      </View>
+                      <>
+                        <View style={styles.stateFieldRow}>
+                          <TextInput
+                            editable={false}
+                            style={[styles.input, styles.stateFieldInput]}
+                            value={draft.backgroundImage || ""}
+                          />
+                          <Pressable onPress={() => setImagePickerOpen(true)} style={styles.stateBrowseButton}>
+                            <Text style={styles.stateBrowseLabel}>Bild waehlen</Text>
+                          </Pressable>
+                        </View>
+                        <Field label="Bild Unschärfe">
+                          <BlurControl
+                            value={draft.backgroundImageBlur || "8"}
+                            onChange={(value) => setDraft((current) => ({ ...current, backgroundImageBlur: value }))}
+                          />
+                        </Field>
+                      </>
                     ) : null}
                   </Field>
                 </>
@@ -688,6 +698,37 @@ function IconPickerRow({
   );
 }
 
+function BlurControl({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <View style={styles.blurControlRow}>
+      {Platform.OS === "web"
+        ? createElement("input", {
+            type: "range",
+            min: 0,
+            max: 24,
+            step: 1,
+            value,
+            onChange: (event: { target: { value: string } }) => onChange(event.target.value),
+            style: webRangeInputStyle,
+          })
+        : null}
+      <TextInput
+        keyboardType="numeric"
+        onChangeText={onChange}
+        style={[styles.input, styles.blurInput]}
+        value={value}
+      />
+      <Text style={styles.blurSuffix}>px</Text>
+    </View>
+  );
+}
+
 function clampInt(raw: string | undefined, fallback: number, min: number) {
   const parsed = Number.parseInt(raw || "", 10);
   if (Number.isNaN(parsed)) {
@@ -1061,6 +1102,19 @@ const styles = StyleSheet.create({
   iconChipLabelActive: {
     color: "#08111f",
   },
+  blurControlRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  blurInput: {
+    width: 74,
+  },
+  blurSuffix: {
+    color: palette.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+  },
   layoutRow: {
     flexDirection: "row",
     gap: 8,
@@ -1160,5 +1214,11 @@ const webColorInputStyle = {
   border: "none",
   borderRadius: 10,
   background: "transparent",
+  cursor: "pointer",
+};
+
+const webRangeInputStyle = {
+  flex: 1,
+  accentColor: palette.accent,
   cursor: "pointer",
 };

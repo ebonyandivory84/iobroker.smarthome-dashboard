@@ -72,6 +72,7 @@ export type SolarWidgetConfig = WidgetBase & {
   type: "solar";
   backgroundMode?: "color" | "image";
   backgroundImage?: string;
+  backgroundImageBlur?: number;
   statePrefix: string;
   keys: {
     pvNow: string;
