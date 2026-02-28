@@ -15,17 +15,19 @@ export function StateWidget({ config, value, onToggle }: StateWidgetProps) {
   const iconName = resolveIconName(config, value);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
+  const iconColor = active
+    ? config.appearance?.iconColor || palette.accent
+    : config.appearance?.iconColor2 || palette.textMuted;
 
   return (
     <View style={styles.container}>
       <View style={styles.iconWrap}>
         <MaterialCommunityIcons
-          color={active ? palette.accent : palette.textMuted}
+          color={iconColor}
           name={(iconName || "toggle-switch-outline") as never}
           size={34}
         />
       </View>
-      <Text style={[styles.title, { color: textColor }]}>{config.title}</Text>
       <Text style={[styles.value, { color: mutedTextColor }]}>
         {hasValue ? resolveStateLabel(config, value, active) : "Keine Daten"}
       </Text>
@@ -234,16 +236,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  title: {
-    color: palette.text,
-    fontSize: 18,
-    fontWeight: "700",
-    marginTop: 14,
-  },
   value: {
     color: palette.textMuted,
     fontSize: 16,
-    marginTop: 4,
+    marginTop: 14,
   },
   hint: {
     color: palette.danger,

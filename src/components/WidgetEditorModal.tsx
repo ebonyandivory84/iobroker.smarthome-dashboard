@@ -40,6 +40,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     if (widget.type === "state") {
       setDraft({
         title: widget.title,
+        showTitle: widget.showTitle === false ? "false" : "true",
         stateId: widget.stateId,
         onLabel: widget.onLabel || "",
         offLabel: widget.offLabel || "",
@@ -61,6 +62,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     if (widget.type === "camera") {
       setDraft({
         title: widget.title,
+        showTitle: widget.showTitle === false ? "false" : "true",
         snapshotUrl: widget.snapshotUrl || "",
         rtspUrl: widget.rtspUrl || "",
         refreshMs: String(widget.refreshMs || 2000),
@@ -72,6 +74,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     if (widget.type === "energy") {
       setDraft({
         title: widget.title,
+        showTitle: widget.showTitle === false ? "false" : "true",
         pvStateId: widget.pvStateId,
         houseStateId: widget.houseStateId,
         batteryStateId: widget.batteryStateId || "",
@@ -84,6 +87,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     if (widget.type === "grafana") {
       setDraft({
         title: widget.title,
+        showTitle: widget.showTitle === false ? "false" : "true",
         url: widget.url || "",
         refreshMs: String(widget.refreshMs || 10000),
         allowInteractions: widget.allowInteractions === false ? "false" : "true",
@@ -95,6 +99,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     if (widget.type === "weather") {
       setDraft({
         title: widget.title,
+        showTitle: widget.showTitle === false ? "false" : "true",
         locationName: widget.locationName || "",
         latitude: String(widget.latitude),
         longitude: String(widget.longitude),
@@ -107,6 +112,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
 
     setDraft({
       title: widget.title,
+      showTitle: widget.showTitle === false ? "false" : "true",
       backgroundMode: widget.backgroundMode || "color",
       backgroundImage: widget.backgroundImage || "",
       backgroundImageBlur: String(widget.backgroundImageBlur ?? 8),
@@ -136,7 +142,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
 
     if (widget.type === "state") {
       onSave(widget.id, {
-        title: draft.title || widget.title,
+        title: draft.title,
+        showTitle: draft.showTitle !== "false",
         stateId: draft.stateId || widget.stateId,
         onLabel: draft.onLabel || undefined,
         offLabel: draft.offLabel || undefined,
@@ -153,7 +160,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       });
     } else if (widget.type === "camera") {
       onSave(widget.id, {
-        title: draft.title || widget.title,
+        title: draft.title,
+        showTitle: draft.showTitle !== "false",
         snapshotUrl: draft.snapshotUrl || undefined,
         rtspUrl: draft.rtspUrl || undefined,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 250),
@@ -161,7 +169,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       });
     } else if (widget.type === "energy") {
       onSave(widget.id, {
-        title: draft.title || widget.title,
+        title: draft.title,
+        showTitle: draft.showTitle !== "false",
         pvStateId: draft.pvStateId || widget.pvStateId,
         houseStateId: draft.houseStateId || widget.houseStateId,
         batteryStateId: draft.batteryStateId || undefined,
@@ -170,7 +179,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       });
     } else if (widget.type === "grafana") {
       onSave(widget.id, {
-        title: draft.title || widget.title,
+        title: draft.title,
+        showTitle: draft.showTitle !== "false",
         url: draft.url || widget.url,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 10000, 1000),
         allowInteractions: draft.allowInteractions !== "false",
@@ -178,7 +188,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       });
     } else if (widget.type === "weather") {
       onSave(widget.id, {
-        title: draft.title || widget.title,
+        title: draft.title,
+        showTitle: draft.showTitle !== "false",
         locationName: draft.locationName || undefined,
         latitude: clampFloat(draft.latitude, widget.latitude),
         longitude: clampFloat(draft.longitude, widget.longitude),
@@ -188,7 +199,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       });
     } else {
       onSave(widget.id, {
-        title: draft.title || widget.title,
+        title: draft.title,
+        showTitle: draft.showTitle !== "false",
         backgroundMode: draft.backgroundMode === "image" ? "image" : "color",
         backgroundImage: draft.backgroundImage || undefined,
         backgroundImageBlur: clampInt(draft.backgroundImageBlur, widget.backgroundImageBlur ?? 8, 0),
@@ -233,6 +245,13 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 value={draft.title || ""}
               />
             </Field>
+            <Field label="Titel anzeigen">
+              <ChoiceRow
+                options={["true", "false"]}
+                value={draft.showTitle || "true"}
+                onSelect={(value) => setDraft((current) => ({ ...current, showTitle: value }))}
+              />
+            </Field>
             <Field label="Darstellung">
               <ColorInputRow
                 firstKey="widgetColor"
@@ -250,6 +269,16 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 values={draft}
                 onChange={setDraft}
               />
+              {widget.type === "state" ? (
+                <ColorInputRow
+                  firstKey="iconColor"
+                  firstLabel="Icon aktiv"
+                  secondKey="iconColor2"
+                  secondLabel="Icon inaktiv"
+                  values={draft}
+                  onChange={setDraft}
+                />
+              ) : null}
               {widget.type === "energy" || widget.type === "solar" ? (
                 <ColorInputRow
                   firstKey="cardColor"
@@ -883,6 +912,8 @@ function buildAppearanceDraft(
     widgetColor2: appearance?.widgetColor2 || widgetDefaults.widgetColor2 || "",
     textColor: appearance?.textColor || widgetDefaults.textColor || "",
     mutedTextColor: appearance?.mutedTextColor || widgetDefaults.mutedTextColor || "",
+    iconColor: appearance?.iconColor || widgetDefaults.iconColor || "",
+    iconColor2: appearance?.iconColor2 || widgetDefaults.iconColor2 || "",
     cardColor: appearance?.cardColor || widgetDefaults.cardColor || "",
     cardColor2: appearance?.cardColor2 || widgetDefaults.cardColor2 || "",
     statColor: appearance?.statColor || widgetDefaults.statColor || "",
@@ -901,6 +932,8 @@ function buildAppearance(draft: Record<string, string>): WidgetAppearance | unde
     widgetColor2: normalizeColor(draft.widgetColor2),
     textColor: normalizeColor(draft.textColor),
     mutedTextColor: normalizeColor(draft.mutedTextColor),
+    iconColor: normalizeColor(draft.iconColor),
+    iconColor2: normalizeColor(draft.iconColor2),
     cardColor: normalizeColor(draft.cardColor),
     cardColor2: normalizeColor(draft.cardColor2),
     statColor: normalizeColor(draft.statColor),
@@ -930,6 +963,8 @@ function getWidgetAppearanceDefaults(
       widgetColor2: theme.widgetTones.stateEnd,
       textColor: palette.text,
       mutedTextColor: palette.textMuted,
+      iconColor: palette.accent,
+      iconColor2: palette.textMuted,
     };
   }
 

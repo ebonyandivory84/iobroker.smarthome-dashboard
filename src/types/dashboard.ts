@@ -17,6 +17,8 @@ export type WidgetAppearance = {
   widgetColor2?: string;
   textColor?: string;
   mutedTextColor?: string;
+  iconColor?: string;
+  iconColor2?: string;
   cardColor?: string;
   cardColor2?: string;
   statColor?: string;
@@ -32,6 +34,7 @@ export type WidgetBase = {
   id: string;
   type: WidgetType;
   title: string;
+  showTitle?: boolean;
   iconPair?: IconPair;
   position: GridPosition;
   appearance?: WidgetAppearance;
