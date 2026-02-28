@@ -181,6 +181,8 @@ function SolarFlowScene({
   const rightCenter = sceneLayout.width - leftCenter;
   const leftX = leftCenter - cardWidth / 2;
   const rightX = rightCenter - cardWidth / 2;
+  const verticalLineLeft = centerX + cardWidth / 2 - 2;
+  const verticalBeamLeft = centerX + cardWidth / 2 - 4;
 
   const topLineStart = topY + cardHeight + connectorInset;
   const topLineEnd = centerY - connectorInset;
@@ -201,8 +203,8 @@ function SolarFlowScene({
       onLayout={(event: LayoutChangeEvent) => setSceneLayout(event.nativeEvent.layout)}
       style={styles.scene}
     >
-      <View style={[styles.lineVertical, { top: topLineStart, left: sceneLayout.width / 2 - 2, height: topLineHeight }]} />
-      <View style={[styles.lineVertical, { top: bottomLineStart, left: sceneLayout.width / 2 - 2, height: bottomLineHeight }]} />
+      <View style={[styles.lineVertical, { top: topLineStart, left: verticalLineLeft, height: topLineHeight }]} />
+      <View style={[styles.lineVertical, { top: bottomLineStart, left: verticalLineLeft, height: bottomLineHeight }]} />
       <View style={[styles.lineHorizontal, { top: centerLineY, left: leftLineStart, width: leftLineWidth }]} />
       <View style={[styles.lineHorizontal, { top: centerLineY, left: rightLineStart, width: rightLineWidth }]} />
 
@@ -211,7 +213,7 @@ function SolarFlowScene({
         axis="y"
         progress={progress}
         range={pvDir === "toHome" ? [0, Math.max(0, topLineHeight - 20)] : [Math.max(0, topLineHeight - 20), 0]}
-        baseStyle={{ top: topLineStart, left: sceneLayout.width / 2 - 4 }}
+        baseStyle={{ top: topLineStart, left: verticalBeamLeft }}
         strength={clamp((pvNow || 0) / 8000, 0.2, 1)}
       />
       <AnimatedBeam
