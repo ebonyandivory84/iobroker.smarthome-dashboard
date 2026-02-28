@@ -59,7 +59,7 @@ export function CameraWidget({ config }: CameraWidgetProps) {
   }, [displayUrl, snapshotUrl]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, displayUrl ? styles.containerBleed : null]}>
       <View style={styles.preview}>
         {displayUrl ? (
           <View style={styles.snapshotWrap}>
@@ -77,10 +77,10 @@ export function CameraWidget({ config }: CameraWidgetProps) {
           </View>
         )}
       </View>
-      {!config.snapshotUrl && !config.rtspUrl ? (
+      {!displayUrl && !config.snapshotUrl && !config.rtspUrl ? (
         <Text style={[styles.hint, { color: mutedTextColor }]}>Widget ist noch nicht konfiguriert.</Text>
       ) : null}
-      {config.rtspUrl ? (
+      {config.rtspUrl && !displayUrl ? (
         <Pressable onPress={() => Linking.openURL(config.rtspUrl!)} style={styles.button}>
           <Text style={[styles.buttonLabel, { color: textColor }]}>RTSP Stream oeffnen</Text>
         </Pressable>
@@ -118,12 +118,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  containerBleed: {
+    marginHorizontal: -16,
+    marginBottom: -16,
+    marginTop: -6,
+  },
   preview: {
     flex: 1,
     minHeight: 120,
-    borderRadius: 16,
+    borderRadius: 0,
     overflow: "hidden",
-    backgroundColor: "rgba(2,6,12,0.55)",
+    backgroundColor: "#000000",
   },
   snapshotWrap: {
     flex: 1,

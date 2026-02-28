@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { GridCanvas } from "../components/GridCanvas";
 import { SettingsModal } from "../components/SettingsModal";
 import { TopBar } from "../components/TopBar";
@@ -77,10 +77,6 @@ export function DashboardScreen() {
   const editingWidget: WidgetConfig | null =
     config.widgets.find((widget) => widget.id === editingWidgetId) || null;
 
-  const normalizeLayout = () => {
-    replaceWidgets(normalizeWidgetLayout(config.widgets, config.grid.columns));
-  };
-
   return (
     <View style={styles.root}>
       <BackgroundLayer
@@ -98,33 +94,6 @@ export function DashboardScreen() {
           onToggleLayoutMode={() => setLayoutMode((current) => !current)}
           title={config.title}
         />
-        <View style={styles.controlPanel}>
-          <View style={styles.controlTextWrap}>
-            <Text style={styles.controlTitle}>Dashboard Controls</Text>
-            <Text style={styles.controlText}>
-              Layout, Widget und Settings bleiben erreichbar, treten aber visuell in den Hintergrund.
-            </Text>
-          </View>
-          <View style={styles.controlActions}>
-            <Pressable onPress={() => setLibraryOpen(true)} style={styles.controlButton}>
-              <Text style={styles.controlButtonLabel}>Widget hinzufuegen</Text>
-            </Pressable>
-            <Pressable onPress={normalizeLayout} style={styles.controlButton}>
-              <Text style={styles.controlButtonLabel}>Layout bereinigen</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setSettingsOpen(true)}
-              style={[styles.controlButton, styles.controlPrimaryButton]}
-            >
-              <Text style={styles.controlPrimaryLabel}>Settings oeffnen</Text>
-            </Pressable>
-          </View>
-        </View>
-        <View style={styles.infoStrip}>
-          <InfoPill label="Grid" value={`${config.grid.columns} Spalten`} />
-          <InfoPill label="Polling" value={`${config.pollingMs} ms`} />
-          <InfoPill label="Adapter" value={config.iobroker.adapterBasePath || "/api"} />
-        </View>
         <GridCanvas
           client={client}
           config={config}
@@ -149,15 +118,6 @@ export function DashboardScreen() {
       />
       <SettingsModal onClose={() => setSettingsOpen(false)} visible={settingsOpen} />
     </View>
-  );
-}
-
-function InfoPill({ label, value }: { label: string; value: string }) {
-  return (
-    <Pressable style={styles.pill}>
-      <Text style={styles.pillLabel}>{label}</Text>
-      <Text style={styles.pillValue}>{value}</Text>
-    </Pressable>
   );
 }
 
@@ -257,85 +217,5 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 96,
-  },
-  controlPanel: {
-    marginHorizontal: 20,
-    marginTop: 4,
-    padding: 12,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.025)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.04)",
-    gap: 10,
-  },
-  controlTextWrap: {
-    gap: 6,
-  },
-  controlTitle: {
-    color: palette.textMuted,
-    fontSize: 11,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-  },
-  controlText: {
-    color: palette.textMuted,
-    lineHeight: 18,
-    fontSize: 12,
-  },
-  controlActions: {
-    flexDirection: "row",
-    gap: 10,
-    flexWrap: "wrap",
-  },
-  controlButton: {
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    backgroundColor: "rgba(255,255,255,0.035)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.04)",
-  },
-  controlPrimaryButton: {
-    backgroundColor: palette.accent,
-    borderColor: "rgba(92, 124, 255, 0.3)",
-  },
-  controlButtonLabel: {
-    color: palette.text,
-    fontWeight: "700",
-    fontSize: 12,
-  },
-  controlPrimaryLabel: {
-    color: "#041019",
-    fontWeight: "800",
-    fontSize: 12,
-  },
-  infoStrip: {
-    flexDirection: "row",
-    gap: 10,
-    marginHorizontal: 20,
-    marginTop: 10,
-    flexWrap: "wrap",
-  },
-  pill: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.035)",
-    borderWidth: 1,
-    borderColor: palette.border,
-  },
-  pillLabel: {
-    color: palette.textMuted,
-    fontSize: 11,
-    textTransform: "uppercase",
-    fontWeight: "700",
-    letterSpacing: 0.7,
-  },
-  pillValue: {
-    color: palette.text,
-    fontSize: 14,
-    fontWeight: "700",
-    marginTop: 2,
   },
 });

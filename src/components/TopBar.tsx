@@ -42,7 +42,7 @@ export function TopBar({
           onPress={onToggleLayoutMode}
           style={[styles.actionButton, isLayoutMode ? styles.layoutActiveButton : null]}
         >
-          <MaterialCommunityIcons color={palette.text} name="drag-variant" size={18} />
+          <MaterialCommunityIcons color={palette.text} name="pencil-outline" size={18} />
         </Pressable>
         <Pressable onPress={onAddWidget} style={styles.actionButton}>
           <MaterialCommunityIcons color={palette.text} name="plus" size={18} />

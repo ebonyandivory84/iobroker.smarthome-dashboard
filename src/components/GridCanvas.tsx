@@ -328,8 +328,8 @@ function WebWidgetShell({
             {widget.type.toUpperCase()}
           </div>
         </div>
-        <div style={webHeaderActionsStyle}>
-          {isLayoutMode ? (
+        {isLayoutMode ? (
+          <div style={webHeaderActionsStyle}>
             <div onMouseDown={begin("drag")} style={webDragHandleStyle} title="Verschieben">
               <span style={webGripDotStyle} />
               <span style={webGripDotStyle} />
@@ -338,14 +338,14 @@ function WebWidgetShell({
               <span style={webGripDotStyle} />
               <span style={webGripDotStyle} />
             </div>
-          ) : null}
-          <button onClick={() => onEditWidget(widget.id)} style={webPrimaryButtonStyle} type="button">
-            Bearbeiten
-          </button>
-          <button onClick={() => onRemoveWidget(widget.id)} style={webIconButtonStyle} type="button">
-            ×
-          </button>
-        </div>
+            <button onClick={() => onEditWidget(widget.id)} style={webPrimaryButtonStyle} type="button">
+              Bearbeiten
+            </button>
+            <button onClick={() => onRemoveWidget(widget.id)} style={webIconButtonStyle} type="button">
+              ×
+            </button>
+          </div>
+        ) : null}
       </div>
       <View style={styles.webContent}>
         {renderWidget(widget, states, client, onUpdateWidget, config.theme)}
