@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useEffect, useRef } from "react";
-import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, Easing, LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
 import { SolarWidgetConfig, StateSnapshot } from "../../types/dashboard";
 import { palette } from "../../utils/theme";
 
@@ -98,6 +98,7 @@ function SolarFlowScene({
   gridPower: number;
 }) {
   const progress = useRef(new Animated.Value(0)).current;
+  const [sceneLayout, setSceneLayout] = useState({ width: 960, height: 420 });
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -112,56 +113,83 @@ function SolarFlowScene({
     return () => loop.stop();
   }, [progress]);
 
+  const cardWidth = clamp(sceneLayout.width * 0.16, 120, 172);
+  const cardHeight = 116;
+  const beamLength = 18;
+  const centerX = sceneLayout.width / 2 - cardWidth / 2;
+  const centerY = clamp(sceneLayout.height * 0.44, 156, sceneLayout.height - cardHeight * 2 - 52);
+  const horizontalGap = clamp(sceneLayout.width * 0.08, 36, 96);
+  const topGap = clamp(sceneLayout.height * 0.12, 64, 132);
+  const bottomGap = clamp(sceneLayout.height * 0.08, 28, 72);
+
+  const topY = Math.max(12, centerY - cardHeight - topGap);
+  const leftX = Math.max(0, centerX - cardWidth - horizontalGap);
+  const rightX = Math.min(sceneLayout.width - cardWidth, centerX + cardWidth + horizontalGap);
+  const bottomY = Math.min(sceneLayout.height - cardHeight - 12, centerY + cardHeight + bottomGap);
+
+  const topLineStart = topY + cardHeight;
+  const topLineHeight = Math.max(12, centerY - topLineStart);
+  const centerLineY = centerY + cardHeight / 2 - 2;
+  const leftLineStart = leftX + cardWidth;
+  const leftLineWidth = Math.max(16, centerX - leftLineStart);
+  const rightLineStart = centerX + cardWidth;
+  const rightLineWidth = Math.max(16, rightX - rightLineStart);
+  const bottomLineStart = centerY + cardHeight;
+  const bottomLineHeight = Math.max(12, bottomY - bottomLineStart);
+
   return (
-    <View style={styles.scene}>
-      <View style={styles.lineVerticalTop} />
-      <View style={styles.lineVerticalBottom} />
-      <View style={styles.lineHorizontalLeft} />
-      <View style={styles.lineHorizontalRight} />
+    <View
+      onLayout={(event: LayoutChangeEvent) => setSceneLayout(event.nativeEvent.layout)}
+      style={styles.scene}
+    >
+      <View style={[styles.lineVertical, { top: topLineStart, left: sceneLayout.width / 2 - 2, height: topLineHeight }]} />
+      <View style={[styles.lineVertical, { top: bottomLineStart, left: sceneLayout.width / 2 - 2, height: bottomLineHeight }]} />
+      <View style={[styles.lineHorizontal, { top: centerLineY, left: leftLineStart, width: leftLineWidth }]} />
+      <View style={[styles.lineHorizontal, { top: centerLineY, left: rightLineStart, width: rightLineWidth }]} />
 
       <AnimatedBeam
         active={pvDir !== "idle"}
         axis="y"
         progress={progress}
-        range={pvDir === "toHome" ? [0, 64] : [64, 0]}
-        baseStyle={styles.beamVerticalBase}
+        range={pvDir === "toHome" ? [0, Math.max(0, topLineHeight - 20)] : [Math.max(0, topLineHeight - 20), 0]}
+        baseStyle={{ top: topLineStart, left: sceneLayout.width / 2 - 4 }}
         strength={clamp((pvNow || 0) / 8000, 0.2, 1)}
       />
       <AnimatedBeam
         active={battDir !== "idle"}
         axis="x"
         progress={progress}
-        range={battDir === "toHome" ? [0, 36] : [36, 0]}
-        baseStyle={styles.beamLeftBase}
+        range={battDir === "toHome" ? [0, Math.max(0, leftLineWidth - beamLength)] : [Math.max(0, leftLineWidth - beamLength), 0]}
+        baseStyle={{ top: centerLineY - 2, left: leftLineStart }}
         strength={clamp(battPower / 6000, 0.2, 1)}
       />
       <AnimatedBeam
         active={gridDir !== "idle"}
         axis="x"
         progress={progress}
-        range={gridDir === "toHome" ? [36, 0] : [0, 36]}
-        baseStyle={styles.beamRightBase}
+        range={gridDir === "toHome" ? [Math.max(0, rightLineWidth - beamLength), 0] : [0, Math.max(0, rightLineWidth - beamLength)]}
+        baseStyle={{ top: centerLineY - 2, left: rightLineStart }}
         strength={clamp(gridPower / 12000, 0.2, 1)}
       />
 
       <NodeCard
         icon="solar-power"
         label="PV"
-        style={styles.nodeTop}
+        style={{ ...styles.nodePosition, top: topY, left: centerX, width: cardWidth, minHeight: cardHeight }}
         value={fmtW(pvNow)}
         highlight={pvDir !== "idle"}
       />
       <NodeCard
         icon="home-lightning-bolt-outline"
         label="Haus"
-        style={styles.nodeCenter}
+        style={{ ...styles.nodePosition, top: centerY, left: centerX, width: cardWidth, minHeight: cardHeight }}
         value={fmtW(homeNow)}
         highlight
       />
       <NodeCard
         icon="battery-high"
         label={soc !== null ? `Akku ${Math.round(soc)}%` : "Akku"}
-        style={styles.nodeLeft}
+        style={{ ...styles.nodePosition, top: centerY, left: leftX, width: cardWidth, minHeight: cardHeight }}
         value={fmtW(battPower || null)}
         meta={battTemp !== null ? `${battTemp.toFixed(1)} °C` : undefined}
         highlight={battDir !== "idle"}
@@ -169,7 +197,7 @@ function SolarFlowScene({
       <NodeCard
         icon="transmission-tower"
         label="Netz"
-        style={styles.nodeRight}
+        style={{ ...styles.nodePosition, top: centerY, left: rightX, width: cardWidth, minHeight: cardHeight }}
         value={fmtW(gridPower || null)}
         meta={gridDir === "toHome" ? "Bezug" : gridDir === "fromHome" ? "Einspeisung" : "Idle"}
         highlight={gridDir !== "idle"}
@@ -177,7 +205,7 @@ function SolarFlowScene({
       <NodeCard
         icon="car-electric"
         label="Auto"
-        style={styles.nodeBottom}
+        style={{ ...styles.nodePosition, top: bottomY, left: centerX, width: cardWidth, minHeight: cardHeight }}
         value="—"
         meta="Wallbox"
       />
@@ -367,70 +395,29 @@ const styles = StyleSheet.create({
   sceneCard: {
     borderRadius: 22,
     padding: 14,
+    alignSelf: "stretch",
+    aspectRatio: 2.15,
+    minHeight: 360,
     backgroundColor: "rgba(255,255,255,0.03)",
     borderWidth: 1,
     borderColor: palette.border,
+    overflow: "hidden",
   },
   scene: {
-    height: 520,
+    flex: 1,
     position: "relative",
-    alignItems: "center",
-    justifyContent: "center",
   },
-  lineVerticalTop: {
+  lineVertical: {
     position: "absolute",
-    top: "29%",
-    left: "50%",
-    marginLeft: -2,
     width: 4,
-    height: "17%",
-    minHeight: 74,
     borderRadius: 99,
     backgroundColor: "rgba(255,255,255,0.16)",
   },
-  lineVerticalBottom: {
+  lineHorizontal: {
     position: "absolute",
-    top: "66%",
-    left: "50%",
-    marginLeft: -2,
-    width: 4,
-    height: "12%",
-    minHeight: 54,
-    borderRadius: 99,
-    backgroundColor: "rgba(255,255,255,0.16)",
-  },
-  lineHorizontalLeft: {
-    position: "absolute",
-    top: "56%",
-    left: "39%",
-    width: "4%",
-    minWidth: 36,
     height: 4,
     borderRadius: 99,
     backgroundColor: "rgba(255,255,255,0.16)",
-  },
-  lineHorizontalRight: {
-    position: "absolute",
-    top: "56%",
-    left: "57%",
-    width: "4%",
-    minWidth: 36,
-    height: 4,
-    borderRadius: 99,
-    backgroundColor: "rgba(255,255,255,0.16)",
-  },
-  beamVerticalBase: {
-    top: "29%",
-    left: "50%",
-    marginLeft: -4,
-  },
-  beamLeftBase: {
-    top: "55.2%",
-    left: "39%",
-  },
-  beamRightBase: {
-    top: "55.2%",
-    left: "57%",
   },
   beamVertical: {
     position: "absolute",
@@ -454,12 +441,11 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 0 },
   },
+  nodePosition: {
+    position: "absolute",
+  },
   nodeCard: {
     position: "absolute",
-    width: "14%",
-    minWidth: 120,
-    maxWidth: 168,
-    minHeight: 112,
     borderRadius: 20,
     padding: 14,
     alignItems: "center",
@@ -469,31 +455,6 @@ const styles = StyleSheet.create({
   },
   nodeCardActive: {
     backgroundColor: "rgba(77, 226, 177, 0.06)",
-  },
-  nodeTop: {
-    top: "5%",
-    left: "50%",
-    transform: [{ translateX: -72 }],
-  },
-  nodeCenter: {
-    top: "43%",
-    left: "50%",
-    transform: [{ translateX: -72 }],
-  },
-  nodeLeft: {
-    top: "43%",
-    left: "32%",
-    transform: [{ translateX: -72 }],
-  },
-  nodeRight: {
-    top: "43%",
-    left: "68%",
-    transform: [{ translateX: -72 }],
-  },
-  nodeBottom: {
-    top: "79%",
-    left: "50%",
-    transform: [{ translateX: -72 }],
   },
   nodeIcon: {
     width: 44,
