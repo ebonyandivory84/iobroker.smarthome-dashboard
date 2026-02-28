@@ -90,10 +90,11 @@ async function main(adapter) {
           (entry.name && entry.name.toLowerCase().includes(query)) ||
           (entry.role && entry.role.toLowerCase().includes(query))
         );
-      })
-      .slice(0, 500);
+      });
 
-    res.json(entries);
+    const limitedEntries = query ? entries.slice(0, 500) : entries.slice(0, 5000);
+
+    res.json(limitedEntries);
   });
 
   if (devServerUrl) {
