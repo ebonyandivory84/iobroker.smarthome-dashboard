@@ -1,21 +1,32 @@
-import { createElement, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { createElement, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ObjectPickerModal } from "./ObjectPickerModal";
+import { IoBrokerClient } from "../services/iobroker";
 import { WidgetAppearance, WidgetConfig } from "../types/dashboard";
 import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { resolveThemeSettings } from "../utils/themeConfig";
+import { stateIconOptions } from "../utils/stateIcons";
 import { palette } from "../utils/theme";
 
 type WidgetEditorModalProps = {
+  client: IoBrokerClient;
   widget: WidgetConfig | null;
   visible: boolean;
   onClose: () => void;
   onSave: (widgetId: string, partial: Partial<WidgetConfig>) => void;
 };
 
-export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEditorModalProps) {
+export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: WidgetEditorModalProps) {
   const { config } = useDashboardConfig();
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const [pickerField, setPickerField] = useState<string | null>(null);
   const theme = resolveThemeSettings(config.theme);
+  const iconPreview = useMemo(() => {
+    const active = (draft.iconActive || widget?.iconPair?.active || "toggle-switch-outline") as keyof typeof MaterialCommunityIcons.glyphMap;
+    const inactive = (draft.iconInactive || widget?.iconPair?.inactive || "toggle-switch-off-outline") as keyof typeof MaterialCommunityIcons.glyphMap;
+    return { active, inactive };
+  }, [draft.iconActive, draft.iconInactive, widget?.iconPair?.active, widget?.iconPair?.inactive]);
 
   useEffect(() => {
     if (!widget || !visible) {
@@ -32,6 +43,8 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
         offLabel: widget.offLabel || "",
         writeable: widget.writeable ? "true" : "false",
         format: widget.format || "boolean",
+        iconActive: widget.iconPair?.active || "toggle-switch",
+        iconInactive: widget.iconPair?.inactive || "toggle-switch-off-outline",
         ...appearanceDraft,
       });
       return;
@@ -55,6 +68,17 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
         houseStateId: widget.houseStateId,
         batteryStateId: widget.batteryStateId || "",
         gridStateId: widget.gridStateId || "",
+        ...appearanceDraft,
+      });
+      return;
+    }
+
+    if (widget.type === "grafana") {
+      setDraft({
+        title: widget.title,
+        url: widget.url || "",
+        refreshMs: String(widget.refreshMs || 10000),
+        allowInteractions: widget.allowInteractions === false ? "false" : "true",
         ...appearanceDraft,
       });
       return;
@@ -94,6 +118,10 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
         offLabel: draft.offLabel || undefined,
         writeable: draft.writeable !== "false",
         format: normalizeStateFormat(draft.format),
+        iconPair: {
+          active: (draft.iconActive || widget.iconPair?.active || "toggle-switch") as never,
+          inactive: (draft.iconInactive || widget.iconPair?.inactive || "toggle-switch-off-outline") as never,
+        },
         appearance,
       });
     } else if (widget.type === "camera") {
@@ -111,6 +139,14 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
         houseStateId: draft.houseStateId || widget.houseStateId,
         batteryStateId: draft.batteryStateId || undefined,
         gridStateId: draft.gridStateId || undefined,
+        appearance,
+      });
+    } else if (widget.type === "grafana") {
+      onSave(widget.id, {
+        title: draft.title || widget.title,
+        url: draft.url || widget.url,
+        refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 10000, 1000),
+        allowInteractions: draft.allowInteractions !== "false",
         appearance,
       });
     } else {
@@ -224,10 +260,9 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
             {widget.type === "state" ? (
               <>
                 <Field label="State ID">
-                  <TextInput
-                    autoCapitalize="none"
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("stateId")}
                     onChangeText={(value) => setDraft((current) => ({ ...current, stateId: value }))}
-                    style={styles.input}
                     value={draft.stateId || ""}
                   />
                 </Field>
@@ -259,6 +294,28 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
                     options={["boolean", "number", "text"]}
                     value={draft.format || "boolean"}
                     onSelect={(value) => setDraft((current) => ({ ...current, format: value }))}
+                  />
+                </Field>
+                <Field label="Symbole">
+                  <View style={styles.iconPreviewRow}>
+                    <View style={styles.iconPreviewCard}>
+                      <MaterialCommunityIcons color={palette.accent} name={iconPreview.active} size={22} />
+                      <Text style={styles.iconPreviewLabel}>Aktiv</Text>
+                    </View>
+                    <View style={styles.iconPreviewCard}>
+                      <MaterialCommunityIcons color={palette.textMuted} name={iconPreview.inactive} size={22} />
+                      <Text style={styles.iconPreviewLabel}>Inaktiv</Text>
+                    </View>
+                  </View>
+                  <IconPickerRow
+                    label="Aktiv"
+                    selected={draft.iconActive || "toggle-switch"}
+                    onSelect={(value) => setDraft((current) => ({ ...current, iconActive: value }))}
+                  />
+                  <IconPickerRow
+                    label="Inaktiv"
+                    selected={draft.iconInactive || "toggle-switch-off-outline"}
+                    onSelect={(value) => setDraft((current) => ({ ...current, iconInactive: value }))}
                   />
                 </Field>
               </>
@@ -294,35 +351,58 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
             {widget.type === "energy" ? (
               <>
                 <Field label="PV State ID">
-                  <TextInput
-                    autoCapitalize="none"
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("pvStateId")}
                     onChangeText={(value) => setDraft((current) => ({ ...current, pvStateId: value }))}
-                    style={styles.input}
                     value={draft.pvStateId || ""}
                   />
                 </Field>
                 <Field label="Haus State ID">
-                  <TextInput
-                    autoCapitalize="none"
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("houseStateId")}
                     onChangeText={(value) => setDraft((current) => ({ ...current, houseStateId: value }))}
-                    style={styles.input}
                     value={draft.houseStateId || ""}
                   />
                 </Field>
                 <Field label="Akku State ID">
-                  <TextInput
-                    autoCapitalize="none"
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("batteryStateId")}
                     onChangeText={(value) => setDraft((current) => ({ ...current, batteryStateId: value }))}
-                    style={styles.input}
                     value={draft.batteryStateId || ""}
                   />
                 </Field>
                 <Field label="Netz State ID">
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("gridStateId")}
+                    onChangeText={(value) => setDraft((current) => ({ ...current, gridStateId: value }))}
+                    value={draft.gridStateId || ""}
+                  />
+                </Field>
+              </>
+            ) : null}
+            {widget.type === "grafana" ? (
+              <>
+                <Field label="Grafana URL">
                   <TextInput
                     autoCapitalize="none"
-                    onChangeText={(value) => setDraft((current) => ({ ...current, gridStateId: value }))}
+                    onChangeText={(value) => setDraft((current) => ({ ...current, url: value }))}
                     style={styles.input}
-                    value={draft.gridStateId || ""}
+                    value={draft.url || ""}
+                  />
+                </Field>
+                <Field label="Refresh (ms)">
+                  <TextInput
+                    keyboardType="numeric"
+                    onChangeText={(value) => setDraft((current) => ({ ...current, refreshMs: value }))}
+                    style={styles.input}
+                    value={draft.refreshMs || ""}
+                  />
+                </Field>
+                <Field label="Interaktionen">
+                  <ChoiceRow
+                    options={["true", "false"]}
+                    value={draft.allowInteractions || "true"}
+                    onSelect={(value) => setDraft((current) => ({ ...current, allowInteractions: value }))}
                   />
                 </Field>
               </>
@@ -330,10 +410,10 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
             {widget.type === "solar" ? (
               <>
                 <Field label="State Prefix">
-                  <TextInput
-                    autoCapitalize="none"
+                  <StateFieldInput
+                    browseLabel="Prefix"
+                    onBrowse={() => setPickerField("statePrefix")}
                     onChangeText={(value) => setDraft((current) => ({ ...current, statePrefix: value }))}
-                    style={styles.input}
                     value={draft.statePrefix || ""}
                   />
                 </Field>
@@ -356,99 +436,99 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
                 <Text style={styles.sectionTitle}>Key-Mapping</Text>
                 <View style={styles.splitRow}>
                   <Field label="PV aktuell">
-                    <TextInput
-                      autoCapitalize="none"
+                    <StateFieldInput
+                      browseLabel="Objekt"
+                      onBrowse={() => setPickerField("keyPvNow")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, keyPvNow: value }))}
-                      style={styles.input}
                       value={draft.keyPvNow || ""}
                     />
                   </Field>
                   <Field label="Haus aktuell">
-                    <TextInput
-                      autoCapitalize="none"
+                    <StateFieldInput
+                      browseLabel="Objekt"
+                      onBrowse={() => setPickerField("keyHomeNow")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, keyHomeNow: value }))}
-                      style={styles.input}
                       value={draft.keyHomeNow || ""}
                     />
                   </Field>
                 </View>
                 <View style={styles.splitRow}>
                   <Field label="Netzbezug">
-                    <TextInput
-                      autoCapitalize="none"
+                    <StateFieldInput
+                      browseLabel="Objekt"
+                      onBrowse={() => setPickerField("keyGridIn")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, keyGridIn: value }))}
-                      style={styles.input}
                       value={draft.keyGridIn || ""}
                     />
                   </Field>
                   <Field label="Einspeisung">
-                    <TextInput
-                      autoCapitalize="none"
+                    <StateFieldInput
+                      browseLabel="Objekt"
+                      onBrowse={() => setPickerField("keyGridOut")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, keyGridOut: value }))}
-                      style={styles.input}
                       value={draft.keyGridOut || ""}
                     />
                   </Field>
                 </View>
                 <View style={styles.splitRow}>
                   <Field label="Akku SOC">
-                    <TextInput
-                      autoCapitalize="none"
+                    <StateFieldInput
+                      browseLabel="Objekt"
+                      onBrowse={() => setPickerField("keySoc")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, keySoc: value }))}
-                      style={styles.input}
                       value={draft.keySoc || ""}
                     />
                   </Field>
                   <Field label="Akku Temp">
-                    <TextInput
-                      autoCapitalize="none"
+                    <StateFieldInput
+                      browseLabel="Objekt"
+                      onBrowse={() => setPickerField("keyBattTemp")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, keyBattTemp: value }))}
-                      style={styles.input}
                       value={draft.keyBattTemp || ""}
                     />
                   </Field>
                 </View>
                 <View style={styles.splitRow}>
                   <Field label="Akku laden">
-                    <TextInput
-                      autoCapitalize="none"
+                    <StateFieldInput
+                      browseLabel="Objekt"
+                      onBrowse={() => setPickerField("keyBattIn")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, keyBattIn: value }))}
-                      style={styles.input}
                       value={draft.keyBattIn || ""}
                     />
                   </Field>
                   <Field label="Akku entladen">
-                    <TextInput
-                      autoCapitalize="none"
+                    <StateFieldInput
+                      browseLabel="Objekt"
+                      onBrowse={() => setPickerField("keyBattOut")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, keyBattOut: value }))}
-                      style={styles.input}
                       value={draft.keyBattOut || ""}
                     />
                   </Field>
                 </View>
                 <View style={styles.splitRow}>
                   <Field label="Tag Verbrauch">
-                    <TextInput
-                      autoCapitalize="none"
+                    <StateFieldInput
+                      browseLabel="Objekt"
+                      onBrowse={() => setPickerField("keyDayConsumed")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, keyDayConsumed: value }))}
-                      style={styles.input}
                       value={draft.keyDayConsumed || ""}
                     />
                   </Field>
                   <Field label="Tag Eigen">
-                    <TextInput
-                      autoCapitalize="none"
+                    <StateFieldInput
+                      browseLabel="Objekt"
+                      onBrowse={() => setPickerField("keyDaySelf")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, keyDaySelf: value }))}
-                      style={styles.input}
                       value={draft.keyDaySelf || ""}
                     />
                   </Field>
                 </View>
                 <Field label="PV Gesamt">
-                  <TextInput
-                    autoCapitalize="none"
+                  <StateFieldInput
+                    browseLabel="Objekt"
+                    onBrowse={() => setPickerField("keyPvTotal")}
                     onChangeText={(value) => setDraft((current) => ({ ...current, keyPvTotal: value }))}
-                    style={styles.input}
                     value={draft.keyPvTotal || ""}
                   />
                 </Field>
@@ -462,6 +542,16 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
           </View>
         </View>
       </View>
+      <ObjectPickerModal
+        client={client}
+        onClose={() => setPickerField(null)}
+        onSelect={(entry) => {
+          applyObjectSelection(pickerField, entry.id, draft, setDraft);
+          setPickerField(null);
+        }}
+        title="ioBroker Objektbaum"
+        visible={Boolean(pickerField)}
+      />
     </Modal>
   );
 }
@@ -499,6 +589,66 @@ function ChoiceRow({
   );
 }
 
+function StateFieldInput({
+  value,
+  onChangeText,
+  onBrowse,
+  browseLabel = "Objekt waehlen",
+}: {
+  value: string;
+  onChangeText: (value: string) => void;
+  onBrowse: () => void;
+  browseLabel?: string;
+}) {
+  return (
+    <View style={styles.stateFieldRow}>
+      <TextInput autoCapitalize="none" onChangeText={onChangeText} style={[styles.input, styles.stateFieldInput]} value={value} />
+      <Pressable onPress={onBrowse} style={styles.stateBrowseButton}>
+        <Text style={styles.stateBrowseLabel}>{browseLabel}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function IconPickerRow({
+  label,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  selected: string;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <View style={styles.iconPickerBlock}>
+      <Text style={styles.iconPickerLabel}>{label}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={styles.iconPickerRow}>
+          {stateIconOptions.map((option) => {
+            const value = label === "Aktiv" ? option.active : option.inactive;
+            const active = selected === value;
+
+            return (
+              <Pressable
+                key={`${label}-${option.label}`}
+                onPress={() => onSelect(value)}
+                style={[styles.iconChip, active ? styles.iconChipActive : null]}
+              >
+                <MaterialCommunityIcons
+                  color={active ? "#08111f" : palette.text}
+                  name={value}
+                  size={18}
+                />
+                <Text style={[styles.iconChipLabel, active ? styles.iconChipLabelActive : null]}>{option.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
 function clampInt(raw: string | undefined, fallback: number, min: number) {
   const parsed = Number.parseInt(raw || "", 10);
   if (Number.isNaN(parsed)) {
@@ -517,8 +667,8 @@ function buildAppearanceDraft(
   return {
     widgetColor: appearance?.widgetColor || widgetDefaults.widgetColor || "",
     widgetColor2: appearance?.widgetColor2 || widgetDefaults.widgetColor2 || "",
-    textColor: appearance?.textColor || "",
-    mutedTextColor: appearance?.mutedTextColor || "",
+    textColor: appearance?.textColor || widgetDefaults.textColor || "",
+    mutedTextColor: appearance?.mutedTextColor || widgetDefaults.mutedTextColor || "",
     cardColor: appearance?.cardColor || widgetDefaults.cardColor || "",
     cardColor2: appearance?.cardColor2 || widgetDefaults.cardColor2 || "",
     statColor: appearance?.statColor || widgetDefaults.statColor || "",
@@ -564,6 +714,8 @@ function getWidgetAppearanceDefaults(
     return {
       widgetColor: theme.widgetTones.stateStart,
       widgetColor2: theme.widgetTones.stateEnd,
+      textColor: palette.text,
+      mutedTextColor: palette.textMuted,
     };
   }
 
@@ -571,6 +723,8 @@ function getWidgetAppearanceDefaults(
     return {
       widgetColor: theme.widgetTones.cameraStart,
       widgetColor2: theme.widgetTones.cameraEnd,
+      textColor: palette.text,
+      mutedTextColor: palette.textMuted,
     };
   }
 
@@ -578,16 +732,56 @@ function getWidgetAppearanceDefaults(
     return {
       widgetColor: theme.widgetTones.energyStart,
       widgetColor2: theme.widgetTones.energyEnd,
+      textColor: palette.text,
+      mutedTextColor: palette.textMuted,
       cardColor: "rgba(255,255,255,0.03)",
+    };
+  }
+
+  if (widget.type === "grafana") {
+    return {
+      widgetColor: "rgba(13, 19, 35, 0.96)",
+      widgetColor2: "rgba(15, 24, 46, 0.94)",
+      textColor: palette.text,
+      mutedTextColor: palette.textMuted,
     };
   }
 
   return {
     widgetColor: theme.widgetTones.solarStart,
     widgetColor2: theme.widgetTones.solarEnd,
+    textColor: palette.text,
+    mutedTextColor: palette.textMuted,
     cardColor: theme.solar.nodeCardBackground,
     statColor: theme.solar.statCardBackground,
   };
+}
+
+function applyObjectSelection(
+  fieldKey: string | null,
+  objectId: string,
+  draft: Record<string, string>,
+  onChange: Dispatch<SetStateAction<Record<string, string>>>
+) {
+  if (!fieldKey) {
+    return;
+  }
+
+  if (fieldKey === "statePrefix") {
+    const segments = objectId.split(".");
+    const prefix = segments.slice(0, -1).join(".");
+    onChange((current) => ({ ...current, statePrefix: prefix || objectId }));
+    return;
+  }
+
+  if (fieldKey.startsWith("key")) {
+    const prefix = (draft.statePrefix || "").trim();
+    const nextValue = prefix && objectId.startsWith(`${prefix}.`) ? objectId.slice(prefix.length + 1) : objectId.split(".").pop() || objectId;
+    onChange((current) => ({ ...current, [fieldKey]: nextValue }));
+    return;
+  }
+
+  onChange((current) => ({ ...current, [fieldKey]: objectId }));
 }
 
 function ColorInputRow({
@@ -749,6 +943,84 @@ const styles = StyleSheet.create({
   splitRow: {
     flexDirection: "row",
     gap: 10,
+  },
+  stateFieldRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+  },
+  stateFieldInput: {
+    flex: 1,
+  },
+  stateBrowseButton: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(92, 124, 255, 0.22)",
+    backgroundColor: "rgba(92, 124, 255, 0.12)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  stateBrowseLabel: {
+    color: palette.text,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  iconPreviewRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 10,
+  },
+  iconPreviewCard: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    padding: 10,
+    alignItems: "center",
+    gap: 6,
+  },
+  iconPreviewLabel: {
+    color: palette.textMuted,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  iconPickerBlock: {
+    gap: 6,
+    marginBottom: 10,
+  },
+  iconPickerLabel: {
+    color: palette.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  iconPickerRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingVertical: 2,
+  },
+  iconChip: {
+    minWidth: 88,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    alignItems: "center",
+    gap: 6,
+  },
+  iconChipActive: {
+    backgroundColor: palette.accent,
+    borderColor: "rgba(92,124,255,0.4)",
+  },
+  iconChipLabel: {
+    color: palette.text,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  iconChipLabelActive: {
+    color: "#08111f",
   },
   layoutRow: {
     flexDirection: "row",

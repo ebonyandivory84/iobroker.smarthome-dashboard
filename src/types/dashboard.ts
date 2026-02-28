@@ -1,4 +1,4 @@
-export type WidgetType = "state" | "camera" | "energy" | "solar";
+export type WidgetType = "state" | "camera" | "energy" | "solar" | "grafana";
 
 export type IconPair = {
   active: string;
@@ -53,6 +53,13 @@ export type CameraWidgetConfig = WidgetBase & {
   refreshMs?: number;
 };
 
+export type GrafanaWidgetConfig = WidgetBase & {
+  type: "grafana";
+  url: string;
+  refreshMs?: number;
+  allowInteractions?: boolean;
+};
+
 export type EnergyWidgetConfig = WidgetBase & {
   type: "energy";
   pvStateId: string;
@@ -84,7 +91,8 @@ export type WidgetConfig =
   | StateWidgetConfig
   | CameraWidgetConfig
   | EnergyWidgetConfig
-  | SolarWidgetConfig;
+  | SolarWidgetConfig
+  | GrafanaWidgetConfig;
 
 export type BackgroundMode = "gradient" | "mesh" | "solid";
 
@@ -132,3 +140,11 @@ export type DashboardSettings = {
 };
 
 export type StateSnapshot = Record<string, unknown>;
+
+export type IoBrokerObjectEntry = {
+  id: string;
+  name?: string;
+  type?: string;
+  role?: string;
+  valueType?: string;
+};

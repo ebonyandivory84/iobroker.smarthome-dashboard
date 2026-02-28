@@ -9,6 +9,7 @@ import { palette } from "../utils/theme";
 import { WidgetFrame } from "./WidgetFrame";
 import { CameraWidget } from "./widgets/CameraWidget";
 import { EnergyWidget } from "./widgets/EnergyWidget";
+import { GrafanaWidget } from "./widgets/GrafanaWidget";
 import { SolarWidget } from "./widgets/SolarWidget";
 import { StateWidget } from "./widgets/StateWidget";
 
@@ -387,6 +388,10 @@ function renderWidget(
     return <SolarWidget config={widget} states={states} theme={theme} />;
   }
 
+  if (widget.type === "grafana") {
+    return <GrafanaWidget config={widget} />;
+  }
+
   return null;
 }
 
@@ -466,6 +471,7 @@ const webWidgetStyle: CSSProperties = {
   position: "absolute",
   display: "flex",
   flexDirection: "column",
+  fontFamily: "Arial, sans-serif",
   borderRadius: 22,
   padding: 16,
   background: "linear-gradient(180deg, rgba(29,35,55,0.94), rgba(20,24,40,0.96))",
@@ -612,6 +618,12 @@ function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThe
       background: `linear-gradient(135deg, ${theme.widgetTones.solarStart} 0%, ${theme.widgetTones.solarEnd} 100%)`,
       border: "1px solid rgba(105, 214, 189, 0.18)",
       boxShadow: "0 18px 30px rgba(10, 62, 82, 0.28)",
+    };
+  }
+  if (type === "grafana") {
+    return {
+      background: "linear-gradient(180deg, rgba(12,18,30,0.96), rgba(9,13,24,0.98))",
+      border: "1px solid rgba(255,255,255,0.06)",
     };
   }
   return {};
