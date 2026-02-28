@@ -23,8 +23,8 @@ export function CameraWidget({ config }: CameraWidgetProps) {
       return null;
     }
     const separator = config.snapshotUrl.includes("?") ? "&" : "?";
-    return `${config.snapshotUrl}${separator}t=${tick}`;
-  }, [config.snapshotUrl, tick]);
+    return `${config.snapshotUrl}${separator}t=${tick}&widget=${encodeURIComponent(config.id)}`;
+  }, [config.id, config.snapshotUrl, tick]);
 
   useEffect(() => {
     if (!snapshotUrl) {
@@ -35,6 +35,13 @@ export function CameraWidget({ config }: CameraWidgetProps) {
     let active = true;
 
     if (!displayUrl) {
+      setDisplayUrl(snapshotUrl);
+      return () => {
+        active = false;
+      };
+    }
+
+    if (Platform.OS === "web") {
       setDisplayUrl(snapshotUrl);
       return () => {
         active = false;
@@ -64,8 +71,11 @@ export function CameraWidget({ config }: CameraWidgetProps) {
         {displayUrl ? (
           <View style={styles.snapshotWrap}>
             {Platform.OS === "web"
-              ? createElement("div", {
-                  style: buildWebSnapshotStyle(displayUrl),
+              ? createElement("img", {
+                  alt: config.title || "Camera snapshot",
+                  draggable: false,
+                  src: displayUrl,
+                  style: webImageStyle,
                 })
               : (
                   <Image resizeMode="contain" source={{ uri: displayUrl }} style={styles.image} />
@@ -97,28 +107,7 @@ export function CameraWidget({ config }: CameraWidgetProps) {
 }
 
 async function preloadSnapshot(uri: string) {
-  if (Platform.OS === "web" && typeof window !== "undefined" && typeof window.Image === "function") {
-    await new Promise<void>((resolve, reject) => {
-      const img = new window.Image();
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error("Snapshot preload failed"));
-      img.src = uri;
-    });
-    return;
-  }
-
   await Image.prefetch(uri);
-}
-
-function buildWebSnapshotStyle(uri: string) {
-  return {
-    width: "100%",
-    height: "100%",
-    backgroundImage: `url("${uri}")`,
-    backgroundPosition: "center",
-    backgroundRepeat: "no-repeat",
-    backgroundSize: "contain",
-  };
 }
 
 const styles = StyleSheet.create({
@@ -182,3 +171,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+
+const webImageStyle = {
+  width: "100%",
+  height: "100%",
+  objectFit: "contain",
+  display: "block",
+  backgroundColor: "#000000",
+} as const;
