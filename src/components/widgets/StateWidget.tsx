@@ -83,6 +83,11 @@ function resolveIconName(config: StateWidgetConfig, value: unknown) {
 }
 
 function resolveStateLabel(config: StateWidgetConfig, value: unknown, active: boolean) {
+  const mappedLabel = resolveMappedLabel(config, value);
+  if (mappedLabel) {
+    return mappedLabel;
+  }
+
   if (active && config.onLabel) {
     return config.onLabel;
   }
@@ -95,6 +100,15 @@ function resolveStateLabel(config: StateWidgetConfig, value: unknown, active: bo
   }
 
   return active ? "Ein" : "Aus";
+}
+
+function resolveMappedLabel(config: StateWidgetConfig, value: unknown) {
+  if (!config.valueLabels || value === null || value === undefined) {
+    return null;
+  }
+
+  const key = config.format === "number" ? String(asNumber(value)) : String(value);
+  return config.valueLabels[key] || null;
 }
 
 function shouldUseBatteryScale(config: StateWidgetConfig) {

@@ -45,6 +45,10 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         offLabel: widget.offLabel || "",
         activeValue: widget.activeValue || "",
         inactiveValue: widget.inactiveValue || "",
+        valueLabelsJson:
+          widget.valueLabels && Object.keys(widget.valueLabels).length
+            ? JSON.stringify(widget.valueLabels, null, 2)
+            : "",
         writeable: widget.writeable ? "true" : "false",
         format: widget.format || "boolean",
         iconActive: widget.iconPair?.active || "toggle-switch",
@@ -138,6 +142,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         offLabel: draft.offLabel || undefined,
         activeValue: draft.activeValue || undefined,
         inactiveValue: draft.inactiveValue || undefined,
+        valueLabels: parseValueLabels(draft.valueLabelsJson),
         writeable: draft.writeable !== "false",
         format: normalizeStateFormat(draft.format),
         iconPair: {
@@ -384,6 +389,24 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     onSelect={(value) => setDraft((current) => ({ ...current, format: value }))}
                   />
                 </Field>
+                {draft.format === "text" || draft.format === "number" ? (
+                  <Field label="Wert-Labels (JSON)">
+                    <TextInput
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      multiline
+                      onChangeText={(value) => setDraft((current) => ({ ...current, valueLabelsJson: value }))}
+                      placeholder={draft.format === "text" ? '{\n  "open": "Offen",\n  "closed": "Geschlossen"\n}' : '{\n  "0": "Zu",\n  "1": "Offen"\n}'}
+                      placeholderTextColor={palette.textMuted}
+                      style={[styles.input, styles.mappingEditor]}
+                      textAlignVertical="top"
+                      value={draft.valueLabelsJson || ""}
+                    />
+                    <Text style={styles.mappingHint}>
+                      Definiere hier, welche Rohwerte vorkommen koennen und welcher Anzeigetext dafuer gezeigt werden soll.
+                    </Text>
+                  </Field>
+                ) : null}
                 <Field label="Symbole">
                   <View style={styles.iconPreviewRow}>
                     <View style={styles.iconPreviewCard}>
@@ -1096,6 +1119,33 @@ function normalizeStateFormat(raw: string | undefined) {
   return "boolean";
 }
 
+function parseValueLabels(raw: string | undefined) {
+  const trimmed = (raw || "").trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    const pairs = Object.entries(parsed).filter(
+      ([key, value]) => typeof key === "string" && typeof value === "string"
+    );
+
+    if (!pairs.length) {
+      return undefined;
+    }
+
+    const result: Record<string, string> = {};
+    pairs.forEach(([key, value]) => {
+      result[key] = value as string;
+    });
+
+    return result;
+  } catch {
+    return undefined;
+  }
+}
+
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
@@ -1225,6 +1275,9 @@ const styles = StyleSheet.create({
     color: palette.textMuted,
     fontSize: 12,
     lineHeight: 18,
+  },
+  mappingEditor: {
+    minHeight: 110,
   },
   blurControlRow: {
     flexDirection: "row",

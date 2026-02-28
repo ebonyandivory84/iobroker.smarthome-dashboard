@@ -45,6 +45,7 @@ export type StateWidgetConfig = WidgetBase & {
   offLabel?: string;
   activeValue?: string;
   inactiveValue?: string;
+  valueLabels?: Record<string, string>;
   format?: "boolean" | "number" | "text";
 };
 
