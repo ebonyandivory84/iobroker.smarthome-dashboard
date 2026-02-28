@@ -48,6 +48,14 @@ async function main(adapter) {
   if (devServerUrl) {
     const target = devServerUrl.replace(/\/+$/, "");
     app.use(
+      "/_expo",
+      createProxyMiddleware({
+        target,
+        changeOrigin: true,
+        ws: true,
+      })
+    );
+    app.use(
       "/smarthome-dashboard",
       createProxyMiddleware({
         target,
@@ -59,6 +67,7 @@ async function main(adapter) {
       })
     );
   } else {
+    app.use("/_expo", express.static(path.join(webRoot, "_expo")));
     app.use("/smarthome-dashboard", express.static(webRoot));
     app.get("/smarthome-dashboard/*", (req, res, next) => {
       const indexPath = path.join(webRoot, "index.html");
