@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { createElement, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -98,16 +99,31 @@ export function ObjectPickerModal({
             <Text style={styles.metaText}>{entries.length} Treffer</Text>
             {loading ? <ActivityIndicator color={palette.accent} size="small" /> : null}
           </View>
+          <Text style={styles.helperText}>
+            Klick auf einen Ordner zum Auf- und Zuklappen. Ein State waehlt die komplette Objekt-ID.
+          </Text>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          <ScrollView style={styles.treeScroll}>
-            {tree.length ? (
-              tree.map((node) => (
-                <TreeBranch key={node.id} node={node} onSelect={onSelect} />
-              ))
-            ) : (
-              <Text style={styles.emptyText}>{loading ? "Lade Objektbaum..." : "Keine Objekte gefunden"}</Text>
-            )}
-          </ScrollView>
+          {Platform.OS === "web"
+            ? createElement(
+                "div",
+                {
+                  style: webTreeScrollStyle,
+                },
+                tree.length ? (
+                  tree.map((node) => <TreeBranch key={node.id} node={node} onSelect={onSelect} />)
+                ) : (
+                  <Text style={styles.emptyText}>{loading ? "Lade Objektbaum..." : "Keine Objekte gefunden"}</Text>
+                )
+              )
+            : (
+                <ScrollView nestedScrollEnabled style={styles.treeScroll}>
+                  {tree.length ? (
+                    tree.map((node) => <TreeBranch key={node.id} node={node} onSelect={onSelect} />)
+                  ) : (
+                    <Text style={styles.emptyText}>{loading ? "Lade Objektbaum..." : "Keine Objekte gefunden"}</Text>
+                  )}
+                </ScrollView>
+              )}
         </View>
       </View>
     </Modal>
@@ -146,6 +162,7 @@ function TreeBranch({
       <Pressable onPress={() => setExpanded((current) => !current)} style={[styles.branchRow, { paddingLeft: 14 + depth * 16 }]}>
         <Text style={styles.branchToggle}>{expanded ? "▾" : "▸"}</Text>
         <Text style={styles.branchLabel}>{node.label}</Text>
+        <Text style={styles.branchMeta}>{node.children.length}</Text>
       </Pressable>
       {expanded
         ? node.children.map((child) => (
@@ -262,7 +279,7 @@ const styles = StyleSheet.create({
   },
   metaRow: {
     marginTop: 10,
-    marginBottom: 10,
+    marginBottom: 8,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -271,18 +288,33 @@ const styles = StyleSheet.create({
     color: palette.textMuted,
     fontSize: 12,
   },
+  helperText: {
+    color: palette.textMuted,
+    fontSize: 12,
+    marginBottom: 10,
+    lineHeight: 18,
+  },
   errorText: {
     color: palette.danger,
     marginBottom: 10,
   },
   treeScroll: {
-    maxHeight: 460,
+    height: 460,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: "rgba(3, 8, 15, 0.55)",
+    paddingVertical: 6,
   },
   branchRow: {
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 34,
+    minHeight: 36,
     borderRadius: 12,
+    marginHorizontal: 6,
+    marginVertical: 1,
+    paddingRight: 12,
+    backgroundColor: "rgba(255,255,255,0.02)",
   },
   branchToggle: {
     width: 16,
@@ -291,10 +323,20 @@ const styles = StyleSheet.create({
   branchLabel: {
     color: palette.text,
     fontWeight: "700",
+    flex: 1,
+  },
+  branchMeta: {
+    color: palette.textMuted,
+    fontSize: 11,
+    fontWeight: "700",
   },
   leafRow: {
+    marginHorizontal: 6,
+    marginVertical: 1,
     paddingVertical: 8,
+    paddingRight: 12,
     borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.015)",
   },
   leafTitle: {
     color: palette.text,
@@ -308,5 +350,15 @@ const styles = StyleSheet.create({
   emptyText: {
     color: palette.textMuted,
     paddingVertical: 18,
+    paddingHorizontal: 14,
   },
 });
+
+const webTreeScrollStyle = {
+  height: "460px",
+  overflowY: "auto",
+  borderRadius: "16px",
+  border: `1px solid ${palette.border}`,
+  background: "rgba(3, 8, 15, 0.55)",
+  padding: "6px 0",
+};

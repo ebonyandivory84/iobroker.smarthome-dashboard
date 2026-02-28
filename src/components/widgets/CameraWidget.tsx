@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Image, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Image, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { CameraWidgetConfig } from "../../types/dashboard";
 import { palette } from "../../utils/theme";
 
@@ -10,6 +10,8 @@ type CameraWidgetProps = {
 export function CameraWidget({ config }: CameraWidgetProps) {
   const [tick, setTick] = useState(0);
   const [displayUrl, setDisplayUrl] = useState<string | null>(null);
+  const [overlayUrl, setOverlayUrl] = useState<string | null>(null);
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
 
@@ -29,6 +31,7 @@ export function CameraWidget({ config }: CameraWidgetProps) {
   useEffect(() => {
     if (!snapshotUrl) {
       setDisplayUrl(null);
+      setOverlayUrl(null);
       return;
     }
 
@@ -44,12 +47,23 @@ export function CameraWidget({ config }: CameraWidgetProps) {
     preloadSnapshot(snapshotUrl)
       .then(() => {
         if (active) {
-          setDisplayUrl(snapshotUrl);
+          overlayOpacity.setValue(0);
+          setOverlayUrl(snapshotUrl);
+          Animated.timing(overlayOpacity, {
+            toValue: 1,
+            duration: 220,
+            useNativeDriver: true,
+          }).start(() => {
+            setDisplayUrl(snapshotUrl);
+            setOverlayUrl(null);
+            overlayOpacity.setValue(0);
+          });
         }
       })
       .catch(() => {
         if (active) {
           setDisplayUrl(snapshotUrl);
+          setOverlayUrl(null);
         }
       });
 
@@ -64,6 +78,13 @@ export function CameraWidget({ config }: CameraWidgetProps) {
         {displayUrl ? (
           <View style={styles.snapshotWrap}>
             <Image resizeMode="contain" source={{ uri: displayUrl }} style={styles.image} />
+            {overlayUrl ? (
+              <Animated.Image
+                resizeMode="contain"
+                source={{ uri: overlayUrl }}
+                style={[styles.image, styles.overlayImage, { opacity: overlayOpacity }]}
+              />
+            ) : null}
           </View>
         ) : (
           <View style={styles.empty}>
