@@ -592,8 +592,9 @@ function getWidgetTone(type: WidgetConfig["type"]): CSSProperties {
   if (type === "solar") {
     return {
       background:
-        "radial-gradient(circle at top left, rgba(127, 38, 255, 0.28), transparent 35%), linear-gradient(180deg, rgba(21, 28, 49, 0.94), rgba(14, 18, 31, 0.98))",
-      border: "1px solid rgba(162, 104, 255, 0.18)",
+        "linear-gradient(135deg, rgba(18, 122, 94, 0.98) 0%, rgba(24, 154, 128, 0.94) 34%, rgba(21, 108, 184, 0.94) 72%, rgba(16, 72, 156, 0.96) 100%)",
+      border: "1px solid rgba(105, 214, 189, 0.18)",
+      boxShadow: "0 18px 30px rgba(10, 62, 82, 0.28)",
     };
   }
   return {};
