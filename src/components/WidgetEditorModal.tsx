@@ -389,24 +389,27 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     onSelect={(value) => setDraft((current) => ({ ...current, format: value }))}
                   />
                 </Field>
-                {draft.format === "text" || draft.format === "number" ? (
-                  <Field label="Wert-Labels (JSON)">
-                    <TextInput
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      multiline
-                      onChangeText={(value) => setDraft((current) => ({ ...current, valueLabelsJson: value }))}
-                      placeholder={draft.format === "text" ? '{\n  "open": "Offen",\n  "closed": "Geschlossen"\n}' : '{\n  "0": "Zu",\n  "1": "Offen"\n}'}
-                      placeholderTextColor={palette.textMuted}
-                      style={[styles.input, styles.mappingEditor]}
-                      textAlignVertical="top"
-                      value={draft.valueLabelsJson || ""}
-                    />
-                    <Text style={styles.mappingHint}>
-                      Definiere hier, welche Rohwerte vorkommen koennen und welcher Anzeigetext dafuer gezeigt werden soll.
-                    </Text>
-                  </Field>
-                ) : null}
+                <Field label="Wert-Labels (JSON)">
+                  <TextInput
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    multiline
+                    onChangeText={(value) => setDraft((current) => ({ ...current, valueLabelsJson: value }))}
+                    placeholder={
+                      draft.format === "number"
+                        ? '{\n  "0": "Zu",\n  "1": "Offen"\n}'
+                        : '{\n  "open": "Offen",\n  "closed": "Geschlossen"\n}'
+                    }
+                    placeholderTextColor={palette.textMuted}
+                    style={[styles.input, styles.mappingEditor]}
+                    textAlignVertical="top"
+                    value={draft.valueLabelsJson || ""}
+                  />
+                  <Text style={styles.mappingHint}>
+                    Optional. Hier kannst du Rohwerte wie `open`, `closed`, `0` oder `1` auf lesbare Labels abbilden.
+                    Besonders sinnvoll bei `text` und `number`.
+                  </Text>
+                </Field>
                 <Field label="Symbole">
                   <View style={styles.iconPreviewRow}>
                     <View style={styles.iconPreviewCard}>
