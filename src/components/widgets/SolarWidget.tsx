@@ -198,6 +198,7 @@ function SolarFlowScene({
       <NodeCard
         icon="solar-power"
         label="PV"
+        nodeColor={widgetAppearance?.pvCardColor}
         theme={theme}
         widgetAppearance={widgetAppearance}
         style={{ ...styles.nodePosition, top: topY, left: centerX, width: cardWidth, minHeight: cardHeight }}
@@ -207,6 +208,7 @@ function SolarFlowScene({
       <NodeCard
         icon="home-lightning-bolt-outline"
         label="Haus"
+        nodeColor={widgetAppearance?.homeCardColor}
         theme={theme}
         widgetAppearance={widgetAppearance}
         style={{ ...styles.nodePosition, top: centerY, left: centerX, width: cardWidth, minHeight: cardHeight }}
@@ -216,6 +218,7 @@ function SolarFlowScene({
       <NodeCard
         icon="battery-high"
         label={soc !== null ? `Akku ${Math.round(soc)}%` : "Akku"}
+        nodeColor={widgetAppearance?.batteryCardColor}
         theme={theme}
         widgetAppearance={widgetAppearance}
         style={{ ...styles.nodePosition, top: centerY, left: leftX, width: cardWidth, minHeight: cardHeight }}
@@ -226,6 +229,7 @@ function SolarFlowScene({
       <NodeCard
         icon="transmission-tower"
         label="Netz"
+        nodeColor={widgetAppearance?.gridCardColor}
         theme={theme}
         widgetAppearance={widgetAppearance}
         style={{ ...styles.nodePosition, top: centerY, left: rightX, width: cardWidth, minHeight: cardHeight }}
@@ -236,6 +240,7 @@ function SolarFlowScene({
       <NodeCard
         icon="car-electric"
         label="Auto"
+        nodeColor={widgetAppearance?.carCardColor}
         theme={theme}
         widgetAppearance={widgetAppearance}
         style={{ ...styles.nodePosition, top: bottomY, left: centerX, width: cardWidth, minHeight: cardHeight }}
@@ -293,6 +298,7 @@ function NodeCard({
   style,
   theme,
   widgetAppearance,
+  nodeColor,
 }: {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   label: string;
@@ -302,13 +308,14 @@ function NodeCard({
   style?: object;
   theme: ThemeSettings;
   widgetAppearance?: SolarWidgetConfig["appearance"];
+  nodeColor?: string;
 }) {
   return (
     <View
       style={[
         styles.nodeCard,
         {
-          backgroundColor: widgetAppearance?.cardColor || theme.solar.nodeCardBackground,
+          backgroundColor: nodeColor || widgetAppearance?.cardColor || theme.solar.nodeCardBackground,
           borderColor: theme.solar.nodeCardBorder,
         },
         style,

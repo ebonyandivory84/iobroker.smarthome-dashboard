@@ -177,14 +177,40 @@ export function WidgetEditorModal({ widget, visible, onClose, onSave }: WidgetEd
                 />
               ) : null}
               {widget.type === "solar" ? (
-                <ColorInputRow
-                  firstKey="statColor"
-                  firstLabel="Stats"
-                  secondKey="statColor2"
-                  secondLabel="Verlauf 2"
-                  values={draft}
-                  onChange={setDraft}
-                />
+                <>
+                  <ColorInputRow
+                    firstKey="statColor"
+                    firstLabel="Stats"
+                    secondKey="statColor2"
+                    secondLabel="Verlauf 2"
+                    values={draft}
+                    onChange={setDraft}
+                  />
+                  <ColorInputRow
+                    firstKey="pvCardColor"
+                    firstLabel="PV"
+                    secondKey="homeCardColor"
+                    secondLabel="Haus"
+                    values={draft}
+                    onChange={setDraft}
+                  />
+                  <ColorInputRow
+                    firstKey="batteryCardColor"
+                    firstLabel="Akku"
+                    secondKey="gridCardColor"
+                    secondLabel="Netz"
+                    values={draft}
+                    onChange={setDraft}
+                  />
+                  <ColorInputRow
+                    firstKey="carCardColor"
+                    firstLabel="Auto"
+                    secondKey="cardColor"
+                    secondLabel="Alle Cards"
+                    values={draft}
+                    onChange={setDraft}
+                  />
+                </>
               ) : null}
             </Field>
             {widget.type === "state" ? (
@@ -487,6 +513,11 @@ function buildAppearanceDraft(
     cardColor2: appearance?.cardColor2 || widgetDefaults.cardColor2 || "",
     statColor: appearance?.statColor || widgetDefaults.statColor || "",
     statColor2: appearance?.statColor2 || widgetDefaults.statColor2 || "",
+    pvCardColor: appearance?.pvCardColor || "",
+    homeCardColor: appearance?.homeCardColor || "",
+    batteryCardColor: appearance?.batteryCardColor || "",
+    gridCardColor: appearance?.gridCardColor || "",
+    carCardColor: appearance?.carCardColor || "",
   };
 }
 
@@ -498,6 +529,11 @@ function buildAppearance(draft: Record<string, string>): WidgetAppearance | unde
     cardColor2: normalizeColor(draft.cardColor2),
     statColor: normalizeColor(draft.statColor),
     statColor2: normalizeColor(draft.statColor2),
+    pvCardColor: normalizeColor(draft.pvCardColor),
+    homeCardColor: normalizeColor(draft.homeCardColor),
+    batteryCardColor: normalizeColor(draft.batteryCardColor),
+    gridCardColor: normalizeColor(draft.gridCardColor),
+    carCardColor: normalizeColor(draft.carCardColor),
   };
 
   return Object.values(appearance).some(Boolean) ? appearance : undefined;

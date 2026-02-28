@@ -19,6 +19,11 @@ export type WidgetAppearance = {
   cardColor2?: string;
   statColor?: string;
   statColor2?: string;
+  pvCardColor?: string;
+  homeCardColor?: string;
+  batteryCardColor?: string;
+  gridCardColor?: string;
+  carCardColor?: string;
 };
 
 export type WidgetBase = {
