@@ -1,4 +1,4 @@
-import { DashboardSettings, StateSnapshot } from "../types/dashboard";
+import { DashboardSettings, IoBrokerObjectEntry, StateSnapshot } from "../types/dashboard";
 
 const buildAuthHeader = (settings: DashboardSettings) => {
   const headers: Record<string, string> = {};
@@ -79,5 +79,22 @@ export class IoBrokerClient {
     } catch (error) {
       console.warn("ioBroker writeState failed", error);
     }
+  }
+
+  async listObjects(query = ""): Promise<IoBrokerObjectEntry[]> {
+    const response = await fetch(this.endpoint("/objects"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...buildAuthHeader(this.settings),
+      },
+      body: JSON.stringify({ query }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Object list failed (${response.status})`);
+    }
+
+    return (await response.json()) as IoBrokerObjectEntry[];
   }
 }

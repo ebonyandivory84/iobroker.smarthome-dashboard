@@ -39,6 +39,12 @@ const OPTIONS: Array<{
     description: "Erweitertes Solar-Widget fuer EKD/PV-Anlagen mit Tageswerten.",
     icon: "solar-power",
   },
+  {
+    type: "grafana",
+    title: "Grafana",
+    description: "Beliebige Grafana Panels oder Dashboards per URL als Widget einbetten.",
+    icon: "chart-box-outline",
+  },
 ];
 
 export function WidgetLibraryModal({

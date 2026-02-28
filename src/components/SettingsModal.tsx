@@ -1,16 +1,6 @@
 import { useEffect, useState } from "react";
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useDashboardConfig } from "../context/DashboardConfigContext";
-import { BackgroundMode } from "../types/dashboard";
-import { resolveThemeSettings } from "../utils/themeConfig";
 import { palette } from "../utils/theme";
 
 type SettingsModalProps = {
@@ -19,16 +9,17 @@ type SettingsModalProps = {
 };
 
 export function SettingsModal({ visible, onClose }: SettingsModalProps) {
-  const { config, patchConfig, rawJson, resetConfig, updateConfigFromJson } = useDashboardConfig();
+  const { config, rawJson, resetConfig, updateConfigFromJson } = useDashboardConfig();
   const [draft, setDraft] = useState(rawJson);
   const [error, setError] = useState<string | null>(null);
-  const theme = resolveThemeSettings(config.theme);
 
   useEffect(() => {
-    if (visible) {
-      setDraft(rawJson);
-      setError(null);
+    if (!visible) {
+      return;
     }
+
+    setDraft(rawJson);
+    setError(null);
   }, [rawJson, visible]);
 
   const save = () => {
@@ -51,355 +42,23 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
             </Pressable>
           </View>
           <Text style={styles.helper}>
-            Hier konfigurierst du ioBroker URL, Hintergrund, Grid und alle Widgets direkt als JSON.
+            Die gesamte Dashboard-Konfiguration ist JSON-basiert. Hier bearbeitest du Titel, Grid,
+            ioBroker-Ziele, Widget-Typen und alle Widget-Einstellungen direkt in einer Datei.
           </Text>
-          <View style={styles.quickForm}>
-            <Field label="Titel">
-              <TextInput
-                onChangeText={(value) => patchConfig({ title: value })}
-                style={styles.input}
-                value={config.title}
-              />
-            </Field>
-            <Field label="ioBroker URL">
-              <TextInput
-                autoCapitalize="none"
-                onChangeText={(value) =>
-                  patchConfig({
-                    iobroker: {
-                      ...config.iobroker,
-                      baseUrl: value,
-                    },
-                  })
-                }
-                style={styles.input}
-                value={config.iobroker.baseUrl}
-              />
-            </Field>
-            <Field label="Polling (ms)">
-              <TextInput
-                keyboardType="numeric"
-                onChangeText={(value) => patchConfig({ pollingMs: Number(value) || config.pollingMs })}
-                style={styles.input}
-                value={String(config.pollingMs)}
-              />
-            </Field>
-            <View style={styles.colorRow}>
-              <Field label="Spalten">
-                <TextInput
-                  keyboardType="numeric"
-                  onChangeText={(value) =>
-                    patchConfig({
-                      grid: {
-                        ...config.grid,
-                        columns: Math.max(1, Number(value) || config.grid.columns),
-                      },
-                    })
-                  }
-                  style={styles.input}
-                  value={String(config.grid.columns)}
-                />
-              </Field>
-              <Field label="Row Height">
-                <TextInput
-                  keyboardType="numeric"
-                  onChangeText={(value) =>
-                    patchConfig({
-                      grid: {
-                        ...config.grid,
-                        rowHeight: Math.max(40, Number(value) || config.grid.rowHeight),
-                      },
-                    })
-                  }
-                  style={styles.input}
-                  value={String(config.grid.rowHeight)}
-                />
-              </Field>
-              <Field label="Gap">
-                <TextInput
-                  keyboardType="numeric"
-                  onChangeText={(value) =>
-                    patchConfig({
-                      grid: {
-                        ...config.grid,
-                        gap: Math.max(0, Number(value) || config.grid.gap),
-                      },
-                    })
-                  }
-                  style={styles.input}
-                  value={String(config.grid.gap)}
-                />
-              </Field>
-            </View>
-            <Field label="Hintergrund">
-              <View style={styles.modeRow}>
-                {(["mesh", "gradient", "solid"] as BackgroundMode[]).map((mode) => (
-                  <Pressable
-                    key={mode}
-                    onPress={() => patchConfig({ backgroundMode: mode })}
-                    style={[styles.modeButton, config.backgroundMode === mode ? styles.modeButtonActive : null]}
-                  >
-                    <Text style={styles.modeLabel}>{mode}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </Field>
-            <View style={styles.colorRow}>
-              <Field label="Basisfarbe">
-                <TextInput
-                  autoCapitalize="none"
-                  onChangeText={(value) => patchConfig({ backgroundColor: value })}
-                  style={styles.input}
-                  value={config.backgroundColor}
-                />
-              </Field>
-              <Field label="Akzent">
-                <TextInput
-                  autoCapitalize="none"
-                  onChangeText={(value) => patchConfig({ backgroundAccent: value })}
-                  style={styles.input}
-                  value={config.backgroundAccent}
-                />
-              </Field>
-            </View>
-            <Field label="Widget Verlaeufe">
-              <View style={styles.colorRow}>
-                <Field label="State Start">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) =>
-                      patchConfig({
-                        theme: {
-                          ...theme,
-                          widgetTones: { ...theme.widgetTones, stateStart: value },
-                        },
-                      })
-                    }
-                    style={styles.input}
-                    value={theme.widgetTones.stateStart}
-                  />
-                </Field>
-                <Field label="State Ende">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) =>
-                      patchConfig({
-                        theme: {
-                          ...theme,
-                          widgetTones: { ...theme.widgetTones, stateEnd: value },
-                        },
-                      })
-                    }
-                    style={styles.input}
-                    value={theme.widgetTones.stateEnd}
-                  />
-                </Field>
-              </View>
-              <View style={styles.colorRow}>
-                <Field label="Solar Start">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) =>
-                      patchConfig({
-                        theme: {
-                          ...theme,
-                          widgetTones: { ...theme.widgetTones, solarStart: value },
-                        },
-                      })
-                    }
-                    style={styles.input}
-                    value={theme.widgetTones.solarStart}
-                  />
-                </Field>
-                <Field label="Solar Ende">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) =>
-                      patchConfig({
-                        theme: {
-                          ...theme,
-                          widgetTones: { ...theme.widgetTones, solarEnd: value },
-                        },
-                      })
-                    }
-                    style={styles.input}
-                    value={theme.widgetTones.solarEnd}
-                  />
-                </Field>
-              </View>
-              <View style={styles.colorRow}>
-                <Field label="Energy Start">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) =>
-                      patchConfig({
-                        theme: {
-                          ...theme,
-                          widgetTones: { ...theme.widgetTones, energyStart: value },
-                        },
-                      })
-                    }
-                    style={styles.input}
-                    value={theme.widgetTones.energyStart}
-                  />
-                </Field>
-                <Field label="Energy Ende">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) =>
-                      patchConfig({
-                        theme: {
-                          ...theme,
-                          widgetTones: { ...theme.widgetTones, energyEnd: value },
-                        },
-                      })
-                    }
-                    style={styles.input}
-                    value={theme.widgetTones.energyEnd}
-                  />
-                </Field>
-              </View>
-              <View style={styles.colorRow}>
-                <Field label="Camera Start">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) =>
-                      patchConfig({
-                        theme: {
-                          ...theme,
-                          widgetTones: { ...theme.widgetTones, cameraStart: value },
-                        },
-                      })
-                    }
-                    style={styles.input}
-                    value={theme.widgetTones.cameraStart}
-                  />
-                </Field>
-                <Field label="Camera Ende">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) =>
-                      patchConfig({
-                        theme: {
-                          ...theme,
-                          widgetTones: { ...theme.widgetTones, cameraEnd: value },
-                        },
-                      })
-                    }
-                    style={styles.input}
-                    value={theme.widgetTones.cameraEnd}
-                  />
-                </Field>
-              </View>
-            </Field>
-            <Field label="Solar Cards und Stats">
-              <View style={styles.colorRow}>
-                <Field label="Scene BG">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) =>
-                      patchConfig({
-                        theme: {
-                          ...theme,
-                          solar: { ...theme.solar, sceneCardBackground: value },
-                        },
-                      })
-                    }
-                    style={styles.input}
-                    value={theme.solar.sceneCardBackground}
-                  />
-                </Field>
-                <Field label="Scene Border">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) =>
-                      patchConfig({
-                        theme: {
-                          ...theme,
-                          solar: { ...theme.solar, sceneCardBorder: value },
-                        },
-                      })
-                    }
-                    style={styles.input}
-                    value={theme.solar.sceneCardBorder}
-                  />
-                </Field>
-              </View>
-              <View style={styles.colorRow}>
-                <Field label="Node BG">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) =>
-                      patchConfig({
-                        theme: {
-                          ...theme,
-                          solar: { ...theme.solar, nodeCardBackground: value },
-                        },
-                      })
-                    }
-                    style={styles.input}
-                    value={theme.solar.nodeCardBackground}
-                  />
-                </Field>
-                <Field label="Node Border">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) =>
-                      patchConfig({
-                        theme: {
-                          ...theme,
-                          solar: { ...theme.solar, nodeCardBorder: value },
-                        },
-                      })
-                    }
-                    style={styles.input}
-                    value={theme.solar.nodeCardBorder}
-                  />
-                </Field>
-              </View>
-              <View style={styles.colorRow}>
-                <Field label="Stat BG">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) =>
-                      patchConfig({
-                        theme: {
-                          ...theme,
-                          solar: { ...theme.solar, statCardBackground: value },
-                        },
-                      })
-                    }
-                    style={styles.input}
-                    value={theme.solar.statCardBackground}
-                  />
-                </Field>
-                <Field label="Stat Border">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) =>
-                      patchConfig({
-                        theme: {
-                          ...theme,
-                          solar: { ...theme.solar, statCardBorder: value },
-                        },
-                      })
-                    }
-                    style={styles.input}
-                    value={theme.solar.statCardBorder}
-                  />
-                </Field>
-              </View>
-            </Field>
+          <View style={styles.metaRow}>
+            <MetaPill label="Titel" value={config.title} />
+            <MetaPill label="Widgets" value={String(config.widgets.length)} />
+            <MetaPill label="API" value={config.iobroker.adapterBasePath || "/smarthome-dashboard/api"} />
           </View>
           <ScrollView style={styles.editorWrap}>
             <TextInput
+              autoCapitalize="none"
+              autoCorrect={false}
               multiline
               onChangeText={setDraft}
               style={styles.editor}
-              value={draft}
-              autoCapitalize="none"
-              autoCorrect={false}
               textAlignVertical="top"
+              value={draft}
             />
           </ScrollView>
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -414,10 +73,10 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
               <Text style={styles.warningLabel}>Demo laden</Text>
             </Pressable>
             <Pressable onPress={onClose} style={[styles.button, styles.secondaryButton]}>
-              <Text style={styles.buttonLabel}>Abbrechen</Text>
+              <Text style={styles.secondaryLabel}>Abbrechen</Text>
             </Pressable>
             <Pressable onPress={save} style={[styles.button, styles.primaryButton]}>
-              <Text style={styles.buttonLabel}>Speichern</Text>
+              <Text style={styles.primaryLabel}>Speichern</Text>
             </Pressable>
           </View>
         </View>
@@ -426,11 +85,13 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function MetaPill({ label, value }: { label: string; value: string }) {
   return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      {children}
+    <View style={styles.pill}>
+      <Text style={styles.pillLabel}>{label}</Text>
+      <Text numberOfLines={1} style={styles.pillValue}>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -438,7 +99,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: "rgba(0, 0, 0, 0.74)",
     padding: 22,
     justifyContent: "center",
   },
@@ -463,67 +124,47 @@ const styles = StyleSheet.create({
   },
   close: {
     color: palette.textMuted,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   helper: {
     color: palette.textMuted,
     marginTop: 10,
-    marginBottom: 12,
     lineHeight: 20,
   },
-  quickForm: {
+  metaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
+    marginTop: 14,
     marginBottom: 14,
   },
-  field: {
-    gap: 6,
+  pill: {
+    minWidth: 120,
+    maxWidth: "100%",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: palette.border,
+    gap: 4,
   },
-  fieldLabel: {
+  pillLabel: {
     color: palette.textMuted,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
-  input: {
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: palette.text,
-    backgroundColor: "rgba(6, 12, 20, 0.9)",
-    borderWidth: 1,
-    borderColor: palette.border,
-  },
-  modeRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  modeButton: {
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderWidth: 1,
-    borderColor: palette.border,
-  },
-  modeButtonActive: {
-    backgroundColor: "rgba(77, 226, 177, 0.12)",
-    borderColor: "rgba(77, 226, 177, 0.3)",
-  },
-  modeLabel: {
+  pillValue: {
     color: palette.text,
     fontWeight: "700",
-    textTransform: "capitalize",
-  },
-  colorRow: {
-    flexDirection: "row",
-    gap: 10,
   },
   editorWrap: {
     flex: 1,
   },
   editor: {
-    minHeight: 480,
+    minHeight: 520,
     padding: 14,
     borderRadius: 16,
     color: palette.text,
@@ -561,7 +202,11 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontWeight: "800",
   },
-  buttonLabel: {
+  secondaryLabel: {
+    color: palette.text,
+    fontWeight: "800",
+  },
+  primaryLabel: {
     color: "#041019",
     fontWeight: "800",
   },

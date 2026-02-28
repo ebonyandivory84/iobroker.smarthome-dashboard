@@ -13,8 +13,8 @@ export function buildWidgetTemplate(
   const basePosition = {
     x: 0,
     y: count + 2,
-    w: type === "camera" ? 6 : type === "solar" ? 8 : 3,
-    h: type === "camera" ? 4 : type === "solar" ? 4 : type === "energy" ? 3 : 2,
+    w: type === "camera" ? 6 : type === "solar" ? 8 : type === "grafana" ? 6 : 3,
+    h: type === "camera" ? 4 : type === "solar" ? 4 : type === "energy" ? 3 : type === "grafana" ? 4 : 2,
   };
 
   if (type === "state") {
@@ -58,6 +58,21 @@ export function buildWidgetTemplate(
       houseStateId: `0_userdata.0.energy_${suffix}.house`,
       batteryStateId: `0_userdata.0.energy_${suffix}.battery`,
       gridStateId: `0_userdata.0.energy_${suffix}.grid`,
+      position: {
+        ...basePosition,
+        w: Math.min(6, grid.columns),
+      },
+    };
+  }
+
+  if (type === "grafana") {
+    return {
+      id: `grafana-${suffix}`,
+      type: "grafana",
+      title: `Grafana ${suffix}`,
+      url: "http://127.0.0.1:3000/d/example/example?viewPanel=1&kiosk",
+      refreshMs: 10000,
+      allowInteractions: true,
       position: {
         ...basePosition,
         w: Math.min(6, grid.columns),

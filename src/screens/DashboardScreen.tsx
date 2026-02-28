@@ -141,6 +141,7 @@ export function DashboardScreen() {
         visible={libraryOpen}
       />
       <WidgetEditorModal
+        client={client}
         onClose={() => setEditingWidgetId(null)}
         onSave={handleUpdateWidget}
         visible={Boolean(editingWidget)}

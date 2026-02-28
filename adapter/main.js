@@ -45,6 +45,57 @@ async function main(adapter) {
     res.json({ ok: true });
   });
 
+  app.post("/smarthome-dashboard/api/objects", async (req, res) => {
+    const query = typeof req.body?.query === "string" ? req.body.query.trim().toLowerCase() : "";
+    const view = await adapter.getObjectViewAsync("system", "state", {
+      startkey: "",
+      endkey: "\u9999",
+    });
+
+    const entries = (view?.rows || [])
+      .map((row) => ({
+        id: row.id,
+        name:
+          row.value &&
+          row.value.common &&
+          typeof row.value.common.name === "string"
+            ? row.value.common.name
+            : undefined,
+        type:
+          row.value &&
+          row.value.common &&
+          typeof row.value.common.type === "string"
+            ? row.value.common.type
+            : undefined,
+        role:
+          row.value &&
+          row.value.common &&
+          typeof row.value.common.role === "string"
+            ? row.value.common.role
+            : undefined,
+        valueType:
+          row.value &&
+          row.value.common &&
+          typeof row.value.common.type === "string"
+            ? row.value.common.type
+            : undefined,
+      }))
+      .filter((entry) => {
+        if (!query) {
+          return true;
+        }
+
+        return (
+          entry.id.toLowerCase().includes(query) ||
+          (entry.name && entry.name.toLowerCase().includes(query)) ||
+          (entry.role && entry.role.toLowerCase().includes(query))
+        );
+      })
+      .slice(0, 500);
+
+    res.json(entries);
+  });
+
   if (devServerUrl) {
     const target = devServerUrl.replace(/\/+$/, "");
     app.use(
