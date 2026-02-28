@@ -1,5 +1,13 @@
 import { DashboardSettings, IoBrokerObjectEntry, StateSnapshot, WidgetImageEntry } from "../types/dashboard";
 
+type ObjectCacheEntry = {
+  items: IoBrokerObjectEntry[];
+  timestamp: number;
+};
+
+const OBJECT_CACHE_TTL_MS = 5 * 60 * 1000;
+const objectCache = new Map<string, ObjectCacheEntry>();
+
 const buildAuthHeader = (settings: DashboardSettings) => {
   const headers: Record<string, string> = {};
 
@@ -38,6 +46,10 @@ export class IoBrokerClient {
     const base = this.resolveBaseUrl();
     const adapterPath = (this.settings.iobroker.adapterBasePath || "").replace(/\/$/, "");
     return `${base}${adapterPath}${path}`;
+  }
+
+  private cacheKey() {
+    return this.endpoint("/objects");
   }
 
   async readStates(stateIds: string[]): Promise<StateSnapshot> {
@@ -82,20 +94,43 @@ export class IoBrokerClient {
   }
 
   async listObjects(query = ""): Promise<IoBrokerObjectEntry[]> {
+    const normalizedQuery = query.trim().toLowerCase();
+    const cacheKey = this.cacheKey();
+    const cached = objectCache.get(cacheKey);
+    const cacheIsFresh = cached && Date.now() - cached.timestamp < OBJECT_CACHE_TTL_MS;
+
+    if (cacheIsFresh) {
+      return filterObjects(cached.items, normalizedQuery);
+    }
+
     const response = await fetch(this.endpoint("/objects"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...buildAuthHeader(this.settings),
       },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query: "" }),
     });
 
     if (!response.ok) {
       throw new Error(`Object list failed (${response.status})`);
     }
 
-    return (await response.json()) as IoBrokerObjectEntry[];
+    const items = (await response.json()) as IoBrokerObjectEntry[];
+    objectCache.set(cacheKey, {
+      items,
+      timestamp: Date.now(),
+    });
+
+    return filterObjects(items, normalizedQuery);
+  }
+
+  async primeObjectCache() {
+    try {
+      await this.listObjects("");
+    } catch (error) {
+      console.warn("Object cache warmup failed", error);
+    }
   }
 
   async listWidgetImages(): Promise<WidgetImageEntry[]> {
@@ -112,4 +147,18 @@ export class IoBrokerClient {
 
     return (await response.json()) as WidgetImageEntry[];
   }
+}
+
+function filterObjects(items: IoBrokerObjectEntry[], query: string) {
+  if (!query) {
+    return items;
+  }
+
+  return items.filter((entry) => {
+    return (
+      entry.id.toLowerCase().includes(query) ||
+      (entry.name && entry.name.toLowerCase().includes(query)) ||
+      (entry.role && entry.role.toLowerCase().includes(query))
+    );
+  });
 }

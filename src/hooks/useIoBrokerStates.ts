@@ -63,6 +63,7 @@ export function useIoBrokerStates() {
     };
 
     sync();
+    client.primeObjectCache();
     const timer = setInterval(sync, config.pollingMs);
 
     return () => {
