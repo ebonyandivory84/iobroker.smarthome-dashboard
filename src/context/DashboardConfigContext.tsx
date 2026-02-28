@@ -23,8 +23,33 @@ type DashboardConfigContextValue = {
 };
 
 const STORAGE_KEY = "smarthome-dashboard-config";
+const LEGACY_DEMO_BASE_URL = "http://127.0.0.1:8087";
 
 const DashboardConfigContext = createContext<DashboardConfigContextValue | null>(null);
+
+function migrateConfig(input: DashboardSettings): DashboardSettings {
+  const nextConfig: DashboardSettings = {
+    ...input,
+    iobroker: {
+      ...input.iobroker,
+      baseUrl: input.iobroker.baseUrl === LEGACY_DEMO_BASE_URL ? "" : input.iobroker.baseUrl,
+    },
+    widgets: input.widgets.map((widget) => {
+      if (widget.type !== "camera") {
+        return widget;
+      }
+
+      const legacySnapshot =
+        widget.snapshotUrl &&
+        (widget.snapshotUrl === `${LEGACY_DEMO_BASE_URL}/cam/einfahrt.jpg` ||
+          widget.snapshotUrl === `${LEGACY_DEMO_BASE_URL}/cam/snapshot.jpg`);
+
+      return legacySnapshot ? { ...widget, snapshotUrl: "" } : widget;
+    }),
+  };
+
+  return nextConfig;
+}
 
 export function DashboardConfigProvider({ children }: PropsWithChildren) {
   const [config, setConfig] = useState<DashboardSettings>(defaultConfig);
@@ -37,7 +62,7 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
           return;
         }
 
-        const parsed = JSON.parse(stored) as DashboardSettings;
+        const parsed = migrateConfig(JSON.parse(stored) as DashboardSettings);
         setConfig(parsed);
         setRawJson(JSON.stringify(parsed, null, 2));
       })
@@ -63,7 +88,7 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
       rawJson,
       updateConfigFromJson(nextJson) {
         try {
-          const parsed = JSON.parse(nextJson) as DashboardSettings;
+          const parsed = migrateConfig(JSON.parse(nextJson) as DashboardSettings);
           persist(parsed);
           return { ok: true };
         } catch (error) {

@@ -21,8 +21,21 @@ const buildAuthHeader = (settings: DashboardSettings) => {
 export class IoBrokerClient {
   constructor(private readonly settings: DashboardSettings) {}
 
+  private resolveBaseUrl() {
+    const configuredBase = this.settings.iobroker.baseUrl.trim();
+    if (configuredBase) {
+      return configuredBase.replace(/\/$/, "");
+    }
+
+    if (typeof window !== "undefined" && window.location?.origin) {
+      return window.location.origin.replace(/\/$/, "");
+    }
+
+    return "";
+  }
+
   private endpoint(path: string) {
-    const base = this.settings.iobroker.baseUrl.replace(/\/$/, "");
+    const base = this.resolveBaseUrl();
     const adapterPath = (this.settings.iobroker.adapterBasePath || "").replace(/\/$/, "");
     return `${base}${adapterPath}${path}`;
   }

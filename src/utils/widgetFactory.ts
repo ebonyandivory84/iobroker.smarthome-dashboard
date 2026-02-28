@@ -39,7 +39,7 @@ export function buildWidgetTemplate(
       id: `camera-${suffix}`,
       type: "camera",
       title: `Kamera ${suffix}`,
-      snapshotUrl: "http://127.0.0.1:8087/cam/snapshot.jpg",
+      snapshotUrl: "",
       rtspUrl: "rtsp://camera.local:554/stream1",
       refreshMs: 2000,
       position: {

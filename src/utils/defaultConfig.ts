@@ -12,7 +12,7 @@ export const defaultConfig: DashboardSettings = {
   },
   pollingMs: 2000,
   iobroker: {
-    baseUrl: "http://127.0.0.1:8087",
+    baseUrl: "",
     adapterBasePath: "/smarthome-dashboard/api",
   },
   widgets: [
@@ -48,7 +48,7 @@ export const defaultConfig: DashboardSettings = {
       id: "camera",
       type: "camera",
       title: "Einfahrt",
-      snapshotUrl: "http://127.0.0.1:8087/cam/einfahrt.jpg",
+      snapshotUrl: "",
       rtspUrl: "rtsp://camera.local:554/stream1",
       refreshMs: 2000,
       position: { x: 6, y: 0, w: 6, h: 4 },
