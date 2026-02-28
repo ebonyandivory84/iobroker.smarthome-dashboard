@@ -230,8 +230,10 @@ function SolarFlowScene({
       />
 
       <NodeCard
-        icon="solar-power"
+        icon="white-balance-sunny"
         label="PV"
+        iconColor="#8af7d3"
+        iconSurface="rgba(35, 98, 88, 0.34)"
         nodeColor={widgetAppearance?.pvCardColor}
         theme={theme}
         textColor={textColor}
@@ -242,8 +244,10 @@ function SolarFlowScene({
         highlight={pvDir !== "idle"}
       />
       <NodeCard
-        icon="home-lightning-bolt-outline"
+        icon="home-variant-outline"
         label="Haus"
+        iconColor="#86b7ff"
+        iconSurface="rgba(35, 59, 110, 0.34)"
         nodeColor={widgetAppearance?.homeCardColor}
         theme={theme}
         textColor={textColor}
@@ -256,6 +260,8 @@ function SolarFlowScene({
       <NodeCard
         icon={resolveBatteryIcon(soc)}
         label={soc !== null ? `Akku ${Math.round(soc)}%` : "Akku"}
+        iconColor="#8b8dff"
+        iconSurface="rgba(58, 48, 110, 0.34)"
         nodeColor={widgetAppearance?.batteryCardColor}
         theme={theme}
         textColor={textColor}
@@ -267,8 +273,10 @@ function SolarFlowScene({
         highlight={battDir !== "idle"}
       />
       <NodeCard
-        icon="transmission-tower"
+        icon="transmission-tower-export"
         label="Netz"
+        iconColor="#b9c4d8"
+        iconSurface="rgba(70, 78, 98, 0.28)"
         nodeColor={widgetAppearance?.gridCardColor}
         theme={theme}
         textColor={textColor}
@@ -280,8 +288,10 @@ function SolarFlowScene({
         highlight={gridDir !== "idle"}
       />
       <NodeCard
-        icon="car-electric"
+        icon="ev-station"
         label="Auto"
+        iconColor="#9fe89f"
+        iconSurface="rgba(46, 94, 62, 0.28)"
         nodeColor={widgetAppearance?.carCardColor}
         theme={theme}
         textColor={textColor}
@@ -345,6 +355,8 @@ function NodeCard({
   mutedTextColor,
   widgetAppearance,
   nodeColor,
+  iconColor,
+  iconSurface,
 }: {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   label: string;
@@ -357,6 +369,8 @@ function NodeCard({
   mutedTextColor: string;
   widgetAppearance?: SolarWidgetConfig["appearance"];
   nodeColor?: string;
+  iconColor?: string;
+  iconSurface?: string;
 }) {
   return (
     <View
@@ -370,8 +384,20 @@ function NodeCard({
         highlight ? styles.nodeCardActive : null,
       ]}
     >
-      <View style={[styles.nodeIcon, highlight ? styles.nodeIconActive : null]}>
-        <MaterialCommunityIcons color={highlight ? palette.accent : palette.textMuted} name={icon} size={26} />
+      <View
+        style={[
+          styles.nodeIcon,
+          { backgroundColor: iconSurface || "rgba(255,255,255,0.08)" },
+          highlight ? styles.nodeIconActive : null,
+        ]}
+      >
+        <View style={styles.nodeIconInner}>
+          <MaterialCommunityIcons
+            color={iconColor || (highlight ? palette.accent : palette.textMuted)}
+            name={icon}
+            size={24}
+          />
+        </View>
       </View>
       <Text style={[styles.nodeLabel, { color: mutedTextColor }]}>{label}</Text>
       <Text style={[styles.nodeValue, { color: textColor }]}>{value}</Text>
@@ -597,19 +623,35 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: "center",
     borderWidth: 1,
+    shadowColor: "#000",
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
   },
   nodeCardActive: {
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
   },
   nodeIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
+    width: 44,
+    height: 44,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
   },
   nodeIconActive: {
-    backgroundColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  nodeIconInner: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
   },
   nodeLabel: {
     marginTop: 8,
