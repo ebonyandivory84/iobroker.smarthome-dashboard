@@ -450,12 +450,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 12,
     alignItems: "center",
-    backgroundColor: "rgba(14, 34, 46, 0.88)",
+    backgroundColor: "rgba(226, 232, 240, 0.12)",
     borderWidth: 1,
-    borderColor: "rgba(90, 188, 177, 0.18)",
+    borderColor: "rgba(226, 232, 240, 0.18)",
   },
   nodeCardActive: {
-    backgroundColor: "rgba(31, 92, 90, 0.28)",
+    backgroundColor: "rgba(226, 232, 240, 0.12)",
+    borderColor: "rgba(226, 232, 240, 0.24)",
   },
   nodeIcon: {
     width: 40,
@@ -463,10 +464,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(77, 226, 177, 0.07)",
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
   nodeIconActive: {
-    backgroundColor: "rgba(77, 226, 177, 0.08)",
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   nodeLabel: {
     marginTop: 8,
