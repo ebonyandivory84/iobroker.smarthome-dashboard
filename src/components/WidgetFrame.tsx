@@ -137,9 +137,8 @@ export function WidgetFrame({
       ) : null}
       {isLayoutMode ? (
         <View style={styles.headerActions}>
-          <Pressable onPress={() => onEdit(widget.id)} style={styles.editButton}>
-            <MaterialCommunityIcons color={palette.text} name="tune-variant" size={16} />
-            <Text style={styles.editButtonLabel}>Bearbeiten</Text>
+          <Pressable onPress={() => onEdit(widget.id)} style={styles.iconButton}>
+            <MaterialCommunityIcons color={palette.text} name="dots-horizontal" size={18} />
           </Pressable>
           <Pressable onPress={() => onRemove(widget.id)} style={styles.iconButton}>
             <MaterialCommunityIcons color={palette.textMuted} name="close" size={18} />
@@ -228,22 +227,6 @@ const styles = StyleSheet.create({
   },
   contentInset: {
     padding: 16,
-  },
-  editButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: "rgba(77, 226, 177, 0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(77, 226, 177, 0.25)",
-  },
-  editButtonLabel: {
-    color: palette.text,
-    fontSize: 12,
-    fontWeight: "700",
   },
   footerRow: {
     position: "absolute",

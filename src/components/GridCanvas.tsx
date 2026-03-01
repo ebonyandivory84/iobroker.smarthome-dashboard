@@ -38,9 +38,9 @@ export function GridCanvas({
   const { width: windowWidth } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
   const isCompactWeb = Platform.OS === "web" && windowWidth < 700;
-  const useSectionedDesktop = Platform.OS === "web" && !isCompactWeb && !isLayoutMode;
+  const useSectionedDesktop = Platform.OS === "web" && !isCompactWeb;
   const useSectionedCompact = Platform.OS === "web" && isCompactWeb;
-  const effectiveLayoutMode = isLayoutMode && !useSectionedDesktop && !useSectionedCompact;
+  const effectiveLayoutMode = isLayoutMode && !useSectionedCompact;
   const displayConfig = useMemo(
     () =>
       useSectionedCompact
@@ -74,6 +74,18 @@ export function GridCanvas({
     onLayoutMeasured?.(nextWidth);
   };
 
+  const handleDisplayUpdate = (widgetId: string, partial: Partial<WidgetConfig>) => {
+    if (!partial.position || !useSectionedDesktop) {
+      onUpdateWidget(widgetId, partial);
+      return;
+    }
+
+    onUpdateWidget(widgetId, {
+      ...partial,
+      position: mapDesktopDisplayPositionToSource(partial.position, config.grid.columns),
+    });
+  };
+
   const content =
     Platform.OS === "web" && !isCompactWeb ? (
       <WebGridCanvas
@@ -86,7 +98,7 @@ export function GridCanvas({
         isLayoutMode={effectiveLayoutMode}
         onEditWidget={onEditWidget}
         onRemoveWidget={onRemoveWidget}
-        onUpdateWidget={onUpdateWidget}
+        onUpdateWidget={handleDisplayUpdate}
         states={states}
       />
     ) : (
@@ -132,7 +144,7 @@ export function GridCanvas({
                 columns={displayConfig.grid.columns}
                 gap={displayConfig.grid.gap}
                 isLayoutMode={effectiveLayoutMode}
-                onCommitPosition={(widgetId, position) => onUpdateWidget(widgetId, { position })}
+                onCommitPosition={(widgetId, position) => handleDisplayUpdate(widgetId, { position })}
                 onEdit={onEditWidget}
                 onRemove={onRemoveWidget}
                 rowHeight={renderRowHeight}
@@ -245,6 +257,21 @@ function buildSectionedConfig(config: DashboardSettings, mode: "desktop" | "mobi
       columns: mode === "mobile" ? sectionColumns : sectionColumns * sectionCount,
     },
     widgets: placedWidgets,
+  };
+}
+
+function mapDesktopDisplayPositionToSource(position: WidgetConfig["position"], sourceColumns: number): WidgetConfig["position"] {
+  const sectionCount = 3;
+  const displaySectionWidth = 3;
+  const sourceSectionWidth = Math.max(1, sourceColumns / sectionCount);
+  const center = position.x + position.w / 2;
+  const sectionIndex = clamp(Math.floor(center / displaySectionWidth), 0, sectionCount - 1);
+  const localX = position.x - sectionIndex * displaySectionWidth;
+
+  return {
+    ...position,
+    x: sectionIndex * sourceSectionWidth + (localX / displaySectionWidth) * sourceSectionWidth,
+    w: (position.w / displaySectionWidth) * sourceSectionWidth,
   };
 }
 
@@ -440,6 +467,7 @@ function WebWidgetShell({
 
   return (
     <div style={shellStyle}>
+      {isLayoutMode ? <div onMouseDown={begin("drag")} style={webWidgetDragSurfaceStyle} /> : null}
       {showHeaderTitle ? (
         <div style={webTitleBadgeStyle}>
           <div style={{ ...webTitleStyle, color: widget.appearance?.textColor || palette.text }}>{widget.title}</div>
@@ -447,16 +475,8 @@ function WebWidgetShell({
       ) : null}
       {isLayoutMode ? (
         <div style={webControlsStyle}>
-          <div onMouseDown={begin("drag")} style={webDragHandleStyle} title="Verschieben">
-            <span style={webGripDotStyle} />
-            <span style={webGripDotStyle} />
-            <span style={webGripDotStyle} />
-            <span style={webGripDotStyle} />
-            <span style={webGripDotStyle} />
-            <span style={webGripDotStyle} />
-          </div>
-          <button onClick={() => onEditWidget(widget.id)} style={webPrimaryButtonStyle} type="button">
-            Bearbeiten
+          <button onClick={() => onEditWidget(widget.id)} style={webIconButtonStyle} type="button">
+            ⋯
           </button>
           <button onClick={() => onRemoveWidget(widget.id)} style={webIconButtonStyle} type="button">
             ×
@@ -627,16 +647,6 @@ const webControlsStyle: CSSProperties = {
   zIndex: 4,
 };
 
-const webPrimaryButtonStyle: CSSProperties = {
-  borderRadius: 14,
-  padding: "8px 12px",
-  border: "1px solid rgba(92, 124, 255, 0.24)",
-  background: "rgba(92, 124, 255, 0.14)",
-  color: palette.text,
-  fontWeight: 700,
-  cursor: "pointer",
-};
-
 const webIconButtonStyle: CSSProperties = {
   width: 32,
   height: 32,
@@ -647,32 +657,7 @@ const webIconButtonStyle: CSSProperties = {
   cursor: "pointer",
   fontSize: 20,
   lineHeight: "28px",
-};
-
-const webDragHandleStyle: CSSProperties = {
-  width: 32,
-  height: 32,
-  display: "grid",
-  gridTemplateColumns: "repeat(2, 1fr)",
-  gap: 3,
-  padding: 6,
-  borderRadius: 16,
-  border: `1px solid ${palette.border}`,
-  background: "rgba(255,255,255,0.04)",
-  cursor: "grab",
-  userSelect: "none",
-  WebkitUserSelect: "none",
-  boxSizing: "border-box",
-  alignItems: "center",
-  justifyItems: "center",
-};
-
-const webGripDotStyle: CSSProperties = {
-  width: 4,
-  height: 4,
-  borderRadius: 999,
-  background: palette.textMuted,
-  opacity: 0.7,
+  fontWeight: 700,
 };
 
 const webTitleBadgeStyle: CSSProperties = {
@@ -690,7 +675,17 @@ const webFooterOverlayStyle: CSSProperties = {
   position: "absolute",
   bottom: 12,
   right: 12,
-  zIndex: 4,
+  zIndex: 6,
+};
+
+const webWidgetDragSurfaceStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  cursor: "grab",
+  zIndex: 2,
+  userSelect: "none",
+  WebkitUserSelect: "none",
+  touchAction: "none",
 };
 
 const webResizeHandleStyle: CSSProperties = {
