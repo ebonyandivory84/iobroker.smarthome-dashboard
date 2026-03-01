@@ -34,17 +34,21 @@ export function normalizeWidgetLayout(widgets: WidgetConfig[], columns: number):
 
 export function constrainToPrimarySections(position: GridPosition, columns: number): GridPosition {
   const sectionWidth = getPrimarySectionWidth(columns);
-  const maxWidth = Math.min(columns, snap(sectionWidth));
-  const minWidth = Math.min(maxWidth, Math.max(1, snap(sectionWidth / PRIMARY_SECTION_COUNT)));
-  const w = clamp(snap(position.w), minWidth, maxWidth);
+  const subColumnWidth = sectionWidth / PRIMARY_SECTION_COUNT;
+  const maxWidth = sectionWidth;
+  const minWidth = Math.min(maxWidth, subColumnWidth);
+  const snappedWidth = snapToSubColumns(position.w, subColumnWidth);
+  const w = clamp(snappedWidth, minWidth, maxWidth);
   const h = Math.max(1, snap(position.h));
   const y = Math.max(0, snap(position.y));
-  const tentativeX = Math.max(0, snap(position.x));
+  const tentativeX = Math.max(0, position.x);
   const center = tentativeX + w / 2;
   const sectionIndex = clamp(Math.floor(center / sectionWidth), 0, PRIMARY_SECTION_COUNT - 1);
-  const sectionStart = snap(sectionIndex * sectionWidth);
-  const sectionEnd = Math.min(columns, snap((sectionIndex + 1) * sectionWidth));
-  const x = clamp(tentativeX, sectionStart, Math.max(sectionStart, sectionEnd - w));
+  const sectionStart = sectionIndex * sectionWidth;
+  const sectionEnd = Math.min(columns, (sectionIndex + 1) * sectionWidth);
+  const localX = clamp(tentativeX - sectionStart, 0, Math.max(0, sectionEnd - sectionStart - w));
+  const snappedLocalX = snapToSubColumns(localX, subColumnWidth);
+  const x = clamp(sectionStart + snappedLocalX, sectionStart, Math.max(sectionStart, sectionEnd - w));
 
   return { x, y, w, h };
 }
@@ -101,4 +105,9 @@ function clamp(value: number, min: number, max: number) {
 
 function snap(value: number) {
   return Math.round(value / GRID_SNAP) * GRID_SNAP;
+}
+
+function snapToSubColumns(value: number, subColumnWidth: number) {
+  const steps = Math.max(1, Math.round(value / subColumnWidth));
+  return steps * subColumnWidth;
 }
