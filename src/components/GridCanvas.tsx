@@ -369,7 +369,7 @@ function getAutoLayoutSpec(widget: WidgetConfig, columns: number) {
     case "camera":
       return { w: mainColumnWidth, h: 2.1 };
     case "solar":
-      return { w: wideWidgetWidth, h: 3.2 };
+      return { w: mainColumnWidth, h: 3.2 };
     case "grafana":
       return { w: wideWidgetWidth, h: 2.8 };
     case "weather":
