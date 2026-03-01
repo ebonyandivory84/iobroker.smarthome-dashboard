@@ -10,6 +10,7 @@ let objectEntriesCacheTimestamp = 0;
 let objectEntriesPromise = null;
 const OBJECT_CACHE_TTL_MS = 5 * 60 * 1000;
 const CONFIG_STATE_ID = "dashboardConfig";
+let webShellCache = null;
 
 function startAdapter(options) {
   const adapter = new utils.Adapter({
@@ -203,14 +204,12 @@ async function main(adapter) {
   } else {
     app.use("/assets", express.static(path.join(webRoot, "assets")));
     app.use("/_expo", express.static(path.join(webRoot, "_expo")));
+    app.get(["/smarthome-dashboard", "/smarthome-dashboard/"], (req, res, next) => {
+      sendWebShell(webRoot, res, next);
+    });
     app.use("/smarthome-dashboard", express.static(webRoot));
     app.get("/smarthome-dashboard/*", (req, res, next) => {
-      const indexPath = path.join(webRoot, "index.html");
-      res.sendFile(indexPath, (error) => {
-        if (error) {
-          next();
-        }
-      });
+      sendWebShell(webRoot, res, next);
     });
   }
 
@@ -223,6 +222,38 @@ async function main(adapter) {
     }
     adapter.log.info(`SmartHome Dashboard available on http://0.0.0.0:${port}/smarthome-dashboard`);
   });
+}
+
+async function sendWebShell(webRoot, res, next) {
+  try {
+    if (!webShellCache) {
+      const indexPath = path.join(webRoot, "index.html");
+      const html = await fs.promises.readFile(indexPath, "utf8");
+      webShellCache = injectStandaloneMeta(html);
+    }
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(webShellCache);
+  } catch (error) {
+    next(error);
+  }
+}
+
+function injectStandaloneMeta(html) {
+  const standaloneMeta = [
+    '<meta name="theme-color" content="#040811" />',
+    '<meta name="apple-mobile-web-app-capable" content="yes" />',
+    '<meta name="mobile-web-app-capable" content="yes" />',
+    '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />',
+    '<meta name="apple-mobile-web-app-title" content="SmartHome Dashboard" />',
+  ].join("\n    ");
+
+  return html
+    .replace(
+      /<meta name="viewport"[^>]*>/i,
+      '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, shrink-to-fit=no" />'
+    )
+    .replace("</head>", `    ${standaloneMeta}\n  </head>`);
 }
 
 async function getCachedObjectEntries(adapter) {
