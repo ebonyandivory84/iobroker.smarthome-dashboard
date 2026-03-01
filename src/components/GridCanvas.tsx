@@ -178,16 +178,10 @@ function buildResponsiveAutoLayoutConfig(config: DashboardSettings, columns: num
   const columnHeights = Array.from({ length: columns }, () => 0);
   const widgets = sortedWidgets.map((widget) => {
     const spec = getAutoLayoutSpec(widget, columns);
-    let bestStart = 0;
-    let bestY = Number.POSITIVE_INFINITY;
-
-    for (let start = 0; start <= columns - spec.w; start += 1) {
-      const y = Math.max(...columnHeights.slice(start, start + spec.w));
-      if (y < bestY) {
-        bestY = y;
-        bestStart = start;
-      }
-    }
+    const desiredStart = clamp(Math.round(widget.position.x), 0, Math.max(0, columns - spec.w));
+    const desiredY = Math.max(0, widget.position.y);
+    const bestStart = desiredStart;
+    const bestY = Math.max(desiredY, ...columnHeights.slice(bestStart, bestStart + spec.w));
 
     for (let index = bestStart; index < bestStart + spec.w; index += 1) {
       columnHeights[index] = bestY + spec.h;
@@ -230,20 +224,18 @@ function buildDesktopAutoLayoutConfig(config: DashboardSettings): DashboardSetti
 
   const widgets = sortedWidgets.map((widget) => {
     const spec = getAutoLayoutSpec(widget, 9);
+    const desiredY = Math.max(0, widget.position.y);
 
     if (spec.w === 1) {
       const preferredSection = getPreferredDesktopSection(widget, sourceColumns);
       const sectionStart = preferredSection * mainColumnWidth;
-      let bestLocal = 0;
-      let bestY = Number.POSITIVE_INFINITY;
-
-      for (let offset = 0; offset < mainColumnWidth; offset += 1) {
-        const y = subColumnHeights[sectionStart + offset];
-        if (y < bestY) {
-          bestY = y;
-          bestLocal = offset;
-        }
-      }
+      const localHint = clamp(
+        Math.round(widget.position.x - preferredSection * sourceColumns / 3),
+        0,
+        mainColumnWidth - 1
+      );
+      const bestLocal = localHint;
+      const bestY = Math.max(desiredY, subColumnHeights[sectionStart + bestLocal]);
 
       const targetIndex = sectionStart + bestLocal;
       subColumnHeights[targetIndex] = bestY + spec.h;
@@ -262,23 +254,11 @@ function buildDesktopAutoLayoutConfig(config: DashboardSettings): DashboardSetti
     const sectionSpan = Math.max(1, Math.round(spec.w / mainColumnWidth));
     const maxStartSection = Math.max(0, 3 - sectionSpan);
     const preferredSection = clamp(getPreferredDesktopSection(widget, sourceColumns), 0, maxStartSection);
-
-    let bestStartSection = preferredSection;
-    let bestY = Number.POSITIVE_INFINITY;
-
-    for (let section = 0; section <= maxStartSection; section += 1) {
-      const candidateStart = section * mainColumnWidth;
-      const candidateEnd = candidateStart + sectionSpan * mainColumnWidth;
-      const y = Math.max(...subColumnHeights.slice(candidateStart, candidateEnd));
-
-      if (y < bestY || (y === bestY && section === preferredSection)) {
-        bestY = y;
-        bestStartSection = section;
-      }
-    }
+    const bestStartSection = preferredSection;
 
     const startIndex = bestStartSection * mainColumnWidth;
     const endIndex = startIndex + sectionSpan * mainColumnWidth;
+    const bestY = Math.max(desiredY, ...subColumnHeights.slice(startIndex, endIndex));
     for (let index = startIndex; index < endIndex; index += 1) {
       subColumnHeights[index] = bestY + spec.h;
     }
