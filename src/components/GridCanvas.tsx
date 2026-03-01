@@ -218,6 +218,11 @@ function buildDesktopAutoLayoutConfig(config: DashboardSettings): DashboardSetti
   const mainColumnWidth = 3;
   const subColumnHeights = Array.from({ length: 9 }, () => 0);
   const sortedWidgets = [...config.widgets].sort((a, b) => {
+    const aPriority = getDesktopWidgetPriority(a);
+    const bPriority = getDesktopWidgetPriority(b);
+    if (aPriority !== bPriority) {
+      return aPriority - bPriority;
+    }
     if (a.position.y !== b.position.y) {
       return a.position.y - b.position.y;
     }
@@ -311,6 +316,25 @@ function getPreferredDesktopSection(widget: WidgetConfig, sourceColumns: number)
   const sectionWidth = sourceColumns / 3;
   const center = widget.position.x + widget.position.w / 2;
   return clamp(Math.floor(center / Math.max(1, sectionWidth)), 0, 2);
+}
+
+function getDesktopWidgetPriority(widget: WidgetConfig) {
+  switch (widget.type) {
+    case "state":
+      return 0;
+    case "weather":
+      return 1;
+    case "camera":
+      return 2;
+    case "energy":
+      return 3;
+    case "solar":
+      return 4;
+    case "grafana":
+      return 5;
+    default:
+      return 10;
+  }
 }
 
 function getAutoLayoutSpec(widget: WidgetConfig, columns: number) {
