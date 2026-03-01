@@ -1,4 +1,4 @@
-import { createElement, useEffect, useMemo, useState } from "react";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { Image, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { CameraWidgetConfig } from "../../types/dashboard";
 import { palette } from "../../utils/theme";
@@ -12,6 +12,7 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
   const [tick, setTick] = useState(0);
   const [displayUrl, setDisplayUrl] = useState<string | null>(null);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
 
@@ -21,7 +22,7 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
   }, [config.refreshMs]);
 
   const reportAspectRatio = (width: number, height: number) => {
-    if (!onAspectRatioDetected || !width || !height) {
+    if (!onAspectRatioDetected || hasReportedAspectRatio.current || !width || !height) {
       return;
     }
 
@@ -30,6 +31,7 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
       return;
     }
 
+    hasReportedAspectRatio.current = true;
     onAspectRatioDetected(ratio);
   };
 

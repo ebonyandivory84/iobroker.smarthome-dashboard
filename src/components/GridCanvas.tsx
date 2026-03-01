@@ -614,12 +614,11 @@ function renderWidget(
       <CameraWidget
         config={widget}
         onAspectRatioDetected={(ratio) => {
-          if (!Number.isFinite(ratio) || ratio <= 0) {
+          if (widget.snapshotAspectRatio) {
             return;
           }
 
-          const current = widget.snapshotAspectRatio;
-          if (current && Math.abs(current - ratio) < 0.03) {
+          if (!Number.isFinite(ratio) || ratio <= 0) {
             return;
           }
 
