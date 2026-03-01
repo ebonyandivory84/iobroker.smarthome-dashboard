@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { createElement } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, ImageBackground, LayoutChangeEvent, Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Animated, Easing, ImageBackground, LayoutChangeEvent, Platform, StyleSheet, Text, View } from "react-native";
 import { SolarWidgetConfig, StateSnapshot, ThemeSettings } from "../../types/dashboard";
 import { resolveThemeSettings } from "../../utils/themeConfig";
 import { palette } from "../../utils/theme";
@@ -15,8 +15,6 @@ type SolarWidgetProps = {
 type FlowDir = "toHome" | "fromHome" | "idle";
 
 export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
-  const { width: windowWidth } = useWindowDimensions();
-  const isCompactWeb = Platform.OS === "web" && windowWidth < 700;
   const resolvedTheme = resolveThemeSettings(theme);
   const widgetAppearance = config.appearance;
   const textColor = widgetAppearance?.textColor || palette.text;
@@ -82,7 +80,6 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
               {
                 borderColor: resolvedTheme.solar.sceneCardBorder,
               },
-              isCompactWeb ? styles.sceneCardCompact : null,
             ]}
           >
             {createElement("div", {
@@ -115,7 +112,6 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
                 {
                   borderColor: resolvedTheme.solar.sceneCardBorder,
                 },
-                isCompactWeb ? styles.sceneCardCompact : null,
               ]}
             >
               <View style={styles.sceneBackgroundOverlay} />
@@ -144,7 +140,6 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
                 backgroundColor: widgetAppearance?.cardColor || resolvedTheme.solar.sceneCardBackground,
                 borderColor: resolvedTheme.solar.sceneCardBorder,
               },
-              isCompactWeb ? styles.sceneCardCompact : null,
             ]}
           >
             <SolarFlowScene
@@ -254,39 +249,43 @@ function SolarFlowScene({
     return () => loop.stop();
   }, [progress]);
 
-  const compactScene = sceneLayout.width < 420;
-  const cardWidth = clamp(sceneLayout.width * (compactScene ? 0.2 : 0.12), compactScene ? 78 : 112, compactScene ? 124 : 170);
-  const cardHeight = clamp(sceneLayout.height * (compactScene ? 0.16 : 0.18), compactScene ? 84 : 104, compactScene ? 104 : 128);
+  const centerCardWidth = clamp(sceneLayout.width * 0.125, 114, 172);
+  const centerCardHeight = clamp(sceneLayout.height * 0.185, 106, 130);
+  const outerCardWidth = clamp(centerCardWidth * 0.84, 92, 142);
+  const outerCardHeight = clamp(centerCardHeight * 0.84, 90, 112);
   const beamLength = 18;
-  const sidePadding = clamp(sceneLayout.width * (compactScene ? 0.04 : 0.08), compactScene ? 12 : 26, compactScene ? 32 : 120);
-  const outerMargin = clamp(sceneLayout.height * (compactScene ? 0.05 : 0.08), compactScene ? 16 : 28, compactScene ? 30 : 54);
-  const connectorInset = compactScene ? 10 : 18;
+  const sidePadding = clamp(sceneLayout.width * 0.11, 34, 150);
+  const outerMargin = clamp(sceneLayout.height * 0.1, 34, 64);
+  const connectorInset = 22;
   const topY = outerMargin;
-  const centerY = sceneLayout.height * 0.5 - cardHeight / 2;
-  const bottomY = sceneLayout.height - outerMargin - cardHeight;
-  const centerX = sceneLayout.width / 2 - cardWidth / 2;
+  const centerY = sceneLayout.height * 0.5 - centerCardHeight / 2;
+  const bottomY = sceneLayout.height - outerMargin - outerCardHeight;
+  const centerMidX = sceneLayout.width / 2;
+  const centerX = centerMidX - centerCardWidth / 2;
   const leftCenter = clamp(
-    sceneLayout.width * (compactScene ? 0.16 : 0.22),
-    cardWidth / 2 + sidePadding,
-    sceneLayout.width / 2 - cardWidth - (compactScene ? 12 : 40)
+    sceneLayout.width * 0.19,
+    outerCardWidth / 2 + sidePadding,
+    centerMidX - centerCardWidth / 2 - outerCardWidth / 2 - 56
   );
   const rightCenter = sceneLayout.width - leftCenter;
-  const leftX = leftCenter - cardWidth / 2;
-  const rightX = rightCenter - cardWidth / 2;
-  const verticalLineLeft = centerX + cardWidth / 2 - 2;
-  const verticalBeamLeft = centerX + cardWidth / 2 - 4;
+  const leftX = leftCenter - outerCardWidth / 2;
+  const rightX = rightCenter - outerCardWidth / 2;
+  const topX = centerMidX - outerCardWidth / 2;
+  const bottomX = centerMidX - outerCardWidth / 2;
+  const verticalLineLeft = centerMidX - 2;
+  const verticalBeamLeft = centerMidX - 4;
 
-  const topLineStart = topY + cardHeight + connectorInset;
+  const topLineStart = topY + outerCardHeight + connectorInset;
   const topLineEnd = centerY - connectorInset;
   const topLineHeight = Math.max(12, topLineEnd - topLineStart);
-  const centerLineY = centerY + cardHeight / 2 - 2;
-  const leftLineStart = leftX + cardWidth + connectorInset;
+  const centerLineY = centerY + centerCardHeight / 2 - 2;
+  const leftLineStart = leftX + outerCardWidth + connectorInset;
   const leftLineEnd = centerX - connectorInset;
   const leftLineWidth = Math.max(16, leftLineEnd - leftLineStart);
-  const rightLineStart = centerX + cardWidth + connectorInset;
+  const rightLineStart = centerX + centerCardWidth + connectorInset;
   const rightLineEnd = rightX - connectorInset;
   const rightLineWidth = Math.max(16, rightLineEnd - rightLineStart);
-  const bottomLineStart = centerY + cardHeight + connectorInset;
+  const bottomLineStart = centerY + centerCardHeight + connectorInset;
   const bottomLineEnd = bottomY - connectorInset;
   const bottomLineHeight = Math.max(12, bottomLineEnd - bottomLineStart);
 
@@ -335,7 +334,7 @@ function SolarFlowScene({
         textColor={textColor}
         mutedTextColor={mutedTextColor}
         widgetAppearance={widgetAppearance}
-        style={{ ...styles.nodePosition, top: topY, left: centerX, width: cardWidth, minHeight: cardHeight }}
+        style={{ ...styles.nodePosition, top: topY, left: topX, width: outerCardWidth, minHeight: outerCardHeight }}
         value={fmtW(pvNow)}
         highlight={pvDir !== "idle"}
       />
@@ -349,7 +348,7 @@ function SolarFlowScene({
         textColor={textColor}
         mutedTextColor={mutedTextColor}
         widgetAppearance={widgetAppearance}
-        style={{ ...styles.nodePosition, top: centerY, left: centerX, width: cardWidth, minHeight: cardHeight }}
+        style={{ ...styles.nodePosition, top: centerY, left: centerX, width: centerCardWidth, minHeight: centerCardHeight }}
         value={fmtW(homeNow)}
         highlight
       />
@@ -363,7 +362,7 @@ function SolarFlowScene({
         textColor={textColor}
         mutedTextColor={mutedTextColor}
         widgetAppearance={widgetAppearance}
-        style={{ ...styles.nodePosition, top: centerY, left: leftX, width: cardWidth, minHeight: cardHeight }}
+        style={{ ...styles.nodePosition, top: centerY + (centerCardHeight - outerCardHeight) / 2, left: leftX, width: outerCardWidth, minHeight: outerCardHeight }}
         value={fmtW(battPower || null)}
         meta={
           soc !== null && battTemp !== null
@@ -386,7 +385,7 @@ function SolarFlowScene({
         textColor={textColor}
         mutedTextColor={mutedTextColor}
         widgetAppearance={widgetAppearance}
-        style={{ ...styles.nodePosition, top: centerY, left: rightX, width: cardWidth, minHeight: cardHeight }}
+        style={{ ...styles.nodePosition, top: centerY + (centerCardHeight - outerCardHeight) / 2, left: rightX, width: outerCardWidth, minHeight: outerCardHeight }}
         value={fmtW(gridPower || null)}
         meta={gridDir === "toHome" ? "Bezug" : gridDir === "fromHome" ? "Einspeisung" : "Idle"}
         highlight={gridDir !== "idle"}
@@ -401,7 +400,7 @@ function SolarFlowScene({
         textColor={textColor}
         mutedTextColor={mutedTextColor}
         widgetAppearance={widgetAppearance}
-        style={{ ...styles.nodePosition, top: bottomY, left: centerX, width: cardWidth, minHeight: cardHeight }}
+        style={{ ...styles.nodePosition, top: bottomY, left: bottomX, width: outerCardWidth, minHeight: outerCardHeight }}
         value="—"
         meta="Wallbox"
       />
@@ -688,14 +687,9 @@ const styles = StyleSheet.create({
     padding: 14,
     alignSelf: "stretch",
     aspectRatio: 1.75,
-    minHeight: 420,
+    minHeight: 560,
     borderWidth: 1,
     overflow: "hidden",
-  },
-  sceneCardCompact: {
-    aspectRatio: 1.1,
-    minHeight: 340,
-    padding: 10,
   },
   scene: {
     flex: 1,
