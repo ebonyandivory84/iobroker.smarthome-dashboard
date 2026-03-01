@@ -30,12 +30,14 @@ export function StateWidget({ config, value, addonValue, onToggle }: StateWidget
         <MaterialCommunityIcons
           color={iconColor}
           name={(iconName || "toggle-switch-outline") as never}
-          size={34}
+          size={30}
         />
       </View>
-      <Text style={[styles.value, { color: mutedTextColor }]}>
-        {hasValue ? resolveStateLabel(config, value, active) : "Keine Daten"}
-      </Text>
+      <View style={styles.textBlock}>
+        <Text numberOfLines={2} style={[styles.value, { color: mutedTextColor }]}>
+          {hasValue ? resolveStateLabel(config, value, active) : "Keine Daten"}
+        </Text>
+      </View>
     </View>
   );
 
@@ -306,8 +308,6 @@ function defaultStateValue(config: StateWidgetConfig, active: boolean) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
   },
   containerWithTitle: {
     paddingTop: 24,
@@ -315,69 +315,78 @@ const styles = StyleSheet.create({
   tapArea: {
     flex: 1,
     width: "100%",
-    alignItems: "center",
-    justifyContent: "center",
   },
   tile: {
     width: "100%",
     height: "100%",
     borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 14,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 12,
     position: "relative",
   },
   iconWrap: {
-    width: 54,
-    height: 54,
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
+    position: "absolute",
+    top: 14,
+    left: 14,
+  },
+  textBlock: {
+    position: "absolute",
+    left: 14,
+    right: 14,
+    bottom: 12,
+    alignItems: "flex-start",
   },
   value: {
     color: palette.textMuted,
     fontSize: 14,
-    marginTop: 12,
-    textAlign: "center",
+    lineHeight: 17,
+    textAlign: "left",
+    fontWeight: "700",
   },
   addonCircle: {
     position: "absolute",
-    top: 10,
-    right: 10,
-    minWidth: 24,
-    height: 24,
+    top: 12,
+    right: 12,
+    minWidth: 30,
+    height: 30,
     borderRadius: 999,
-    paddingHorizontal: 7,
+    paddingHorizontal: 9,
     alignItems: "center",
     justifyContent: "center",
   },
   addonCircleLabel: {
     color: "#ffffff",
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "800",
   },
   addonText: {
     position: "absolute",
-    top: 12,
-    right: 10,
-    fontSize: 13,
+    top: 14,
+    right: 12,
+    fontSize: 15,
     fontWeight: "800",
   },
   addonIconWrap: {
     position: "absolute",
-    top: 10,
-    right: 10,
+    top: 12,
+    right: 12,
   },
   addonBars: {
     position: "absolute",
-    top: 10,
-    right: 10,
-    height: 20,
+    top: 12,
+    right: 12,
+    height: 28,
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: 2,
+    gap: 3,
   },
   addonBar: {
-    width: 3,
+    width: 4,
     borderRadius: 2,
   },
 });
