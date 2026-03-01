@@ -75,6 +75,7 @@ export function GridCanvas({
         cellWidth={cellWidth}
         client={client}
         config={displayConfig}
+        sourceColumns={config.grid.columns}
         rowHeight={renderRowHeight}
         theme={resolveThemeSettings(displayConfig.theme)}
         isLayoutMode={effectiveLayoutMode}
@@ -128,7 +129,11 @@ export function GridCanvas({
                 isLayoutMode={effectiveLayoutMode}
                 allowManualLayout={!isCompactWeb}
                 allowResize={false}
-                onCommitPosition={(widgetId, position) => onUpdateWidget(widgetId, { position })}
+                onCommitPosition={(widgetId, position) =>
+                  onUpdateWidget(widgetId, {
+                    position: mapDisplayPositionToSourceHint(position, displayConfig.grid.columns, config.grid.columns),
+                  })
+                }
                 onEdit={onEditWidget}
                 onRemove={onRemoveWidget}
                 rowHeight={renderRowHeight}
@@ -355,8 +360,29 @@ function ceilGridUnit(value: number) {
   return Math.ceil(value / GRID_SNAP) * GRID_SNAP;
 }
 
+function mapDisplayPositionToSourceHint(position: WidgetConfig["position"], displayColumns: number, sourceColumns: number) {
+  if (displayColumns <= 1 || sourceColumns <= 1 || displayColumns === sourceColumns) {
+    return position;
+  }
+
+  const sectionCount = 3;
+  const displaySectionWidth = displayColumns / sectionCount;
+  const sourceSectionWidth = sourceColumns / sectionCount;
+  const center = position.x + position.w / 2;
+  const sectionIndex = clamp(Math.floor(center / Math.max(1, displaySectionWidth)), 0, sectionCount - 1);
+  const displaySectionStart = sectionIndex * displaySectionWidth;
+  const localX = clamp(position.x - displaySectionStart, 0, Math.max(0, displaySectionWidth - 0.5));
+  const mappedX = sectionIndex * sourceSectionWidth + (localX / Math.max(1, displaySectionWidth)) * sourceSectionWidth;
+
+  return {
+    ...position,
+    x: mappedX,
+  };
+}
+
 function WebGridCanvas({
   config,
+  sourceColumns,
   theme,
   states,
   client,
@@ -369,6 +395,7 @@ function WebGridCanvas({
   onRemoveWidget,
 }: {
   config: DashboardSettings;
+  sourceColumns: number;
   theme: ReturnType<typeof resolveThemeSettings>;
   states: StateSnapshot;
   client: IoBrokerClient;
@@ -417,6 +444,7 @@ function WebGridCanvas({
           onUpdateWidget={onUpdateWidget}
           allowManualLayout={true}
           allowResize={false}
+          sourceColumns={sourceColumns}
           states={states}
           stepX={stepX}
           stepY={stepY}
@@ -443,6 +471,7 @@ function WebWidgetShell({
   onRemoveWidget,
   allowManualLayout = true,
   allowResize = true,
+  sourceColumns,
 }: {
   widget: WidgetConfig;
   config: DashboardSettings;
@@ -459,6 +488,7 @@ function WebWidgetShell({
   onRemoveWidget: (widgetId: string) => void;
   allowManualLayout?: boolean;
   allowResize?: boolean;
+  sourceColumns: number;
 }) {
   const [preview, setPreview] = useState(widget.position);
   const showHeaderTitle = widget.type !== "camera" && widget.showTitle !== false && Boolean(widget.title.trim());
@@ -509,7 +539,9 @@ function WebWidgetShell({
       }
       interaction.current = null;
       if (allowManualLayout) {
-        onUpdateWidget(widget.id, { position: preview });
+        onUpdateWidget(widget.id, {
+          position: mapDisplayPositionToSourceHint(preview, config.grid.columns, sourceColumns),
+        });
       }
     };
 
