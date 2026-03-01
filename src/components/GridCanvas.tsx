@@ -160,6 +160,10 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function buildResponsiveAutoLayoutConfig(config: DashboardSettings, columns: number): DashboardSettings {
+  if (columns === 9) {
+    return buildDesktopAutoLayoutConfig(config);
+  }
+
   const sortedWidgets = [...config.widgets].sort((a, b) => {
     if (a.position.y !== b.position.y) {
       return a.position.y - b.position.y;
@@ -207,6 +211,106 @@ function buildResponsiveAutoLayoutConfig(config: DashboardSettings, columns: num
     },
     widgets,
   };
+}
+
+function buildDesktopAutoLayoutConfig(config: DashboardSettings): DashboardSettings {
+  const sourceColumns = Math.max(1, config.grid.columns);
+  const mainColumnWidth = 3;
+  const subColumnHeights = Array.from({ length: 9 }, () => 0);
+  const sortedWidgets = [...config.widgets].sort((a, b) => {
+    if (a.position.y !== b.position.y) {
+      return a.position.y - b.position.y;
+    }
+    if (a.position.x !== b.position.x) {
+      return a.position.x - b.position.x;
+    }
+    return a.id.localeCompare(b.id);
+  });
+
+  const widgets = sortedWidgets.map((widget) => {
+    const spec = getAutoLayoutSpec(widget, 9);
+
+    if (spec.w === 1) {
+      const preferredSection = getPreferredDesktopSection(widget, sourceColumns);
+      const sectionStart = preferredSection * mainColumnWidth;
+      let bestLocal = 0;
+      let bestY = Number.POSITIVE_INFINITY;
+
+      for (let offset = 0; offset < mainColumnWidth; offset += 1) {
+        const y = subColumnHeights[sectionStart + offset];
+        if (y < bestY) {
+          bestY = y;
+          bestLocal = offset;
+        }
+      }
+
+      const targetIndex = sectionStart + bestLocal;
+      subColumnHeights[targetIndex] = bestY + spec.h;
+
+      return {
+        ...widget,
+        position: {
+          x: targetIndex,
+          y: bestY,
+          w: 1,
+          h: spec.h,
+        },
+      };
+    }
+
+    const sectionSpan = Math.max(1, Math.round(spec.w / mainColumnWidth));
+    const maxStartSection = Math.max(0, 3 - sectionSpan);
+    const preferredSection = clamp(getPreferredDesktopSection(widget, sourceColumns), 0, maxStartSection);
+
+    let bestStartSection = preferredSection;
+    let bestY = Number.POSITIVE_INFINITY;
+
+    for (let section = 0; section <= maxStartSection; section += 1) {
+      const candidateStart = section * mainColumnWidth;
+      const candidateEnd = candidateStart + sectionSpan * mainColumnWidth;
+      const y = Math.max(...subColumnHeights.slice(candidateStart, candidateEnd));
+
+      if (y < bestY || (y === bestY && section === preferredSection)) {
+        bestY = y;
+        bestStartSection = section;
+      }
+    }
+
+    const startIndex = bestStartSection * mainColumnWidth;
+    const endIndex = startIndex + sectionSpan * mainColumnWidth;
+    for (let index = startIndex; index < endIndex; index += 1) {
+      subColumnHeights[index] = bestY + spec.h;
+    }
+
+    return {
+      ...widget,
+      position: {
+        x: startIndex,
+        y: bestY,
+        w: sectionSpan * mainColumnWidth,
+        h: spec.h,
+      },
+    };
+  });
+
+  return {
+    ...config,
+    grid: {
+      ...config.grid,
+      columns: 9,
+    },
+    widgets,
+  };
+}
+
+function getPreferredDesktopSection(widget: WidgetConfig, sourceColumns: number) {
+  if (widget.type === "state") {
+    return 0;
+  }
+
+  const sectionWidth = sourceColumns / 3;
+  const center = widget.position.x + widget.position.w / 2;
+  return clamp(Math.floor(center / Math.max(1, sectionWidth)), 0, 2);
 }
 
 function getAutoLayoutSpec(widget: WidgetConfig, columns: number) {
