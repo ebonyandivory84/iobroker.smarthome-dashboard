@@ -182,9 +182,10 @@ function buildResponsiveAutoLayoutConfig(config: DashboardSettings, columns: num
     const desiredY = Math.max(0, widget.position.y);
     const bestStart = desiredStart;
     const bestY = Math.max(desiredY, ...columnHeights.slice(bestStart, bestStart + spec.w));
+    const snappedBottom = ceilGridUnit(bestY + spec.h);
 
     for (let index = bestStart; index < bestStart + spec.w; index += 1) {
-      columnHeights[index] = bestY + spec.h;
+      columnHeights[index] = snappedBottom;
     }
 
     return {
@@ -236,9 +237,10 @@ function buildDesktopAutoLayoutConfig(config: DashboardSettings): DashboardSetti
       );
       const bestLocal = localHint;
       const bestY = Math.max(desiredY, subColumnHeights[sectionStart + bestLocal]);
+      const snappedBottom = ceilGridUnit(bestY + spec.h);
 
       const targetIndex = sectionStart + bestLocal;
-      subColumnHeights[targetIndex] = bestY + spec.h;
+      subColumnHeights[targetIndex] = snappedBottom;
 
       return {
         ...widget,
@@ -259,8 +261,9 @@ function buildDesktopAutoLayoutConfig(config: DashboardSettings): DashboardSetti
     const startIndex = bestStartSection * mainColumnWidth;
     const endIndex = startIndex + sectionSpan * mainColumnWidth;
     const bestY = Math.max(desiredY, ...subColumnHeights.slice(startIndex, endIndex));
+    const snappedBottom = ceilGridUnit(bestY + spec.h);
     for (let index = startIndex; index < endIndex; index += 1) {
-      subColumnHeights[index] = bestY + spec.h;
+      subColumnHeights[index] = snappedBottom;
     }
 
     return {
@@ -302,16 +305,16 @@ function getAutoLayoutSpec(widget: WidgetConfig, columns: number) {
         return { w: 1, h: Math.max(0.6, roundGridUnit(1 / ratio)) };
       }
       case "solar":
-        return { w: 1, h: 3.8 };
+        return { w: 1, h: roundGridUnit(3.8) };
       case "grafana":
-        return { w: 1, h: 2.8 };
+        return { w: 1, h: roundGridUnit(2.8) };
       case "weather":
-        return { w: 1, h: 1.8 };
+        return { w: 1, h: roundGridUnit(1.8) };
       case "energy":
-        return { w: 1, h: 2 };
+        return { w: 1, h: roundGridUnit(2) };
     }
 
-    return { w: 1, h: Math.max(1.5, fallbackHeight) };
+    return { w: 1, h: Math.max(1.5, roundGridUnit(fallbackHeight)) };
   }
 
   const mainColumnWidth = 3;
@@ -325,16 +328,16 @@ function getAutoLayoutSpec(widget: WidgetConfig, columns: number) {
       return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(mainColumnWidth / ratio)) };
     }
     case "solar":
-      return { w: mainColumnWidth, h: 3.2 };
+      return { w: mainColumnWidth, h: roundGridUnit(3.2) };
     case "grafana":
-      return { w: wideWidgetWidth, h: 2.8 };
+      return { w: wideWidgetWidth, h: roundGridUnit(2.8) };
     case "weather":
-      return { w: mainColumnWidth, h: 2.2 };
+      return { w: mainColumnWidth, h: roundGridUnit(2.2) };
     case "energy":
-      return { w: mainColumnWidth, h: 2.4 };
+      return { w: mainColumnWidth, h: roundGridUnit(2.4) };
   }
 
-  return { w: 1, h: Math.max(1, fallbackHeight) };
+  return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
 }
 
 function normalizeAspectRatio(value?: number) {
@@ -346,6 +349,10 @@ function normalizeAspectRatio(value?: number) {
 
 function roundGridUnit(value: number) {
   return Math.round(value / GRID_SNAP) * GRID_SNAP;
+}
+
+function ceilGridUnit(value: number) {
+  return Math.ceil(value / GRID_SNAP) * GRID_SNAP;
 }
 
 function WebGridCanvas({
