@@ -249,23 +249,23 @@ function SolarFlowScene({
     return () => loop.stop();
   }, [progress]);
 
-  const centerCardWidth = clamp(sceneLayout.width * 0.125, 114, 172);
-  const centerCardHeight = clamp(sceneLayout.height * 0.185, 106, 130);
-  const outerCardWidth = clamp(centerCardWidth * 0.84, 92, 142);
-  const outerCardHeight = clamp(centerCardHeight * 0.84, 90, 112);
+  const centerCardWidth = clamp(sceneLayout.width * 0.12, 110, 164);
+  const centerCardHeight = clamp(sceneLayout.height * 0.18, 102, 124);
+  const outerCardWidth = clamp(centerCardWidth * 0.76, 84, 126);
+  const outerCardHeight = clamp(centerCardHeight * 0.76, 82, 100);
   const beamLength = 18;
-  const sidePadding = clamp(sceneLayout.width * 0.11, 34, 150);
+  const sidePadding = clamp(sceneLayout.width * 0.14, 52, 180);
   const outerMargin = clamp(sceneLayout.height * 0.1, 34, 64);
-  const connectorInset = 22;
+  const connectorInset = 18;
   const topY = outerMargin;
   const centerY = sceneLayout.height * 0.5 - centerCardHeight / 2;
   const bottomY = sceneLayout.height - outerMargin - outerCardHeight;
   const centerMidX = sceneLayout.width / 2;
   const centerX = centerMidX - centerCardWidth / 2;
   const leftCenter = clamp(
-    sceneLayout.width * 0.19,
+    sceneLayout.width * 0.15,
     outerCardWidth / 2 + sidePadding,
-    centerMidX - centerCardWidth / 2 - outerCardWidth / 2 - 56
+    centerMidX - centerCardWidth / 2 - outerCardWidth / 2 - 72
   );
   const rightCenter = sceneLayout.width - leftCenter;
   const leftX = leftCenter - outerCardWidth / 2;
@@ -332,7 +332,7 @@ function SolarFlowScene({
         nodeColor={widgetAppearance?.pvCardColor}
         theme={theme}
         textColor={textColor}
-        mutedTextColor={mutedTextColor}
+        mutedTextColor={textColor}
         widgetAppearance={widgetAppearance}
         style={{ ...styles.nodePosition, top: topY, left: topX, width: outerCardWidth, minHeight: outerCardHeight }}
         value={fmtW(pvNow)}
@@ -346,7 +346,7 @@ function SolarFlowScene({
         nodeColor={widgetAppearance?.homeCardColor}
         theme={theme}
         textColor={textColor}
-        mutedTextColor={mutedTextColor}
+        mutedTextColor={textColor}
         widgetAppearance={widgetAppearance}
         style={{ ...styles.nodePosition, top: centerY, left: centerX, width: centerCardWidth, minHeight: centerCardHeight }}
         value={fmtW(homeNow)}
@@ -360,7 +360,7 @@ function SolarFlowScene({
         nodeColor={widgetAppearance?.batteryCardColor}
         theme={theme}
         textColor={textColor}
-        mutedTextColor={mutedTextColor}
+        mutedTextColor={textColor}
         widgetAppearance={widgetAppearance}
         style={{ ...styles.nodePosition, top: centerY + (centerCardHeight - outerCardHeight) / 2, left: leftX, width: outerCardWidth, minHeight: outerCardHeight }}
         value={fmtW(battPower || null)}
@@ -402,7 +402,6 @@ function SolarFlowScene({
         widgetAppearance={widgetAppearance}
         style={{ ...styles.nodePosition, top: bottomY, left: bottomX, width: outerCardWidth, minHeight: outerCardHeight }}
         value="—"
-        meta="Wallbox"
       />
     </View>
   );
@@ -503,7 +502,11 @@ function NodeCard({
         </View>
       </View>
       <Text style={[styles.nodeValue, styles.nodeValueCompact, { color: textColor }]}>{value}</Text>
-      {meta ? <Text style={[styles.nodeMeta, { color: mutedTextColor }]}>{meta}</Text> : null}
+      {meta ? (
+        <Text adjustsFontSizeToFit numberOfLines={1} style={[styles.nodeMeta, { color: mutedTextColor }]}>
+          {meta}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -798,7 +801,9 @@ const styles = StyleSheet.create({
   nodeMeta: {
     marginTop: 4,
     color: palette.textMuted,
-    fontSize: 11,
+    fontSize: 10,
+    maxWidth: "92%",
+    textAlign: "center",
   },
   bottomRow: {
     flexDirection: "row",
