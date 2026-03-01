@@ -44,13 +44,13 @@ export function GridCanvas({
   const displayConfig = useMemo(
     () =>
       useSectionedCompact
-        ? buildSectionedConfig(config, "mobile")
+        ? buildMobileConfig(config)
         : useSectionedDesktop
-          ? buildSectionedConfig(config, "desktop")
+          ? buildSectionedDesktopConfig(config)
           : config,
     [config, useSectionedCompact, useSectionedDesktop]
   );
-  const useStructuredGridSizing = useSectionedCompact || useSectionedDesktop;
+  const useStructuredGridSizing = useSectionedDesktop;
   const canvasInset = Platform.OS === "web" ? 64 : 60;
   const availableWidth = containerWidth > 0 ? containerWidth : windowWidth;
   const canvasWidth = Math.max(320, availableWidth - canvasInset);
@@ -176,10 +176,9 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function buildSectionedConfig(config: DashboardSettings, mode: "desktop" | "mobile"): DashboardSettings {
+function buildSectionedDesktopConfig(config: DashboardSettings): DashboardSettings {
   const sectionCount = 3;
   const sectionColumns = 3;
-  const sectionGapRows = 1.5;
   const sourceSectionWidth = Math.max(1, config.grid.columns / sectionCount);
   const sections = Array.from({ length: sectionCount }, () => [] as WidgetConfig[]);
 
@@ -205,11 +204,8 @@ function buildSectionedConfig(config: DashboardSettings, mode: "desktop" | "mobi
     });
   });
 
-  const sectionOrder = mode === "mobile" ? [2, 1, 0] : [0, 1, 2];
-  const orderedSections = sectionOrder.map((index) => sections[index]);
-
-  let rowOffset = 0;
-  const placedWidgets = orderedSections.flatMap((sectionWidgets, renderIndex) => {
+  const placedWidgets = [0, 1, 2].flatMap((sectionIndex, renderIndex) => {
+    const sectionWidgets = sections[sectionIndex];
     if (!sectionWidgets.length) {
       return [];
     }
@@ -228,18 +224,6 @@ function buildSectionedConfig(config: DashboardSettings, mode: "desktop" | "mobi
       0
     );
 
-    if (mode === "mobile") {
-      const stacked = normalizedSection.map((widget) => ({
-        ...widget,
-        position: {
-          ...widget.position,
-          y: widget.position.y + rowOffset,
-        },
-      }));
-      rowOffset += sectionHeight + sectionGapRows;
-      return stacked;
-    }
-
     const xOffset = renderIndex * sectionColumns;
     return normalizedSection.map((widget) => ({
       ...widget,
@@ -254,10 +238,86 @@ function buildSectionedConfig(config: DashboardSettings, mode: "desktop" | "mobi
     ...config,
     grid: {
       ...config.grid,
-      columns: mode === "mobile" ? sectionColumns : sectionColumns * sectionCount,
+      columns: sectionColumns * sectionCount,
     },
     widgets: placedWidgets,
   };
+}
+
+function buildMobileConfig(config: DashboardSettings): DashboardSettings {
+  const sectionCount = 3;
+  const sourceSectionWidth = Math.max(1, config.grid.columns / sectionCount);
+  const sectionOrder = [2, 1, 0];
+  const sectionGapRows = 0.5;
+  const sections = Array.from({ length: sectionCount }, () => [] as WidgetConfig[]);
+
+  config.widgets.forEach((widget) => {
+    const center = widget.position.x + widget.position.w / 2;
+    const sectionIndex = clamp(Math.floor(center / sourceSectionWidth), 0, sectionCount - 1);
+    sections[sectionIndex].push(widget);
+  });
+
+  let rowOffset = 0;
+  const mobileWidgets = sectionOrder.flatMap((sectionIndex) => {
+    const ordered = [...sections[sectionIndex]].sort((a, b) => {
+      if (a.position.y !== b.position.y) {
+        return a.position.y - b.position.y;
+      }
+      return a.position.x - b.position.x;
+    });
+
+    if (!ordered.length) {
+      return [];
+    }
+
+    const stacked = ordered.map((widget) => {
+      const nextHeight = deriveMobileHeight(widget);
+      const nextWidget = {
+        ...widget,
+        position: {
+          x: 0,
+          y: rowOffset,
+          w: 1,
+          h: nextHeight,
+        },
+      };
+      rowOffset += nextHeight + config.grid.gap / Math.max(1, config.grid.rowHeight);
+      return nextWidget;
+    });
+
+    rowOffset += sectionGapRows;
+    return stacked;
+  });
+
+  return {
+    ...config,
+    grid: {
+      ...config.grid,
+      columns: 1,
+    },
+    widgets: mobileWidgets,
+  };
+}
+
+function deriveMobileHeight(widget: WidgetConfig) {
+  const fallbackHeight = widget.position.h;
+
+  switch (widget.type) {
+    case "state":
+      return 1.15;
+    case "camera":
+      return 2.4;
+    case "solar":
+      return 4.4;
+    case "grafana":
+      return 3.4;
+    case "weather":
+      return 2.3;
+    case "energy":
+      return 2.6;
+  }
+
+  return Math.max(1.2, fallbackHeight);
 }
 
 function mapDesktopDisplayPositionToSource(position: WidgetConfig["position"], sourceColumns: number): WidgetConfig["position"] {
