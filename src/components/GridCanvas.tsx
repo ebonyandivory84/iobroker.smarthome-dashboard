@@ -50,6 +50,7 @@ export function GridCanvas({
           : config,
     [config, useSectionedCompact, useSectionedDesktop]
   );
+  const useStructuredGridSizing = useSectionedCompact || useSectionedDesktop;
   const canvasInset = Platform.OS === "web" ? 64 : 60;
   const availableWidth = containerWidth > 0 ? containerWidth : windowWidth;
   const canvasWidth = Math.max(320, availableWidth - canvasInset);
@@ -57,14 +58,15 @@ export function GridCanvas({
     const totalGap = (displayConfig.grid.columns - 1) * displayConfig.grid.gap;
     return (canvasWidth - totalGap) / displayConfig.grid.columns;
   }, [canvasWidth, displayConfig.grid.columns, displayConfig.grid.gap]);
+  const renderRowHeight = useStructuredGridSizing ? cellWidth : displayConfig.grid.rowHeight;
 
   const canvasHeight = useMemo(() => {
     const maxRow = displayConfig.widgets.reduce((largest, widget) => {
       const bottom = widget.position.y + widget.position.h;
       return Math.max(largest, bottom);
     }, 0);
-    return maxRow * (displayConfig.grid.rowHeight + displayConfig.grid.gap) + 120;
-  }, [displayConfig.grid.gap, displayConfig.grid.rowHeight, displayConfig.widgets]);
+    return maxRow * (renderRowHeight + displayConfig.grid.gap) + 120;
+  }, [displayConfig.grid.gap, displayConfig.widgets, renderRowHeight]);
 
   const handleLayout = (event: LayoutChangeEvent) => {
     const nextWidth = event.nativeEvent.layout.width;
@@ -79,6 +81,7 @@ export function GridCanvas({
         cellWidth={cellWidth}
         client={client}
         config={displayConfig}
+        rowHeight={renderRowHeight}
         theme={resolveThemeSettings(displayConfig.theme)}
         isLayoutMode={effectiveLayoutMode}
         onEditWidget={onEditWidget}
@@ -100,14 +103,14 @@ export function GridCanvas({
               ]}
             />
           ))}
-          {Array.from({ length: Math.round(canvasHeight / ((displayConfig.grid.rowHeight + displayConfig.grid.gap) * GRID_SNAP)) + 1 }).map(
+          {Array.from({ length: Math.round(canvasHeight / ((renderRowHeight + displayConfig.grid.gap) * GRID_SNAP)) + 1 }).map(
             (_, index) => (
               <View
                 key={`row-${index}`}
                 style={[
                   styles.gridRowLine,
                   {
-                    top: fineGridOffset(index, displayConfig.grid.rowHeight, displayConfig.grid.gap),
+                    top: fineGridOffset(index, renderRowHeight, displayConfig.grid.gap),
                   },
                 ]}
               />
@@ -117,9 +120,9 @@ export function GridCanvas({
         {displayConfig.widgets.map((widget) => {
           const style = {
             left: widget.position.x * (cellWidth + displayConfig.grid.gap),
-            top: widget.position.y * (displayConfig.grid.rowHeight + displayConfig.grid.gap),
+            top: widget.position.y * (renderRowHeight + displayConfig.grid.gap),
             width: widget.position.w * cellWidth + (widget.position.w - 1) * displayConfig.grid.gap,
-            height: widget.position.h * displayConfig.grid.rowHeight + (widget.position.h - 1) * displayConfig.grid.gap,
+            height: widget.position.h * renderRowHeight + (widget.position.h - 1) * displayConfig.grid.gap,
           };
 
           return (
@@ -132,7 +135,7 @@ export function GridCanvas({
                 onCommitPosition={(widgetId, position) => onUpdateWidget(widgetId, { position })}
                 onEdit={onEditWidget}
                 onRemove={onRemoveWidget}
-                rowHeight={displayConfig.grid.rowHeight}
+                rowHeight={renderRowHeight}
                 widget={widget}
               >
                 {renderWidget(widget, states, client, onUpdateWidget, displayConfig.theme)}
@@ -199,17 +202,8 @@ function buildSectionedConfig(config: DashboardSettings, mode: "desktop" | "mobi
       return [];
     }
 
-    const sectionTop = sectionWidgets.reduce((smallest, widget) => Math.min(smallest, widget.position.y), Number.POSITIVE_INFINITY);
-    const rebasedSectionWidgets = sectionWidgets.map((widget) => ({
-      ...widget,
-      position: {
-        ...widget.position,
-        y: widget.position.y - (Number.isFinite(sectionTop) ? sectionTop : 0),
-      },
-    }));
-
     const normalizedSection = normalizeWidgetLayout(
-      [...rebasedSectionWidgets].sort((a, b) => {
+      [...sectionWidgets].sort((a, b) => {
         if (a.position.y !== b.position.y) {
           return a.position.y - b.position.y;
         }
@@ -261,6 +255,7 @@ function WebGridCanvas({
   client,
   cellWidth,
   canvasHeight,
+  rowHeight,
   isLayoutMode,
   onEditWidget,
   onUpdateWidget,
@@ -272,13 +267,14 @@ function WebGridCanvas({
   client: IoBrokerClient;
   cellWidth: number;
   canvasHeight: number;
+  rowHeight: number;
   isLayoutMode: boolean;
   onEditWidget: (widgetId: string) => void;
   onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void;
   onRemoveWidget: (widgetId: string) => void;
 }) {
   const stepX = cellWidth + config.grid.gap;
-  const stepY = config.grid.rowHeight + config.grid.gap;
+  const stepY = rowHeight + config.grid.gap;
 
   return (
     <div style={{ ...webCanvasStyle, minHeight: canvasHeight }}>
@@ -296,7 +292,7 @@ function WebGridCanvas({
           key={`h-${index}`}
           style={{
             ...webHorizontalLineStyle,
-            top: fineGridOffset(index, config.grid.rowHeight, config.grid.gap),
+            top: fineGridOffset(index, rowHeight, config.grid.gap),
           }}
         />
       ))}
@@ -306,6 +302,7 @@ function WebGridCanvas({
           cellWidth={cellWidth}
           client={client}
           config={config}
+          rowHeight={rowHeight}
           theme={theme}
           isLayoutMode={isLayoutMode}
           onEditWidget={onEditWidget}
@@ -324,6 +321,7 @@ function WebGridCanvas({
 function WebWidgetShell({
   widget,
   config,
+  rowHeight,
   theme,
   states,
   client,
@@ -337,6 +335,7 @@ function WebWidgetShell({
 }: {
   widget: WidgetConfig;
   config: DashboardSettings;
+  rowHeight: number;
   theme: ReturnType<typeof resolveThemeSettings>;
   states: StateSnapshot;
   client: IoBrokerClient;
@@ -428,7 +427,7 @@ function WebWidgetShell({
     left: preview.x * stepX,
     top: preview.y * stepY,
     width: preview.w * cellWidth + (preview.w - 1) * config.grid.gap,
-    height: preview.h * config.grid.rowHeight + (preview.h - 1) * config.grid.gap,
+    height: preview.h * rowHeight + (preview.h - 1) * config.grid.gap,
     boxShadow: isLayoutMode ? "inset 0 0 0 1px rgba(77, 226, 177, 0.22)" : undefined,
   };
 
