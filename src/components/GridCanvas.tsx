@@ -461,7 +461,7 @@ function WebWidgetShell({
   const contentStyle = [
     styles.webContent,
     widget.type === "camera" ? styles.webContentBleed : null,
-    widget.type !== "camera" && widget.type !== "solar" ? styles.webContentInset : null,
+    widget.type !== "camera" && widget.type !== "solar" && widget.type !== "state" ? styles.webContentInset : null,
     widget.type === "grafana" ? styles.webContentGrafana : null,
   ];
 

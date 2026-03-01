@@ -154,7 +154,12 @@ export function WidgetFrame({
           style={webDragLayerStyle}
         />
       ) : null}
-      <View style={[styles.content, widget.type !== "camera" && widget.type !== "solar" ? styles.contentInset : null]}>
+      <View
+        style={[
+          styles.content,
+          widget.type !== "camera" && widget.type !== "solar" && widget.type !== "state" ? styles.contentInset : null,
+        ]}
+      >
         {children}
       </View>
       <View pointerEvents="box-none" style={styles.footerRow}>
