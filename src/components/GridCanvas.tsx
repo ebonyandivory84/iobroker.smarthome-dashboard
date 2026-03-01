@@ -534,6 +534,10 @@ function WebWidgetShell({
       ? {
           border: "none",
           background: "#000000",
+          backdropFilter: "none",
+          WebkitBackdropFilter: "none",
+          contain: "layout paint style",
+          isolation: "isolate",
         }
       : null),
     left: preview.x * stepX,

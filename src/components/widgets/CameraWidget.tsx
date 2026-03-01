@@ -60,13 +60,6 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
       };
     }
 
-    if (Platform.OS === "web") {
-      setDisplayUrl(snapshotUrl);
-      return () => {
-        active = false;
-      };
-    }
-
     preloadSnapshot(snapshotUrl)
       .then(() => {
         if (active) {
@@ -176,6 +169,16 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
 }
 
 async function preloadSnapshot(uri: string) {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    await new Promise<void>((resolve, reject) => {
+      const img = new window.Image();
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("Snapshot preload failed"));
+      img.src = uri;
+    });
+    return;
+  }
+
   await Image.prefetch(uri);
 }
 
@@ -195,6 +198,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    ...(Platform.OS === "web"
+      ? {
+          isolation: "isolate" as const,
+        }
+      : null),
   },
   titleBadge: {
     position: "absolute",
