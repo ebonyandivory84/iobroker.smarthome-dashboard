@@ -14,6 +14,7 @@ type WidgetFrameProps = {
   gap: number;
   columns: number;
   isLayoutMode: boolean;
+  allowManualLayout?: boolean;
   onCommitPosition: (widgetId: string, next: WidgetConfig["position"]) => void;
   onEdit: (widgetId: string) => void;
   onRemove: (widgetId: string) => void;
@@ -27,6 +28,7 @@ export function WidgetFrame({
   gap,
   columns,
   isLayoutMode,
+  allowManualLayout = true,
   onCommitPosition,
   onEdit,
   onRemove,
@@ -146,7 +148,7 @@ export function WidgetFrame({
           </Pressable>
         </View>
       ) : null}
-      {Platform.OS === "web" && isLayoutMode ? (
+      {Platform.OS === "web" && isLayoutMode && allowManualLayout ? (
         <div
           draggable={false}
           onDragStart={(event) => event.preventDefault()}
@@ -164,12 +166,12 @@ export function WidgetFrame({
       </View>
       <View pointerEvents="box-none" style={styles.footerRow}>
         <View />
-        {isLayoutMode ? (
+        {isLayoutMode && allowManualLayout ? (
           <View style={styles.resizeHandle}>
             <MaterialCommunityIcons color={palette.textMuted} name="resize-bottom-right" size={18} />
           </View>
         ) : null}
-        {Platform.OS === "web" && isLayoutMode ? (
+        {Platform.OS === "web" && isLayoutMode && allowManualLayout ? (
           <div
             draggable={false}
             onDragStart={(event) => event.preventDefault()}

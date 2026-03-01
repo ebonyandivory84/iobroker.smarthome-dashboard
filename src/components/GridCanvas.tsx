@@ -3,7 +3,7 @@ import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { IoBrokerClient } from "../services/iobroker";
 import { DashboardSettings, StateSnapshot, WidgetConfig } from "../types/dashboard";
-import { constrainToPrimarySections, GRID_SNAP, normalizeWidgetLayout } from "../utils/gridLayout";
+import { constrainToPrimarySections, GRID_SNAP } from "../utils/gridLayout";
 import { resolveThemeSettings } from "../utils/themeConfig";
 import { palette } from "../utils/theme";
 import { WidgetFrame } from "./WidgetFrame";
@@ -38,19 +38,13 @@ export function GridCanvas({
   const { width: windowWidth } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
   const isCompactWeb = Platform.OS === "web" && windowWidth < 700;
-  const useSectionedDesktop = Platform.OS === "web" && !isCompactWeb;
-  const useSectionedCompact = Platform.OS === "web" && isCompactWeb;
-  const effectiveLayoutMode = isLayoutMode && !useSectionedCompact;
+  const displayColumns = isCompactWeb ? 1 : 3;
+  const effectiveLayoutMode = isLayoutMode;
   const displayConfig = useMemo(
-    () =>
-      useSectionedCompact
-        ? buildMobileConfig(config)
-        : useSectionedDesktop
-          ? buildSectionedDesktopConfig(config)
-          : config,
-    [config, useSectionedCompact, useSectionedDesktop]
+    () => buildResponsiveAutoLayoutConfig(config, displayColumns),
+    [config, displayColumns]
   );
-  const useStructuredGridSizing = useSectionedDesktop;
+  const useStructuredGridSizing = true;
   const canvasInset = Platform.OS === "web" ? 64 : 60;
   const availableWidth = containerWidth > 0 ? containerWidth : windowWidth;
   const canvasWidth = Math.max(320, availableWidth - canvasInset);
@@ -74,18 +68,6 @@ export function GridCanvas({
     onLayoutMeasured?.(nextWidth);
   };
 
-  const handleDisplayUpdate = (widgetId: string, partial: Partial<WidgetConfig>) => {
-    if (!partial.position || !useSectionedDesktop) {
-      onUpdateWidget(widgetId, partial);
-      return;
-    }
-
-    onUpdateWidget(widgetId, {
-      ...partial,
-      position: mapDesktopDisplayPositionToSource(partial.position, config.grid.columns),
-    });
-  };
-
   const content =
     Platform.OS === "web" && !isCompactWeb ? (
       <WebGridCanvas
@@ -98,7 +80,7 @@ export function GridCanvas({
         isLayoutMode={effectiveLayoutMode}
         onEditWidget={onEditWidget}
         onRemoveWidget={onRemoveWidget}
-        onUpdateWidget={handleDisplayUpdate}
+        onUpdateWidget={onUpdateWidget}
         states={states}
       />
     ) : (
@@ -144,7 +126,8 @@ export function GridCanvas({
                 columns={displayConfig.grid.columns}
                 gap={displayConfig.grid.gap}
                 isLayoutMode={effectiveLayoutMode}
-                onCommitPosition={(widgetId, position) => handleDisplayUpdate(widgetId, { position })}
+                allowManualLayout={false}
+                onCommitPosition={(widgetId, position) => onUpdateWidget(widgetId, { position })}
                 onEdit={onEditWidget}
                 onRemove={onRemoveWidget}
                 rowHeight={renderRowHeight}
@@ -176,163 +159,94 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function buildSectionedDesktopConfig(config: DashboardSettings): DashboardSettings {
-  const sectionCount = 3;
-  const sectionColumns = 3;
-  const sourceSectionWidth = Math.max(1, config.grid.columns / sectionCount);
-  const sections = Array.from({ length: sectionCount }, () => [] as WidgetConfig[]);
-
-  config.widgets.forEach((widget) => {
-    const center = widget.position.x + widget.position.w / 2;
-    const sectionIndex = clamp(Math.floor(center / sourceSectionWidth), 0, sectionCount - 1);
-    const sectionStart = sectionIndex * sourceSectionWidth;
-    const widthRatio = widget.position.w / sourceSectionWidth;
-    const rawLocalWidth = Math.round(widthRatio * sectionColumns);
-    const localWidth = clamp(rawLocalWidth || 1, 1, sectionColumns);
-    const localStartRatio = (widget.position.x - sectionStart) / sourceSectionWidth;
-    const rawLocalX = Math.round(localStartRatio * sectionColumns);
-    const localX = clamp(rawLocalX, 0, Math.max(0, sectionColumns - localWidth));
-
-    sections[sectionIndex].push({
-      ...widget,
-      position: {
-        ...widget.position,
-        x: localX,
-        y: widget.position.y,
-        w: localWidth,
-      },
-    });
-  });
-
-  const placedWidgets = [0, 1, 2].flatMap((sectionIndex, renderIndex) => {
-    const sectionWidgets = sections[sectionIndex];
-    if (!sectionWidgets.length) {
-      return [];
+function buildResponsiveAutoLayoutConfig(config: DashboardSettings, columns: number): DashboardSettings {
+  const sortedWidgets = [...config.widgets].sort((a, b) => {
+    if (a.position.y !== b.position.y) {
+      return a.position.y - b.position.y;
     }
-
-    const normalizedSection = normalizeWidgetLayout(
-      [...sectionWidgets].sort((a, b) => {
-        if (a.position.y !== b.position.y) {
-          return a.position.y - b.position.y;
-        }
-        return a.position.x - b.position.x;
-      }),
-      sectionColumns
-    );
-    const sectionHeight = normalizedSection.reduce(
-      (largest, widget) => Math.max(largest, widget.position.y + widget.position.h),
-      0
-    );
-
-    const xOffset = renderIndex * sectionColumns;
-    return normalizedSection.map((widget) => ({
-      ...widget,
-      position: {
-        ...widget.position,
-        x: widget.position.x + xOffset,
-      },
-    }));
-  });
-
-  return {
-    ...config,
-    grid: {
-      ...config.grid,
-      columns: sectionColumns * sectionCount,
-    },
-    widgets: placedWidgets,
-  };
-}
-
-function buildMobileConfig(config: DashboardSettings): DashboardSettings {
-  const sectionCount = 3;
-  const sourceSectionWidth = Math.max(1, config.grid.columns / sectionCount);
-  const sectionOrder = [2, 1, 0];
-  const sectionGapRows = 0.5;
-  const sections = Array.from({ length: sectionCount }, () => [] as WidgetConfig[]);
-
-  config.widgets.forEach((widget) => {
-    const center = widget.position.x + widget.position.w / 2;
-    const sectionIndex = clamp(Math.floor(center / sourceSectionWidth), 0, sectionCount - 1);
-    sections[sectionIndex].push(widget);
-  });
-
-  let rowOffset = 0;
-  const mobileWidgets = sectionOrder.flatMap((sectionIndex) => {
-    const ordered = [...sections[sectionIndex]].sort((a, b) => {
-      if (a.position.y !== b.position.y) {
-        return a.position.y - b.position.y;
-      }
+    if (a.position.x !== b.position.x) {
       return a.position.x - b.position.x;
-    });
+    }
+    return a.id.localeCompare(b.id);
+  });
 
-    if (!ordered.length) {
-      return [];
+  const columnHeights = Array.from({ length: columns }, () => 0);
+  const widgets = sortedWidgets.map((widget) => {
+    const spec = getAutoLayoutSpec(widget, columns);
+    let bestStart = 0;
+    let bestY = Number.POSITIVE_INFINITY;
+
+    for (let start = 0; start <= columns - spec.w; start += 1) {
+      const y = Math.max(...columnHeights.slice(start, start + spec.w));
+      if (y < bestY) {
+        bestY = y;
+        bestStart = start;
+      }
     }
 
-    const stacked = ordered.map((widget) => {
-      const nextHeight = deriveMobileHeight(widget);
-      const nextWidget = {
-        ...widget,
-        position: {
-          x: 0,
-          y: rowOffset,
-          w: 1,
-          h: nextHeight,
-        },
-      };
-      rowOffset += nextHeight + config.grid.gap / Math.max(1, config.grid.rowHeight);
-      return nextWidget;
-    });
+    for (let index = bestStart; index < bestStart + spec.w; index += 1) {
+      columnHeights[index] = bestY + spec.h;
+    }
 
-    rowOffset += sectionGapRows;
-    return stacked;
+    return {
+      ...widget,
+      position: {
+        x: bestStart,
+        y: bestY,
+        w: spec.w,
+        h: spec.h,
+      },
+    };
   });
 
   return {
     ...config,
     grid: {
       ...config.grid,
-      columns: 1,
+      columns,
     },
-    widgets: mobileWidgets,
+    widgets,
   };
 }
 
-function deriveMobileHeight(widget: WidgetConfig) {
+function getAutoLayoutSpec(widget: WidgetConfig, columns: number) {
   const fallbackHeight = widget.position.h;
+
+  if (columns === 1) {
+    switch (widget.type) {
+      case "state":
+        return { w: 1, h: 1 };
+      case "camera":
+        return { w: 1, h: 2.2 };
+      case "solar":
+        return { w: 1, h: 3.8 };
+      case "grafana":
+        return { w: 1, h: 2.8 };
+      case "weather":
+        return { w: 1, h: 1.8 };
+      case "energy":
+        return { w: 1, h: 2 };
+    }
+
+    return { w: 1, h: Math.max(1.5, fallbackHeight) };
+  }
 
   switch (widget.type) {
     case "state":
-      return 1.15;
+      return { w: 1, h: 1 };
     case "camera":
-      return 2.4;
+      return { w: 1, h: 1.15 };
     case "solar":
-      return 4.4;
+      return { w: Math.min(2, columns), h: 1.8 };
     case "grafana":
-      return 3.4;
+      return { w: Math.min(2, columns), h: 1.6 };
     case "weather":
-      return 2.3;
+      return { w: 1, h: 1.2 };
     case "energy":
-      return 2.6;
+      return { w: 1, h: 1.3 };
   }
 
-  return Math.max(1.2, fallbackHeight);
-}
-
-function mapDesktopDisplayPositionToSource(position: WidgetConfig["position"], sourceColumns: number): WidgetConfig["position"] {
-  const sectionCount = 3;
-  const displaySectionWidth = 3;
-  const sourceSectionWidth = Math.max(1, sourceColumns / sectionCount);
-  const center = position.x + position.w / 2;
-  const sectionIndex = clamp(Math.floor(center / displaySectionWidth), 0, sectionCount - 1);
-  const localX = position.x - sectionIndex * displaySectionWidth;
-
-  return {
-    ...position,
-    x: sectionIndex * sourceSectionWidth + (localX / displaySectionWidth) * sourceSectionWidth,
-    w: (position.w / displaySectionWidth) * sourceSectionWidth,
-  };
+  return { w: 1, h: Math.max(1, fallbackHeight) };
 }
 
 function WebGridCanvas({
@@ -395,6 +309,7 @@ function WebGridCanvas({
           onEditWidget={onEditWidget}
           onRemoveWidget={onRemoveWidget}
           onUpdateWidget={onUpdateWidget}
+          allowManualLayout={false}
           states={states}
           stepX={stepX}
           stepY={stepY}
@@ -419,6 +334,7 @@ function WebWidgetShell({
   onEditWidget,
   onUpdateWidget,
   onRemoveWidget,
+  allowManualLayout = true,
 }: {
   widget: WidgetConfig;
   config: DashboardSettings;
@@ -433,6 +349,7 @@ function WebWidgetShell({
   onEditWidget: (widgetId: string) => void;
   onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void;
   onRemoveWidget: (widgetId: string) => void;
+  allowManualLayout?: boolean;
 }) {
   const [preview, setPreview] = useState(widget.position);
   const showHeaderTitle = widget.type !== "camera" && widget.showTitle !== false && Boolean(widget.title.trim());
@@ -457,6 +374,10 @@ function WebWidgetShell({
       const dx = snapUnits((event.clientX - active.startX) / stepX);
       const dy = snapUnits((event.clientY - active.startY) / stepY);
 
+      if (!allowManualLayout) {
+        return;
+      }
+
       if (active.mode === "drag") {
         setPreview(constrainToPrimarySections({
           ...active.startPosition,
@@ -478,7 +399,9 @@ function WebWidgetShell({
         return;
       }
       interaction.current = null;
-      onUpdateWidget(widget.id, { position: preview });
+      if (allowManualLayout) {
+        onUpdateWidget(widget.id, { position: preview });
+      }
     };
 
     window.addEventListener("mousemove", handleMove);
@@ -527,7 +450,7 @@ function WebWidgetShell({
 
   return (
     <div style={shellStyle}>
-      {isLayoutMode ? <div onMouseDown={begin("drag")} style={webWidgetDragSurfaceStyle} /> : null}
+      {isLayoutMode && allowManualLayout ? <div onMouseDown={begin("drag")} style={webWidgetDragSurfaceStyle} /> : null}
       {showHeaderTitle ? (
         <div style={webTitleBadgeStyle}>
           <div style={{ ...webTitleStyle, color: widget.appearance?.textColor || palette.text }}>{widget.title}</div>
@@ -546,7 +469,7 @@ function WebWidgetShell({
       <View style={contentStyle}>
         {renderWidget(widget, states, client, onUpdateWidget, config.theme)}
       </View>
-      {isLayoutMode ? (
+      {isLayoutMode && allowManualLayout ? (
         <div style={webFooterOverlayStyle}>
           <div onMouseDown={begin("resize")} style={webResizeHandleStyle} title="Skalieren" />
         </div>
