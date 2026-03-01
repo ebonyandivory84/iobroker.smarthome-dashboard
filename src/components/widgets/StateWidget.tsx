@@ -6,10 +6,11 @@ import { palette } from "../../utils/theme";
 type StateWidgetProps = {
   config: StateWidgetConfig;
   value: unknown;
+  addonValue?: unknown;
   onToggle: () => void;
 };
 
-export function StateWidget({ config, value, onToggle }: StateWidgetProps) {
+export function StateWidget({ config, value, addonValue, onToggle }: StateWidgetProps) {
   const hasValue = value !== null && value !== undefined;
   const hasTitle = config.showTitle !== false && Boolean(config.title?.trim());
   const active = resolveStateActive(config, value);
@@ -21,10 +22,10 @@ export function StateWidget({ config, value, onToggle }: StateWidgetProps) {
   const activeBackground = config.appearance?.activeWidgetColor || "rgba(136, 142, 160, 0.96)";
   const inactiveBackground = config.appearance?.inactiveWidgetColor || "rgba(54, 58, 74, 0.96)";
   const tileBackground = active ? activeBackground : inactiveBackground;
-  const addonValue = resolveAddonValue(config, value, active);
+  const resolvedAddonValue = resolveAddonValue(config, value, addonValue, active);
   const content = (
     <View style={[styles.tile, { backgroundColor: tileBackground }]}>
-      <AddonChip config={config} value={addonValue} />
+      <AddonChip config={config} value={resolvedAddonValue} />
       <View style={styles.iconWrap}>
         <MaterialCommunityIcons
           color={iconColor}
@@ -175,12 +176,16 @@ function resolveMappedLabel(config: StateWidgetConfig, value: unknown) {
   return config.valueLabels[key] || null;
 }
 
-function resolveAddonValue(config: StateWidgetConfig, value: unknown, active: boolean) {
+function resolveAddonValue(config: StateWidgetConfig, value: unknown, addonValue: unknown, active: boolean) {
   if (config.addonUseStateValue) {
-    if (value === null || value === undefined) {
+    const sourceValue = addonValue !== undefined ? addonValue : value;
+    if (sourceValue === null || sourceValue === undefined) {
       return null;
     }
-    return resolveStateLabel(config, value, active);
+    if (typeof sourceValue === "string" || typeof sourceValue === "number" || typeof sourceValue === "boolean") {
+      return String(sourceValue);
+    }
+    return resolveStateLabel(config, sourceValue, active);
   }
 
   const explicit = (config.addonValue || "").trim();

@@ -56,6 +56,7 @@ export type StateWidgetConfig = WidgetBase & {
   format?: "boolean" | "number" | "text";
   addonMode?: "none" | "circle" | "text" | "icon" | "bars";
   addonValue?: string;
+  addonStateId?: string;
   addonColor?: string;
   addonIcon?: string;
   addonUseStateValue?: boolean;

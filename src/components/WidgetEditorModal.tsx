@@ -56,6 +56,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         iconInactive: widget.iconPair?.inactive || "toggle-switch-off-outline",
         addonMode: widget.addonMode || "none",
         addonValue: widget.addonValue || "",
+        addonStateId: widget.addonStateId || "",
         addonColor: widget.addonColor || "",
         addonIcon: widget.addonIcon || "",
         addonUseStateValue: widget.addonUseStateValue ? "true" : "false",
@@ -163,6 +164,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         },
         addonMode: normalizeAddonMode(draft.addonMode),
         addonValue: draft.addonValue || undefined,
+        addonStateId: draft.addonStateId || undefined,
         addonColor: draft.addonColor || undefined,
         addonIcon: draft.addonIcon || undefined,
         addonUseStateValue: draft.addonUseStateValue === "true",
@@ -496,6 +498,15 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                           onSelect={(value) => setDraft((current) => ({ ...current, addonUseStateValue: value }))}
                         />
                       </Field>
+                      {draft.addonUseStateValue === "true" ? (
+                        <Field label="Addon State ID">
+                          <StateFieldInput
+                            onBrowse={() => setPickerField("addonStateId")}
+                            onChangeText={(value) => setDraft((current) => ({ ...current, addonStateId: value }))}
+                            value={draft.addonStateId || ""}
+                          />
+                        </Field>
+                      ) : null}
                       <Field label="Addon Text / Wert">
                         <TextInput
                           onChangeText={(value) => setDraft((current) => ({ ...current, addonValue: value }))}
@@ -505,25 +516,17 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                           value={draft.addonValue || ""}
                         />
                       </Field>
-                      <Field label="Addon Farbe">
-                        <TextInput
-                          autoCapitalize="none"
-                          onChangeText={(value) => setDraft((current) => ({ ...current, addonColor: value }))}
-                          placeholder="#8b5cf6"
-                          placeholderTextColor={palette.textMuted}
-                          style={styles.input}
-                          value={draft.addonColor || ""}
-                        />
-                      </Field>
+                      <ColorField
+                        label="Addon Farbe"
+                        value={draft.addonColor || ""}
+                        onChange={(value) => setDraft((current) => ({ ...current, addonColor: value }))}
+                      />
                       {draft.addonMode === "icon" ? (
                         <Field label="Addon Icon">
-                          <TextInput
-                            autoCapitalize="none"
-                            onChangeText={(value) => setDraft((current) => ({ ...current, addonIcon: value }))}
-                            placeholder="z. B. lock / lightning-bolt"
-                            placeholderTextColor={palette.textMuted}
-                            style={styles.input}
-                            value={draft.addonIcon || ""}
+                          <IconPickerRow
+                            label="Addon"
+                            selected={draft.addonIcon || "lock"}
+                            onSelect={(value) => setDraft((current) => ({ ...current, addonIcon: value }))}
                           />
                         </Field>
                       ) : null}

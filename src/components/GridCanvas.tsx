@@ -505,6 +505,7 @@ function renderWidget(
   if (widget.type === "state") {
     return (
       <StateWidget
+        addonValue={widget.addonStateId ? states[widget.addonStateId] : undefined}
         config={widget}
         value={states[widget.stateId]}
         onToggle={() => client.writeState(widget.stateId, resolveStateNextValue(widget, states[widget.stateId]))}
