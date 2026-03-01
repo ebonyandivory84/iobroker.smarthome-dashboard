@@ -199,8 +199,17 @@ function buildSectionedConfig(config: DashboardSettings, mode: "desktop" | "mobi
       return [];
     }
 
+    const sectionTop = sectionWidgets.reduce((smallest, widget) => Math.min(smallest, widget.position.y), Number.POSITIVE_INFINITY);
+    const rebasedSectionWidgets = sectionWidgets.map((widget) => ({
+      ...widget,
+      position: {
+        ...widget.position,
+        y: widget.position.y - (Number.isFinite(sectionTop) ? sectionTop : 0),
+      },
+    }));
+
     const normalizedSection = normalizeWidgetLayout(
-      [...sectionWidgets].sort((a, b) => {
+      [...rebasedSectionWidgets].sort((a, b) => {
         if (a.position.y !== b.position.y) {
           return a.position.y - b.position.y;
         }

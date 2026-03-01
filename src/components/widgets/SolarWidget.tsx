@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { createElement } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, ImageBackground, LayoutChangeEvent, Platform, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, ImageBackground, LayoutChangeEvent, Platform, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SolarWidgetConfig, StateSnapshot, ThemeSettings } from "../../types/dashboard";
 import { resolveThemeSettings } from "../../utils/themeConfig";
 import { palette } from "../../utils/theme";
@@ -15,6 +15,8 @@ type SolarWidgetProps = {
 type FlowDir = "toHome" | "fromHome" | "idle";
 
 export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
+  const { width: windowWidth } = useWindowDimensions();
+  const isCompactWeb = Platform.OS === "web" && windowWidth < 700;
   const resolvedTheme = resolveThemeSettings(theme);
   const widgetAppearance = config.appearance;
   const textColor = widgetAppearance?.textColor || palette.text;
@@ -80,6 +82,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
               {
                 borderColor: resolvedTheme.solar.sceneCardBorder,
               },
+              isCompactWeb ? styles.sceneCardCompact : null,
             ]}
           >
             {createElement("div", {
@@ -112,6 +115,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
                 {
                   borderColor: resolvedTheme.solar.sceneCardBorder,
                 },
+                isCompactWeb ? styles.sceneCardCompact : null,
               ]}
             >
               <View style={styles.sceneBackgroundOverlay} />
@@ -140,6 +144,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
                 backgroundColor: widgetAppearance?.cardColor || resolvedTheme.solar.sceneCardBackground,
                 borderColor: resolvedTheme.solar.sceneCardBorder,
               },
+              isCompactWeb ? styles.sceneCardCompact : null,
             ]}
           >
             <SolarFlowScene
@@ -249,17 +254,22 @@ function SolarFlowScene({
     return () => loop.stop();
   }, [progress]);
 
-  const cardWidth = clamp(sceneLayout.width * 0.12, 112, 170);
-  const cardHeight = clamp(sceneLayout.height * 0.18, 104, 128);
+  const compactScene = sceneLayout.width < 420;
+  const cardWidth = clamp(sceneLayout.width * (compactScene ? 0.2 : 0.12), compactScene ? 78 : 112, compactScene ? 124 : 170);
+  const cardHeight = clamp(sceneLayout.height * (compactScene ? 0.16 : 0.18), compactScene ? 84 : 104, compactScene ? 104 : 128);
   const beamLength = 18;
-  const sidePadding = clamp(sceneLayout.width * 0.08, 26, 120);
-  const outerMargin = clamp(sceneLayout.height * 0.08, 28, 54);
-  const connectorInset = 18;
+  const sidePadding = clamp(sceneLayout.width * (compactScene ? 0.04 : 0.08), compactScene ? 12 : 26, compactScene ? 32 : 120);
+  const outerMargin = clamp(sceneLayout.height * (compactScene ? 0.05 : 0.08), compactScene ? 16 : 28, compactScene ? 30 : 54);
+  const connectorInset = compactScene ? 10 : 18;
   const topY = outerMargin;
   const centerY = sceneLayout.height * 0.5 - cardHeight / 2;
   const bottomY = sceneLayout.height - outerMargin - cardHeight;
   const centerX = sceneLayout.width / 2 - cardWidth / 2;
-  const leftCenter = clamp(sceneLayout.width * 0.22, cardWidth / 2 + sidePadding, sceneLayout.width / 2 - cardWidth - 40);
+  const leftCenter = clamp(
+    sceneLayout.width * (compactScene ? 0.16 : 0.22),
+    cardWidth / 2 + sidePadding,
+    sceneLayout.width / 2 - cardWidth - (compactScene ? 12 : 40)
+  );
   const rightCenter = sceneLayout.width - leftCenter;
   const leftX = leftCenter - cardWidth / 2;
   const rightX = rightCenter - cardWidth / 2;
@@ -678,9 +688,14 @@ const styles = StyleSheet.create({
     padding: 14,
     alignSelf: "stretch",
     aspectRatio: 1.75,
-    minHeight: 560,
+    minHeight: 420,
     borderWidth: 1,
     overflow: "hidden",
+  },
+  sceneCardCompact: {
+    aspectRatio: 1.1,
+    minHeight: 340,
+    padding: 10,
   },
   scene: {
     flex: 1,
