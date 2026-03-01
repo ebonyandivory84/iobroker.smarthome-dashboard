@@ -84,7 +84,7 @@ export function GridCanvas({
         states={states}
       />
     ) : (
-      <View style={[styles.canvas, { minHeight: canvasHeight }]}>
+      <View style={[styles.canvas, { height: canvasHeight }]}>
         <View pointerEvents="none" style={styles.gridOverlay}>
           {Array.from({ length: Math.round(displayConfig.grid.columns / GRID_SNAP) + 1 }).map((_, index) => (
             <View
@@ -382,7 +382,7 @@ function WebGridCanvas({
   const stepY = rowHeight + config.grid.gap;
 
   return (
-    <div style={{ ...webCanvasStyle, minHeight: canvasHeight }}>
+    <div style={{ ...webCanvasStyle, height: canvasHeight }}>
       {Array.from({ length: Math.round(config.grid.columns / GRID_SNAP) + 1 }).map((_, index) => (
         <div
           key={`v-${index}`}
