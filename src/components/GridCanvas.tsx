@@ -66,7 +66,7 @@ export function GridCanvas({
   };
 
   const content =
-    Platform.OS === "web" ? (
+    Platform.OS === "web" && !isCompactWeb ? (
       <WebGridCanvas
         canvasHeight={canvasHeight}
         cellWidth={cellWidth}
