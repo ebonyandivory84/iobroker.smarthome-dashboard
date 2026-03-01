@@ -31,7 +31,6 @@ export function StateWidget({ config, value, onToggle }: StateWidgetProps) {
       <Text style={[styles.value, { color: mutedTextColor }]}>
         {hasValue ? resolveStateLabel(config, value, active) : "Keine Daten"}
       </Text>
-      {!hasValue ? <Text style={styles.hint}>{config.stateId}</Text> : null}
       {config.writeable ? (
         <Pressable onPress={onToggle} style={[styles.button, active ? styles.buttonActive : styles.buttonIdle]}>
           <Text style={[styles.buttonLabel, { color: textColor }]}>{active ? "Ausschalten" : "Schalten"}</Text>
@@ -240,11 +239,6 @@ const styles = StyleSheet.create({
     color: palette.textMuted,
     fontSize: 16,
     marginTop: 14,
-  },
-  hint: {
-    color: palette.danger,
-    fontSize: 12,
-    marginTop: 6,
   },
   button: {
     marginTop: "auto",
