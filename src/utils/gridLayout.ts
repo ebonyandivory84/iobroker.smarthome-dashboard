@@ -1,6 +1,7 @@
 import { GridPosition, WidgetConfig } from "../types/dashboard";
 
 export const GRID_SNAP = 0.5;
+export const PRIMARY_SECTION_COUNT = 3;
 
 export function resolveWidgetPosition(
   widgets: WidgetConfig[],
@@ -29,6 +30,27 @@ export function normalizeWidgetLayout(widgets: WidgetConfig[], columns: number):
   }
 
   return placed;
+}
+
+export function constrainToPrimarySections(position: GridPosition, columns: number): GridPosition {
+  const sectionWidth = getPrimarySectionWidth(columns);
+  const maxWidth = Math.min(columns, snap(sectionWidth));
+  const minWidth = Math.min(maxWidth, Math.max(1, snap(sectionWidth / PRIMARY_SECTION_COUNT)));
+  const w = clamp(snap(position.w), minWidth, maxWidth);
+  const h = Math.max(1, snap(position.h));
+  const y = Math.max(0, snap(position.y));
+  const tentativeX = Math.max(0, snap(position.x));
+  const center = tentativeX + w / 2;
+  const sectionIndex = clamp(Math.floor(center / sectionWidth), 0, PRIMARY_SECTION_COUNT - 1);
+  const sectionStart = snap(sectionIndex * sectionWidth);
+  const sectionEnd = Math.min(columns, snap((sectionIndex + 1) * sectionWidth));
+  const x = clamp(tentativeX, sectionStart, Math.max(sectionStart, sectionEnd - w));
+
+  return { x, y, w, h };
+}
+
+export function getPrimarySectionWidth(columns: number) {
+  return Math.max(1, columns / PRIMARY_SECTION_COUNT);
 }
 
 function sanitizePosition(position: GridPosition, columns: number): GridPosition {

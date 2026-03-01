@@ -8,7 +8,7 @@ import { WidgetLibraryModal } from "../components/WidgetLibraryModal";
 import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { useIoBrokerStates } from "../hooks/useIoBrokerStates";
 import { BackgroundMode, WidgetConfig, WidgetType } from "../types/dashboard";
-import { normalizeWidgetLayout, resolveWidgetPosition } from "../utils/gridLayout";
+import { constrainToPrimarySections, normalizeWidgetLayout, resolveWidgetPosition } from "../utils/gridLayout";
 import { buildWidgetTemplate } from "../utils/widgetFactory";
 import { palette } from "../utils/theme";
 
@@ -24,11 +24,12 @@ export function DashboardScreen() {
 
   const addWidgetByType = (type: WidgetType) => {
     const widget = buildWidgetTemplate(type, config.widgets.length, { columns: config.grid.columns });
+    const constrainedPosition = constrainToPrimarySections(widget.position, config.grid.columns);
     const nextWidgets = normalizeWidgetLayout([
       ...config.widgets,
       {
-      ...widget,
-      position: resolveWidgetPosition(config.widgets, widget.id, widget.position, config.grid.columns),
+        ...widget,
+        position: resolveWidgetPosition(config.widgets, widget.id, constrainedPosition, config.grid.columns),
       },
     ], config.grid.columns);
     addWidget(nextWidgets[nextWidgets.length - 1]);
@@ -47,7 +48,12 @@ export function DashboardScreen() {
               ...widget,
               ...partial,
               position: partial.position
-                ? resolveWidgetPosition(config.widgets, widgetId, partial.position, config.grid.columns)
+                ? resolveWidgetPosition(
+                    config.widgets,
+                    widgetId,
+                    constrainToPrimarySections(partial.position, config.grid.columns),
+                    config.grid.columns
+                  )
                 : widget.position,
             } as WidgetConfig)
           : widget
@@ -59,7 +65,11 @@ export function DashboardScreen() {
   };
 
   useEffect(() => {
-    const normalized = normalizeWidgetLayout(config.widgets, config.grid.columns);
+    const constrained = config.widgets.map((widget) => ({
+      ...widget,
+      position: constrainToPrimarySections(widget.position, config.grid.columns),
+    }));
+    const normalized = normalizeWidgetLayout(constrained, config.grid.columns);
     const changed = normalized.some((widget, index) => {
       const current = config.widgets[index];
       return (

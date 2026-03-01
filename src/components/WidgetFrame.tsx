@@ -4,7 +4,7 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { WidgetConfig } from "../types/dashboard";
-import { GRID_SNAP } from "../utils/gridLayout";
+import { constrainToPrimarySections, GRID_SNAP } from "../utils/gridLayout";
 import { palette } from "../utils/theme";
 
 type WidgetFrameProps = {
@@ -73,17 +73,17 @@ export function WidgetFrame({
       const ySteps = snap(dy / (rowHeight + gap));
 
       if (current.mode === "drag") {
-        onCommitPosition(widget.id, {
+        onCommitPosition(widget.id, constrainToPrimarySections({
           ...widget.position,
           x: clamp(current.startPosition.x + xSteps, 0, columns - current.startPosition.w),
           y: Math.max(0, current.startPosition.y + ySteps),
-        });
+        }, columns));
       } else {
-        onCommitPosition(widget.id, {
+        onCommitPosition(widget.id, constrainToPrimarySections({
           ...widget.position,
-          w: clamp(current.startPosition.w + xSteps, 1, columns - current.startPosition.x),
+          w: clamp(current.startPosition.w + xSteps, 1, columns),
           h: Math.max(1, current.startPosition.h + ySteps),
-        });
+        }, columns));
       }
 
       interaction.current = null;

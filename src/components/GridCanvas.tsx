@@ -3,7 +3,7 @@ import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { IoBrokerClient } from "../services/iobroker";
 import { DashboardSettings, StateSnapshot, WidgetConfig } from "../types/dashboard";
-import { GRID_SNAP, normalizeWidgetLayout } from "../utils/gridLayout";
+import { constrainToPrimarySections, GRID_SNAP, normalizeWidgetLayout } from "../utils/gridLayout";
 import { resolveThemeSettings } from "../utils/themeConfig";
 import { palette } from "../utils/theme";
 import { WidgetFrame } from "./WidgetFrame";
@@ -199,7 +199,15 @@ function buildSectionedConfig(config: DashboardSettings, mode: "desktop" | "mobi
       return [];
     }
 
-    const normalizedSection = normalizeWidgetLayout(sectionWidgets, sectionColumns);
+    const normalizedSection = normalizeWidgetLayout(
+      [...sectionWidgets].sort((a, b) => {
+        if (a.position.y !== b.position.y) {
+          return a.position.y - b.position.y;
+        }
+        return a.position.x - b.position.x;
+      }),
+      sectionColumns
+    );
     const sectionHeight = normalizedSection.reduce(
       (largest, widget) => Math.max(largest, widget.position.y + widget.position.h),
       0
@@ -355,17 +363,17 @@ function WebWidgetShell({
       const dy = snapUnits((event.clientY - active.startY) / stepY);
 
       if (active.mode === "drag") {
-        setPreview({
+        setPreview(constrainToPrimarySections({
           ...active.startPosition,
           x: clamp(active.startPosition.x + dx, 0, config.grid.columns - active.startPosition.w),
           y: Math.max(0, active.startPosition.y + dy),
-        });
+        }, config.grid.columns));
       } else {
-        setPreview({
+        setPreview(constrainToPrimarySections({
           ...active.startPosition,
-          w: clamp(active.startPosition.w + dx, 1, config.grid.columns - active.startPosition.x),
+          w: clamp(active.startPosition.w + dx, 1, config.grid.columns),
           h: Math.max(1, active.startPosition.h + dy),
-        });
+        }, config.grid.columns));
       }
     };
 
