@@ -135,6 +135,26 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       keyDaySelf: widget.keys.daySelf,
       keyPvTotal: widget.keys.pvTotal || "",
       keyBattTemp: widget.keys.battTemp || "",
+      nodePvX: formatNodeValue(widget.nodeLayout?.pv?.x, 0.44),
+      nodePvY: formatNodeValue(widget.nodeLayout?.pv?.y, 0.07),
+      nodePvW: formatNodeValue(widget.nodeLayout?.pv?.w, 0.12),
+      nodePvH: formatNodeValue(widget.nodeLayout?.pv?.h, 0.18),
+      nodeHomeX: formatNodeValue(widget.nodeLayout?.home?.x, 0.44),
+      nodeHomeY: formatNodeValue(widget.nodeLayout?.home?.y, 0.41),
+      nodeHomeW: formatNodeValue(widget.nodeLayout?.home?.w, 0.12),
+      nodeHomeH: formatNodeValue(widget.nodeLayout?.home?.h, 0.18),
+      nodeBatteryX: formatNodeValue(widget.nodeLayout?.battery?.x, 0.14),
+      nodeBatteryY: formatNodeValue(widget.nodeLayout?.battery?.y, 0.43),
+      nodeBatteryW: formatNodeValue(widget.nodeLayout?.battery?.w, 0.1),
+      nodeBatteryH: formatNodeValue(widget.nodeLayout?.battery?.h, 0.14),
+      nodeGridX: formatNodeValue(widget.nodeLayout?.grid?.x, 0.76),
+      nodeGridY: formatNodeValue(widget.nodeLayout?.grid?.y, 0.43),
+      nodeGridW: formatNodeValue(widget.nodeLayout?.grid?.w, 0.1),
+      nodeGridH: formatNodeValue(widget.nodeLayout?.grid?.h, 0.14),
+      nodeCarX: formatNodeValue(widget.nodeLayout?.car?.x, 0.45),
+      nodeCarY: formatNodeValue(widget.nodeLayout?.car?.y, 0.77),
+      nodeCarW: formatNodeValue(widget.nodeLayout?.car?.w, 0.1),
+      nodeCarH: formatNodeValue(widget.nodeLayout?.car?.h, 0.14),
       ...appearanceDraft,
     });
   }, [visible, widget]);
@@ -232,6 +252,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           pvTotal: draft.keyPvTotal || undefined,
           battTemp: draft.keyBattTemp || undefined,
         },
+        nodeLayout: buildSolarNodeLayout(draft),
         appearance,
       });
     }
@@ -794,6 +815,50 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={draft.keyPvTotal || ""}
                   />
                 </Field>
+                <Field label="Node Layout">
+                  <Pressable
+                    onPress={() => setDraft((current) => ({ ...current, ...buildDefaultSolarNodeDraft() }))}
+                    style={styles.stateBrowseButton}
+                  >
+                    <Text style={styles.stateBrowseLabel}>Auto</Text>
+                  </Pressable>
+                  <Text style={styles.mappingHint}>Werte sind relative Anteile von 0 bis 1 innerhalb der Solar-Szene.</Text>
+                </Field>
+                <Text style={styles.sectionTitle}>PV</Text>
+                <View style={styles.quadRow}>
+                  <MiniNumberField label="x" fieldKey="nodePvX" draft={draft} setDraft={setDraft} />
+                  <MiniNumberField label="y" fieldKey="nodePvY" draft={draft} setDraft={setDraft} />
+                  <MiniNumberField label="w" fieldKey="nodePvW" draft={draft} setDraft={setDraft} />
+                  <MiniNumberField label="h" fieldKey="nodePvH" draft={draft} setDraft={setDraft} />
+                </View>
+                <Text style={styles.sectionTitle}>Haus</Text>
+                <View style={styles.quadRow}>
+                  <MiniNumberField label="x" fieldKey="nodeHomeX" draft={draft} setDraft={setDraft} />
+                  <MiniNumberField label="y" fieldKey="nodeHomeY" draft={draft} setDraft={setDraft} />
+                  <MiniNumberField label="w" fieldKey="nodeHomeW" draft={draft} setDraft={setDraft} />
+                  <MiniNumberField label="h" fieldKey="nodeHomeH" draft={draft} setDraft={setDraft} />
+                </View>
+                <Text style={styles.sectionTitle}>Akku</Text>
+                <View style={styles.quadRow}>
+                  <MiniNumberField label="x" fieldKey="nodeBatteryX" draft={draft} setDraft={setDraft} />
+                  <MiniNumberField label="y" fieldKey="nodeBatteryY" draft={draft} setDraft={setDraft} />
+                  <MiniNumberField label="w" fieldKey="nodeBatteryW" draft={draft} setDraft={setDraft} />
+                  <MiniNumberField label="h" fieldKey="nodeBatteryH" draft={draft} setDraft={setDraft} />
+                </View>
+                <Text style={styles.sectionTitle}>Netz</Text>
+                <View style={styles.quadRow}>
+                  <MiniNumberField label="x" fieldKey="nodeGridX" draft={draft} setDraft={setDraft} />
+                  <MiniNumberField label="y" fieldKey="nodeGridY" draft={draft} setDraft={setDraft} />
+                  <MiniNumberField label="w" fieldKey="nodeGridW" draft={draft} setDraft={setDraft} />
+                  <MiniNumberField label="h" fieldKey="nodeGridH" draft={draft} setDraft={setDraft} />
+                </View>
+                <Text style={styles.sectionTitle}>Auto</Text>
+                <View style={styles.quadRow}>
+                  <MiniNumberField label="x" fieldKey="nodeCarX" draft={draft} setDraft={setDraft} />
+                  <MiniNumberField label="y" fieldKey="nodeCarY" draft={draft} setDraft={setDraft} />
+                  <MiniNumberField label="w" fieldKey="nodeCarW" draft={draft} setDraft={setDraft} />
+                  <MiniNumberField label="h" fieldKey="nodeCarH" draft={draft} setDraft={setDraft} />
+                </View>
               </>
             ) : null}
           </ScrollView>
@@ -925,6 +990,31 @@ function IconPickerRow({
   );
 }
 
+function MiniNumberField({
+  label,
+  fieldKey,
+  draft,
+  setDraft,
+}: {
+  label: string;
+  fieldKey: string;
+  draft: Record<string, string>;
+  setDraft: Dispatch<SetStateAction<Record<string, string>>>;
+}) {
+  return (
+    <View style={styles.quadField}>
+      <Text style={styles.quadLabel}>{label}</Text>
+      <TextInput
+        autoCapitalize="none"
+        keyboardType="decimal-pad"
+        onChangeText={(value) => setDraft((current) => ({ ...current, [fieldKey]: value }))}
+        style={[styles.input, styles.quadInput]}
+        value={draft[fieldKey] || ""}
+      />
+    </View>
+  );
+}
+
 function BlurControl({
   value,
   onChange,
@@ -970,6 +1060,71 @@ function clampFloat(raw: string | undefined, fallback: number) {
     return fallback;
   }
   return parsed;
+}
+
+function formatNodeValue(value: number | undefined, fallback: number) {
+  return String(typeof value === "number" ? value : fallback);
+}
+
+function buildDefaultSolarNodeDraft() {
+  return {
+    nodePvX: "0.44",
+    nodePvY: "0.07",
+    nodePvW: "0.12",
+    nodePvH: "0.18",
+    nodeHomeX: "0.44",
+    nodeHomeY: "0.41",
+    nodeHomeW: "0.12",
+    nodeHomeH: "0.18",
+    nodeBatteryX: "0.14",
+    nodeBatteryY: "0.43",
+    nodeBatteryW: "0.1",
+    nodeBatteryH: "0.14",
+    nodeGridX: "0.76",
+    nodeGridY: "0.43",
+    nodeGridW: "0.1",
+    nodeGridH: "0.14",
+    nodeCarX: "0.45",
+    nodeCarY: "0.77",
+    nodeCarW: "0.1",
+    nodeCarH: "0.14",
+  };
+}
+
+function buildSolarNodeLayout(draft: Record<string, string>) {
+  const defaults = buildDefaultSolarNodeDraft();
+  return {
+    pv: {
+      x: clampFloat(draft.nodePvX, Number(defaults.nodePvX)),
+      y: clampFloat(draft.nodePvY, Number(defaults.nodePvY)),
+      w: clampFloat(draft.nodePvW, Number(defaults.nodePvW)),
+      h: clampFloat(draft.nodePvH, Number(defaults.nodePvH)),
+    },
+    home: {
+      x: clampFloat(draft.nodeHomeX, Number(defaults.nodeHomeX)),
+      y: clampFloat(draft.nodeHomeY, Number(defaults.nodeHomeY)),
+      w: clampFloat(draft.nodeHomeW, Number(defaults.nodeHomeW)),
+      h: clampFloat(draft.nodeHomeH, Number(defaults.nodeHomeH)),
+    },
+    battery: {
+      x: clampFloat(draft.nodeBatteryX, Number(defaults.nodeBatteryX)),
+      y: clampFloat(draft.nodeBatteryY, Number(defaults.nodeBatteryY)),
+      w: clampFloat(draft.nodeBatteryW, Number(defaults.nodeBatteryW)),
+      h: clampFloat(draft.nodeBatteryH, Number(defaults.nodeBatteryH)),
+    },
+    grid: {
+      x: clampFloat(draft.nodeGridX, Number(defaults.nodeGridX)),
+      y: clampFloat(draft.nodeGridY, Number(defaults.nodeGridY)),
+      w: clampFloat(draft.nodeGridW, Number(defaults.nodeGridW)),
+      h: clampFloat(draft.nodeGridH, Number(defaults.nodeGridH)),
+    },
+    car: {
+      x: clampFloat(draft.nodeCarX, Number(defaults.nodeCarX)),
+      y: clampFloat(draft.nodeCarY, Number(defaults.nodeCarY)),
+      w: clampFloat(draft.nodeCarW, Number(defaults.nodeCarW)),
+      h: clampFloat(draft.nodeCarH, Number(defaults.nodeCarH)),
+    },
+  };
 }
 
 function buildAppearanceDraft(
@@ -1416,6 +1571,22 @@ const styles = StyleSheet.create({
     color: palette.textMuted,
     fontSize: 12,
     fontWeight: "700",
+  },
+  quadRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8,
+  },
+  quadField: {
+    flex: 1,
+  },
+  quadLabel: {
+    color: palette.textMuted,
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  quadInput: {
+    minWidth: 0,
   },
   layoutRow: {
     flexDirection: "row",

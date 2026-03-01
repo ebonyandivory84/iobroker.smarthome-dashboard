@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { createElement } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, ImageBackground, LayoutChangeEvent, Platform, StyleSheet, Text, View } from "react-native";
-import { SolarWidgetConfig, StateSnapshot, ThemeSettings } from "../../types/dashboard";
+import { SolarLayoutConfig, SolarNodeLayout, SolarWidgetConfig, StateSnapshot, ThemeSettings } from "../../types/dashboard";
 import { resolveThemeSettings } from "../../utils/themeConfig";
 import { palette } from "../../utils/theme";
 
@@ -100,6 +100,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
               pvDir={pvDir}
               pvNow={pvNow}
               soc={soc}
+              nodeLayout={config.nodeLayout}
             />
           </View>
         ) : (
@@ -129,6 +130,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
                 pvDir={pvDir}
                 pvNow={pvNow}
                 soc={soc}
+                nodeLayout={config.nodeLayout}
               />
             </ImageBackground>
           )
@@ -156,6 +158,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
               pvDir={pvDir}
               pvNow={pvNow}
               soc={soc}
+              nodeLayout={config.nodeLayout}
             />
           </View>
         )}
@@ -218,6 +221,7 @@ function SolarFlowScene({
   textColor,
   mutedTextColor,
   widgetAppearance,
+  nodeLayout,
 }: {
   pvDir: FlowDir;
   pvNow: number | null;
@@ -232,6 +236,7 @@ function SolarFlowScene({
   textColor: string;
   mutedTextColor: string;
   widgetAppearance?: SolarWidgetConfig["appearance"];
+  nodeLayout?: Partial<SolarLayoutConfig>;
 }) {
   const progress = useRef(new Animated.Value(0)).current;
   const [sceneLayout, setSceneLayout] = useState({ width: 960, height: 520 });
@@ -249,44 +254,38 @@ function SolarFlowScene({
     return () => loop.stop();
   }, [progress]);
 
-  const centerCardWidth = clamp(sceneLayout.width * 0.12, 110, 164);
-  const centerCardHeight = clamp(sceneLayout.height * 0.18, 102, 124);
-  const outerCardWidth = clamp(centerCardWidth * 0.76, 84, 126);
-  const outerCardHeight = clamp(centerCardHeight * 0.76, 82, 100);
+  const defaults = getDefaultNodeLayout();
+  const pvBox = resolveNodeBox(nodeLayout?.pv, defaults.pv, sceneLayout);
+  const homeBox = resolveNodeBox(nodeLayout?.home, defaults.home, sceneLayout);
+  const batteryBox = resolveNodeBox(nodeLayout?.battery, defaults.battery, sceneLayout);
+  const gridBox = resolveNodeBox(nodeLayout?.grid, defaults.grid, sceneLayout);
+  const carBox = resolveNodeBox(nodeLayout?.car, defaults.car, sceneLayout);
   const beamLength = 18;
-  const sidePadding = clamp(sceneLayout.width * 0.14, 52, 180);
-  const outerMargin = clamp(sceneLayout.height * 0.1, 34, 64);
   const connectorInset = 18;
-  const topY = outerMargin;
-  const centerY = sceneLayout.height * 0.5 - centerCardHeight / 2;
-  const bottomY = sceneLayout.height - outerMargin - outerCardHeight;
-  const centerMidX = sceneLayout.width / 2;
-  const centerX = centerMidX - centerCardWidth / 2;
-  const leftCenter = clamp(
-    sceneLayout.width * 0.15,
-    outerCardWidth / 2 + sidePadding,
-    centerMidX - centerCardWidth / 2 - outerCardWidth / 2 - 72
-  );
-  const rightCenter = sceneLayout.width - leftCenter;
-  const leftX = leftCenter - outerCardWidth / 2;
-  const rightX = rightCenter - outerCardWidth / 2;
-  const topX = centerMidX - outerCardWidth / 2;
-  const bottomX = centerMidX - outerCardWidth / 2;
-  const verticalLineLeft = centerMidX - 2;
-  const verticalBeamLeft = centerMidX - 4;
+  const topMidX = pvBox.x + pvBox.w / 2;
+  const homeMidX = homeBox.x + homeBox.w / 2;
+  const carMidX = carBox.x + carBox.w / 2;
+  const batteryMidY = batteryBox.y + batteryBox.h / 2;
+  const homeMidY = homeBox.y + homeBox.h / 2;
+  const gridMidY = gridBox.y + gridBox.h / 2;
+  const topLineLeft = Math.round((topMidX + homeMidX) / 2) - 2;
+  const topBeamLeft = topLineLeft - 2;
+  const bottomLineLeft = Math.round((carMidX + homeMidX) / 2) - 2;
+  const bottomBeamLeft = bottomLineLeft - 2;
 
-  const topLineStart = topY + outerCardHeight + connectorInset;
-  const topLineEnd = centerY - connectorInset;
+  const topLineStart = pvBox.y + pvBox.h + connectorInset;
+  const topLineEnd = homeBox.y - connectorInset;
   const topLineHeight = Math.max(12, topLineEnd - topLineStart);
-  const centerLineY = centerY + centerCardHeight / 2 - 2;
-  const leftLineStart = leftX + outerCardWidth + connectorInset;
-  const leftLineEnd = centerX - connectorInset;
+  const leftLineTop = Math.round((batteryMidY + homeMidY) / 2) - 2;
+  const rightLineTop = Math.round((gridMidY + homeMidY) / 2) - 2;
+  const leftLineStart = batteryBox.x + batteryBox.w + connectorInset;
+  const leftLineEnd = homeBox.x - connectorInset;
   const leftLineWidth = Math.max(16, leftLineEnd - leftLineStart);
-  const rightLineStart = centerX + centerCardWidth + connectorInset;
-  const rightLineEnd = rightX - connectorInset;
+  const rightLineStart = homeBox.x + homeBox.w + connectorInset;
+  const rightLineEnd = gridBox.x - connectorInset;
   const rightLineWidth = Math.max(16, rightLineEnd - rightLineStart);
-  const bottomLineStart = centerY + centerCardHeight + connectorInset;
-  const bottomLineEnd = bottomY - connectorInset;
+  const bottomLineStart = homeBox.y + homeBox.h + connectorInset;
+  const bottomLineEnd = carBox.y - connectorInset;
   const bottomLineHeight = Math.max(12, bottomLineEnd - bottomLineStart);
 
   return (
@@ -294,17 +293,17 @@ function SolarFlowScene({
       onLayout={(event: LayoutChangeEvent) => setSceneLayout(event.nativeEvent.layout)}
       style={styles.scene}
     >
-      <View style={[styles.lineVertical, { top: topLineStart, left: verticalLineLeft, height: topLineHeight }]} />
-      <View style={[styles.lineVertical, { top: bottomLineStart, left: verticalLineLeft, height: bottomLineHeight }]} />
-      <View style={[styles.lineHorizontal, { top: centerLineY, left: leftLineStart, width: leftLineWidth }]} />
-      <View style={[styles.lineHorizontal, { top: centerLineY, left: rightLineStart, width: rightLineWidth }]} />
+      <View style={[styles.lineVertical, { top: topLineStart, left: topLineLeft, height: topLineHeight }]} />
+      <View style={[styles.lineVertical, { top: bottomLineStart, left: bottomLineLeft, height: bottomLineHeight }]} />
+      <View style={[styles.lineHorizontal, { top: leftLineTop, left: leftLineStart, width: leftLineWidth }]} />
+      <View style={[styles.lineHorizontal, { top: rightLineTop, left: rightLineStart, width: rightLineWidth }]} />
 
       <AnimatedBeam
         active={pvDir !== "idle"}
         axis="y"
         progress={progress}
         range={pvDir === "toHome" ? [0, Math.max(0, topLineHeight - 20)] : [Math.max(0, topLineHeight - 20), 0]}
-        baseStyle={{ top: topLineStart, left: verticalBeamLeft }}
+        baseStyle={{ top: topLineStart, left: topBeamLeft }}
         strength={clamp((pvNow || 0) / 8000, 0.2, 1)}
       />
       <AnimatedBeam
@@ -312,7 +311,7 @@ function SolarFlowScene({
         axis="x"
         progress={progress}
         range={battDir === "toHome" ? [0, Math.max(0, leftLineWidth - beamLength)] : [Math.max(0, leftLineWidth - beamLength), 0]}
-        baseStyle={{ top: centerLineY - 2, left: leftLineStart }}
+        baseStyle={{ top: leftLineTop - 2, left: leftLineStart }}
         strength={clamp(battPower / 6000, 0.2, 1)}
       />
       <AnimatedBeam
@@ -320,7 +319,7 @@ function SolarFlowScene({
         axis="x"
         progress={progress}
         range={gridDir === "toHome" ? [Math.max(0, rightLineWidth - beamLength), 0] : [0, Math.max(0, rightLineWidth - beamLength)]}
-        baseStyle={{ top: centerLineY - 2, left: rightLineStart }}
+        baseStyle={{ top: rightLineTop - 2, left: rightLineStart }}
         strength={clamp(gridPower / 12000, 0.2, 1)}
       />
 
@@ -334,7 +333,7 @@ function SolarFlowScene({
         textColor={textColor}
         mutedTextColor={textColor}
         widgetAppearance={widgetAppearance}
-        style={{ ...styles.nodePosition, top: topY, left: topX, width: outerCardWidth, minHeight: outerCardHeight }}
+        style={{ ...styles.nodePosition, top: pvBox.y, left: pvBox.x, width: pvBox.w, minHeight: pvBox.h }}
         value={fmtW(pvNow)}
         highlight={pvDir !== "idle"}
       />
@@ -348,7 +347,7 @@ function SolarFlowScene({
         textColor={textColor}
         mutedTextColor={textColor}
         widgetAppearance={widgetAppearance}
-        style={{ ...styles.nodePosition, top: centerY, left: centerX, width: centerCardWidth, minHeight: centerCardHeight }}
+        style={{ ...styles.nodePosition, top: homeBox.y, left: homeBox.x, width: homeBox.w, minHeight: homeBox.h }}
         value={fmtW(homeNow)}
         highlight
       />
@@ -362,7 +361,7 @@ function SolarFlowScene({
         textColor={textColor}
         mutedTextColor={textColor}
         widgetAppearance={widgetAppearance}
-        style={{ ...styles.nodePosition, top: centerY + (centerCardHeight - outerCardHeight) / 2, left: leftX, width: outerCardWidth, minHeight: outerCardHeight }}
+        style={{ ...styles.nodePosition, top: batteryBox.y, left: batteryBox.x, width: batteryBox.w, minHeight: batteryBox.h }}
         value={fmtW(battPower || null)}
         meta={
           soc !== null && battTemp !== null
@@ -385,7 +384,7 @@ function SolarFlowScene({
         textColor={textColor}
         mutedTextColor={mutedTextColor}
         widgetAppearance={widgetAppearance}
-        style={{ ...styles.nodePosition, top: centerY + (centerCardHeight - outerCardHeight) / 2, left: rightX, width: outerCardWidth, minHeight: outerCardHeight }}
+        style={{ ...styles.nodePosition, top: gridBox.y, left: gridBox.x, width: gridBox.w, minHeight: gridBox.h }}
         value={fmtW(gridPower || null)}
         meta={gridDir === "toHome" ? "Bezug" : gridDir === "fromHome" ? "Einspeisung" : "Idle"}
         highlight={gridDir !== "idle"}
@@ -400,7 +399,7 @@ function SolarFlowScene({
         textColor={textColor}
         mutedTextColor={mutedTextColor}
         widgetAppearance={widgetAppearance}
-        style={{ ...styles.nodePosition, top: bottomY, left: bottomX, width: outerCardWidth, minHeight: outerCardHeight }}
+        style={{ ...styles.nodePosition, top: carBox.y, left: carBox.x, width: carBox.w, minHeight: carBox.h }}
         value="—"
       />
     </View>
@@ -664,6 +663,38 @@ function resolveBatteryIcon(soc: number | null): keyof typeof MaterialCommunityI
     return "battery-10";
   }
   return "battery-outline";
+}
+
+function getDefaultNodeLayout(): SolarLayoutConfig {
+  return {
+    pv: { x: 0.44, y: 0.07, w: 0.12, h: 0.18 },
+    home: { x: 0.44, y: 0.41, w: 0.12, h: 0.18 },
+    battery: { x: 0.14, y: 0.43, w: 0.1, h: 0.14 },
+    grid: { x: 0.76, y: 0.43, w: 0.1, h: 0.14 },
+    car: { x: 0.45, y: 0.77, w: 0.1, h: 0.14 },
+  };
+}
+
+function resolveNodeBox(
+  partial: Partial<SolarNodeLayout> | undefined,
+  fallback: SolarNodeLayout,
+  scene: { width: number; height: number }
+) {
+  const x = clamp(typeof partial?.x === "number" ? partial.x : fallback.x, 0, 1);
+  const y = clamp(typeof partial?.y === "number" ? partial.y : fallback.y, 0, 1);
+  const w = clamp(typeof partial?.w === "number" ? partial.w : fallback.w, 0.06, 0.4);
+  const h = clamp(typeof partial?.h === "number" ? partial.h : fallback.h, 0.08, 0.4);
+  const width = scene.width * w;
+  const height = scene.height * h;
+  const left = clamp(scene.width * x, 0, Math.max(0, scene.width - width));
+  const top = clamp(scene.height * y, 0, Math.max(0, scene.height - height));
+
+  return {
+    x: left,
+    y: top,
+    w: width,
+    h: height,
+  };
 }
 
 function buildBlurredBackgroundStyle(imageName: string, blur: number) {

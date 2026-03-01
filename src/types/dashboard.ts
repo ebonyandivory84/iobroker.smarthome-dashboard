@@ -85,6 +85,21 @@ export type WeatherWidgetConfig = WidgetBase & {
   refreshMs?: number;
 };
 
+export type SolarNodeLayout = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
+export type SolarLayoutConfig = {
+  pv: SolarNodeLayout;
+  home: SolarNodeLayout;
+  battery: SolarNodeLayout;
+  grid: SolarNodeLayout;
+  car: SolarNodeLayout;
+};
+
 export type EnergyWidgetConfig = WidgetBase & {
   type: "energy";
   pvStateId: string;
@@ -113,6 +128,7 @@ export type SolarWidgetConfig = WidgetBase & {
     battTemp?: string;
   };
   dailyEnergyUnit?: "auto" | "Wh" | "kWh";
+  nodeLayout?: Partial<SolarLayoutConfig>;
 };
 
 export type WidgetConfig =
