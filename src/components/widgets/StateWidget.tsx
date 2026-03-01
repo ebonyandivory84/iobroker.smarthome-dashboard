@@ -18,8 +18,8 @@ export function StateWidget({ config, value, onToggle }: StateWidgetProps) {
   const iconColor = active
     ? config.appearance?.iconColor || palette.accent
     : config.appearance?.iconColor2 || palette.textMuted;
-  const activeBackground = config.appearance?.activeWidgetColor || "rgba(70, 76, 96, 0.96)";
-  const inactiveBackground = config.appearance?.inactiveWidgetColor || "rgba(54, 58, 74, 0.94)";
+  const activeBackground = config.appearance?.activeWidgetColor || "rgba(136, 142, 160, 0.96)";
+  const inactiveBackground = config.appearance?.inactiveWidgetColor || "rgba(54, 58, 74, 0.96)";
   const tileBackground = active ? activeBackground : inactiveBackground;
   const addonValue = resolveAddonValue(config, value, active);
   const content = (
@@ -314,19 +314,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   tile: {
-    width: "74%",
-    aspectRatio: 1,
+    width: "100%",
+    height: "100%",
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    padding: 12,
+    padding: 14,
     position: "relative",
   },
   iconWrap: {
     width: 54,
     height: 54,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.04)",
     alignItems: "center",
     justifyContent: "center",
   },
