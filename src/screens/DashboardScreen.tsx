@@ -40,51 +40,16 @@ export function DashboardScreen() {
     if (!currentWidget) {
       return;
     }
-
-    const nextWidgets = normalizeWidgetLayout(
-      config.widgets.map((widget) =>
-        widget.id === widgetId
-          ? ({
-              ...widget,
-              ...partial,
-              position: partial.position
-                ? resolveWidgetPosition(
-                    config.widgets,
-                    widgetId,
-                    constrainToPrimarySections(partial.position, config.grid.columns),
-                    config.grid.columns
-                  )
-                : widget.position,
-            } as WidgetConfig)
-          : widget
-      ),
-      config.grid.columns
-    );
-
-    replaceWidgets(nextWidgets);
-  };
-
-  useEffect(() => {
-    const constrained = config.widgets.map((widget) => ({
-      ...widget,
-      position: constrainToPrimarySections(widget.position, config.grid.columns),
-    }));
-    const normalized = normalizeWidgetLayout(constrained, config.grid.columns);
-    const changed = normalized.some((widget, index) => {
-      const current = config.widgets[index];
-      return (
-        current &&
-        (current.position.x !== widget.position.x ||
-          current.position.y !== widget.position.y ||
-          current.position.w !== widget.position.w ||
-          current.position.h !== widget.position.h)
-      );
-    });
-
-    if (changed) {
-      replaceWidgets(normalized);
+    if (partial.position) {
+      updateWidget(widgetId, {
+        ...partial,
+        position: constrainToPrimarySections(partial.position, config.grid.columns),
+      });
+      return;
     }
-  }, [config.grid.columns, config.widgets, replaceWidgets]);
+
+    updateWidget(widgetId, partial);
+  };
 
   const editingWidget: WidgetConfig | null =
     config.widgets.find((widget) => widget.id === editingWidgetId) || null;
