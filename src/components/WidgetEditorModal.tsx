@@ -54,6 +54,11 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         format: widget.format || "boolean",
         iconActive: widget.iconPair?.active || "toggle-switch",
         iconInactive: widget.iconPair?.inactive || "toggle-switch-off-outline",
+        addonMode: widget.addonMode || "none",
+        addonValue: widget.addonValue || "",
+        addonColor: widget.addonColor || "",
+        addonIcon: widget.addonIcon || "",
+        addonUseStateValue: widget.addonUseStateValue ? "true" : "false",
         ...appearanceDraft,
       });
       return;
@@ -156,6 +161,11 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           active: (draft.iconActive || widget.iconPair?.active || "toggle-switch") as never,
           inactive: (draft.iconInactive || widget.iconPair?.inactive || "toggle-switch-off-outline") as never,
         },
+        addonMode: normalizeAddonMode(draft.addonMode),
+        addonValue: draft.addonValue || undefined,
+        addonColor: draft.addonColor || undefined,
+        addonIcon: draft.addonIcon || undefined,
+        addonUseStateValue: draft.addonUseStateValue === "true",
         appearance,
       });
     } else if (widget.type === "camera") {
@@ -470,6 +480,55 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     selected={draft.iconInactive || "toggle-switch-off-outline"}
                     onSelect={(value) => setDraft((current) => ({ ...current, iconInactive: value }))}
                   />
+                </Field>
+                <Field label="Addon">
+                  <ChoiceRow
+                    options={["none", "circle", "text", "icon", "bars"]}
+                    value={draft.addonMode || "none"}
+                    onSelect={(value) => setDraft((current) => ({ ...current, addonMode: value }))}
+                  />
+                  {(draft.addonMode || "none") !== "none" ? (
+                    <>
+                      <Field label="Addon nutzt State-Wert">
+                        <ChoiceRow
+                          options={["false", "true"]}
+                          value={draft.addonUseStateValue || "false"}
+                          onSelect={(value) => setDraft((current) => ({ ...current, addonUseStateValue: value }))}
+                        />
+                      </Field>
+                      <Field label="Addon Text / Wert">
+                        <TextInput
+                          onChangeText={(value) => setDraft((current) => ({ ...current, addonValue: value }))}
+                          placeholder="z. B. 21 / 420 W / Schloss"
+                          placeholderTextColor={palette.textMuted}
+                          style={styles.input}
+                          value={draft.addonValue || ""}
+                        />
+                      </Field>
+                      <Field label="Addon Farbe">
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, addonColor: value }))}
+                          placeholder="#8b5cf6"
+                          placeholderTextColor={palette.textMuted}
+                          style={styles.input}
+                          value={draft.addonColor || ""}
+                        />
+                      </Field>
+                      {draft.addonMode === "icon" ? (
+                        <Field label="Addon Icon">
+                          <TextInput
+                            autoCapitalize="none"
+                            onChangeText={(value) => setDraft((current) => ({ ...current, addonIcon: value }))}
+                            placeholder="z. B. lock / lightning-bolt"
+                            placeholderTextColor={palette.textMuted}
+                            style={styles.input}
+                            value={draft.addonIcon || ""}
+                          />
+                        </Field>
+                      ) : null}
+                    </>
+                  ) : null}
                 </Field>
               </>
             ) : null}
@@ -1173,6 +1232,13 @@ function normalizeStateFormat(raw: string | undefined) {
     return raw;
   }
   return "boolean";
+}
+
+function normalizeAddonMode(raw: string | undefined) {
+  if (raw === "circle" || raw === "text" || raw === "icon" || raw === "bars") {
+    return raw;
+  }
+  return "none";
 }
 
 function parseValueLabels(raw: string | undefined) {

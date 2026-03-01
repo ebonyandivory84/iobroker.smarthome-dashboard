@@ -18,11 +18,13 @@ export function StateWidget({ config, value, onToggle }: StateWidgetProps) {
   const iconColor = active
     ? config.appearance?.iconColor || palette.accent
     : config.appearance?.iconColor2 || palette.textMuted;
-  const activeBackground = config.appearance?.activeWidgetColor || "rgba(255,255,255,0.06)";
-  const inactiveBackground = config.appearance?.inactiveWidgetColor || "rgba(255,255,255,0.04)";
+  const activeBackground = config.appearance?.activeWidgetColor || "rgba(70, 76, 96, 0.96)";
+  const inactiveBackground = config.appearance?.inactiveWidgetColor || "rgba(54, 58, 74, 0.94)";
   const tileBackground = active ? activeBackground : inactiveBackground;
+  const addonValue = resolveAddonValue(config, value, active);
   const content = (
     <View style={[styles.tile, { backgroundColor: tileBackground }]}>
+      <AddonChip config={config} value={addonValue} />
       <View style={styles.iconWrap}>
         <MaterialCommunityIcons
           color={iconColor}
@@ -45,6 +47,58 @@ export function StateWidget({ config, value, onToggle }: StateWidgetProps) {
       ) : (
         content
       )}
+    </View>
+  );
+}
+
+function AddonChip({
+  config,
+  value,
+}: {
+  config: StateWidgetConfig;
+  value: string | null;
+}) {
+  if (!config.addonMode || config.addonMode === "none" || !value) {
+    return null;
+  }
+
+  const color = config.addonColor || "#8b5cf6";
+
+  if (config.addonMode === "circle") {
+    return (
+      <View style={[styles.addonCircle, { backgroundColor: color }]}>
+        <Text style={styles.addonCircleLabel}>{value}</Text>
+      </View>
+    );
+  }
+
+  if (config.addonMode === "text") {
+    return <Text style={[styles.addonText, { color }]}>{value}</Text>;
+  }
+
+  if (config.addonMode === "icon") {
+    return (
+      <View style={styles.addonIconWrap}>
+        <MaterialCommunityIcons color={color} name={(config.addonIcon || "lock") as never} size={16} />
+      </View>
+    );
+  }
+
+  const bars = Math.max(1, Math.min(4, Number.parseInt(value, 10) || 1));
+  return (
+    <View style={styles.addonBars}>
+      {Array.from({ length: 4 }).map((_, index) => (
+        <View
+          key={`bar-${index}`}
+          style={[
+            styles.addonBar,
+            {
+              backgroundColor: index < bars ? color : "rgba(255,255,255,0.12)",
+              height: 7 + index * 3,
+            },
+          ]}
+        />
+      ))}
     </View>
   );
 }
@@ -119,6 +173,18 @@ function resolveMappedLabel(config: StateWidgetConfig, value: unknown) {
 
   const key = config.format === "number" ? String(asNumber(value)) : String(value);
   return config.valueLabels[key] || null;
+}
+
+function resolveAddonValue(config: StateWidgetConfig, value: unknown, active: boolean) {
+  if (config.addonUseStateValue) {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    return resolveStateLabel(config, value, active);
+  }
+
+  const explicit = (config.addonValue || "").trim();
+  return explicit || null;
 }
 
 function shouldUseBatteryScale(config: StateWidgetConfig) {
@@ -248,12 +314,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   tile: {
-    width: "86%",
+    width: "74%",
     aspectRatio: 1,
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
     padding: 12,
+    position: "relative",
   },
   iconWrap: {
     width: 54,
@@ -268,5 +335,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 12,
     textAlign: "center",
+  },
+  addonCircle: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    minWidth: 24,
+    height: 24,
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addonCircleLabel: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  addonText: {
+    position: "absolute",
+    top: 12,
+    right: 10,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  addonIconWrap: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+  },
+  addonBars: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    height: 20,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 2,
+  },
+  addonBar: {
+    width: 3,
+    borderRadius: 2,
   },
 });

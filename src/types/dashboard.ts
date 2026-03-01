@@ -54,6 +54,11 @@ export type StateWidgetConfig = WidgetBase & {
   inactiveValue?: string;
   valueLabels?: Record<string, string>;
   format?: "boolean" | "number" | "text";
+  addonMode?: "none" | "circle" | "text" | "icon" | "bars";
+  addonValue?: string;
+  addonColor?: string;
+  addonIcon?: string;
+  addonUseStateValue?: boolean;
 };
 
 export type CameraWidgetConfig = WidgetBase & {
