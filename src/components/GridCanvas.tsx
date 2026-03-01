@@ -3,7 +3,7 @@ import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { IoBrokerClient } from "../services/iobroker";
 import { DashboardSettings, StateSnapshot, WidgetConfig } from "../types/dashboard";
-import { GRID_SNAP } from "../utils/gridLayout";
+import { GRID_SNAP, normalizeWidgetLayout } from "../utils/gridLayout";
 import { resolveThemeSettings } from "../utils/themeConfig";
 import { palette } from "../utils/theme";
 import { WidgetFrame } from "./WidgetFrame";
@@ -38,32 +38,26 @@ export function GridCanvas({
   const { width: windowWidth } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
   const isCompactWeb = Platform.OS === "web" && windowWidth < 700;
+  const effectiveLayoutMode = isLayoutMode && !isCompactWeb;
+  const displayConfig = useMemo(
+    () => (isCompactWeb ? buildCompactMobileConfig(config) : config),
+    [config, isCompactWeb]
+  );
   const canvasInset = Platform.OS === "web" ? 64 : 60;
   const availableWidth = containerWidth > 0 ? containerWidth : windowWidth;
   const canvasWidth = Math.max(320, availableWidth - canvasInset);
-  const minGridWidth = useMemo(() => {
-    if (!isCompactWeb) {
-      return canvasWidth;
-    }
-
-    const minCellWidth = 64;
-    return Math.max(
-      canvasWidth,
-      config.grid.columns * minCellWidth + (config.grid.columns - 1) * config.grid.gap
-    );
-  }, [canvasWidth, config.grid.columns, config.grid.gap, isCompactWeb]);
   const cellWidth = useMemo(() => {
-    const totalGap = (config.grid.columns - 1) * config.grid.gap;
-    return ((isCompactWeb ? minGridWidth : canvasWidth) - totalGap) / config.grid.columns;
-  }, [canvasWidth, config.grid.columns, config.grid.gap, isCompactWeb, minGridWidth]);
+    const totalGap = (displayConfig.grid.columns - 1) * displayConfig.grid.gap;
+    return (canvasWidth - totalGap) / displayConfig.grid.columns;
+  }, [canvasWidth, displayConfig.grid.columns, displayConfig.grid.gap]);
 
   const canvasHeight = useMemo(() => {
-    const maxRow = config.widgets.reduce((largest, widget) => {
+    const maxRow = displayConfig.widgets.reduce((largest, widget) => {
       const bottom = widget.position.y + widget.position.h;
       return Math.max(largest, bottom);
     }, 0);
-    return maxRow * (config.grid.rowHeight + config.grid.gap) + 120;
-  }, [config.grid.gap, config.grid.rowHeight, config.widgets]);
+    return maxRow * (displayConfig.grid.rowHeight + displayConfig.grid.gap) + 120;
+  }, [displayConfig.grid.gap, displayConfig.grid.rowHeight, displayConfig.widgets]);
 
   const handleLayout = (event: LayoutChangeEvent) => {
     const nextWidth = event.nativeEvent.layout.width;
@@ -73,78 +67,68 @@ export function GridCanvas({
 
   const content =
     Platform.OS === "web" ? (
-      createElement(
-        "div",
-        {
-          style: {
-            ...webScrollerStyle,
-            ...(isCompactWeb ? webScrollerCompactStyle : null),
-          },
-        },
-        createElement(WebGridCanvas, {
-          canvasHeight,
-          cellWidth,
-          client,
-          config,
-          theme: resolveThemeSettings(config.theme),
-          isLayoutMode,
-          onEditWidget,
-          onRemoveWidget,
-          onUpdateWidget,
-          states,
-          canvasWidth: isCompactWeb ? minGridWidth : undefined,
-        })
-      )
+      <WebGridCanvas
+        canvasHeight={canvasHeight}
+        cellWidth={cellWidth}
+        client={client}
+        config={displayConfig}
+        theme={resolveThemeSettings(displayConfig.theme)}
+        isLayoutMode={effectiveLayoutMode}
+        onEditWidget={onEditWidget}
+        onRemoveWidget={onRemoveWidget}
+        onUpdateWidget={onUpdateWidget}
+        states={states}
+      />
     ) : (
       <View style={[styles.canvas, { minHeight: canvasHeight }]}>
         <View pointerEvents="none" style={styles.gridOverlay}>
-          {Array.from({ length: Math.round(config.grid.columns / GRID_SNAP) + 1 }).map((_, index) => (
+          {Array.from({ length: Math.round(displayConfig.grid.columns / GRID_SNAP) + 1 }).map((_, index) => (
             <View
               key={`col-${index}`}
               style={[
                 styles.gridLine,
                 {
-                  left: fineGridOffset(index, cellWidth, config.grid.gap),
+                  left: fineGridOffset(index, cellWidth, displayConfig.grid.gap),
                 },
               ]}
             />
           ))}
-          {Array.from({ length: Math.round(canvasHeight / ((config.grid.rowHeight + config.grid.gap) * GRID_SNAP)) + 1 }).map(
+          {Array.from({ length: Math.round(canvasHeight / ((displayConfig.grid.rowHeight + displayConfig.grid.gap) * GRID_SNAP)) + 1 }).map(
             (_, index) => (
               <View
                 key={`row-${index}`}
                 style={[
                   styles.gridRowLine,
                   {
-                    top: fineGridOffset(index, config.grid.rowHeight, config.grid.gap),
+                    top: fineGridOffset(index, displayConfig.grid.rowHeight, displayConfig.grid.gap),
                   },
                 ]}
               />
             )
           )}
         </View>
-        {config.widgets.map((widget) => {
+        {displayConfig.widgets.map((widget) => {
           const style = {
-            left: widget.position.x * (cellWidth + config.grid.gap),
-            top: widget.position.y * (config.grid.rowHeight + config.grid.gap),
-            width: widget.position.w * cellWidth + (widget.position.w - 1) * config.grid.gap,
-            height: widget.position.h * config.grid.rowHeight + (widget.position.h - 1) * config.grid.gap,
+            left: widget.position.x * (cellWidth + displayConfig.grid.gap),
+            top: widget.position.y * (displayConfig.grid.rowHeight + displayConfig.grid.gap),
+            width: widget.position.w * cellWidth + (widget.position.w - 1) * displayConfig.grid.gap,
+            height: widget.position.h * displayConfig.grid.rowHeight + (widget.position.h - 1) * displayConfig.grid.gap,
           };
 
           return (
             <View key={widget.id} style={[styles.widget, style]}>
               <WidgetFrame
                 cellWidth={cellWidth}
-                columns={config.grid.columns}
-                gap={config.grid.gap}
-                isLayoutMode={isLayoutMode}
+                columns={displayConfig.grid.columns}
+                gap={displayConfig.grid.gap}
+                isLayoutMode={effectiveLayoutMode}
                 onCommitPosition={(widgetId, position) => onUpdateWidget(widgetId, { position })}
                 onEdit={onEditWidget}
                 onRemove={onRemoveWidget}
-                rowHeight={config.grid.rowHeight}
+                rowHeight={displayConfig.grid.rowHeight}
                 widget={widget}
               >
-                {renderWidget(widget, states, client, onUpdateWidget, config.theme)}
+                {renderWidget(widget, states, client, onUpdateWidget, displayConfig.theme)}
               </WidgetFrame>
             </View>
           );
@@ -170,6 +154,64 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
+function buildCompactMobileConfig(config: DashboardSettings): DashboardSettings {
+  const sectionCount = 3;
+  const sectionColumns = Math.max(1, Math.ceil(config.grid.columns / sectionCount));
+  const sectionGapRows = 1.5;
+  const sections = Array.from({ length: sectionCount }, () => [] as WidgetConfig[]);
+
+  config.widgets.forEach((widget) => {
+    const center = widget.position.x + widget.position.w / 2;
+    const sectionIndex = clamp(Math.floor(center / sectionColumns), 0, sectionCount - 1);
+    const sectionStart = sectionIndex * sectionColumns;
+    const localWidth = Math.min(widget.position.w, sectionColumns);
+    const localX = clamp(widget.position.x - sectionStart, 0, Math.max(0, sectionColumns - localWidth));
+
+    sections[sectionIndex].push({
+      ...widget,
+      position: {
+        ...widget.position,
+        x: localX,
+        y: widget.position.y,
+        w: localWidth,
+      },
+    });
+  });
+
+  let rowOffset = 0;
+  const stackedWidgets = sections.flatMap((sectionWidgets) => {
+    if (!sectionWidgets.length) {
+      return [];
+    }
+
+    const normalizedSection = normalizeWidgetLayout(sectionWidgets, sectionColumns);
+    const sectionHeight = normalizedSection.reduce(
+      (largest, widget) => Math.max(largest, widget.position.y + widget.position.h),
+      0
+    );
+
+    const placed = normalizedSection.map((widget) => ({
+      ...widget,
+      position: {
+        ...widget.position,
+        y: widget.position.y + rowOffset,
+      },
+    }));
+
+    rowOffset += sectionHeight + sectionGapRows;
+    return placed;
+  });
+
+  return {
+    ...config,
+    grid: {
+      ...config.grid,
+      columns: sectionColumns,
+    },
+    widgets: stackedWidgets,
+  };
+}
+
 function WebGridCanvas({
   config,
   theme,
@@ -177,7 +219,6 @@ function WebGridCanvas({
   client,
   cellWidth,
   canvasHeight,
-  canvasWidth,
   isLayoutMode,
   onEditWidget,
   onUpdateWidget,
@@ -189,7 +230,6 @@ function WebGridCanvas({
   client: IoBrokerClient;
   cellWidth: number;
   canvasHeight: number;
-  canvasWidth?: number;
   isLayoutMode: boolean;
   onEditWidget: (widgetId: string) => void;
   onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void;
@@ -199,7 +239,7 @@ function WebGridCanvas({
   const stepY = config.grid.rowHeight + config.grid.gap;
 
   return (
-    <div style={{ ...webCanvasStyle, minHeight: canvasHeight, width: canvasWidth ? `${canvasWidth + 24}px` : "auto" }}>
+    <div style={{ ...webCanvasStyle, minHeight: canvasHeight }}>
       {Array.from({ length: Math.round(config.grid.columns / GRID_SNAP) + 1 }).map((_, index) => (
         <div
           key={`v-${index}`}
@@ -500,15 +540,6 @@ const webCanvasStyle: CSSProperties = {
   background: "linear-gradient(180deg, rgba(11,16,29,0.78), rgba(8,11,21,0.92))",
   border: "1px solid rgba(255,255,255,0.04)",
   overflow: "hidden",
-};
-
-const webScrollerStyle: CSSProperties = {
-  width: "100%",
-};
-
-const webScrollerCompactStyle: CSSProperties = {
-  overflowX: "auto",
-  WebkitOverflowScrolling: "touch",
 };
 
 const webVerticalLineStyle: CSSProperties = {
