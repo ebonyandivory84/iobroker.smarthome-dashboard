@@ -152,7 +152,6 @@ function BackgroundLayer({
   return (
     <>
       <View style={[styles.background, { backgroundColor: color }]} />
-      <View style={[styles.accentOrb, { backgroundColor: accent }]} />
       <View style={[styles.meshA, { backgroundColor: accent }]} />
       <View style={[styles.meshB, { backgroundColor: palette.accentWarm }]} />
     </>
@@ -183,15 +182,6 @@ const styles = StyleSheet.create({
   background: {
     ...StyleSheet.absoluteFillObject,
     opacity: 1,
-  },
-  accentOrb: {
-    position: "absolute",
-    top: -120,
-    right: -80,
-    width: 320,
-    height: 320,
-    borderRadius: 999,
-    opacity: 0.18,
   },
   gradientTop: {
     position: "absolute",
