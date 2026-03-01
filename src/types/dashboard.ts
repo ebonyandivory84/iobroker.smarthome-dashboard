@@ -67,6 +67,7 @@ export type CameraWidgetConfig = WidgetBase & {
   snapshotUrl?: string;
   rtspUrl?: string;
   refreshMs?: number;
+  snapshotAspectRatio?: number;
 };
 
 export type GrafanaWidgetConfig = WidgetBase & {

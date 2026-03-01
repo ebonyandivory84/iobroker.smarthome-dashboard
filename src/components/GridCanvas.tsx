@@ -297,8 +297,10 @@ function getAutoLayoutSpec(widget: WidgetConfig, columns: number) {
     switch (widget.type) {
       case "state":
         return { w: 1, h: 1 };
-      case "camera":
-        return { w: 1, h: 2.2 };
+      case "camera": {
+        const ratio = normalizeAspectRatio(widget.snapshotAspectRatio);
+        return { w: 1, h: Math.max(0.6, roundGridUnit(1 / ratio)) };
+      }
       case "solar":
         return { w: 1, h: 3.8 };
       case "grafana":
@@ -318,8 +320,10 @@ function getAutoLayoutSpec(widget: WidgetConfig, columns: number) {
   switch (widget.type) {
     case "state":
       return { w: 1, h: 1 };
-    case "camera":
-      return { w: mainColumnWidth, h: 2.1 };
+    case "camera": {
+      const ratio = normalizeAspectRatio(widget.snapshotAspectRatio);
+      return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(mainColumnWidth / ratio)) };
+    }
     case "solar":
       return { w: mainColumnWidth, h: 3.2 };
     case "grafana":
@@ -331,6 +335,17 @@ function getAutoLayoutSpec(widget: WidgetConfig, columns: number) {
   }
 
   return { w: 1, h: Math.max(1, fallbackHeight) };
+}
+
+function normalizeAspectRatio(value?: number) {
+  if (!value || !Number.isFinite(value) || value <= 0) {
+    return 16 / 9;
+  }
+  return value;
+}
+
+function roundGridUnit(value: number) {
+  return Math.round(value / GRID_SNAP) * GRID_SNAP;
 }
 
 function WebGridCanvas({
@@ -584,7 +599,23 @@ function renderWidget(
   }
 
   if (widget.type === "camera") {
-    return <CameraWidget config={widget} />;
+    return (
+      <CameraWidget
+        config={widget}
+        onAspectRatioDetected={(ratio) => {
+          if (!Number.isFinite(ratio) || ratio <= 0) {
+            return;
+          }
+
+          const current = widget.snapshotAspectRatio;
+          if (current && Math.abs(current - ratio) < 0.03) {
+            return;
+          }
+
+          onUpdateWidget(widget.id, { snapshotAspectRatio: ratio });
+        }}
+      />
+    );
   }
 
   if (widget.type === "energy") {

@@ -5,9 +5,10 @@ import { palette } from "../../utils/theme";
 
 type CameraWidgetProps = {
   config: CameraWidgetConfig;
+  onAspectRatioDetected?: (ratio: number) => void;
 };
 
-export function CameraWidget({ config }: CameraWidgetProps) {
+export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProps) {
   const [tick, setTick] = useState(0);
   const [displayUrl, setDisplayUrl] = useState<string | null>(null);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
@@ -18,6 +19,19 @@ export function CameraWidget({ config }: CameraWidgetProps) {
     const timer = setInterval(() => setTick((current) => current + 1), config.refreshMs || 2000);
     return () => clearInterval(timer);
   }, [config.refreshMs]);
+
+  const reportAspectRatio = (width: number, height: number) => {
+    if (!onAspectRatioDetected || !width || !height) {
+      return;
+    }
+
+    const ratio = width / height;
+    if (!Number.isFinite(ratio) || ratio <= 0) {
+      return;
+    }
+
+    onAspectRatioDetected(ratio);
+  };
 
   const snapshotUrl = useMemo(() => {
     if (!config.snapshotUrl) {
@@ -84,11 +98,29 @@ export function CameraWidget({ config }: CameraWidgetProps) {
               ? createElement("img", {
                   alt: config.title || "Camera snapshot",
                   draggable: false,
+                  onLoad: (event: Event) => {
+                    const target = event.currentTarget as HTMLImageElement | null;
+                    if (!target) {
+                      return;
+                    }
+                    reportAspectRatio(target.naturalWidth, target.naturalHeight);
+                  },
                   src: displayUrl,
                   style: webImageStyle,
                 })
               : (
-                  <Image resizeMode="contain" source={{ uri: displayUrl }} style={styles.image} />
+                  <Image
+                    onLoad={(event) => {
+                      const source = event.nativeEvent.source;
+                      if (!source) {
+                        return;
+                      }
+                      reportAspectRatio(source.width, source.height);
+                    }}
+                    resizeMode="contain"
+                    source={{ uri: displayUrl }}
+                    style={styles.image}
+                  />
                 )}
             {config.showTitle !== false && config.title ? (
               <View style={styles.titleBadge}>
