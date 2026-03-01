@@ -122,6 +122,7 @@ export function WidgetFrame({
     <View
       style={[
         styles.shell,
+        widget.type === "state" ? styles.shellTransparent : null,
         interactionMode === "drag"
           ? {
               transform: [{ translateX: dragOffset.x }, { translateY: dragOffset.y }],
@@ -187,6 +188,9 @@ const styles = StyleSheet.create({
     backgroundColor: palette.panel,
     borderWidth: 0,
     overflow: "hidden",
+  },
+  shellTransparent: {
+    backgroundColor: "transparent",
   },
   headerActions: {
     position: "absolute",

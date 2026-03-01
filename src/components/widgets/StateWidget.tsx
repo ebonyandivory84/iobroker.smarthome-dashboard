@@ -14,14 +14,15 @@ export function StateWidget({ config, value, onToggle }: StateWidgetProps) {
   const hasTitle = config.showTitle !== false && Boolean(config.title?.trim());
   const active = resolveStateActive(config, value);
   const iconName = resolveIconName(config, value);
-  const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const iconColor = active
     ? config.appearance?.iconColor || palette.accent
     : config.appearance?.iconColor2 || palette.textMuted;
-
-  return (
-    <View style={[styles.container, hasTitle ? styles.containerWithTitle : null]}>
+  const activeBackground = config.appearance?.activeWidgetColor || "rgba(255,255,255,0.06)";
+  const inactiveBackground = config.appearance?.inactiveWidgetColor || "rgba(255,255,255,0.04)";
+  const tileBackground = active ? activeBackground : inactiveBackground;
+  const content = (
+    <View style={[styles.tile, { backgroundColor: tileBackground }]}>
       <View style={styles.iconWrap}>
         <MaterialCommunityIcons
           color={iconColor}
@@ -32,11 +33,18 @@ export function StateWidget({ config, value, onToggle }: StateWidgetProps) {
       <Text style={[styles.value, { color: mutedTextColor }]}>
         {hasValue ? resolveStateLabel(config, value, active) : "Keine Daten"}
       </Text>
+    </View>
+  );
+
+  return (
+    <View style={[styles.container, hasTitle ? styles.containerWithTitle : null]}>
       {config.writeable ? (
-        <Pressable onPress={onToggle} style={[styles.button, active ? styles.buttonActive : styles.buttonIdle]}>
-          <Text style={[styles.buttonLabel, { color: textColor }]}>{active ? "Ausschalten" : "Schalten"}</Text>
+        <Pressable onPress={onToggle} style={styles.tapArea}>
+          {content}
         </Pressable>
-      ) : null}
+      ) : (
+        content
+      )}
     </View>
   );
 }
@@ -233,6 +241,20 @@ const styles = StyleSheet.create({
   containerWithTitle: {
     paddingTop: 24,
   },
+  tapArea: {
+    flex: 1,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tile: {
+    width: "86%",
+    aspectRatio: 1,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 12,
+  },
   iconWrap: {
     width: 54,
     height: 54,
@@ -243,24 +265,8 @@ const styles = StyleSheet.create({
   },
   value: {
     color: palette.textMuted,
-    fontSize: 16,
-    marginTop: 14,
+    fontSize: 14,
+    marginTop: 12,
     textAlign: "center",
-  },
-  button: {
-    marginTop: "auto",
-    borderRadius: 14,
-    alignItems: "center",
-    paddingVertical: 10,
-  },
-  buttonActive: {
-    backgroundColor: "rgba(247, 181, 74, 0.25)",
-  },
-  buttonIdle: {
-    backgroundColor: "rgba(77, 226, 177, 0.18)",
-  },
-  buttonLabel: {
-    color: palette.text,
-    fontWeight: "700",
   },
 });

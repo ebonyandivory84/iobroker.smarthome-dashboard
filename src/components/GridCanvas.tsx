@@ -711,9 +711,9 @@ function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThe
   const type = widget.type;
   if (type === "state") {
     return {
-      background: `linear-gradient(135deg, ${theme.widgetTones.stateStart} 0%, ${theme.widgetTones.stateEnd} 100%)`,
-      border: "1px solid rgba(255,255,255,0.1)",
-      boxShadow: "0 18px 30px rgba(98, 10, 46, 0.32)",
+      background: "transparent",
+      border: "none",
+      boxShadow: "none",
     };
   }
   if (type === "energy") {

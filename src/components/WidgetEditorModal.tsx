@@ -270,14 +270,24 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 onChange={setDraft}
               />
               {widget.type === "state" ? (
-                <ColorInputRow
-                  firstKey="iconColor"
-                  firstLabel="Icon aktiv"
-                  secondKey="iconColor2"
-                  secondLabel="Icon inaktiv"
-                  values={draft}
-                  onChange={setDraft}
-                />
+                <>
+                  <ColorInputRow
+                    firstKey="activeWidgetColor"
+                    firstLabel="Widget aktiv"
+                    secondKey="inactiveWidgetColor"
+                    secondLabel="Widget inaktiv"
+                    values={draft}
+                    onChange={setDraft}
+                  />
+                  <ColorInputRow
+                    firstKey="iconColor"
+                    firstLabel="Icon aktiv"
+                    secondKey="iconColor2"
+                    secondLabel="Icon inaktiv"
+                    values={draft}
+                    onChange={setDraft}
+                  />
+                </>
               ) : null}
               {widget.type === "energy" || widget.type === "solar" ? (
                 <ColorInputRow
@@ -910,6 +920,10 @@ function buildAppearanceDraft(
   return {
     widgetColor: appearance?.widgetColor || widgetDefaults.widgetColor || "",
     widgetColor2: appearance?.widgetColor2 || widgetDefaults.widgetColor2 || "",
+    activeWidgetColor: appearance?.activeWidgetColor || "",
+    activeWidgetColor2: appearance?.activeWidgetColor2 || "",
+    inactiveWidgetColor: appearance?.inactiveWidgetColor || "",
+    inactiveWidgetColor2: appearance?.inactiveWidgetColor2 || "",
     textColor: appearance?.textColor || widgetDefaults.textColor || "",
     mutedTextColor: appearance?.mutedTextColor || widgetDefaults.mutedTextColor || "",
     iconColor: appearance?.iconColor || widgetDefaults.iconColor || "",
@@ -930,6 +944,10 @@ function buildAppearance(draft: Record<string, string>): WidgetAppearance | unde
   const appearance: WidgetAppearance = {
     widgetColor: normalizeColor(draft.widgetColor),
     widgetColor2: normalizeColor(draft.widgetColor2),
+    activeWidgetColor: normalizeColor(draft.activeWidgetColor),
+    activeWidgetColor2: normalizeColor(draft.activeWidgetColor2),
+    inactiveWidgetColor: normalizeColor(draft.inactiveWidgetColor),
+    inactiveWidgetColor2: normalizeColor(draft.inactiveWidgetColor2),
     textColor: normalizeColor(draft.textColor),
     mutedTextColor: normalizeColor(draft.mutedTextColor),
     iconColor: normalizeColor(draft.iconColor),

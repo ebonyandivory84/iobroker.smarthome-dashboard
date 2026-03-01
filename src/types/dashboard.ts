@@ -15,6 +15,10 @@ export type GridPosition = {
 export type WidgetAppearance = {
   widgetColor?: string;
   widgetColor2?: string;
+  activeWidgetColor?: string;
+  activeWidgetColor2?: string;
+  inactiveWidgetColor?: string;
+  inactiveWidgetColor2?: string;
   textColor?: string;
   mutedTextColor?: string;
   iconColor?: string;
