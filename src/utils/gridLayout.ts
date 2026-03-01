@@ -37,7 +37,7 @@ export function constrainToPrimarySections(position: GridPosition, columns: numb
   const subColumnWidth = sectionWidth / PRIMARY_SECTION_COUNT;
   const maxWidth = sectionWidth;
   const minWidth = Math.min(maxWidth, subColumnWidth);
-  const snappedWidth = snapToSubColumns(position.w, subColumnWidth);
+  const snappedWidth = snapToSubColumns(position.w, subColumnWidth, 1);
   const w = clamp(snappedWidth, minWidth, maxWidth);
   const h = Math.max(1, snap(position.h));
   const y = Math.max(0, snap(position.y));
@@ -47,7 +47,7 @@ export function constrainToPrimarySections(position: GridPosition, columns: numb
   const sectionStart = sectionIndex * sectionWidth;
   const sectionEnd = Math.min(columns, (sectionIndex + 1) * sectionWidth);
   const localX = clamp(tentativeX - sectionStart, 0, Math.max(0, sectionEnd - sectionStart - w));
-  const snappedLocalX = snapToSubColumns(localX, subColumnWidth);
+  const snappedLocalX = snapToSubColumns(localX, subColumnWidth, 0);
   const x = clamp(sectionStart + snappedLocalX, sectionStart, Math.max(sectionStart, sectionEnd - w));
 
   return { x, y, w, h };
@@ -107,7 +107,7 @@ function snap(value: number) {
   return Math.round(value / GRID_SNAP) * GRID_SNAP;
 }
 
-function snapToSubColumns(value: number, subColumnWidth: number) {
-  const steps = Math.max(1, Math.round(value / subColumnWidth));
+function snapToSubColumns(value: number, subColumnWidth: number, minSteps: number) {
+  const steps = Math.max(minSteps, Math.round(value / subColumnWidth));
   return steps * subColumnWidth;
 }
