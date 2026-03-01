@@ -1,5 +1,5 @@
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { IoBrokerClient } from "../services/iobroker";
 import { DashboardSettings, StateSnapshot, WidgetConfig } from "../types/dashboard";
@@ -37,13 +37,25 @@ export function GridCanvas({
 }: GridCanvasProps) {
   const { width: windowWidth } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
+  const isCompactWeb = Platform.OS === "web" && windowWidth < 700;
   const canvasInset = Platform.OS === "web" ? 64 : 60;
   const availableWidth = containerWidth > 0 ? containerWidth : windowWidth;
   const canvasWidth = Math.max(320, availableWidth - canvasInset);
+  const minGridWidth = useMemo(() => {
+    if (!isCompactWeb) {
+      return canvasWidth;
+    }
+
+    const minCellWidth = 64;
+    return Math.max(
+      canvasWidth,
+      config.grid.columns * minCellWidth + (config.grid.columns - 1) * config.grid.gap
+    );
+  }, [canvasWidth, config.grid.columns, config.grid.gap, isCompactWeb]);
   const cellWidth = useMemo(() => {
     const totalGap = (config.grid.columns - 1) * config.grid.gap;
-    return (canvasWidth - totalGap) / config.grid.columns;
-  }, [canvasWidth, config.grid.columns, config.grid.gap]);
+    return ((isCompactWeb ? minGridWidth : canvasWidth) - totalGap) / config.grid.columns;
+  }, [canvasWidth, config.grid.columns, config.grid.gap, isCompactWeb, minGridWidth]);
 
   const canvasHeight = useMemo(() => {
     const maxRow = config.widgets.reduce((largest, widget) => {
@@ -61,18 +73,28 @@ export function GridCanvas({
 
   const content =
     Platform.OS === "web" ? (
-      <WebGridCanvas
-        canvasHeight={canvasHeight}
-        cellWidth={cellWidth}
-        client={client}
-        config={config}
-        theme={resolveThemeSettings(config.theme)}
-        isLayoutMode={isLayoutMode}
-        onEditWidget={onEditWidget}
-        onRemoveWidget={onRemoveWidget}
-        onUpdateWidget={onUpdateWidget}
-        states={states}
-      />
+      createElement(
+        "div",
+        {
+          style: {
+            ...webScrollerStyle,
+            ...(isCompactWeb ? webScrollerCompactStyle : null),
+          },
+        },
+        createElement(WebGridCanvas, {
+          canvasHeight,
+          cellWidth,
+          client,
+          config,
+          theme: resolveThemeSettings(config.theme),
+          isLayoutMode,
+          onEditWidget,
+          onRemoveWidget,
+          onUpdateWidget,
+          states,
+          canvasWidth: isCompactWeb ? minGridWidth : undefined,
+        })
+      )
     ) : (
       <View style={[styles.canvas, { minHeight: canvasHeight }]}>
         <View pointerEvents="none" style={styles.gridOverlay}>
@@ -155,6 +177,7 @@ function WebGridCanvas({
   client,
   cellWidth,
   canvasHeight,
+  canvasWidth,
   isLayoutMode,
   onEditWidget,
   onUpdateWidget,
@@ -166,6 +189,7 @@ function WebGridCanvas({
   client: IoBrokerClient;
   cellWidth: number;
   canvasHeight: number;
+  canvasWidth?: number;
   isLayoutMode: boolean;
   onEditWidget: (widgetId: string) => void;
   onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void;
@@ -175,7 +199,7 @@ function WebGridCanvas({
   const stepY = config.grid.rowHeight + config.grid.gap;
 
   return (
-    <div style={{ ...webCanvasStyle, minHeight: canvasHeight }}>
+    <div style={{ ...webCanvasStyle, minHeight: canvasHeight, width: canvasWidth ? `${canvasWidth + 24}px` : "auto" }}>
       {Array.from({ length: Math.round(config.grid.columns / GRID_SNAP) + 1 }).map((_, index) => (
         <div
           key={`v-${index}`}
@@ -243,6 +267,7 @@ function WebWidgetShell({
   onRemoveWidget: (widgetId: string) => void;
 }) {
   const [preview, setPreview] = useState(widget.position);
+  const showHeaderTitle = widget.type !== "camera" && widget.showTitle !== false && Boolean(widget.title.trim());
   const interaction = useRef<{
     mode: "drag" | "resize";
     startX: number;
@@ -312,6 +337,14 @@ function WebWidgetShell({
   const shellStyle: CSSProperties = {
     ...webWidgetStyle,
     ...getWidgetTone(widget, theme),
+    ...(widget.type === "camera"
+      ? {
+          padding: 0,
+          gap: 0,
+          border: "none",
+          background: "#000000",
+        }
+      : null),
     left: preview.x * stepX,
     top: preview.y * stepY,
     width: preview.w * cellWidth + (preview.w - 1) * config.grid.gap,
@@ -321,37 +354,48 @@ function WebWidgetShell({
 
   return (
     <div style={shellStyle}>
-      <div style={webHeaderStyle}>
-        <div>
-          <div style={{ ...webTitleStyle, color: widget.appearance?.textColor || palette.text }}>{widget.title}</div>
-          <div style={{ ...webSubtitleStyle, color: widget.appearance?.mutedTextColor || palette.textMuted }}>
-            {widget.type.toUpperCase()}
+      {showHeaderTitle || isLayoutMode ? (
+        <div
+          style={{
+            ...webHeaderStyle,
+            ...(widget.type === "camera" ? webOverlayHeaderStyle : null),
+          }}
+        >
+          <div>
+            {showHeaderTitle ? (
+              <div style={{ ...webTitleStyle, color: widget.appearance?.textColor || palette.text }}>{widget.title}</div>
+            ) : null}
           </div>
-        </div>
-        {isLayoutMode ? (
-          <div style={webHeaderActionsStyle}>
-            <div onMouseDown={begin("drag")} style={webDragHandleStyle} title="Verschieben">
-              <span style={webGripDotStyle} />
-              <span style={webGripDotStyle} />
-              <span style={webGripDotStyle} />
-              <span style={webGripDotStyle} />
-              <span style={webGripDotStyle} />
-              <span style={webGripDotStyle} />
+          {isLayoutMode ? (
+            <div style={webHeaderActionsStyle}>
+              <div onMouseDown={begin("drag")} style={webDragHandleStyle} title="Verschieben">
+                <span style={webGripDotStyle} />
+                <span style={webGripDotStyle} />
+                <span style={webGripDotStyle} />
+                <span style={webGripDotStyle} />
+                <span style={webGripDotStyle} />
+                <span style={webGripDotStyle} />
+              </div>
+              <button onClick={() => onEditWidget(widget.id)} style={webPrimaryButtonStyle} type="button">
+                Bearbeiten
+              </button>
+              <button onClick={() => onRemoveWidget(widget.id)} style={webIconButtonStyle} type="button">
+                ×
+              </button>
             </div>
-            <button onClick={() => onEditWidget(widget.id)} style={webPrimaryButtonStyle} type="button">
-              Bearbeiten
-            </button>
-            <button onClick={() => onRemoveWidget(widget.id)} style={webIconButtonStyle} type="button">
-              ×
-            </button>
-          </div>
-        ) : null}
-      </div>
-      <View style={styles.webContent}>
+          ) : null}
+        </div>
+      ) : null}
+      <View style={[styles.webContent, widget.type === "camera" ? styles.webContentBleed : null]}>
         {renderWidget(widget, states, client, onUpdateWidget, config.theme)}
       </View>
       {isLayoutMode ? (
-        <div style={webFooterStyle}>
+        <div
+          style={{
+            ...webFooterStyle,
+            ...(widget.type === "camera" ? webOverlayFooterStyle : null),
+          }}
+        >
           <span style={webHintStyle}>Snap: 0.5 Raster</span>
           <div onMouseDown={begin("resize")} style={webResizeHandleStyle} title="Skalieren" />
         </div>
@@ -438,6 +482,10 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 0,
   },
+  webContentBleed: {
+    width: "100%",
+    height: "100%",
+  },
 });
 
 function snapUnits(value: number) {
@@ -452,6 +500,15 @@ const webCanvasStyle: CSSProperties = {
   background: "linear-gradient(180deg, rgba(11,16,29,0.78), rgba(8,11,21,0.92))",
   border: "1px solid rgba(255,255,255,0.04)",
   overflow: "hidden",
+};
+
+const webScrollerStyle: CSSProperties = {
+  width: "100%",
+};
+
+const webScrollerCompactStyle: CSSProperties = {
+  overflowX: "auto",
+  WebkitOverflowScrolling: "touch",
 };
 
 const webVerticalLineStyle: CSSProperties = {
@@ -499,14 +556,6 @@ const webTitleStyle: CSSProperties = {
   color: palette.text,
   fontSize: 17,
   fontWeight: 700,
-};
-
-const webSubtitleStyle: CSSProperties = {
-  color: palette.textMuted,
-  fontSize: 11,
-  fontWeight: 700,
-  letterSpacing: 0.7,
-  marginTop: 2,
 };
 
 const webHeaderActionsStyle: CSSProperties = {
@@ -571,6 +620,25 @@ const webFooterStyle: CSSProperties = {
   marginTop: "auto",
   paddingTop: 10,
   borderTop: `1px solid ${palette.border}`,
+};
+
+const webOverlayHeaderStyle: CSSProperties = {
+  position: "absolute",
+  top: 12,
+  left: 12,
+  right: 12,
+  zIndex: 4,
+};
+
+const webOverlayFooterStyle: CSSProperties = {
+  position: "absolute",
+  left: 12,
+  right: 12,
+  bottom: 12,
+  marginTop: 0,
+  paddingTop: 0,
+  borderTop: "none",
+  zIndex: 4,
 };
 
 const webHintStyle: CSSProperties = {

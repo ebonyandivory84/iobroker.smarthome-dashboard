@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { palette } from "../utils/theme";
 
 type TopBarProps = {
@@ -21,15 +21,18 @@ export function TopBar({
   onOpenSettings,
   onAddWidget,
 }: TopBarProps) {
+  const { width } = useWindowDimensions();
+  const isCompact = width < 700;
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isCompact ? styles.containerCompact : null]}>
       <View>
         <View style={styles.titleRow}>
           <Text style={styles.kicker}>My Home</Text>
           <MaterialCommunityIcons color={palette.text} name="chevron-down" size={18} />
         </View>
         <Text style={styles.title}>{title}</Text>
-        <View style={styles.statusRow}>
+        <View style={[styles.statusRow, isCompact ? styles.statusRowCompact : null]}>
           <View style={[styles.statusDot, isOnline ? styles.statusOnline : styles.statusOffline]} />
           <Text style={styles.statusText}>{isOnline ? "Verbunden" : "Offline"}</Text>
           <Text numberOfLines={1} style={styles.statusDetail}>
@@ -37,7 +40,7 @@ export function TopBar({
           </Text>
         </View>
       </View>
-      <View style={styles.actions}>
+      <View style={[styles.actions, isCompact ? styles.actionsCompact : null]}>
         <Pressable
           onPress={onToggleLayoutMode}
           style={[styles.actionButton, isLayoutMode ? styles.layoutActiveButton : null]}
@@ -70,6 +73,14 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     zIndex: 30,
   },
+  containerCompact: {
+    marginHorizontal: 10,
+    marginTop: 10,
+    paddingHorizontal: 8,
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 10,
+  },
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -93,6 +104,11 @@ const styles = StyleSheet.create({
     gap: 8,
     maxWidth: 420,
     opacity: 0.75,
+  },
+  statusRowCompact: {
+    flexWrap: "wrap",
+    maxWidth: "100%",
+    rowGap: 4,
   },
   statusDot: {
     width: 9,
@@ -119,6 +135,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     alignSelf: "flex-start",
+  },
+  actionsCompact: {
+    alignSelf: "flex-end",
   },
   actionButton: {
     width: 38,

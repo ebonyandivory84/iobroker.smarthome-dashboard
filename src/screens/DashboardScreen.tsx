@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { GridCanvas } from "../components/GridCanvas";
 import { SettingsModal } from "../components/SettingsModal";
 import { TopBar } from "../components/TopBar";
@@ -13,6 +13,8 @@ import { buildWidgetTemplate } from "../utils/widgetFactory";
 import { palette } from "../utils/theme";
 
 export function DashboardScreen() {
+  const { width } = useWindowDimensions();
+  const isCompact = width < 700;
   const { addWidget, config, removeWidget, replaceWidgets, updateWidget } = useDashboardConfig();
   const { client, error, isOnline, states } = useIoBrokerStates();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -84,7 +86,10 @@ export function DashboardScreen() {
         color={config.backgroundColor}
         mode={config.backgroundMode}
       />
-      <ScrollView contentContainerStyle={styles.scrollContent} style={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        style={[styles.scroll, isCompact ? styles.scrollCompact : null]}
+      >
         <TopBar
           isOnline={isOnline}
           isLayoutMode={layoutMode}
@@ -169,6 +174,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.28,
     shadowRadius: 22,
     shadowOffset: { width: 0, height: 14 },
+  },
+  scrollCompact: {
+    margin: 6,
+    borderRadius: 28,
+    borderWidth: 6,
   },
   background: {
     ...StyleSheet.absoluteFillObject,
