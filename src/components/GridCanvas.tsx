@@ -40,9 +40,19 @@ export function GridCanvas({
   const isCompactWeb = Platform.OS === "web" && windowWidth < 700;
   const displayColumns = isCompactWeb ? 1 : 9;
   const effectiveLayoutMode = isLayoutMode;
+  const displayGap = Platform.OS === "web" && !isCompactWeb ? Math.max(config.grid.gap, 18) : config.grid.gap;
   const displayConfig = useMemo(
-    () => buildResponsiveAutoLayoutConfig(config, displayColumns),
-    [config, displayColumns]
+    () => {
+      const next = buildResponsiveAutoLayoutConfig(config, displayColumns);
+      return {
+        ...next,
+        grid: {
+          ...next.grid,
+          gap: displayGap,
+        },
+      };
+    },
+    [config, displayColumns, displayGap]
   );
   const useStructuredGridSizing = true;
   const canvasInset = Platform.OS === "web" ? 64 : 60;

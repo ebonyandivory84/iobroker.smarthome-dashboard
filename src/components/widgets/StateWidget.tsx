@@ -30,7 +30,7 @@ export function StateWidget({ config, value, addonValue, onToggle }: StateWidget
         <MaterialCommunityIcons
           color={iconColor}
           name={(iconName || "toggle-switch-outline") as never}
-          size={30}
+          size={44}
         />
       </View>
       <View style={styles.textBlock}>
@@ -326,13 +326,13 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   iconWrap: {
-    width: 40,
-    height: 40,
+    width: 58,
+    height: 58,
     alignItems: "center",
     justifyContent: "center",
     position: "absolute",
-    top: 14,
-    left: 14,
+    top: 10,
+    left: 10,
   },
   textBlock: {
     position: "absolute",
@@ -350,43 +350,43 @@ const styles = StyleSheet.create({
   },
   addonCircle: {
     position: "absolute",
-    top: 12,
-    right: 12,
-    minWidth: 30,
-    height: 30,
+    top: 10,
+    right: 10,
+    minWidth: 34,
+    height: 34,
     borderRadius: 999,
-    paddingHorizontal: 9,
+    paddingHorizontal: 10,
     alignItems: "center",
     justifyContent: "center",
   },
   addonCircleLabel: {
     color: "#ffffff",
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "800",
   },
   addonText: {
     position: "absolute",
-    top: 14,
-    right: 12,
-    fontSize: 15,
+    top: 12,
+    right: 10,
+    fontSize: 16,
     fontWeight: "800",
   },
   addonIconWrap: {
     position: "absolute",
-    top: 12,
-    right: 12,
+    top: 10,
+    right: 10,
   },
   addonBars: {
     position: "absolute",
-    top: 12,
-    right: 12,
-    height: 28,
+    top: 10,
+    right: 10,
+    height: 32,
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 3,
   },
   addonBar: {
-    width: 4,
+    width: 5,
     borderRadius: 2,
   },
 });
