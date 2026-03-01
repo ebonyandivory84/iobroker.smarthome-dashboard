@@ -11,6 +11,7 @@ type StateWidgetProps = {
 
 export function StateWidget({ config, value, onToggle }: StateWidgetProps) {
   const hasValue = value !== null && value !== undefined;
+  const hasTitle = config.showTitle !== false && Boolean(config.title?.trim());
   const active = resolveStateActive(config, value);
   const iconName = resolveIconName(config, value);
   const textColor = config.appearance?.textColor || palette.text;
@@ -20,7 +21,7 @@ export function StateWidget({ config, value, onToggle }: StateWidgetProps) {
     : config.appearance?.iconColor2 || palette.textMuted;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, hasTitle ? styles.containerWithTitle : null]}>
       <View style={styles.iconWrap}>
         <MaterialCommunityIcons
           color={iconColor}
@@ -226,6 +227,11 @@ function defaultStateValue(config: StateWidgetConfig, active: boolean) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  containerWithTitle: {
+    paddingTop: 24,
   },
   iconWrap: {
     width: 54,
@@ -239,6 +245,7 @@ const styles = StyleSheet.create({
     color: palette.textMuted,
     fontSize: 16,
     marginTop: 14,
+    textAlign: "center",
   },
   button: {
     marginTop: "auto",
