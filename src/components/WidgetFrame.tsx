@@ -32,7 +32,7 @@ export function WidgetFrame({
   onRemove,
   children,
 }: WidgetFrameProps) {
-  const showHeaderTitle = widget.showTitle !== false && Boolean(widget.title.trim());
+  const showHeaderTitle = widget.type !== "camera" && widget.showTitle !== false && Boolean(widget.title.trim());
   const interaction = useRef<{
     mode: "drag" | "resize";
     startX: number;
@@ -130,29 +130,23 @@ export function WidgetFrame({
           : null,
       ]}
     >
-      {showHeaderTitle || isLayoutMode ? (
-        <View style={styles.header}>
-          <View>{showHeaderTitle ? <Text style={styles.title}>{widget.title}</Text> : null}</View>
-          {isLayoutMode ? (
-            <View style={styles.headerActions}>
-              <Pressable onPress={() => onEdit(widget.id)} style={styles.editButton}>
-                <MaterialCommunityIcons color={palette.text} name="tune-variant" size={16} />
-                <Text style={styles.editButtonLabel}>Bearbeiten</Text>
-              </Pressable>
-              <Pressable onPress={() => onRemove(widget.id)} style={styles.iconButton}>
-                <MaterialCommunityIcons color={palette.textMuted} name="close" size={18} />
-              </Pressable>
-            </View>
-          ) : null}
+      {showHeaderTitle ? (
+        <View style={styles.titleBadge}>
+          <Text style={styles.title}>{widget.title}</Text>
         </View>
       ) : null}
       {isLayoutMode ? (
-        <View style={styles.dragStrip}>
-          <MaterialCommunityIcons color={palette.textMuted} name="drag-horizontal-variant" size={18} />
-          <Text style={styles.dragStripText}>Ziehen zum Verschieben</Text>
+        <View style={styles.headerActions}>
+          <Pressable onPress={() => onEdit(widget.id)} style={styles.editButton}>
+            <MaterialCommunityIcons color={palette.text} name="tune-variant" size={16} />
+            <Text style={styles.editButtonLabel}>Bearbeiten</Text>
+          </Pressable>
+          <Pressable onPress={() => onRemove(widget.id)} style={styles.iconButton}>
+            <MaterialCommunityIcons color={palette.textMuted} name="close" size={18} />
+          </Pressable>
         </View>
       ) : null}
-      {Platform.OS === "web" ? (
+      {Platform.OS === "web" && isLayoutMode ? (
         <div
           draggable={false}
           onDragStart={(event) => event.preventDefault()}
@@ -160,20 +154,21 @@ export function WidgetFrame({
           style={webDragLayerStyle}
         />
       ) : null}
-      <View style={styles.content}>{children}</View>
-      <View style={styles.footerRow}>
-        {isLayoutMode ? <Text style={styles.layoutHint}>Snap: 0.5 Raster</Text> : <View />}
+      <View style={[styles.content, widget.type !== "camera" && widget.type !== "solar" ? styles.contentInset : null]}>
+        {children}
+      </View>
+      <View pointerEvents="box-none" style={styles.footerRow}>
+        <View />
         {isLayoutMode ? (
           <View style={styles.resizeHandle}>
             <MaterialCommunityIcons color={palette.textMuted} name="resize-bottom-right" size={18} />
-            <Text style={styles.resizeText}>Skalieren</Text>
           </View>
         ) : null}
-        {Platform.OS === "web" ? (
+        {Platform.OS === "web" && isLayoutMode ? (
           <div
             draggable={false}
             onDragStart={(event) => event.preventDefault()}
-            onMouseDown={isLayoutMode ? handleWebMouseDown("resize") : undefined}
+            onMouseDown={handleWebMouseDown("resize")}
             style={webResizeLayerStyle}
           />
         ) : null}
@@ -190,21 +185,18 @@ const styles = StyleSheet.create({
   shell: {
     flex: 1,
     borderRadius: 22,
-    padding: 16,
     backgroundColor: palette.panel,
-    borderWidth: 1,
-    borderColor: palette.border,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    marginBottom: 10,
+    borderWidth: 0,
+    overflow: "hidden",
   },
   headerActions: {
+    position: "absolute",
+    top: 12,
+    right: 12,
     flexDirection: "row",
     gap: 8,
     alignItems: "center",
+    zIndex: 10,
   },
   iconButton: {
     width: 32,
@@ -216,12 +208,26 @@ const styles = StyleSheet.create({
   },
   title: {
     color: palette.text,
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "700",
+  },
+  titleBadge: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    maxWidth: "74%",
+    zIndex: 10,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    backgroundColor: "rgba(4, 8, 14, 0.34)",
   },
   content: {
     flex: 1,
     minHeight: 0,
+  },
+  contentInset: {
+    padding: 16,
   },
   editButton: {
     flexDirection: "row",
@@ -239,55 +245,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
-  dragStrip: {
-    marginBottom: 10,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1,
-    borderColor: palette.border,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    position: "relative",
-  },
-  dragStripText: {
-    color: palette.textMuted,
-    fontSize: 12,
-    fontWeight: "700",
-  },
   footerRow: {
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: palette.border,
+    position: "absolute",
+    right: 12,
+    bottom: 12,
+    left: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
   },
-  layoutHint: {
-    color: palette.textMuted,
-    fontSize: 11,
-    lineHeight: 16,
-  },
   resizeHandle: {
     borderRadius: 12,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 8,
     backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
     borderColor: palette.border,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
     position: "relative",
-  },
-  resizeText: {
-    color: palette.textMuted,
-    fontSize: 12,
-    fontWeight: "700",
   },
 });
 

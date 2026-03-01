@@ -38,10 +38,17 @@ export function GridCanvas({
   const { width: windowWidth } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
   const isCompactWeb = Platform.OS === "web" && windowWidth < 700;
-  const effectiveLayoutMode = isLayoutMode && !isCompactWeb;
+  const useSectionedDesktop = Platform.OS === "web" && !isCompactWeb && !isLayoutMode;
+  const useSectionedCompact = Platform.OS === "web" && isCompactWeb;
+  const effectiveLayoutMode = isLayoutMode && !useSectionedDesktop && !useSectionedCompact;
   const displayConfig = useMemo(
-    () => (isCompactWeb ? buildCompactMobileConfig(config) : config),
-    [config, isCompactWeb]
+    () =>
+      useSectionedCompact
+        ? buildSectionedConfig(config, "mobile")
+        : useSectionedDesktop
+          ? buildSectionedConfig(config, "desktop")
+          : config,
+    [config, useSectionedCompact, useSectionedDesktop]
   );
   const canvasInset = Platform.OS === "web" ? 64 : 60;
   const availableWidth = containerWidth > 0 ? containerWidth : windowWidth;
@@ -154,18 +161,23 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function buildCompactMobileConfig(config: DashboardSettings): DashboardSettings {
+function buildSectionedConfig(config: DashboardSettings, mode: "desktop" | "mobile"): DashboardSettings {
   const sectionCount = 3;
-  const sectionColumns = Math.max(1, Math.ceil(config.grid.columns / sectionCount));
+  const sectionColumns = 3;
   const sectionGapRows = 1.5;
+  const sourceSectionWidth = Math.max(1, config.grid.columns / sectionCount);
   const sections = Array.from({ length: sectionCount }, () => [] as WidgetConfig[]);
 
   config.widgets.forEach((widget) => {
     const center = widget.position.x + widget.position.w / 2;
-    const sectionIndex = clamp(Math.floor(center / sectionColumns), 0, sectionCount - 1);
-    const sectionStart = sectionIndex * sectionColumns;
-    const localWidth = Math.min(widget.position.w, sectionColumns);
-    const localX = clamp(widget.position.x - sectionStart, 0, Math.max(0, sectionColumns - localWidth));
+    const sectionIndex = clamp(Math.floor(center / sourceSectionWidth), 0, sectionCount - 1);
+    const sectionStart = sectionIndex * sourceSectionWidth;
+    const widthRatio = widget.position.w / sourceSectionWidth;
+    const rawLocalWidth = Math.round(widthRatio * sectionColumns);
+    const localWidth = clamp(rawLocalWidth || 1, 1, sectionColumns);
+    const localStartRatio = (widget.position.x - sectionStart) / sourceSectionWidth;
+    const rawLocalX = Math.round(localStartRatio * sectionColumns);
+    const localX = clamp(rawLocalX, 0, Math.max(0, sectionColumns - localWidth));
 
     sections[sectionIndex].push({
       ...widget,
@@ -178,8 +190,11 @@ function buildCompactMobileConfig(config: DashboardSettings): DashboardSettings 
     });
   });
 
+  const sectionOrder = mode === "mobile" ? [2, 1, 0] : [0, 1, 2];
+  const orderedSections = sectionOrder.map((index) => sections[index]);
+
   let rowOffset = 0;
-  const stackedWidgets = sections.flatMap((sectionWidgets) => {
+  const placedWidgets = orderedSections.flatMap((sectionWidgets, renderIndex) => {
     if (!sectionWidgets.length) {
       return [];
     }
@@ -190,25 +205,35 @@ function buildCompactMobileConfig(config: DashboardSettings): DashboardSettings 
       0
     );
 
-    const placed = normalizedSection.map((widget) => ({
+    if (mode === "mobile") {
+      const stacked = normalizedSection.map((widget) => ({
+        ...widget,
+        position: {
+          ...widget.position,
+          y: widget.position.y + rowOffset,
+        },
+      }));
+      rowOffset += sectionHeight + sectionGapRows;
+      return stacked;
+    }
+
+    const xOffset = renderIndex * sectionColumns;
+    return normalizedSection.map((widget) => ({
       ...widget,
       position: {
         ...widget.position,
-        y: widget.position.y + rowOffset,
+        x: widget.position.x + xOffset,
       },
     }));
-
-    rowOffset += sectionHeight + sectionGapRows;
-    return placed;
   });
 
   return {
     ...config,
     grid: {
       ...config.grid,
-      columns: sectionColumns,
+      columns: mode === "mobile" ? sectionColumns : sectionColumns * sectionCount,
     },
-    widgets: stackedWidgets,
+    widgets: placedWidgets,
   };
 }
 
@@ -379,8 +404,6 @@ function WebWidgetShell({
     ...getWidgetTone(widget, theme),
     ...(widget.type === "camera"
       ? {
-          padding: 0,
-          gap: 0,
           border: "none",
           background: "#000000",
         }
@@ -392,51 +415,43 @@ function WebWidgetShell({
     boxShadow: isLayoutMode ? "inset 0 0 0 1px rgba(77, 226, 177, 0.22)" : undefined,
   };
 
+  const contentStyle = [
+    styles.webContent,
+    widget.type === "camera" ? styles.webContentBleed : null,
+    widget.type !== "camera" && widget.type !== "solar" ? styles.webContentInset : null,
+    widget.type === "grafana" ? styles.webContentGrafana : null,
+  ];
+
   return (
     <div style={shellStyle}>
-      {showHeaderTitle || isLayoutMode ? (
-        <div
-          style={{
-            ...webHeaderStyle,
-            ...(widget.type === "camera" ? webOverlayHeaderStyle : null),
-          }}
-        >
-          <div>
-            {showHeaderTitle ? (
-              <div style={{ ...webTitleStyle, color: widget.appearance?.textColor || palette.text }}>{widget.title}</div>
-            ) : null}
-          </div>
-          {isLayoutMode ? (
-            <div style={webHeaderActionsStyle}>
-              <div onMouseDown={begin("drag")} style={webDragHandleStyle} title="Verschieben">
-                <span style={webGripDotStyle} />
-                <span style={webGripDotStyle} />
-                <span style={webGripDotStyle} />
-                <span style={webGripDotStyle} />
-                <span style={webGripDotStyle} />
-                <span style={webGripDotStyle} />
-              </div>
-              <button onClick={() => onEditWidget(widget.id)} style={webPrimaryButtonStyle} type="button">
-                Bearbeiten
-              </button>
-              <button onClick={() => onRemoveWidget(widget.id)} style={webIconButtonStyle} type="button">
-                ×
-              </button>
-            </div>
-          ) : null}
+      {showHeaderTitle ? (
+        <div style={webTitleBadgeStyle}>
+          <div style={{ ...webTitleStyle, color: widget.appearance?.textColor || palette.text }}>{widget.title}</div>
         </div>
       ) : null}
-      <View style={[styles.webContent, widget.type === "camera" ? styles.webContentBleed : null]}>
+      {isLayoutMode ? (
+        <div style={webControlsStyle}>
+          <div onMouseDown={begin("drag")} style={webDragHandleStyle} title="Verschieben">
+            <span style={webGripDotStyle} />
+            <span style={webGripDotStyle} />
+            <span style={webGripDotStyle} />
+            <span style={webGripDotStyle} />
+            <span style={webGripDotStyle} />
+            <span style={webGripDotStyle} />
+          </div>
+          <button onClick={() => onEditWidget(widget.id)} style={webPrimaryButtonStyle} type="button">
+            Bearbeiten
+          </button>
+          <button onClick={() => onRemoveWidget(widget.id)} style={webIconButtonStyle} type="button">
+            ×
+          </button>
+        </div>
+      ) : null}
+      <View style={contentStyle}>
         {renderWidget(widget, states, client, onUpdateWidget, config.theme)}
       </View>
       {isLayoutMode ? (
-        <div
-          style={{
-            ...webFooterStyle,
-            ...(widget.type === "camera" ? webOverlayFooterStyle : null),
-          }}
-        >
-          <span style={webHintStyle}>Snap: 0.5 Raster</span>
+        <div style={webFooterOverlayStyle}>
           <div onMouseDown={begin("resize")} style={webResizeHandleStyle} title="Skalieren" />
         </div>
       ) : null}
@@ -522,6 +537,12 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 0,
   },
+  webContentInset: {
+    padding: 16,
+  },
+  webContentGrafana: {
+    paddingTop: 10,
+  },
   webContentBleed: {
     width: "100%",
     height: "100%",
@@ -566,33 +587,28 @@ const webWidgetStyle: CSSProperties = {
   flexDirection: "column",
   fontFamily: "Arial, sans-serif",
   borderRadius: 22,
-  padding: 16,
   background: "linear-gradient(180deg, rgba(29,35,55,0.94), rgba(20,24,40,0.96))",
-  border: `1px solid ${palette.border}`,
+  border: "none",
   boxSizing: "border-box",
-  gap: 10,
   overflow: "hidden",
-  boxShadow: "0 16px 24px rgba(0,0,0,0.22)",
+  boxShadow: "none",
   backdropFilter: "blur(12px)",
-};
-
-const webHeaderStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "flex-start",
-  gap: 8,
 };
 
 const webTitleStyle: CSSProperties = {
   color: palette.text,
-  fontSize: 17,
+  fontSize: 15,
   fontWeight: 700,
 };
 
-const webHeaderActionsStyle: CSSProperties = {
+const webControlsStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 8,
+  position: "absolute",
+  top: 12,
+  right: 12,
+  zIndex: 4,
 };
 
 const webPrimaryButtonStyle: CSSProperties = {
@@ -643,38 +659,22 @@ const webGripDotStyle: CSSProperties = {
   opacity: 0.7,
 };
 
-const webFooterStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: 10,
-  marginTop: "auto",
-  paddingTop: 10,
-  borderTop: `1px solid ${palette.border}`,
-};
-
-const webOverlayHeaderStyle: CSSProperties = {
+const webTitleBadgeStyle: CSSProperties = {
   position: "absolute",
   top: 12,
   left: 12,
-  right: 12,
+  maxWidth: "74%",
+  padding: "8px 10px",
+  borderRadius: 12,
+  background: "rgba(4,8,14,0.34)",
   zIndex: 4,
 };
 
-const webOverlayFooterStyle: CSSProperties = {
+const webFooterOverlayStyle: CSSProperties = {
   position: "absolute",
-  left: 12,
-  right: 12,
   bottom: 12,
-  marginTop: 0,
-  paddingTop: 0,
-  borderTop: "none",
+  right: 12,
   zIndex: 4,
-};
-
-const webHintStyle: CSSProperties = {
-  color: palette.textMuted,
-  fontSize: 11,
 };
 
 const webResizeHandleStyle: CSSProperties = {
