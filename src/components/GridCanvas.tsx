@@ -126,7 +126,8 @@ export function GridCanvas({
                 columns={displayConfig.grid.columns}
                 gap={displayConfig.grid.gap}
                 isLayoutMode={effectiveLayoutMode}
-                allowManualLayout={false}
+                allowManualLayout={!isCompactWeb}
+                allowResize={false}
                 onCommitPosition={(widgetId, position) => onUpdateWidget(widgetId, { position })}
                 onEdit={onEditWidget}
                 onRemove={onRemoveWidget}
@@ -440,7 +441,8 @@ function WebGridCanvas({
           onEditWidget={onEditWidget}
           onRemoveWidget={onRemoveWidget}
           onUpdateWidget={onUpdateWidget}
-          allowManualLayout={false}
+          allowManualLayout={true}
+          allowResize={false}
           states={states}
           stepX={stepX}
           stepY={stepY}
@@ -466,6 +468,7 @@ function WebWidgetShell({
   onUpdateWidget,
   onRemoveWidget,
   allowManualLayout = true,
+  allowResize = true,
 }: {
   widget: WidgetConfig;
   config: DashboardSettings;
@@ -481,6 +484,7 @@ function WebWidgetShell({
   onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void;
   onRemoveWidget: (widgetId: string) => void;
   allowManualLayout?: boolean;
+  allowResize?: boolean;
 }) {
   const [preview, setPreview] = useState(widget.position);
   const showHeaderTitle = widget.type !== "camera" && widget.showTitle !== false && Boolean(widget.title.trim());
@@ -600,7 +604,7 @@ function WebWidgetShell({
       <View style={contentStyle}>
         {renderWidget(widget, states, client, onUpdateWidget, config.theme)}
       </View>
-      {isLayoutMode && allowManualLayout ? (
+      {isLayoutMode && allowManualLayout && allowResize ? (
         <div style={webFooterOverlayStyle}>
           <div onMouseDown={begin("resize")} style={webResizeHandleStyle} title="Skalieren" />
         </div>

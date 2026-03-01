@@ -15,6 +15,7 @@ type WidgetFrameProps = {
   columns: number;
   isLayoutMode: boolean;
   allowManualLayout?: boolean;
+  allowResize?: boolean;
   onCommitPosition: (widgetId: string, next: WidgetConfig["position"]) => void;
   onEdit: (widgetId: string) => void;
   onRemove: (widgetId: string) => void;
@@ -29,6 +30,7 @@ export function WidgetFrame({
   columns,
   isLayoutMode,
   allowManualLayout = true,
+  allowResize = true,
   onCommitPosition,
   onEdit,
   onRemove,
@@ -166,12 +168,12 @@ export function WidgetFrame({
       </View>
       <View pointerEvents="box-none" style={styles.footerRow}>
         <View />
-        {isLayoutMode && allowManualLayout ? (
+        {isLayoutMode && allowManualLayout && allowResize ? (
           <View style={styles.resizeHandle}>
             <MaterialCommunityIcons color={palette.textMuted} name="resize-bottom-right" size={18} />
           </View>
         ) : null}
-        {Platform.OS === "web" && isLayoutMode && allowManualLayout ? (
+        {Platform.OS === "web" && isLayoutMode && allowManualLayout && allowResize ? (
           <div
             draggable={false}
             onDragStart={(event) => event.preventDefault()}
