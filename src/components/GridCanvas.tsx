@@ -38,7 +38,7 @@ export function GridCanvas({
   const { width: windowWidth } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
   const isCompactWeb = Platform.OS === "web" && windowWidth < 700;
-  const displayColumns = isCompactWeb ? 1 : 3;
+  const displayColumns = isCompactWeb ? 1 : 9;
   const effectiveLayoutMode = isLayoutMode;
   const displayConfig = useMemo(
     () => buildResponsiveAutoLayoutConfig(config, displayColumns),
@@ -231,19 +231,22 @@ function getAutoLayoutSpec(widget: WidgetConfig, columns: number) {
     return { w: 1, h: Math.max(1.5, fallbackHeight) };
   }
 
+  const mainColumnWidth = 3;
+  const wideWidgetWidth = Math.min(mainColumnWidth * 2, columns);
+
   switch (widget.type) {
     case "state":
       return { w: 1, h: 1 };
     case "camera":
-      return { w: 1, h: 1.15 };
+      return { w: mainColumnWidth, h: 2.1 };
     case "solar":
-      return { w: Math.min(2, columns), h: 1.8 };
+      return { w: wideWidgetWidth, h: 3.2 };
     case "grafana":
-      return { w: Math.min(2, columns), h: 1.6 };
+      return { w: wideWidgetWidth, h: 2.8 };
     case "weather":
-      return { w: 1, h: 1.2 };
+      return { w: mainColumnWidth, h: 2.2 };
     case "energy":
-      return { w: 1, h: 1.3 };
+      return { w: mainColumnWidth, h: 2.4 };
   }
 
   return { w: 1, h: Math.max(1, fallbackHeight) };
