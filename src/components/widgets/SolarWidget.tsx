@@ -242,6 +242,7 @@ function SolarFlowScene({
   const gridBox = resolveNodeBox(effectiveNodeLayout?.grid, defaults.grid, sceneLayout);
   const carBox = resolveNodeBox(effectiveNodeLayout?.car, defaults.car, sceneLayout);
   const flowDotSize = veryCompactMode ? 8 : compactMode ? 10 : 12;
+  const lineGap = veryCompactMode ? 8 : compactMode ? 10 : 6;
   const homeMidX = homeBox.x + homeBox.w / 2;
   const batteryMidY = batteryBox.y + batteryBox.h / 2;
   const homeMidY = homeBox.y + homeBox.h / 2;
@@ -249,19 +250,19 @@ function SolarFlowScene({
   const topLineLeft = Math.round(homeMidX) - 2;
   const bottomLineLeft = Math.round(homeMidX) - 2;
 
-  const topLineStart = pvBox.y + pvBox.h;
-  const topLineEnd = homeBox.y;
+  const topLineStart = pvBox.y + pvBox.h + lineGap;
+  const topLineEnd = homeBox.y - lineGap;
   const topLineHeight = Math.max(12, topLineEnd - topLineStart);
   const leftLineTop = Math.round((batteryMidY + homeMidY) / 2) - 2;
   const rightLineTop = Math.round((gridMidY + homeMidY) / 2) - 2;
-  const leftLineStart = batteryBox.x + batteryBox.w;
-  const leftLineEnd = homeBox.x;
+  const leftLineStart = batteryBox.x + batteryBox.w + lineGap;
+  const leftLineEnd = homeBox.x - lineGap;
   const leftLineWidth = Math.max(16, leftLineEnd - leftLineStart);
-  const rightLineStart = homeBox.x + homeBox.w;
-  const rightLineEnd = gridBox.x;
+  const rightLineStart = homeBox.x + homeBox.w + lineGap;
+  const rightLineEnd = gridBox.x - lineGap;
   const rightLineWidth = Math.max(16, rightLineEnd - rightLineStart);
-  const bottomLineStart = homeBox.y + homeBox.h;
-  const bottomLineEnd = carBox.y;
+  const bottomLineStart = homeBox.y + homeBox.h + lineGap;
+  const bottomLineEnd = carBox.y - lineGap;
   const bottomLineHeight = Math.max(12, bottomLineEnd - bottomLineStart);
 
   return (
@@ -512,6 +513,7 @@ function NodeCard({
       </View>
       <Text
         adjustsFontSizeToFit
+        minimumFontScale={0.72}
         numberOfLines={1}
         style={[
           styles.nodeValue,
@@ -525,8 +527,7 @@ function NodeCard({
       </Text>
       {meta ? (
         <Text
-          adjustsFontSizeToFit
-          numberOfLines={1}
+          numberOfLines={2}
           style={[
             styles.nodeMeta,
             compact ? styles.nodeMetaCompact : null,
@@ -728,21 +729,21 @@ function getDefaultNodeLayout(
 
   if (compactSingleColumn) {
     return {
-      pv: { x: 0.4, y: 0.03, w: 0.2, h: 0.12 },
-      home: { x: 0.34, y: 0.34, w: 0.32, h: 0.17 },
-      battery: { x: 0.03, y: 0.42, w: 0.16, h: 0.12 },
-      grid: { x: 0.81, y: 0.42, w: 0.16, h: 0.12 },
-      car: { x: 0.41, y: 0.8, w: 0.18, h: 0.11 },
+      pv: { x: 0.39, y: 0.04, w: 0.22, h: 0.22 },
+      home: { x: 0.35, y: 0.34, w: 0.3, h: 0.3 },
+      battery: { x: 0.02, y: 0.41, w: 0.18, h: 0.18 },
+      grid: { x: 0.8, y: 0.41, w: 0.18, h: 0.18 },
+      car: { x: 0.41, y: 0.72, w: 0.18, h: 0.18 },
     };
   }
 
   if (compactTablet) {
     return {
-      pv: { x: 0.41, y: 0.03, w: 0.18, h: 0.12 },
-      home: { x: 0.37, y: 0.35, w: 0.26, h: 0.17 },
-      battery: { x: 0.03, y: 0.4, w: 0.14, h: 0.12 },
-      grid: { x: 0.83, y: 0.4, w: 0.14, h: 0.12 },
-      car: { x: 0.42, y: 0.82, w: 0.16, h: 0.11 },
+      pv: { x: 0.4, y: 0.04, w: 0.2, h: 0.2 },
+      home: { x: 0.38, y: 0.34, w: 0.24, h: 0.24 },
+      battery: { x: 0.02, y: 0.4, w: 0.17, h: 0.17 },
+      grid: { x: 0.81, y: 0.4, w: 0.17, h: 0.17 },
+      car: { x: 0.415, y: 0.74, w: 0.17, h: 0.17 },
     };
   }
 
