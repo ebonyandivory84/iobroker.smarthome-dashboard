@@ -13,6 +13,7 @@ import { defaultConfig } from "../utils/defaultConfig";
 type DashboardConfigContextValue = {
   config: DashboardSettings;
   rawJson: string;
+  savedDashboards: string[];
   updateConfigFromJson: (nextJson: string) => { ok: boolean; error?: string };
   patchConfig: (partial: Partial<DashboardSettings>) => void;
   resetConfig: () => void;
@@ -20,11 +21,16 @@ type DashboardConfigContextValue = {
   updateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void;
   addWidget: (widget: WidgetConfig) => void;
   removeWidget: (widgetId: string) => void;
+  refreshSavedDashboards: () => Promise<void>;
+  saveNamedDashboard: (name: string) => Promise<{ ok: boolean; error?: string }>;
+  loadNamedDashboard: (name: string) => Promise<{ ok: boolean; error?: string }>;
+  deleteNamedDashboard: (name: string) => Promise<{ ok: boolean; error?: string }>;
 };
 
 const STORAGE_KEY = "smarthome-dashboard-config";
 const LEGACY_DEMO_BASE_URL = "http://127.0.0.1:8087";
 const REMOTE_CONFIG_ENDPOINT = "/smarthome-dashboard/api/config";
+const SAVED_DASHBOARDS_ENDPOINT = "/smarthome-dashboard/api/dashboards";
 
 const DashboardConfigContext = createContext<DashboardConfigContextValue | null>(null);
 
@@ -55,12 +61,22 @@ function migrateConfig(input: DashboardSettings): DashboardSettings {
 export function DashboardConfigProvider({ children }: PropsWithChildren) {
   const [config, setConfig] = useState<DashboardSettings>(defaultConfig);
   const [rawJson, setRawJson] = useState(JSON.stringify(defaultConfig, null, 2));
+  const [savedDashboards, setSavedDashboards] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
 
     const hydrate = async () => {
       let remoteJson = "";
+
+      try {
+        const dashboards = await readSavedDashboards();
+        if (active) {
+          setSavedDashboards(dashboards);
+        }
+      } catch (error) {
+        console.warn("Saved dashboard load failed", error);
+      }
 
       try {
         remoteJson = await readRemoteConfig();
@@ -127,6 +143,7 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
     () => ({
       config,
       rawJson,
+      savedDashboards,
       updateConfigFromJson(nextJson) {
         try {
           const parsed = migrateConfig(JSON.parse(nextJson) as DashboardSettings);
@@ -176,8 +193,58 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
         };
         persist(nextConfig);
       },
+      async refreshSavedDashboards() {
+        try {
+          setSavedDashboards(await readSavedDashboards());
+        } catch (error) {
+          console.warn("Saved dashboard refresh failed", error);
+        }
+      },
+      async saveNamedDashboard(name) {
+        const trimmedName = name.trim();
+        if (!trimmedName) {
+          return { ok: false, error: "Name fehlt" };
+        }
+
+        try {
+          await writeSavedDashboard(trimmedName, rawJson);
+          setSavedDashboards(await readSavedDashboards());
+          return { ok: true };
+        } catch (error) {
+          return { ok: false, error: error instanceof Error ? error.message : "Dashboard speichern fehlgeschlagen" };
+        }
+      },
+      async loadNamedDashboard(name) {
+        const trimmedName = name.trim();
+        if (!trimmedName) {
+          return { ok: false, error: "Name fehlt" };
+        }
+
+        try {
+          const nextJson = await readSavedDashboard(trimmedName);
+          const parsed = migrateConfig(JSON.parse(nextJson) as DashboardSettings);
+          await persist(parsed);
+          return { ok: true };
+        } catch (error) {
+          return { ok: false, error: error instanceof Error ? error.message : "Dashboard laden fehlgeschlagen" };
+        }
+      },
+      async deleteNamedDashboard(name) {
+        const trimmedName = name.trim();
+        if (!trimmedName) {
+          return { ok: false, error: "Name fehlt" };
+        }
+
+        try {
+          await removeSavedDashboard(trimmedName);
+          setSavedDashboards(await readSavedDashboards());
+          return { ok: true };
+        } catch (error) {
+          return { ok: false, error: error instanceof Error ? error.message : "Dashboard loeschen fehlgeschlagen" };
+        }
+      },
     }),
-    [config, rawJson]
+    [config, rawJson, savedDashboards]
   );
 
   return <DashboardConfigContext.Provider value={value}>{children}</DashboardConfigContext.Provider>;
@@ -207,6 +274,60 @@ async function writeRemoteConfig(configJson: string) {
 
   if (!response.ok) {
     throw new Error(`Remote config save failed (${response.status})`);
+  }
+}
+
+async function readSavedDashboards() {
+  const response = await fetch(SAVED_DASHBOARDS_ENDPOINT, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Saved dashboards read failed (${response.status})`);
+  }
+
+  const payload = (await response.json()) as { dashboards?: string[] };
+  return Array.isArray(payload.dashboards) ? payload.dashboards : [];
+}
+
+async function readSavedDashboard(name: string) {
+  const response = await fetch(`${SAVED_DASHBOARDS_ENDPOINT}/${encodeURIComponent(name)}`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Saved dashboard read failed (${response.status})`);
+  }
+
+  const payload = (await response.json()) as { configJson?: string };
+  if (typeof payload.configJson !== "string" || !payload.configJson) {
+    throw new Error("Saved dashboard config missing");
+  }
+
+  return payload.configJson;
+}
+
+async function writeSavedDashboard(name: string, configJson: string) {
+  const response = await fetch(`${SAVED_DASHBOARDS_ENDPOINT}/${encodeURIComponent(name)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ configJson }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Saved dashboard save failed (${response.status})`);
+  }
+}
+
+async function removeSavedDashboard(name: string) {
+  const response = await fetch(`${SAVED_DASHBOARDS_ENDPOINT}/${encodeURIComponent(name)}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Saved dashboard delete failed (${response.status})`);
   }
 }
 

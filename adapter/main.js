@@ -10,6 +10,7 @@ let objectEntriesCacheTimestamp = 0;
 let objectEntriesPromise = null;
 const OBJECT_CACHE_TTL_MS = 5 * 60 * 1000;
 const CONFIG_STATE_ID = "dashboardConfig";
+const SAVED_DASHBOARDS_STATE_ID = "savedDashboards";
 let webShellCache = null;
 
 function startAdapter(options) {
@@ -40,6 +41,19 @@ async function main(adapter) {
       read: true,
       write: true,
       def: "",
+    },
+    native: {},
+  });
+
+  await adapter.setObjectNotExistsAsync(SAVED_DASHBOARDS_STATE_ID, {
+    type: "state",
+    common: {
+      name: "Saved dashboard configurations",
+      type: "string",
+      role: "json",
+      read: true,
+      write: true,
+      def: "{}",
     },
     native: {},
   });
@@ -80,6 +94,84 @@ async function main(adapter) {
       res.json({ ok: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Config save failed" });
+    }
+  });
+
+  app.get("/smarthome-dashboard/api/dashboards", async (_req, res) => {
+    try {
+      const dashboards = await readSavedDashboards(adapter);
+      res.json({ dashboards: Object.keys(dashboards).sort((a, b) => a.localeCompare(b, "de")) });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Saved dashboards read failed" });
+    }
+  });
+
+  app.get("/smarthome-dashboard/api/dashboards/:name", async (req, res) => {
+    const name = normalizeDashboardName(req.params?.name);
+    if (!name) {
+      res.status(400).json({ error: "name missing" });
+      return;
+    }
+
+    try {
+      const dashboards = await readSavedDashboards(adapter);
+      const configJson = dashboards[name];
+      if (!configJson) {
+        res.status(404).json({ error: "Dashboard not found" });
+        return;
+      }
+
+      res.json({ configJson });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Saved dashboard read failed" });
+    }
+  });
+
+  app.put("/smarthome-dashboard/api/dashboards/:name", async (req, res) => {
+    const name = normalizeDashboardName(req.params?.name);
+    const configJson = typeof req.body?.configJson === "string" ? req.body.configJson : "";
+
+    if (!name) {
+      res.status(400).json({ error: "name missing" });
+      return;
+    }
+
+    if (!configJson) {
+      res.status(400).json({ error: "configJson missing" });
+      return;
+    }
+
+    try {
+      JSON.parse(configJson);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Invalid JSON" });
+      return;
+    }
+
+    try {
+      const dashboards = await readSavedDashboards(adapter);
+      dashboards[name] = configJson;
+      await writeSavedDashboards(adapter, dashboards);
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Saved dashboard save failed" });
+    }
+  });
+
+  app.delete("/smarthome-dashboard/api/dashboards/:name", async (req, res) => {
+    const name = normalizeDashboardName(req.params?.name);
+    if (!name) {
+      res.status(400).json({ error: "name missing" });
+      return;
+    }
+
+    try {
+      const dashboards = await readSavedDashboards(adapter);
+      delete dashboards[name];
+      await writeSavedDashboards(adapter, dashboards);
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Saved dashboard delete failed" });
     }
   });
 
@@ -221,6 +313,40 @@ async function main(adapter) {
       adapter.log.info(`SmartHome Dashboard static web root: ${webRoot}`);
     }
     adapter.log.info(`SmartHome Dashboard available on http://0.0.0.0:${port}/smarthome-dashboard`);
+  });
+}
+
+function normalizeDashboardName(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+async function readSavedDashboards(adapter) {
+  const state = await adapter.getStateAsync(SAVED_DASHBOARDS_STATE_ID);
+  const raw = typeof state?.val === "string" ? state.val : "";
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        ([key, value]) => typeof key === "string" && key.trim() && typeof value === "string" && value
+      )
+    );
+  } catch {
+    return {};
+  }
+}
+
+async function writeSavedDashboards(adapter, dashboards) {
+  await adapter.setStateAsync(SAVED_DASHBOARDS_STATE_ID, {
+    val: JSON.stringify(dashboards, null, 2),
+    ack: true,
   });
 }
 

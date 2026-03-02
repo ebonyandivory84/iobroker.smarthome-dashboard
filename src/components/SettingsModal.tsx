@@ -9,8 +9,19 @@ type SettingsModalProps = {
 };
 
 export function SettingsModal({ visible, onClose }: SettingsModalProps) {
-  const { config, rawJson, resetConfig, updateConfigFromJson } = useDashboardConfig();
+  const {
+    config,
+    rawJson,
+    resetConfig,
+    updateConfigFromJson,
+    savedDashboards,
+    refreshSavedDashboards,
+    saveNamedDashboard,
+    loadNamedDashboard,
+    deleteNamedDashboard,
+  } = useDashboardConfig();
   const [draft, setDraft] = useState(rawJson);
+  const [dashboardName, setDashboardName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -19,8 +30,10 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     }
 
     setDraft(rawJson);
+    setDashboardName(config.title || "");
     setError(null);
-  }, [rawJson, visible]);
+    refreshSavedDashboards();
+  }, [config.title, rawJson, visible]);
 
   const save = () => {
     const result = updateConfigFromJson(draft);
@@ -29,6 +42,34 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
       return;
     }
     onClose();
+  };
+
+  const saveCurrentAsNamed = async () => {
+    const result = await saveNamedDashboard(dashboardName);
+    if (!result.ok) {
+      setError(result.error || "Dashboard speichern fehlgeschlagen");
+      return;
+    }
+    setError(null);
+  };
+
+  const loadSaved = async (name: string) => {
+    const result = await loadNamedDashboard(name);
+    if (!result.ok) {
+      setError(result.error || "Dashboard laden fehlgeschlagen");
+      return;
+    }
+    setError(null);
+    onClose();
+  };
+
+  const removeSaved = async (name: string) => {
+    const result = await deleteNamedDashboard(name);
+    if (!result.ok) {
+      setError(result.error || "Dashboard loeschen fehlgeschlagen");
+      return;
+    }
+    setError(null);
   };
 
   return (
@@ -49,6 +90,42 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
             <MetaPill label="Titel" value={config.title} />
             <MetaPill label="Widgets" value={String(config.widgets.length)} />
             <MetaPill label="API" value={config.iobroker.adapterBasePath || "/smarthome-dashboard/api"} />
+          </View>
+          <View style={styles.libraryCard}>
+            <Text style={styles.sectionTitle}>Gespeicherte Dashboards</Text>
+            <View style={styles.saveRow}>
+              <TextInput
+                onChangeText={setDashboardName}
+                placeholder="Dashboard-Name"
+                placeholderTextColor={palette.textMuted}
+                style={[styles.input, styles.nameInput]}
+                value={dashboardName}
+              />
+              <Pressable onPress={saveCurrentAsNamed} style={[styles.button, styles.secondaryButton]}>
+                <Text style={styles.secondaryLabel}>Unter Namen speichern</Text>
+              </Pressable>
+            </View>
+            <View style={styles.savedList}>
+              {savedDashboards.length ? (
+                savedDashboards.map((name) => (
+                  <View key={name} style={styles.savedItem}>
+                    <Text numberOfLines={1} style={styles.savedName}>
+                      {name}
+                    </Text>
+                    <View style={styles.savedActions}>
+                      <Pressable onPress={() => loadSaved(name)} style={[styles.button, styles.primaryButtonSmall]}>
+                        <Text style={styles.primaryLabel}>Laden</Text>
+                      </Pressable>
+                      <Pressable onPress={() => removeSaved(name)} style={[styles.button, styles.warningButtonSmall]}>
+                        <Text style={styles.warningLabel}>Loeschen</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.emptyText}>Noch keine Dashboards im Adapter gespeichert.</Text>
+              )}
+            </View>
           </View>
           <ScrollView style={styles.editorWrap}>
             <TextInput
@@ -138,6 +215,52 @@ const styles = StyleSheet.create({
     marginTop: 14,
     marginBottom: 14,
   },
+  libraryCard: {
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderWidth: 1,
+    borderColor: palette.border,
+    gap: 12,
+  },
+  sectionTitle: {
+    color: palette.text,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  saveRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  nameInput: {
+    flex: 1,
+    minWidth: 220,
+  },
+  savedList: {
+    gap: 10,
+  },
+  savedItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingVertical: 2,
+  },
+  savedName: {
+    flex: 1,
+    color: palette.text,
+    fontWeight: "700",
+  },
+  savedActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  emptyText: {
+    color: palette.textMuted,
+  },
   pill: {
     minWidth: 120,
     maxWidth: "100%",
@@ -162,6 +285,15 @@ const styles = StyleSheet.create({
   },
   editorWrap: {
     flex: 1,
+  },
+  input: {
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: palette.text,
+    backgroundColor: "rgba(6, 12, 20, 0.9)",
+    borderWidth: 1,
+    borderColor: palette.border,
   },
   editor: {
     minHeight: 520,
@@ -197,6 +329,16 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     backgroundColor: palette.accent,
+  },
+  primaryButtonSmall: {
+    backgroundColor: palette.accent,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  warningButtonSmall: {
+    backgroundColor: "rgba(247, 181, 74, 0.22)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   warningLabel: {
     color: palette.text,
