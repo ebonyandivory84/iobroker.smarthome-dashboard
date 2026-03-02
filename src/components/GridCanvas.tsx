@@ -765,11 +765,11 @@ function snapUnits(value: number) {
 const webCanvasStyle: CSSProperties = {
   position: "relative",
   margin: 20,
-  borderRadius: 30,
+  borderRadius: 0,
   padding: 12,
-  background: "linear-gradient(180deg, rgba(11,16,29,0.78), rgba(8,11,21,0.92))",
-  border: "1px solid rgba(255,255,255,0.04)",
-  overflow: "hidden",
+  background: "transparent",
+  border: "none",
+  overflow: "visible",
 };
 
 const webVerticalLineStyle: CSSProperties = {

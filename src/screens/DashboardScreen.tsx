@@ -110,33 +110,16 @@ function BackgroundLayer({
   color: string;
   accent: string;
 }) {
-  if (mode === "solid") {
-    return <View style={[styles.background, { backgroundColor: color }]} />;
-  }
-
-  if (mode === "gradient") {
-    return (
-      <>
-        <View style={[styles.background, { backgroundColor: color }]} />
-        <View style={[styles.gradientTop, { backgroundColor: accent }]} />
-        <View style={[styles.gradientBottom, { backgroundColor: "#000000" }]} />
-      </>
-    );
-  }
-
-  return (
-    <>
-      <View style={[styles.background, { backgroundColor: color }]} />
-      <View style={[styles.meshA, { backgroundColor: accent }]} />
-      <View style={[styles.meshB, { backgroundColor: palette.accentWarm }]} />
-    </>
-  );
+  void mode;
+  void color;
+  void accent;
+  return <View style={[styles.background, { backgroundColor: "#000000" }]} />;
 }
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: palette.background,
+    backgroundColor: "#000000",
   },
   scroll: {
     flex: 1,
