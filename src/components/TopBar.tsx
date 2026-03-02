@@ -3,12 +3,10 @@ import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-na
 import { palette } from "../utils/theme";
 
 type TopBarProps = {
-  title: string;
   pageTitles: Array<{ id: string; title: string }>;
   activePageId: string;
   isOnline: boolean;
   isLayoutMode: boolean;
-  statusDetail: string;
   onToggleLayoutMode: () => void;
   onOpenSettings: () => void;
   onAddWidget: () => void;
@@ -16,12 +14,10 @@ type TopBarProps = {
 };
 
 export function TopBar({
-  title,
   pageTitles,
   activePageId,
   isOnline,
   isLayoutMode,
-  statusDetail,
   onToggleLayoutMode,
   onOpenSettings,
   onAddWidget,
@@ -35,6 +31,7 @@ export function TopBar({
       <View>
         <View style={styles.titleRow}>
           <Text style={styles.kicker}>My Home</Text>
+          <View style={[styles.statusDot, isOnline ? styles.statusOnline : styles.statusOffline]} />
           <View style={styles.pageTabs}>
             {pageTitles.map((page) => {
               const activePage = page.id === activePageId;
@@ -51,14 +48,6 @@ export function TopBar({
               );
             })}
           </View>
-        </View>
-        <Text style={styles.title}>{title}</Text>
-        <View style={[styles.statusRow, isCompact ? styles.statusRowCompact : null]}>
-          <View style={[styles.statusDot, isOnline ? styles.statusOnline : styles.statusOffline]} />
-          <Text style={styles.statusText}>{isOnline ? "Verbunden" : "Offline"}</Text>
-          <Text numberOfLines={1} style={styles.statusDetail}>
-            {statusDetail}
-          </Text>
         </View>
       </View>
       <View style={[styles.actions, isCompact ? styles.actionsCompact : null]}>
@@ -113,12 +102,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "800",
   },
-  title: {
-    color: palette.textMuted,
-    fontSize: 13,
-    marginTop: 4,
-    fontWeight: "700",
-  },
   pageTabs: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -149,39 +132,16 @@ const styles = StyleSheet.create({
   pageTabLabelActive: {
     color: "#041019",
   },
-  statusRow: {
-    marginTop: 6,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    maxWidth: 420,
-    opacity: 0.75,
-  },
-  statusRowCompact: {
-    flexWrap: "wrap",
-    maxWidth: "100%",
-    rowGap: 4,
-  },
   statusDot: {
-    width: 9,
-    height: 9,
+    width: 10,
+    height: 10,
     borderRadius: 99,
   },
   statusOnline: {
-    backgroundColor: palette.accent,
+    backgroundColor: "#34d399",
   },
   statusOffline: {
     backgroundColor: palette.danger,
-  },
-  statusText: {
-    color: palette.text,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  statusDetail: {
-    color: palette.textMuted,
-    fontSize: 12,
-    flexShrink: 1,
   },
   actions: {
     flexDirection: "row",

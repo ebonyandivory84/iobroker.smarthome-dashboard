@@ -32,6 +32,7 @@ export function DashboardScreen() {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
   const [layoutMode, setLayoutMode] = useState(false);
+  const [visiblePageId, setVisiblePageId] = useState(activePageId);
   const activePageIndex = Math.max(0, dashboardPages.findIndex((page) => page.id === activePageId));
 
   const pageConfigs = useMemo(
@@ -52,6 +53,10 @@ export function DashboardScreen() {
 
     horizontalPagerRef.current.scrollTo({ x: width * activePageIndex, animated: true });
   }, [activePageIndex, width]);
+
+  useEffect(() => {
+    setVisiblePageId(activePageId);
+  }, [activePageId]);
 
   const addWidgetByType = (type: WidgetType) => {
     const widget = buildWidgetTemplate(type, config.widgets.length, { columns: config.grid.columns });
@@ -85,14 +90,26 @@ export function DashboardScreen() {
   const editingWidget: WidgetConfig | null =
     config.widgets.find((widget) => widget.id === editingWidgetId) || null;
 
-  const handlePageScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const resolvePageFromOffset = (offsetX: number) => {
     if (!width) {
-      return;
+      return null;
     }
 
-    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width);
-    const nextPage = dashboardPages[nextIndex];
+    const nextIndex = Math.round(offsetX / width);
+    return dashboardPages[nextIndex] || null;
+  };
+
+  const handlePageScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const nextPage = resolvePageFromOffset(event.nativeEvent.contentOffset.x);
+    if (nextPage && nextPage.id !== visiblePageId) {
+      setVisiblePageId(nextPage.id);
+    }
+  };
+
+  const handlePageScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const nextPage = resolvePageFromOffset(event.nativeEvent.contentOffset.x);
     if (nextPage) {
+      setVisiblePageId(nextPage.id);
       setActivePage(nextPage.id);
     }
   };
@@ -111,22 +128,25 @@ export function DashboardScreen() {
         ref={horizontalPagerRef}
         scrollEventThrottle={16}
         showsHorizontalScrollIndicator={false}
+        onScroll={handlePageScroll}
         onMomentumScrollEnd={handlePageScrollEnd}
+        onScrollEndDrag={handlePageScrollEnd}
       >
         {pageConfigs.map((pageConfig) => (
           <View key={pageConfig.activePageId} style={[styles.page, { width }]}>
             <ScrollView contentContainerStyle={styles.scrollContent} style={styles.pageScroll}>
               <TopBar
-                activePageId={activePageId}
+                activePageId={visiblePageId}
                 isOnline={isOnline}
                 isLayoutMode={layoutMode}
                 pageTitles={dashboardPages.map((page) => ({ id: page.id, title: page.title }))}
-                statusDetail={error || config.iobroker.baseUrl}
                 onAddWidget={() => setLibraryOpen(true)}
                 onOpenSettings={() => setSettingsOpen(true)}
-                onSelectPage={setActivePage}
+                onSelectPage={(pageId) => {
+                  setVisiblePageId(pageId);
+                  setActivePage(pageId);
+                }}
                 onToggleLayoutMode={() => setLayoutMode((current) => !current)}
-                title={pageConfig.title}
               />
               <GridCanvas
                 client={client}
