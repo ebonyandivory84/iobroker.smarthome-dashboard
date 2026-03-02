@@ -156,6 +156,8 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
           styles.bottomRow,
           compactWidget ? styles.bottomRowCompact : null,
           veryCompactWidget ? styles.bottomRowVeryCompact : null,
+          compactWidget ? styles.bottomRowOverlay : null,
+          veryCompactWidget ? styles.bottomRowOverlayVeryCompact : null,
         ]}
       >
         {statCards.map((stat, index) => (
@@ -961,6 +963,19 @@ const styles = StyleSheet.create({
     gap: 10,
     flexWrap: "wrap",
     marginTop: 18,
+  },
+  bottomRowOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    marginTop: 0,
+    paddingHorizontal: 4,
+    zIndex: 5,
+  },
+  bottomRowOverlayVeryCompact: {
+    bottom: 2,
+    paddingHorizontal: 2,
   },
   bottomRowCompact: {
     gap: 8,
