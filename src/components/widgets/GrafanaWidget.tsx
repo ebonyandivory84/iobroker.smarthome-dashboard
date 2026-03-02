@@ -10,17 +10,18 @@ type GrafanaWidgetProps = {
 export function GrafanaWidget({ config }: GrafanaWidgetProps) {
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
+  const resolvedUrl = normalizeGrafanaUrl(config.url);
 
   if (Platform.OS !== "web") {
     return (
       <View style={styles.fallback}>
         <Text style={[styles.title, { color: textColor }]}>Grafana ist aktuell nur im Web eingebettet.</Text>
-        <Text style={[styles.meta, { color: mutedTextColor }]}>{config.url || "Grafana-URL fehlt"}</Text>
+        <Text style={[styles.meta, { color: mutedTextColor }]}>{resolvedUrl || "Grafana-URL fehlt"}</Text>
       </View>
     );
   }
 
-  if (!config.url) {
+  if (!resolvedUrl) {
     return (
       <View style={styles.fallback}>
         <Text style={[styles.title, { color: textColor }]}>Grafana-URL fehlt</Text>
@@ -32,11 +33,27 @@ export function GrafanaWidget({ config }: GrafanaWidgetProps) {
   }
 
   return createElement("iframe", {
-    src: config.url,
+    src: resolvedUrl,
     style: webFrameStyle,
     sandbox: config.allowInteractions ? "allow-same-origin allow-scripts allow-forms allow-popups" : "allow-same-origin allow-scripts",
     referrerPolicy: "no-referrer",
   });
+}
+
+function normalizeGrafanaUrl(value?: string) {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  if (trimmed.startsWith("<")) {
+    const match = trimmed.match(/src\s*=\s*["']([^"']+)["']/i);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return trimmed;
 }
 
 const styles = StyleSheet.create({
