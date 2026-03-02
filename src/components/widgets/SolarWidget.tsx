@@ -235,35 +235,33 @@ function SolarFlowScene({
   }, [progress]);
 
   const defaults = getDefaultNodeLayout(sceneLayout, compactMode, veryCompactMode);
-  const pvBox = resolveNodeBox(nodeLayout?.pv, defaults.pv, sceneLayout);
-  const homeBox = resolveNodeBox(nodeLayout?.home, defaults.home, sceneLayout);
-  const batteryBox = resolveNodeBox(nodeLayout?.battery, defaults.battery, sceneLayout);
-  const gridBox = resolveNodeBox(nodeLayout?.grid, defaults.grid, sceneLayout);
-  const carBox = resolveNodeBox(nodeLayout?.car, defaults.car, sceneLayout);
-  const beamLength = 18;
-  const connectorInset = 18;
+  const effectiveNodeLayout = compactMode || veryCompactMode ? undefined : nodeLayout;
+  const pvBox = resolveNodeBox(effectiveNodeLayout?.pv, defaults.pv, sceneLayout);
+  const homeBox = resolveNodeBox(effectiveNodeLayout?.home, defaults.home, sceneLayout);
+  const batteryBox = resolveNodeBox(effectiveNodeLayout?.battery, defaults.battery, sceneLayout);
+  const gridBox = resolveNodeBox(effectiveNodeLayout?.grid, defaults.grid, sceneLayout);
+  const carBox = resolveNodeBox(effectiveNodeLayout?.car, defaults.car, sceneLayout);
+  const flowDotSize = veryCompactMode ? 8 : compactMode ? 10 : 12;
   const homeMidX = homeBox.x + homeBox.w / 2;
   const batteryMidY = batteryBox.y + batteryBox.h / 2;
   const homeMidY = homeBox.y + homeBox.h / 2;
   const gridMidY = gridBox.y + gridBox.h / 2;
   const topLineLeft = Math.round(homeMidX) - 2;
-  const topBeamLeft = topLineLeft - 2;
   const bottomLineLeft = Math.round(homeMidX) - 2;
-  const bottomBeamLeft = bottomLineLeft - 2;
 
-  const topLineStart = pvBox.y + pvBox.h + connectorInset;
-  const topLineEnd = homeBox.y - connectorInset;
+  const topLineStart = pvBox.y + pvBox.h;
+  const topLineEnd = homeBox.y;
   const topLineHeight = Math.max(12, topLineEnd - topLineStart);
   const leftLineTop = Math.round((batteryMidY + homeMidY) / 2) - 2;
   const rightLineTop = Math.round((gridMidY + homeMidY) / 2) - 2;
-  const leftLineStart = batteryBox.x + batteryBox.w + connectorInset;
-  const leftLineEnd = homeBox.x - connectorInset;
+  const leftLineStart = batteryBox.x + batteryBox.w;
+  const leftLineEnd = homeBox.x;
   const leftLineWidth = Math.max(16, leftLineEnd - leftLineStart);
-  const rightLineStart = homeBox.x + homeBox.w + connectorInset;
-  const rightLineEnd = gridBox.x - connectorInset;
+  const rightLineStart = homeBox.x + homeBox.w;
+  const rightLineEnd = gridBox.x;
   const rightLineWidth = Math.max(16, rightLineEnd - rightLineStart);
-  const bottomLineStart = homeBox.y + homeBox.h + connectorInset;
-  const bottomLineEnd = carBox.y - connectorInset;
+  const bottomLineStart = homeBox.y + homeBox.h;
+  const bottomLineEnd = carBox.y;
   const bottomLineHeight = Math.max(12, bottomLineEnd - bottomLineStart);
 
   return (
@@ -276,28 +274,31 @@ function SolarFlowScene({
       <View style={[styles.lineHorizontal, { top: leftLineTop, left: leftLineStart, width: leftLineWidth }]} />
       <View style={[styles.lineHorizontal, { top: rightLineTop, left: rightLineStart, width: rightLineWidth }]} />
 
-      <AnimatedBeam
+      <AnimatedFlowDot
         active={pvDir !== "idle"}
         axis="y"
         progress={progress}
-        range={pvDir === "toHome" ? [0, Math.max(0, topLineHeight - 20)] : [Math.max(0, topLineHeight - 20), 0]}
-        baseStyle={{ top: topLineStart, left: topBeamLeft }}
+        range={pvDir === "toHome" ? [0, Math.max(0, topLineHeight - flowDotSize)] : [Math.max(0, topLineHeight - flowDotSize), 0]}
+        baseStyle={{ top: topLineStart, left: topLineLeft - (flowDotSize - 4) / 2 }}
+        size={flowDotSize}
         strength={clamp((pvNow || 0) / 8000, 0.2, 1)}
       />
-      <AnimatedBeam
+      <AnimatedFlowDot
         active={battDir !== "idle"}
         axis="x"
         progress={progress}
-        range={battDir === "toHome" ? [0, Math.max(0, leftLineWidth - beamLength)] : [Math.max(0, leftLineWidth - beamLength), 0]}
-        baseStyle={{ top: leftLineTop - 2, left: leftLineStart }}
+        range={battDir === "toHome" ? [0, Math.max(0, leftLineWidth - flowDotSize)] : [Math.max(0, leftLineWidth - flowDotSize), 0]}
+        baseStyle={{ top: leftLineTop - (flowDotSize - 4) / 2, left: leftLineStart }}
+        size={flowDotSize}
         strength={clamp(battPower / 6000, 0.2, 1)}
       />
-      <AnimatedBeam
+      <AnimatedFlowDot
         active={gridDir !== "idle"}
         axis="x"
         progress={progress}
-        range={gridDir === "toHome" ? [Math.max(0, rightLineWidth - beamLength), 0] : [0, Math.max(0, rightLineWidth - beamLength)]}
-        baseStyle={{ top: rightLineTop - 2, left: rightLineStart }}
+        range={gridDir === "toHome" ? [Math.max(0, rightLineWidth - flowDotSize), 0] : [0, Math.max(0, rightLineWidth - flowDotSize)]}
+        baseStyle={{ top: rightLineTop - (flowDotSize - 4) / 2, left: rightLineStart }}
+        size={flowDotSize}
         strength={clamp(gridPower / 12000, 0.2, 1)}
       />
 
@@ -394,11 +395,12 @@ function SolarFlowScene({
   );
 }
 
-function AnimatedBeam({
+function AnimatedFlowDot({
   active,
   progress,
   axis,
   range,
+  size,
   strength,
   baseStyle,
 }: {
@@ -406,6 +408,7 @@ function AnimatedBeam({
   progress: Animated.Value;
   axis: "x" | "y";
   range: [number, number];
+  size: number;
   strength: number;
   baseStyle?: object;
 }) {
@@ -421,9 +424,12 @@ function AnimatedBeam({
   return (
     <Animated.View
       style={[
-        axis === "x" ? styles.beamHorizontal : styles.beamVertical,
+        styles.flowDot,
         baseStyle,
         {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
           opacity: clamp(0.35 + strength * 0.65, 0.35, 1),
           transform,
         },
@@ -722,21 +728,21 @@ function getDefaultNodeLayout(
 
   if (compactSingleColumn) {
     return {
-      pv: { x: 0.41, y: 0.0, w: 0.16, h: 0.11 },
-      home: { x: 0.39, y: 0.42, w: 0.22, h: 0.15 },
-      battery: { x: 0.04, y: 0.44, w: 0.14, h: 0.11 },
-      grid: { x: 0.82, y: 0.44, w: 0.14, h: 0.11 },
-      car: { x: 0.42, y: 0.92, w: 0.14, h: 0.1 },
+      pv: { x: 0.4, y: 0.03, w: 0.2, h: 0.12 },
+      home: { x: 0.34, y: 0.34, w: 0.32, h: 0.17 },
+      battery: { x: 0.03, y: 0.42, w: 0.16, h: 0.12 },
+      grid: { x: 0.81, y: 0.42, w: 0.16, h: 0.12 },
+      car: { x: 0.41, y: 0.8, w: 0.18, h: 0.11 },
     };
   }
 
   if (compactTablet) {
     return {
-      pv: { x: 0.43, y: 0.0, w: 0.12, h: 0.11 },
-      home: { x: 0.41, y: 0.41, w: 0.17, h: 0.15 },
-      battery: { x: 0.06, y: 0.43, w: 0.11, h: 0.11 },
-      grid: { x: 0.83, y: 0.43, w: 0.11, h: 0.11 },
-      car: { x: 0.445, y: 0.92, w: 0.1, h: 0.1 },
+      pv: { x: 0.41, y: 0.03, w: 0.18, h: 0.12 },
+      home: { x: 0.37, y: 0.35, w: 0.26, h: 0.17 },
+      battery: { x: 0.03, y: 0.4, w: 0.14, h: 0.12 },
+      grid: { x: 0.83, y: 0.4, w: 0.14, h: 0.12 },
+      car: { x: 0.42, y: 0.82, w: 0.16, h: 0.11 },
     };
   }
 
@@ -833,22 +839,8 @@ const styles = StyleSheet.create({
     borderRadius: 99,
     backgroundColor: "rgba(255,255,255,0.16)",
   },
-  beamVertical: {
+  flowDot: {
     position: "absolute",
-    width: 8,
-    height: 20,
-    borderRadius: 99,
-    backgroundColor: palette.accentWarm,
-    shadowColor: palette.accentWarm,
-    shadowOpacity: 0.8,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  beamHorizontal: {
-    position: "absolute",
-    width: 18,
-    height: 8,
-    borderRadius: 99,
     backgroundColor: palette.accentWarm,
     shadowColor: palette.accentWarm,
     shadowOpacity: 0.8,
