@@ -989,7 +989,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
     borderWidth: 1,
-    alignItems: "center",
   },
   miniCompact: {
     flexBasis: 110,
@@ -999,13 +998,12 @@ const styles = StyleSheet.create({
   miniCornerCompact: {
     flexGrow: 0,
     flexBasis: "auto",
-    width: "34%",
+    width: "42%",
   },
   miniValue: {
     color: palette.text,
     fontSize: 18,
     fontWeight: "800",
-    textAlign: "center",
   },
   miniValueCompact: {
     fontSize: 15,
@@ -1014,7 +1012,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     color: palette.textMuted,
     fontSize: 12,
-    textAlign: "center",
   },
   miniLabelCompact: {
     marginTop: 3,
