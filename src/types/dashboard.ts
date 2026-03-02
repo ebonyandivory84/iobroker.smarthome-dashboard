@@ -101,6 +101,11 @@ export type SolarLayoutConfig = {
   car: SolarNodeLayout;
 };
 
+export type SolarStatConfig = {
+  label: string;
+  stateId?: string;
+};
+
 export type EnergyWidgetConfig = WidgetBase & {
   type: "energy";
   pvStateId: string;
@@ -130,6 +135,12 @@ export type SolarWidgetConfig = WidgetBase & {
   };
   dailyEnergyUnit?: "auto" | "Wh" | "kWh";
   nodeLayout?: Partial<SolarLayoutConfig>;
+  stats?: {
+    first?: SolarStatConfig;
+    second?: SolarStatConfig;
+    third?: SolarStatConfig;
+    fourth?: SolarStatConfig;
+  };
 };
 
 export type WidgetConfig =

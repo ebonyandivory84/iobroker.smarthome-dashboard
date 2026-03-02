@@ -135,8 +135,16 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       keyDaySelf: widget.keys.daySelf,
       keyPvTotal: widget.keys.pvTotal || "",
       keyBattTemp: widget.keys.battTemp || "",
+      stat1Label: widget.stats?.first?.label || "Eigenverbrauch",
+      stat1StateId: widget.stats?.first?.stateId || "",
+      stat2Label: widget.stats?.second?.label || "Verbraucht",
+      stat2StateId: widget.stats?.second?.stateId || "",
+      stat3Label: widget.stats?.third?.label || "Autarkie",
+      stat3StateId: widget.stats?.third?.stateId || "",
+      stat4Label: widget.stats?.fourth?.label || "PV Gesamt",
+      stat4StateId: widget.stats?.fourth?.stateId || "",
       nodePvX: formatNodeValue(widget.nodeLayout?.pv?.x, 0.44),
-      nodePvY: formatNodeValue(widget.nodeLayout?.pv?.y, 0.07),
+      nodePvY: formatNodeValue(widget.nodeLayout?.pv?.y, 0.02),
       nodePvW: formatNodeValue(widget.nodeLayout?.pv?.w, 0.12),
       nodePvH: formatNodeValue(widget.nodeLayout?.pv?.h, 0.18),
       nodeHomeX: formatNodeValue(widget.nodeLayout?.home?.x, 0.44),
@@ -152,7 +160,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       nodeGridW: formatNodeValue(widget.nodeLayout?.grid?.w, 0.1),
       nodeGridH: formatNodeValue(widget.nodeLayout?.grid?.h, 0.14),
       nodeCarX: formatNodeValue(widget.nodeLayout?.car?.x, 0.45),
-      nodeCarY: formatNodeValue(widget.nodeLayout?.car?.y, 0.77),
+      nodeCarY: formatNodeValue(widget.nodeLayout?.car?.y, 0.83),
       nodeCarW: formatNodeValue(widget.nodeLayout?.car?.w, 0.1),
       nodeCarH: formatNodeValue(widget.nodeLayout?.car?.h, 0.14),
       ...appearanceDraft,
@@ -253,6 +261,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           battTemp: draft.keyBattTemp || undefined,
         },
         nodeLayout: buildSolarNodeLayout(draft),
+        stats: buildSolarStats(draft),
         appearance,
       });
     }
@@ -815,6 +824,79 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={draft.keyPvTotal || ""}
                   />
                 </Field>
+                <Text style={styles.sectionTitle}>Stats</Text>
+                <View style={styles.splitRow}>
+                  <Field label="Stat 1 Label">
+                    <TextInput
+                      onChangeText={(value) => setDraft((current) => ({ ...current, stat1Label: value }))}
+                      style={styles.input}
+                      value={draft.stat1Label || ""}
+                    />
+                  </Field>
+                  <Field label="Stat 1 Datenpunkt">
+                    <StateFieldInput
+                      browseLabel="Objekt"
+                      onBrowse={() => setPickerField("stat1StateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, stat1StateId: value }))}
+                      value={draft.stat1StateId || ""}
+                    />
+                  </Field>
+                </View>
+                <View style={styles.splitRow}>
+                  <Field label="Stat 2 Label">
+                    <TextInput
+                      onChangeText={(value) => setDraft((current) => ({ ...current, stat2Label: value }))}
+                      style={styles.input}
+                      value={draft.stat2Label || ""}
+                    />
+                  </Field>
+                  <Field label="Stat 2 Datenpunkt">
+                    <StateFieldInput
+                      browseLabel="Objekt"
+                      onBrowse={() => setPickerField("stat2StateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, stat2StateId: value }))}
+                      value={draft.stat2StateId || ""}
+                    />
+                  </Field>
+                </View>
+                <View style={styles.splitRow}>
+                  <Field label="Stat 3 Label">
+                    <TextInput
+                      onChangeText={(value) => setDraft((current) => ({ ...current, stat3Label: value }))}
+                      style={styles.input}
+                      value={draft.stat3Label || ""}
+                    />
+                  </Field>
+                  <Field label="Stat 3 Datenpunkt">
+                    <StateFieldInput
+                      browseLabel="Objekt"
+                      onBrowse={() => setPickerField("stat3StateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, stat3StateId: value }))}
+                      value={draft.stat3StateId || ""}
+                    />
+                  </Field>
+                </View>
+                <View style={styles.splitRow}>
+                  <Field label="Stat 4 Label">
+                    <TextInput
+                      onChangeText={(value) => setDraft((current) => ({ ...current, stat4Label: value }))}
+                      style={styles.input}
+                      value={draft.stat4Label || ""}
+                    />
+                  </Field>
+                  <Field label="Stat 4 Datenpunkt">
+                    <StateFieldInput
+                      browseLabel="Objekt"
+                      onBrowse={() => setPickerField("stat4StateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, stat4StateId: value }))}
+                      value={draft.stat4StateId || ""}
+                    />
+                  </Field>
+                </View>
+                <Text style={styles.mappingHint}>
+                  Leer lassen, um den bisherigen Standardwert des Solar-Widgets zu nutzen. Wenn ein Datenpunkt gesetzt ist,
+                  wird dessen aktueller Wert direkt angezeigt.
+                </Text>
                 <Field label="Node Layout">
                   <Pressable
                     onPress={() => setDraft((current) => ({ ...current, ...buildDefaultSolarNodeDraft() }))}
@@ -1069,7 +1151,7 @@ function formatNodeValue(value: number | undefined, fallback: number) {
 function buildDefaultSolarNodeDraft() {
   return {
     nodePvX: "0.44",
-    nodePvY: "0.07",
+    nodePvY: "0.02",
     nodePvW: "0.12",
     nodePvH: "0.18",
     nodeHomeX: "0.44",
@@ -1085,7 +1167,7 @@ function buildDefaultSolarNodeDraft() {
     nodeGridW: "0.1",
     nodeGridH: "0.14",
     nodeCarX: "0.45",
-    nodeCarY: "0.77",
+    nodeCarY: "0.83",
     nodeCarW: "0.1",
     nodeCarH: "0.14",
   };
@@ -1123,6 +1205,27 @@ function buildSolarNodeLayout(draft: Record<string, string>) {
       y: clampFloat(draft.nodeCarY, Number(defaults.nodeCarY)),
       w: clampFloat(draft.nodeCarW, Number(defaults.nodeCarW)),
       h: clampFloat(draft.nodeCarH, Number(defaults.nodeCarH)),
+    },
+  };
+}
+
+function buildSolarStats(draft: Record<string, string>) {
+  return {
+    first: {
+      label: (draft.stat1Label || "Eigenverbrauch").trim() || "Eigenverbrauch",
+      stateId: (draft.stat1StateId || "").trim() || undefined,
+    },
+    second: {
+      label: (draft.stat2Label || "Verbraucht").trim() || "Verbraucht",
+      stateId: (draft.stat2StateId || "").trim() || undefined,
+    },
+    third: {
+      label: (draft.stat3Label || "Autarkie").trim() || "Autarkie",
+      stateId: (draft.stat3StateId || "").trim() || undefined,
+    },
+    fourth: {
+      label: (draft.stat4Label || "PV Gesamt").trim() || "PV Gesamt",
+      stateId: (draft.stat4StateId || "").trim() || undefined,
     },
   };
 }

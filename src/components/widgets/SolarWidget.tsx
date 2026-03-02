@@ -72,6 +72,30 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
   const backgroundBlur = clamp(config.backgroundImageBlur ?? 8, 0, 24);
   const compactWidget = widgetLayout.width > 0 && (widgetLayout.width < 520 || widgetLayout.height < 420);
   const veryCompactWidget = widgetLayout.width > 0 && (widgetLayout.width < 420 || widgetLayout.height < 340);
+  const customStatValues = {
+    first: config.stats?.first?.stateId ? states[config.stats.first.stateId] : undefined,
+    second: config.stats?.second?.stateId ? states[config.stats.second.stateId] : undefined,
+    third: config.stats?.third?.stateId ? states[config.stats.third.stateId] : undefined,
+    fourth: config.stats?.fourth?.stateId ? states[config.stats.fourth.stateId] : undefined,
+  };
+  const statCards = [
+    {
+      label: config.stats?.first?.label || "Eigenverbrauch",
+      value: resolveSolarStatValue(customStatValues.first, fmtKWh(daySelfKWh)),
+    },
+    {
+      label: config.stats?.second?.label || "Verbraucht",
+      value: resolveSolarStatValue(customStatValues.second, fmtKWh(dayConsumedKWh)),
+    },
+    {
+      label: config.stats?.third?.label || "Autarkie",
+      value: resolveSolarStatValue(customStatValues.third, autarkPct === null ? "—" : `${Math.round(autarkPct)} %`),
+    },
+    {
+      label: config.stats?.fourth?.label || "PV Gesamt",
+      value: resolveSolarStatValue(customStatValues.fourth, fmtKWh(pvTotalKWh)),
+    },
+  ];
 
   return (
     <View
@@ -80,106 +104,57 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
     >
       {config.backgroundMode === "image" && config.backgroundImage ? (
         Platform.OS === "web" ? (
-          <View
-            style={[
-              styles.sceneCard,
-              compactWidget ? styles.sceneCardCompact : null,
-              veryCompactWidget ? styles.sceneCardVeryCompact : null,
-              {
-                borderColor: resolvedTheme.solar.sceneCardBorder,
-              },
-            ]}
-          >
+          <>
             {createElement("div", {
-              style: buildBlurredBackgroundStyle(config.backgroundImage, backgroundBlur),
+              style: buildBlurredWidgetBackgroundStyle(config.backgroundImage, backgroundBlur),
             })}
-            <View style={styles.sceneBackgroundOverlay} />
-            <SolarFlowScene
-              battDir={battDir}
-              battPower={Math.abs(battSigned)}
-              battTemp={battTemp}
-              gridDir={gridDir}
-              gridPower={Math.abs(gridSigned)}
-              homeNow={homeNow}
-              mutedTextColor={mutedTextColor}
-              textColor={textColor}
-              widgetAppearance={widgetAppearance}
-              theme={resolvedTheme}
-              pvDir={pvDir}
-              pvNow={pvNow}
-              soc={soc}
-              compactMode={compactWidget}
-              veryCompactMode={veryCompactWidget}
-              nodeLayout={config.nodeLayout}
-            />
-          </View>
+            <View style={styles.widgetBackgroundOverlay} />
+          </>
         ) : (
-            <ImageBackground
-              blurRadius={backgroundBlur}
-              imageStyle={styles.sceneBackgroundImage}
-              source={{ uri: `/smarthome-dashboard/widget-assets/${encodeURIComponent(config.backgroundImage)}` }}
-              style={[
-                styles.sceneCard,
-                compactWidget ? styles.sceneCardCompact : null,
-                veryCompactWidget ? styles.sceneCardVeryCompact : null,
-                {
-                  borderColor: resolvedTheme.solar.sceneCardBorder,
-                },
-              ]}
-            >
-              <View style={styles.sceneBackgroundOverlay} />
-              <SolarFlowScene
-                battDir={battDir}
-                battPower={Math.abs(battSigned)}
-                battTemp={battTemp}
-                gridDir={gridDir}
-                gridPower={Math.abs(gridSigned)}
-                homeNow={homeNow}
-                mutedTextColor={mutedTextColor}
-                textColor={textColor}
-                widgetAppearance={widgetAppearance}
-                theme={resolvedTheme}
-                pvDir={pvDir}
-                pvNow={pvNow}
-                soc={soc}
-                compactMode={compactWidget}
-                veryCompactMode={veryCompactWidget}
-                nodeLayout={config.nodeLayout}
-              />
-            </ImageBackground>
-          )
-      ) : (
-          <View
-            style={[
-              styles.sceneCard,
-              compactWidget ? styles.sceneCardCompact : null,
-              veryCompactWidget ? styles.sceneCardVeryCompact : null,
-              {
-                backgroundColor: widgetAppearance?.cardColor || resolvedTheme.solar.sceneCardBackground,
-                borderColor: resolvedTheme.solar.sceneCardBorder,
-              },
-            ]}
+          <ImageBackground
+            blurRadius={backgroundBlur}
+            imageStyle={styles.widgetBackgroundImage}
+            source={{ uri: `/smarthome-dashboard/widget-assets/${encodeURIComponent(config.backgroundImage)}` }}
+            style={styles.widgetBackground}
           >
-            <SolarFlowScene
-              battDir={battDir}
-              battPower={Math.abs(battSigned)}
-              battTemp={battTemp}
-              gridDir={gridDir}
-              gridPower={Math.abs(gridSigned)}
-              homeNow={homeNow}
-              mutedTextColor={mutedTextColor}
-              textColor={textColor}
-              widgetAppearance={widgetAppearance}
-              theme={resolvedTheme}
-              pvDir={pvDir}
-              pvNow={pvNow}
-              soc={soc}
-              compactMode={compactWidget}
-              veryCompactMode={veryCompactWidget}
-              nodeLayout={config.nodeLayout}
-            />
-          </View>
-        )}
+            <View style={styles.widgetBackgroundOverlay} />
+          </ImageBackground>
+        )
+      ) : null}
+
+      <View
+        style={[
+          styles.sceneCard,
+          compactWidget ? styles.sceneCardCompact : null,
+          veryCompactWidget ? styles.sceneCardVeryCompact : null,
+          {
+            backgroundColor:
+              config.backgroundMode === "image" && config.backgroundImage
+                ? "rgba(0,0,0,0)"
+                : widgetAppearance?.cardColor || resolvedTheme.solar.sceneCardBackground,
+            borderColor: resolvedTheme.solar.sceneCardBorder,
+          },
+        ]}
+      >
+        <SolarFlowScene
+          battDir={battDir}
+          battPower={Math.abs(battSigned)}
+          battTemp={battTemp}
+          gridDir={gridDir}
+          gridPower={Math.abs(gridSigned)}
+          homeNow={homeNow}
+          mutedTextColor={mutedTextColor}
+          textColor={textColor}
+          widgetAppearance={widgetAppearance}
+          theme={resolvedTheme}
+          pvDir={pvDir}
+          pvNow={pvNow}
+          soc={soc}
+          compactMode={compactWidget}
+          veryCompactMode={veryCompactWidget}
+          nodeLayout={config.nodeLayout}
+        />
+      </View>
 
       <View
         style={[
@@ -188,42 +163,18 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
           veryCompactWidget ? styles.bottomRowVeryCompact : null,
         ]}
       >
-        <MiniStat
-          appearance={widgetAppearance}
-          compact={compactWidget}
-          label="Eigenverbrauch"
-          mutedTextColor={mutedTextColor}
-          textColor={textColor}
-          theme={resolvedTheme}
-          value={fmtKWh(daySelfKWh)}
-        />
-        <MiniStat
-          appearance={widgetAppearance}
-          compact={compactWidget}
-          label="Verbraucht"
-          mutedTextColor={mutedTextColor}
-          textColor={textColor}
-          theme={resolvedTheme}
-          value={fmtKWh(dayConsumedKWh)}
-        />
-        <MiniStat
-          appearance={widgetAppearance}
-          compact={compactWidget}
-          label="Autarkie"
-          mutedTextColor={mutedTextColor}
-          textColor={textColor}
-          theme={resolvedTheme}
-          value={autarkPct === null ? "—" : `${Math.round(autarkPct)} %`}
-        />
-        <MiniStat
-          appearance={widgetAppearance}
-          compact={compactWidget}
-          label="PV Gesamt"
-          mutedTextColor={mutedTextColor}
-          textColor={textColor}
-          theme={resolvedTheme}
-          value={fmtKWh(pvTotalKWh)}
-        />
+        {statCards.map((stat, index) => (
+          <MiniStat
+            key={`solar-stat-${index}`}
+            appearance={widgetAppearance}
+            compact={compactWidget}
+            label={stat.label}
+            mutedTextColor={mutedTextColor}
+            textColor={textColor}
+            theme={resolvedTheme}
+            value={stat.value}
+          />
+        ))}
       </View>
 
       {!compactWidget ? (
@@ -725,6 +676,25 @@ function fmtKWh(n: number | null) {
   return `${n.toFixed(1)} kWh`;
 }
 
+function resolveSolarStatValue(rawValue: unknown, fallback: string) {
+  if (rawValue === undefined) {
+    return fallback;
+  }
+  if (rawValue === null) {
+    return "—";
+  }
+  if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
+    if (Math.abs(rawValue) >= 1000) {
+      return rawValue.toLocaleString("de-DE", { maximumFractionDigits: 0 });
+    }
+    if (Number.isInteger(rawValue)) {
+      return String(rawValue);
+    }
+    return rawValue.toLocaleString("de-DE", { maximumFractionDigits: 1 });
+  }
+  return String(rawValue);
+}
+
 function resolveBatteryIcon(soc: number | null): keyof typeof MaterialCommunityIcons.glyphMap {
   if (soc === null) {
     return "battery-outline";
@@ -763,26 +733,26 @@ function getDefaultNodeLayout(
       home: { x: 0.37, y: 0.41, w: 0.26, h: 0.18 },
       battery: { x: 0.04, y: 0.45, w: 0.16, h: 0.13 },
       grid: { x: 0.8, y: 0.45, w: 0.16, h: 0.13 },
-      car: { x: 0.42, y: 0.8, w: 0.16, h: 0.13 },
+      car: { x: 0.42, y: 0.84, w: 0.16, h: 0.13 },
     };
   }
 
   if (compactTablet) {
     return {
-      pv: { x: 0.42, y: 0.06, w: 0.15, h: 0.17 },
+      pv: { x: 0.42, y: 0.03, w: 0.15, h: 0.17 },
       home: { x: 0.4, y: 0.41, w: 0.2, h: 0.18 },
       battery: { x: 0.08, y: 0.44, w: 0.13, h: 0.13 },
       grid: { x: 0.79, y: 0.44, w: 0.13, h: 0.13 },
-      car: { x: 0.435, y: 0.79, w: 0.13, h: 0.13 },
+      car: { x: 0.435, y: 0.84, w: 0.13, h: 0.13 },
     };
   }
 
   return {
-    pv: { x: 0.44, y: 0.07, w: 0.12, h: 0.18 },
+    pv: { x: 0.44, y: 0.02, w: 0.12, h: 0.18 },
     home: { x: 0.44, y: 0.41, w: 0.12, h: 0.18 },
     battery: { x: 0.14, y: 0.43, w: 0.1, h: 0.14 },
     grid: { x: 0.76, y: 0.43, w: 0.1, h: 0.14 },
-    car: { x: 0.45, y: 0.77, w: 0.1, h: 0.14 },
+    car: { x: 0.45, y: 0.83, w: 0.1, h: 0.14 },
   };
 }
 
@@ -808,11 +778,10 @@ function resolveNodeBox(
   };
 }
 
-function buildBlurredBackgroundStyle(imageName: string, blur: number) {
+function buildBlurredWidgetBackgroundStyle(imageName: string, blur: number) {
   return {
     position: "absolute",
     inset: "-18px",
-    borderRadius: "28px",
     backgroundImage: `url("/smarthome-dashboard/widget-assets/${encodeURIComponent(imageName)}")`,
     backgroundPosition: "center",
     backgroundRepeat: "no-repeat",
@@ -826,6 +795,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     gap: 12,
+    position: "relative",
+    overflow: "hidden",
+  },
+  widgetBackground: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  widgetBackgroundImage: {
+    resizeMode: "cover",
+  },
+  widgetBackgroundOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(5, 10, 18, 0.32)",
   },
   sceneCard: {
     borderRadius: 22,
@@ -846,15 +827,6 @@ const styles = StyleSheet.create({
     flex: 1,
     position: "relative",
     backgroundColor: "rgba(0,0,0,0)",
-  },
-  sceneBackgroundImage: {
-    borderRadius: 22,
-    resizeMode: "cover",
-  },
-  sceneBackgroundOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 22,
-    backgroundColor: "rgba(5, 10, 18, 0.3)",
   },
   lineVertical: {
     position: "absolute",
