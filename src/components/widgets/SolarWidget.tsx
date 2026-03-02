@@ -19,6 +19,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
   const widgetAppearance = config.appearance;
   const textColor = widgetAppearance?.textColor || palette.text;
   const mutedTextColor = widgetAppearance?.mutedTextColor || palette.textMuted;
+  const [widgetLayout, setWidgetLayout] = useState({ width: 0, height: 0 });
   const getValue = (snapshot: StateSnapshot, key?: string) => {
     if (!key) {
       return null;
@@ -69,14 +70,21 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
   const battDir = dirFromSigned(battSigned);
   const gridDir = dirFromSigned(gridSigned);
   const backgroundBlur = clamp(config.backgroundImageBlur ?? 8, 0, 24);
+  const compactWidget = widgetLayout.width > 0 && (widgetLayout.width < 520 || widgetLayout.height < 420);
+  const veryCompactWidget = widgetLayout.width > 0 && (widgetLayout.width < 420 || widgetLayout.height < 340);
 
   return (
-    <View style={styles.container}>
+    <View
+      onLayout={(event: LayoutChangeEvent) => setWidgetLayout(event.nativeEvent.layout)}
+      style={styles.container}
+    >
       {config.backgroundMode === "image" && config.backgroundImage ? (
         Platform.OS === "web" ? (
           <View
             style={[
               styles.sceneCard,
+              compactWidget ? styles.sceneCardCompact : null,
+              veryCompactWidget ? styles.sceneCardVeryCompact : null,
               {
                 borderColor: resolvedTheme.solar.sceneCardBorder,
               },
@@ -100,6 +108,8 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
               pvDir={pvDir}
               pvNow={pvNow}
               soc={soc}
+              compactMode={compactWidget}
+              veryCompactMode={veryCompactWidget}
               nodeLayout={config.nodeLayout}
             />
           </View>
@@ -110,6 +120,8 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
               source={{ uri: `/smarthome-dashboard/widget-assets/${encodeURIComponent(config.backgroundImage)}` }}
               style={[
                 styles.sceneCard,
+                compactWidget ? styles.sceneCardCompact : null,
+                veryCompactWidget ? styles.sceneCardVeryCompact : null,
                 {
                   borderColor: resolvedTheme.solar.sceneCardBorder,
                 },
@@ -130,6 +142,8 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
                 pvDir={pvDir}
                 pvNow={pvNow}
                 soc={soc}
+                compactMode={compactWidget}
+                veryCompactMode={veryCompactWidget}
                 nodeLayout={config.nodeLayout}
               />
             </ImageBackground>
@@ -138,6 +152,8 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
           <View
             style={[
               styles.sceneCard,
+              compactWidget ? styles.sceneCardCompact : null,
+              veryCompactWidget ? styles.sceneCardVeryCompact : null,
               {
                 backgroundColor: widgetAppearance?.cardColor || resolvedTheme.solar.sceneCardBackground,
                 borderColor: resolvedTheme.solar.sceneCardBorder,
@@ -158,14 +174,23 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
               pvDir={pvDir}
               pvNow={pvNow}
               soc={soc}
+              compactMode={compactWidget}
+              veryCompactMode={veryCompactWidget}
               nodeLayout={config.nodeLayout}
             />
           </View>
         )}
 
-      <View style={styles.bottomRow}>
+      <View
+        style={[
+          styles.bottomRow,
+          compactWidget ? styles.bottomRowCompact : null,
+          veryCompactWidget ? styles.bottomRowVeryCompact : null,
+        ]}
+      >
         <MiniStat
           appearance={widgetAppearance}
+          compact={compactWidget}
           label="Eigenverbrauch"
           mutedTextColor={mutedTextColor}
           textColor={textColor}
@@ -174,6 +199,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
         />
         <MiniStat
           appearance={widgetAppearance}
+          compact={compactWidget}
           label="Verbraucht"
           mutedTextColor={mutedTextColor}
           textColor={textColor}
@@ -182,6 +208,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
         />
         <MiniStat
           appearance={widgetAppearance}
+          compact={compactWidget}
           label="Autarkie"
           mutedTextColor={mutedTextColor}
           textColor={textColor}
@@ -190,6 +217,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
         />
         <MiniStat
           appearance={widgetAppearance}
+          compact={compactWidget}
           label="PV Gesamt"
           mutedTextColor={mutedTextColor}
           textColor={textColor}
@@ -198,10 +226,12 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
         />
       </View>
 
-      <Text style={[styles.footnote, { color: mutedTextColor }]}>
-        Tageswerte nutzen `dailyEnergyUnit={config.dailyEnergyUnit || "auto"}`. `auto` erkennt `Wh`/`kWh` aus Strings
-        oder schaetzt nackte Zahlen plausibel.
-      </Text>
+      {!compactWidget ? (
+        <Text style={[styles.footnote, { color: mutedTextColor }]}>
+          Tageswerte nutzen `dailyEnergyUnit={config.dailyEnergyUnit || "auto"}`. `auto` erkennt `Wh`/`kWh` aus
+          Strings oder schaetzt nackte Zahlen plausibel.
+        </Text>
+      ) : null}
       {missingCore ? <Text style={styles.warning}>Keine Solar-Daten gefunden. Pruefe Prefix und Key-Mapping.</Text> : null}
     </View>
   );
@@ -221,6 +251,8 @@ function SolarFlowScene({
   textColor,
   mutedTextColor,
   widgetAppearance,
+  compactMode,
+  veryCompactMode,
   nodeLayout,
 }: {
   pvDir: FlowDir;
@@ -236,6 +268,8 @@ function SolarFlowScene({
   textColor: string;
   mutedTextColor: string;
   widgetAppearance?: SolarWidgetConfig["appearance"];
+  compactMode?: boolean;
+  veryCompactMode?: boolean;
   nodeLayout?: Partial<SolarLayoutConfig>;
 }) {
   const progress = useRef(new Animated.Value(0)).current;
@@ -254,7 +288,7 @@ function SolarFlowScene({
     return () => loop.stop();
   }, [progress]);
 
-  const defaults = getDefaultNodeLayout(sceneLayout);
+  const defaults = getDefaultNodeLayout(sceneLayout, compactMode, veryCompactMode);
   const pvBox = resolveNodeBox(nodeLayout?.pv, defaults.pv, sceneLayout);
   const homeBox = resolveNodeBox(nodeLayout?.home, defaults.home, sceneLayout);
   const batteryBox = resolveNodeBox(nodeLayout?.battery, defaults.battery, sceneLayout);
@@ -333,6 +367,8 @@ function SolarFlowScene({
         textColor={textColor}
         mutedTextColor={textColor}
         widgetAppearance={widgetAppearance}
+        compact={compactMode}
+        veryCompact={veryCompactMode}
         style={{ ...styles.nodePosition, top: pvBox.y, left: pvBox.x, width: pvBox.w, minHeight: pvBox.h }}
         value={fmtW(pvNow)}
         highlight={pvDir !== "idle"}
@@ -347,6 +383,8 @@ function SolarFlowScene({
         textColor={textColor}
         mutedTextColor={textColor}
         widgetAppearance={widgetAppearance}
+        compact={compactMode}
+        veryCompact={veryCompactMode}
         style={{ ...styles.nodePosition, top: homeBox.y, left: homeBox.x, width: homeBox.w, minHeight: homeBox.h }}
         value={fmtW(homeNow)}
         highlight
@@ -361,6 +399,8 @@ function SolarFlowScene({
         textColor={textColor}
         mutedTextColor={textColor}
         widgetAppearance={widgetAppearance}
+        compact={compactMode}
+        veryCompact={veryCompactMode}
         style={{ ...styles.nodePosition, top: batteryBox.y, left: batteryBox.x, width: batteryBox.w, minHeight: batteryBox.h }}
         value={fmtW(battPower || null)}
         meta={
@@ -384,6 +424,8 @@ function SolarFlowScene({
         textColor={textColor}
         mutedTextColor={mutedTextColor}
         widgetAppearance={widgetAppearance}
+        compact={compactMode}
+        veryCompact={veryCompactMode}
         style={{ ...styles.nodePosition, top: gridBox.y, left: gridBox.x, width: gridBox.w, minHeight: gridBox.h }}
         value={fmtW(gridPower || null)}
         meta={gridDir === "toHome" ? "Bezug" : gridDir === "fromHome" ? "Einspeisung" : "Idle"}
@@ -399,6 +441,8 @@ function SolarFlowScene({
         textColor={textColor}
         mutedTextColor={mutedTextColor}
         widgetAppearance={widgetAppearance}
+        compact={compactMode}
+        veryCompact={veryCompactMode}
         style={{ ...styles.nodePosition, top: carBox.y, left: carBox.x, width: carBox.w, minHeight: carBox.h }}
         value="—"
       />
@@ -458,6 +502,8 @@ function NodeCard({
   nodeColor,
   iconColor,
   iconSurface,
+  compact,
+  veryCompact,
 }: {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   label: string;
@@ -472,7 +518,11 @@ function NodeCard({
   nodeColor?: string;
   iconColor?: string;
   iconSurface?: string;
+  compact?: boolean;
+  veryCompact?: boolean;
 }) {
+  const iconSize = veryCompact ? 18 : compact ? 20 : 24;
+
   return (
     <View
       style={[
@@ -481,6 +531,8 @@ function NodeCard({
           backgroundColor: nodeColor || widgetAppearance?.cardColor || theme.solar.nodeCardBackground,
           borderColor: theme.solar.nodeCardBorder,
         },
+        compact ? styles.nodeCardCompact : null,
+        veryCompact ? styles.nodeCardVeryCompact : null,
         style,
         highlight ? styles.nodeCardActive : null,
       ]}
@@ -489,20 +541,49 @@ function NodeCard({
         style={[
           styles.nodeIcon,
           { backgroundColor: iconSurface || "rgba(255,255,255,0.08)" },
+          compact ? styles.nodeIconCompact : null,
+          veryCompact ? styles.nodeIconVeryCompact : null,
           highlight ? styles.nodeIconActive : null,
         ]}
       >
-        <View style={styles.nodeIconInner}>
+        <View
+          style={[
+            styles.nodeIconInner,
+            compact ? styles.nodeIconInnerCompact : null,
+            veryCompact ? styles.nodeIconInnerVeryCompact : null,
+          ]}
+        >
           <MaterialCommunityIcons
             color={iconColor || (highlight ? palette.accent : palette.textMuted)}
             name={icon}
-            size={24}
+            size={iconSize}
           />
         </View>
       </View>
-      <Text style={[styles.nodeValue, styles.nodeValueCompact, { color: textColor }]}>{value}</Text>
+      <Text
+        adjustsFontSizeToFit
+        numberOfLines={1}
+        style={[
+          styles.nodeValue,
+          styles.nodeValueCompact,
+          compact ? styles.nodeValueCompactText : null,
+          veryCompact ? styles.nodeValueVeryCompactText : null,
+          { color: textColor },
+        ]}
+      >
+        {value}
+      </Text>
       {meta ? (
-        <Text adjustsFontSizeToFit numberOfLines={1} style={[styles.nodeMeta, { color: mutedTextColor }]}>
+        <Text
+          adjustsFontSizeToFit
+          numberOfLines={1}
+          style={[
+            styles.nodeMeta,
+            compact ? styles.nodeMetaCompact : null,
+            veryCompact ? styles.nodeMetaVeryCompact : null,
+            { color: mutedTextColor },
+          ]}
+        >
           {meta}
         </Text>
       ) : null}
@@ -517,6 +598,7 @@ function MiniStat({
   theme,
   textColor,
   mutedTextColor,
+  compact,
 }: {
   appearance?: SolarWidgetConfig["appearance"];
   label: string;
@@ -524,6 +606,7 @@ function MiniStat({
   theme: ThemeSettings;
   textColor: string;
   mutedTextColor: string;
+  compact?: boolean;
 }) {
   return (
     <View
@@ -533,10 +616,11 @@ function MiniStat({
           backgroundColor: appearance?.statColor || theme.solar.statCardBackground,
           borderColor: theme.solar.statCardBorder,
         },
+        compact ? styles.miniCompact : null,
       ]}
     >
-      <Text style={[styles.miniValue, { color: textColor }]}>{value}</Text>
-      <Text style={[styles.miniLabel, { color: mutedTextColor }]}>{label}</Text>
+      <Text style={[styles.miniValue, compact ? styles.miniValueCompact : null, { color: textColor }]}>{value}</Text>
+      <Text style={[styles.miniLabel, compact ? styles.miniLabelCompact : null, { color: mutedTextColor }]}>{label}</Text>
     </View>
   );
 }
@@ -665,9 +749,13 @@ function resolveBatteryIcon(soc: number | null): keyof typeof MaterialCommunityI
   return "battery-outline";
 }
 
-function getDefaultNodeLayout(scene: { width: number; height: number }): SolarLayoutConfig {
-  const compactSingleColumn = scene.width <= 420;
-  const compactTablet = scene.width > 420 && scene.width <= 620;
+function getDefaultNodeLayout(
+  scene: { width: number; height: number },
+  compactMode?: boolean,
+  veryCompactMode?: boolean
+): SolarLayoutConfig {
+  const compactSingleColumn = veryCompactMode || scene.width <= 420 || scene.height <= 260;
+  const compactTablet = (!compactSingleColumn && compactMode) || (scene.width > 420 && scene.width <= 620) || scene.height <= 340;
 
   if (compactSingleColumn) {
     return {
@@ -743,10 +831,16 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     padding: 14,
     alignSelf: "stretch",
-    aspectRatio: 1.75,
-    minHeight: 560,
+    minHeight: 0,
+    flex: 1,
     borderWidth: 1,
     overflow: "hidden",
+  },
+  sceneCardCompact: {
+    padding: 10,
+  },
+  sceneCardVeryCompact: {
+    padding: 8,
   },
   scene: {
     flex: 1,
@@ -810,6 +904,14 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
   },
+  nodeCardCompact: {
+    borderRadius: 16,
+    padding: 9,
+  },
+  nodeCardVeryCompact: {
+    borderRadius: 14,
+    padding: 7,
+  },
   nodeCardActive: {
     shadowOpacity: 0.2,
     shadowRadius: 14,
@@ -824,6 +926,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.06)",
   },
+  nodeIconCompact: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+  },
+  nodeIconVeryCompact: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+  },
   nodeIconActive: {
     borderColor: "rgba(255,255,255,0.12)",
   },
@@ -834,6 +946,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  nodeIconInnerCompact: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+  },
+  nodeIconInnerVeryCompact: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
   },
   nodeLabel: {
     marginTop: 8,
@@ -852,6 +974,14 @@ const styles = StyleSheet.create({
   nodeValueCompact: {
     marginTop: 12,
   },
+  nodeValueCompactText: {
+    marginTop: 10,
+    fontSize: 15,
+  },
+  nodeValueVeryCompactText: {
+    marginTop: 8,
+    fontSize: 13,
+  },
   nodeMeta: {
     marginTop: 4,
     color: palette.textMuted,
@@ -859,11 +989,27 @@ const styles = StyleSheet.create({
     maxWidth: "92%",
     textAlign: "center",
   },
+  nodeMetaCompact: {
+    marginTop: 3,
+    fontSize: 9,
+  },
+  nodeMetaVeryCompact: {
+    marginTop: 2,
+    fontSize: 8,
+  },
   bottomRow: {
     flexDirection: "row",
     gap: 10,
     flexWrap: "wrap",
     marginTop: 18,
+  },
+  bottomRowCompact: {
+    gap: 8,
+    marginTop: 10,
+  },
+  bottomRowVeryCompact: {
+    gap: 6,
+    marginTop: 8,
   },
   mini: {
     flexGrow: 1,
@@ -872,15 +1018,27 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1,
   },
+  miniCompact: {
+    flexBasis: 110,
+    padding: 10,
+    borderRadius: 14,
+  },
   miniValue: {
     color: palette.text,
     fontSize: 18,
     fontWeight: "800",
   },
+  miniValueCompact: {
+    fontSize: 15,
+  },
   miniLabel: {
     marginTop: 4,
     color: palette.textMuted,
     fontSize: 12,
+  },
+  miniLabelCompact: {
+    marginTop: 3,
+    fontSize: 11,
   },
   footnote: {
     color: palette.textMuted,
