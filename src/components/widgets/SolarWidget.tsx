@@ -729,7 +729,7 @@ function getDefaultNodeLayout(
     return {
       pv: { x: 0.385, y: 0.015, w: 0.23, h: 0.2 },
       home: { x: 0.38, y: 0.31, w: 0.24, h: 0.24 },
-      battery: { x: 0.0, y: 0.38, w: 0.2, h: 0.18 },
+      battery: { x: 0.0, y: 0.34, w: 0.2, h: 0.18 },
       grid: { x: 0.8, y: 0.34, w: 0.2, h: 0.18 },
       car: { x: 0.35, y: 0.64, w: 0.3, h: 0.16 },
     };
@@ -739,7 +739,7 @@ function getDefaultNodeLayout(
     return {
       pv: { x: 0.38, y: 0.02, w: 0.24, h: 0.18 },
       home: { x: 0.39, y: 0.4, w: 0.22, h: 0.2 },
-      battery: { x: 0.0, y: 0.45, w: 0.22, h: 0.18 },
+      battery: { x: 0.0, y: 0.41, w: 0.22, h: 0.18 },
       grid: { x: 0.78, y: 0.41, w: 0.22, h: 0.18 },
       car: { x: 0.35, y: 0.7, w: 0.3, h: 0.14 },
     };
