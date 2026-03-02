@@ -633,6 +633,17 @@ function WebWidgetShell({
           isolation: "isolate",
         }
       : null),
+    ...(widget.type === "grafana"
+      ? {
+          border: "none",
+          background: "transparent",
+          backdropFilter: "none",
+          WebkitBackdropFilter: "none",
+          boxShadow: "none",
+          contain: "layout paint style",
+          isolation: "isolate",
+        }
+      : null),
     left: displayOffset(preview.x, cellWidth, config.grid.gap, mainColumnExtraGap),
     top: preview.y * stepY,
     width: displaySpan(preview.x, preview.w, cellWidth, config.grid.gap, mainColumnExtraGap),
@@ -642,8 +653,13 @@ function WebWidgetShell({
 
   const contentStyle = [
     styles.webContent,
-    widget.type === "camera" ? styles.webContentBleed : null,
-    widget.type !== "camera" && widget.type !== "solar" && widget.type !== "state" ? styles.webContentInset : null,
+    widget.type === "camera" || widget.type === "grafana" ? styles.webContentBleed : null,
+    widget.type !== "camera" &&
+    widget.type !== "solar" &&
+    widget.type !== "state" &&
+    widget.type !== "grafana"
+      ? styles.webContentInset
+      : null,
     widget.type === "grafana" ? styles.webContentGrafana : null,
   ];
 

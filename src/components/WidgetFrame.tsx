@@ -161,7 +161,12 @@ export function WidgetFrame({
       <View
         style={[
           styles.content,
-          widget.type !== "camera" && widget.type !== "solar" && widget.type !== "state" ? styles.contentInset : null,
+          widget.type !== "camera" &&
+          widget.type !== "solar" &&
+          widget.type !== "state" &&
+          widget.type !== "grafana"
+            ? styles.contentInset
+            : null,
         ]}
       >
         {children}

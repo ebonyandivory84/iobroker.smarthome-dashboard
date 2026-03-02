@@ -86,6 +86,7 @@ const webFrameStyle = {
   width: "100%",
   height: "100%",
   border: "0",
-  borderRadius: "16px",
-  background: "rgba(0,0,0,0.18)",
+  borderRadius: "0",
+  background: "transparent",
+  display: "block",
 };
