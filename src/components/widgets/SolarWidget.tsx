@@ -740,9 +740,9 @@ function getDefaultNodeLayout(
   if (compactTablet) {
     return {
       pv: { x: 0.38, y: 0.015, w: 0.24, h: 0.2 },
-      home: { x: 0.39, y: 0.43, w: 0.22, h: 0.22 },
-      battery: { x: 0.0, y: 0.45, w: 0.22, h: 0.18 },
-      grid: { x: 0.78, y: 0.45, w: 0.22, h: 0.18 },
+      home: { x: 0.39, y: 0.5, w: 0.22, h: 0.22 },
+      battery: { x: 0.0, y: 0.52, w: 0.22, h: 0.18 },
+      grid: { x: 0.78, y: 0.52, w: 0.22, h: 0.18 },
       car: { x: 0.35, y: 0.84, w: 0.3, h: 0.16 },
     };
   }
