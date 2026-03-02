@@ -11,6 +11,7 @@ export function GrafanaWidget({ config }: GrafanaWidgetProps) {
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const resolvedUrl = normalizeGrafanaUrl(config.url);
+  const sandboxValue = config.allowInteractions === false ? "allow-same-origin allow-scripts" : undefined;
 
   if (Platform.OS !== "web") {
     return (
@@ -35,7 +36,10 @@ export function GrafanaWidget({ config }: GrafanaWidgetProps) {
   return createElement("iframe", {
     src: resolvedUrl,
     style: webFrameStyle,
-    sandbox: config.allowInteractions ? "allow-same-origin allow-scripts allow-forms allow-popups" : "allow-same-origin allow-scripts",
+    sandbox: sandboxValue,
+    allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
+    allowFullScreen: true,
+    loading: "eager",
     referrerPolicy: "no-referrer",
   });
 }
