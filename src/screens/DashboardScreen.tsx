@@ -121,6 +121,19 @@ export function DashboardScreen() {
         color={config.backgroundColor}
         mode={config.backgroundMode}
       />
+      <TopBar
+        activePageId={visiblePageId}
+        isOnline={isOnline}
+        isLayoutMode={layoutMode}
+        pageTitles={dashboardPages.map((page) => ({ id: page.id, title: page.title }))}
+        onAddWidget={() => setLibraryOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onSelectPage={(pageId) => {
+          setVisiblePageId(pageId);
+          setActivePage(pageId);
+        }}
+        onToggleLayoutMode={() => setLayoutMode((current) => !current)}
+      />
       <ScrollView
         style={[styles.scroll, isCompact ? styles.scrollCompact : null]}
         horizontal
@@ -135,19 +148,6 @@ export function DashboardScreen() {
         {pageConfigs.map((pageConfig) => (
           <View key={pageConfig.activePageId} style={[styles.page, { width }]}>
             <ScrollView contentContainerStyle={styles.scrollContent} style={styles.pageScroll}>
-              <TopBar
-                activePageId={visiblePageId}
-                isOnline={isOnline}
-                isLayoutMode={layoutMode}
-                pageTitles={dashboardPages.map((page) => ({ id: page.id, title: page.title }))}
-                onAddWidget={() => setLibraryOpen(true)}
-                onOpenSettings={() => setSettingsOpen(true)}
-                onSelectPage={(pageId) => {
-                  setVisiblePageId(pageId);
-                  setActivePage(pageId);
-                }}
-                onToggleLayoutMode={() => setLayoutMode((current) => !current)}
-              />
               <GridCanvas
                 client={client}
                 config={pageConfig}
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 96,
-    paddingTop: 6,
+    paddingTop: 2,
   },
   page: {
     flex: 1,
