@@ -242,7 +242,7 @@ function SolarFlowScene({
   const gridBox = resolveNodeBox(effectiveNodeLayout?.grid, defaults.grid, sceneLayout);
   const carBox = resolveNodeBox(effectiveNodeLayout?.car, defaults.car, sceneLayout);
   const flowDotSize = veryCompactMode ? 8 : compactMode ? 10 : 12;
-  const lineGap = veryCompactMode ? 8 : compactMode ? 10 : 6;
+  const lineGap = veryCompactMode ? 8 : compactMode ? 10 : 2;
   const homeMidX = homeBox.x + homeBox.w / 2;
   const batteryMidY = batteryBox.y + batteryBox.h / 2;
   const homeMidY = homeBox.y + homeBox.h / 2;
@@ -739,11 +739,11 @@ function getDefaultNodeLayout(
 
   if (compactTablet) {
     return {
-      pv: { x: 0.4, y: 0.04, w: 0.2, h: 0.2 },
-      home: { x: 0.38, y: 0.34, w: 0.24, h: 0.24 },
-      battery: { x: 0.02, y: 0.4, w: 0.17, h: 0.17 },
-      grid: { x: 0.81, y: 0.4, w: 0.17, h: 0.17 },
-      car: { x: 0.415, y: 0.74, w: 0.17, h: 0.17 },
+      pv: { x: 0.39, y: 0.04, w: 0.22, h: 0.22 },
+      home: { x: 0.36, y: 0.34, w: 0.28, h: 0.28 },
+      battery: { x: 0.04, y: 0.39, w: 0.18, h: 0.18 },
+      grid: { x: 0.78, y: 0.39, w: 0.18, h: 0.18 },
+      car: { x: 0.41, y: 0.72, w: 0.18, h: 0.18 },
     };
   }
 
