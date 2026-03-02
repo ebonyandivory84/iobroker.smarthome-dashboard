@@ -1,5 +1,4 @@
 import { createElement } from "react";
-import { useEffect, useMemo, useState } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 import { GrafanaWidgetConfig } from "../../types/dashboard";
 import { palette } from "../../utils/theme";
@@ -12,23 +11,8 @@ export function GrafanaWidget({ config }: GrafanaWidgetProps) {
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const resolvedUrl = normalizeGrafanaUrl(config.url);
-  const refreshMs = normalizeRefreshMs(config.refreshMs);
+  const iframeUrl = applyGrafanaRefresh(resolvedUrl, config.refreshMs);
   const sandboxValue = config.allowInteractions === false ? "allow-same-origin allow-scripts" : undefined;
-  const [refreshTick, setRefreshTick] = useState(0);
-
-  useEffect(() => {
-    if (!refreshMs) {
-      return;
-    }
-
-    const timer = setInterval(() => {
-      setRefreshTick((current) => current + 1);
-    }, refreshMs);
-
-    return () => clearInterval(timer);
-  }, [refreshMs]);
-
-  const iframeUrl = useMemo(() => appendCacheBuster(resolvedUrl, refreshTick), [resolvedUrl, refreshTick]);
 
   if (Platform.OS !== "web") {
     return (
@@ -85,13 +69,38 @@ function normalizeRefreshMs(value?: number) {
   return Math.max(0, Math.round(value));
 }
 
-function appendCacheBuster(url: string, refreshTick: number) {
-  if (!url || refreshTick <= 0) {
+function applyGrafanaRefresh(url: string, refreshMs?: number) {
+  if (!url) {
+    return url;
+  }
+
+  if (/[?&]refresh=/.test(url)) {
+    return url;
+  }
+
+  const normalizedRefreshMs = normalizeRefreshMs(refreshMs);
+  if (!normalizedRefreshMs) {
     return url;
   }
 
   const separator = url.includes("?") ? "&" : "?";
-  return `${url}${separator}_smarthomeRefresh=${refreshTick}`;
+  return `${url}${separator}refresh=${toGrafanaRefreshValue(normalizedRefreshMs)}`;
+}
+
+function toGrafanaRefreshValue(refreshMs: number) {
+  if (refreshMs < 1000) {
+    return "1s";
+  }
+
+  if (refreshMs < 60000) {
+    return `${Math.max(1, Math.round(refreshMs / 1000))}s`;
+  }
+
+  if (refreshMs < 3600000) {
+    return `${Math.max(1, Math.round(refreshMs / 60000))}m`;
+  }
+
+  return `${Math.max(1, Math.round(refreshMs / 3600000))}h`;
 }
 
 const styles = StyleSheet.create({
