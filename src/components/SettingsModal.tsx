@@ -22,6 +22,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   } = useDashboardConfig();
   const [draft, setDraft] = useState(rawJson);
   const [dashboardName, setDashboardName] = useState("");
+  const [homeLabel, setHomeLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,12 +32,23 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
 
     setDraft(rawJson);
     setDashboardName(config.title || "");
+    setHomeLabel(config.homeLabel || "My Home");
     setError(null);
     refreshSavedDashboards();
-  }, [config.title, rawJson, visible]);
+  }, [config.homeLabel, config.title, rawJson, visible]);
 
   const save = () => {
-    const result = updateConfigFromJson(draft);
+    let nextDraft = draft;
+
+    try {
+      const parsed = JSON.parse(draft) as Record<string, unknown>;
+      parsed.homeLabel = (homeLabel || "").trim() || "My Home";
+      nextDraft = JSON.stringify(parsed, null, 2);
+    } catch {
+      // Let the existing JSON validation path surface the error.
+    }
+
+    const result = updateConfigFromJson(nextDraft);
     if (!result.ok) {
       setError(result.error || "JSON invalid");
       return;
@@ -87,9 +99,20 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
             ioBroker-Ziele, Widget-Typen und alle Widget-Einstellungen direkt in einer Datei.
           </Text>
           <View style={styles.metaRow}>
+            <MetaPill label="Home" value={config.homeLabel || "My Home"} />
             <MetaPill label="Titel" value={config.title} />
             <MetaPill label="Widgets" value={String(config.widgets.length)} />
             <MetaPill label="API" value={config.iobroker.adapterBasePath || "/smarthome-dashboard/api"} />
+          </View>
+          <View style={styles.libraryCard}>
+            <Text style={styles.sectionTitle}>Kopfzeile</Text>
+            <TextInput
+              onChangeText={setHomeLabel}
+              placeholder="Name links oben"
+              placeholderTextColor={palette.textMuted}
+              style={styles.input}
+              value={homeLabel}
+            />
           </View>
           <View style={styles.libraryCard}>
             <Text style={styles.sectionTitle}>Gespeicherte Dashboards</Text>

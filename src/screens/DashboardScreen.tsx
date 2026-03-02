@@ -122,6 +122,7 @@ export function DashboardScreen() {
         mode={config.backgroundMode}
       />
       <TopBar
+        homeLabel={config.homeLabel || "My Home"}
         activePageId={visiblePageId}
         isOnline={isOnline}
         isLayoutMode={layoutMode}

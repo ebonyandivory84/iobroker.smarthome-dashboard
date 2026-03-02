@@ -78,6 +78,7 @@ const defaultWidgets: DashboardSettings["widgets"] = [
 
 export const defaultConfig: DashboardSettings = {
   title: "SmartHome Control",
+  homeLabel: "My Home",
   backgroundMode: "mesh",
   backgroundColor: "#08111f",
   backgroundAccent: "#123a5d",

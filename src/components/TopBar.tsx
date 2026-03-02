@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-na
 import { palette } from "../utils/theme";
 
 type TopBarProps = {
+  homeLabel: string;
   pageTitles: Array<{ id: string; title: string }>;
   activePageId: string;
   isOnline: boolean;
@@ -14,6 +15,7 @@ type TopBarProps = {
 };
 
 export function TopBar({
+  homeLabel,
   pageTitles,
   activePageId,
   isOnline,
@@ -30,7 +32,7 @@ export function TopBar({
     <View style={[styles.container, isCompact ? styles.containerCompact : null]}>
       <View>
         <View style={styles.titleRow}>
-          <Text style={styles.kicker}>My Home</Text>
+          <Text style={styles.kicker}>{homeLabel}</Text>
           <View style={[styles.statusDot, isOnline ? styles.statusOnline : styles.statusOffline]} />
           <View style={styles.pageTabs}>
             {pageTitles.map((page) => {

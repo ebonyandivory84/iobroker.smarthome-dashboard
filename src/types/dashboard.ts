@@ -181,6 +181,7 @@ export type DashboardPage = {
 
 export type DashboardSettings = {
   title: string;
+  homeLabel?: string;
   backgroundMode: BackgroundMode;
   backgroundColor: string;
   backgroundAccent: string;
