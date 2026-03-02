@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from "react-native";
 import { StateWidgetConfig } from "../../types/dashboard";
 import { palette } from "../../utils/theme";
 
@@ -11,6 +12,7 @@ type StateWidgetProps = {
 };
 
 export function StateWidget({ config, value, addonValue, onToggle }: StateWidgetProps) {
+  const [tileLayout, setTileLayout] = useState({ width: 0, height: 0 });
   const hasValue = value !== null && value !== undefined;
   const hasTitle = config.showTitle !== false && Boolean(config.title?.trim());
   const active = resolveStateActive(config, value);
@@ -23,17 +25,40 @@ export function StateWidget({ config, value, addonValue, onToggle }: StateWidget
   const inactiveBackground = config.appearance?.inactiveWidgetColor || "rgba(54, 58, 74, 0.96)";
   const tileBackground = active ? activeBackground : inactiveBackground;
   const resolvedAddonValue = resolveAddonValue(config, value, addonValue, active);
+  const compactTile = tileLayout.width > 0 && (tileLayout.width < 220 || tileLayout.height < 180);
+  const veryCompactTile = tileLayout.width > 0 && (tileLayout.width < 170 || tileLayout.height < 140);
+  const iconSize = veryCompactTile ? 34 : compactTile ? 38 : 44;
   const content = (
-    <View style={[styles.tile, { backgroundColor: tileBackground }]}>
+    <View
+      onLayout={(event: LayoutChangeEvent) => setTileLayout(event.nativeEvent.layout)}
+      style={[
+        styles.tile,
+        compactTile ? styles.tileCompact : null,
+        veryCompactTile ? styles.tileVeryCompact : null,
+        { backgroundColor: tileBackground },
+      ]}
+    >
       <AddonChip config={config} value={resolvedAddonValue} />
-      <View style={styles.iconWrap}>
+      <View
+        style={[
+          styles.iconWrap,
+          compactTile ? styles.iconWrapCompact : null,
+          veryCompactTile ? styles.iconWrapVeryCompact : null,
+        ]}
+      >
         <MaterialCommunityIcons
           color={iconColor}
           name={(iconName || "toggle-switch-outline") as never}
-          size={44}
+          size={iconSize}
         />
       </View>
-      <View style={styles.textBlock}>
+      <View
+        style={[
+          styles.textBlock,
+          compactTile ? styles.textBlockCompact : null,
+          veryCompactTile ? styles.textBlockVeryCompact : null,
+        ]}
+      >
         <Text numberOfLines={2} style={[styles.value, { color: mutedTextColor }]}>
           {hasValue ? resolveStateLabel(config, value, active) : "Keine Daten"}
         </Text>
@@ -325,6 +350,16 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     position: "relative",
   },
+  tileCompact: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 10,
+  },
+  tileVeryCompact: {
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 9,
+  },
   iconWrap: {
     width: 58,
     height: 58,
@@ -334,12 +369,34 @@ const styles = StyleSheet.create({
     top: 10,
     left: 10,
   },
+  iconWrapCompact: {
+    width: 48,
+    height: 48,
+    top: 8,
+    left: 8,
+  },
+  iconWrapVeryCompact: {
+    width: 42,
+    height: 42,
+    top: 7,
+    left: 7,
+  },
   textBlock: {
     position: "absolute",
     left: 14,
     right: 14,
     bottom: 12,
     alignItems: "flex-start",
+  },
+  textBlockCompact: {
+    left: 12,
+    right: 12,
+    bottom: 10,
+  },
+  textBlockVeryCompact: {
+    left: 10,
+    right: 10,
+    bottom: 9,
   },
   value: {
     color: palette.textMuted,
