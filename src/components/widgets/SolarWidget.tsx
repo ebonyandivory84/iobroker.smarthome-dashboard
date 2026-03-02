@@ -56,10 +56,6 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
 
   const { pvNow, homeNow, gridIn, gridOut, soc, battIn, battOut, battTemp, pvTotalKWh, dayConsumedKWh, daySelfKWh } =
     displaySnapshot;
-  const autarkPct =
-    daySelfKWh !== null && dayConsumedKWh !== null && dayConsumedKWh > 0
-      ? clamp((daySelfKWh / dayConsumedKWh) * 100, 0, 100)
-      : null;
   const missingCore = pvNow === null && homeNow === null && gridIn === null && gridOut === null;
 
   const battSigned =
@@ -75,7 +71,6 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
   const customStatValues = {
     first: config.stats?.first?.stateId ? states[config.stats.first.stateId] : undefined,
     second: config.stats?.second?.stateId ? states[config.stats.second.stateId] : undefined,
-    third: config.stats?.third?.stateId ? states[config.stats.third.stateId] : undefined,
   };
   const statCards = [
     {
@@ -85,10 +80,6 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
     {
       label: config.stats?.second?.label || "Verbraucht",
       value: resolveSolarStatValue(customStatValues.second, fmtKWh(dayConsumedKWh)),
-    },
-    {
-      label: config.stats?.third?.label || "Autarkie",
-      value: resolveSolarStatValue(customStatValues.third, autarkPct === null ? "—" : `${Math.round(autarkPct)} %`),
     },
   ];
 
@@ -165,6 +156,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
             key={`solar-stat-${index}`}
             appearance={widgetAppearance}
             compact={compactWidget}
+            cornerCompact={compactWidget}
             label={stat.label}
             mutedTextColor={mutedTextColor}
             textColor={textColor}
@@ -553,6 +545,7 @@ function MiniStat({
   textColor,
   mutedTextColor,
   compact,
+  cornerCompact,
 }: {
   appearance?: SolarWidgetConfig["appearance"];
   label: string;
@@ -561,6 +554,7 @@ function MiniStat({
   textColor: string;
   mutedTextColor: string;
   compact?: boolean;
+  cornerCompact?: boolean;
 }) {
   return (
     <View
@@ -571,6 +565,7 @@ function MiniStat({
           borderColor: theme.solar.statCardBorder,
         },
         compact ? styles.miniCompact : null,
+        cornerCompact ? styles.miniCornerCompact : null,
       ]}
     >
       <Text style={[styles.miniValue, compact ? styles.miniValueCompact : null, { color: textColor }]}>{value}</Text>
@@ -752,10 +747,10 @@ function getDefaultNodeLayout(
 
   return {
     pv: { x: 0.44, y: 0.02, w: 0.12, h: 0.18 },
-    home: { x: 0.44, y: 0.43, w: 0.12, h: 0.18 },
-    battery: { x: 0.14, y: 0.45, w: 0.1, h: 0.14 },
-    grid: { x: 0.76, y: 0.45, w: 0.1, h: 0.14 },
-    car: { x: 0.45, y: 0.81, w: 0.1, h: 0.14 },
+    home: { x: 0.44, y: 0.29, w: 0.12, h: 0.18 },
+    battery: { x: 0.14, y: 0.31, w: 0.1, h: 0.14 },
+    grid: { x: 0.76, y: 0.31, w: 0.1, h: 0.14 },
+    car: { x: 0.45, y: 0.67, w: 0.1, h: 0.14 },
   };
 }
 
@@ -969,6 +964,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    justifyContent: "space-between",
+    flexWrap: "nowrap",
+    alignItems: "flex-end",
     marginTop: 0,
     paddingHorizontal: 4,
     zIndex: 5,
@@ -996,6 +994,11 @@ const styles = StyleSheet.create({
     flexBasis: 110,
     padding: 10,
     borderRadius: 14,
+  },
+  miniCornerCompact: {
+    flexGrow: 0,
+    flexBasis: "auto",
+    width: "42%",
   },
   miniValue: {
     color: palette.text,
