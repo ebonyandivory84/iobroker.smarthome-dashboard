@@ -1,23 +1,7 @@
 import { DashboardSettings } from "../types/dashboard";
 import { defaultThemeSettings } from "./themeConfig";
 
-export const defaultConfig: DashboardSettings = {
-  title: "SmartHome Control",
-  backgroundMode: "mesh",
-  backgroundColor: "#08111f",
-  backgroundAccent: "#123a5d",
-  theme: defaultThemeSettings,
-  grid: {
-    columns: 12,
-    rowHeight: 84,
-    gap: 12,
-  },
-  pollingMs: 2000,
-  iobroker: {
-    baseUrl: "",
-    adapterBasePath: "/smarthome-dashboard/api",
-  },
-  widgets: [
+const defaultWidgets: DashboardSettings["widgets"] = [
     {
       id: "front-door",
       type: "state",
@@ -90,5 +74,31 @@ export const defaultConfig: DashboardSettings = {
       dailyEnergyUnit: "auto",
       position: { x: 0, y: 5, w: 12, h: 5 },
     },
+  ];
+
+export const defaultConfig: DashboardSettings = {
+  title: "SmartHome Control",
+  backgroundMode: "mesh",
+  backgroundColor: "#08111f",
+  backgroundAccent: "#123a5d",
+  theme: defaultThemeSettings,
+  grid: {
+    columns: 12,
+    rowHeight: 84,
+    gap: 12,
+  },
+  pollingMs: 2000,
+  iobroker: {
+    baseUrl: "",
+    adapterBasePath: "/smarthome-dashboard/api",
+  },
+  activePageId: "home",
+  pages: [
+    {
+      id: "home",
+      title: "SmartHome Control",
+      widgets: defaultWidgets,
+    },
   ],
+  widgets: defaultWidgets,
 };

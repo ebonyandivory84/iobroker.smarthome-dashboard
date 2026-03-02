@@ -7,6 +7,7 @@ type WidgetLibraryModalProps = {
   visible: boolean;
   onClose: () => void;
   onSelectType: (type: WidgetType) => void;
+  onCreateDashboard: () => void;
 };
 
 const OPTIONS: Array<{
@@ -45,12 +46,19 @@ const OPTIONS: Array<{
     description: "Beliebige Grafana Panels oder Dashboards per URL als Widget einbetten.",
     icon: "chart-box-outline",
   },
+  {
+    type: "weather",
+    title: "Wetter",
+    description: "Aktuelles Wetter und kurze Vorhersage per Koordinaten anzeigen.",
+    icon: "weather-partly-cloudy",
+  },
 ];
 
 export function WidgetLibraryModal({
   visible,
   onClose,
   onSelectType,
+  onCreateDashboard,
 }: WidgetLibraryModalProps) {
   return (
     <Modal animationType="fade" transparent visible={visible}>
@@ -63,6 +71,19 @@ export function WidgetLibraryModal({
             </Pressable>
           </View>
           <View style={styles.grid}>
+            <Pressable
+              onPress={() => {
+                onCreateDashboard();
+                onClose();
+              }}
+              style={[styles.option, styles.optionFeature]}
+            >
+              <View style={styles.iconWrap}>
+                <MaterialCommunityIcons color={palette.accent} name="view-carousel-outline" size={28} />
+              </View>
+              <Text style={styles.optionTitle}>Neues Dashboard</Text>
+              <Text style={styles.optionText}>Erstellt eine weitere Seite, zwischen der du wischen oder tippen kannst.</Text>
+            </Pressable>
             {OPTIONS.map((option) => (
               <Pressable
                 key={option.type}
@@ -129,6 +150,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.03)",
     borderWidth: 1,
     borderColor: palette.border,
+  },
+  optionFeature: {
+    backgroundColor: "rgba(77, 226, 177, 0.05)",
   },
   iconWrap: {
     width: 52,

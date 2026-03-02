@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { GridCanvas } from "../components/GridCanvas";
 import { SettingsModal } from "../components/SettingsModal";
 import { TopBar } from "../components/TopBar";
@@ -15,12 +15,43 @@ import { palette } from "../utils/theme";
 export function DashboardScreen() {
   const { width } = useWindowDimensions();
   const isCompact = width < 700;
-  const { addWidget, config, removeWidget, replaceWidgets, updateWidget } = useDashboardConfig();
+  const horizontalPagerRef = useRef<ScrollView | null>(null);
+  const {
+    addWidget,
+    config,
+    dashboardPages,
+    activePageId,
+    createDashboardPage,
+    removeWidget,
+    replaceWidgets,
+    setActivePage,
+    updateWidget,
+  } = useDashboardConfig();
   const { client, error, isOnline, states, writeStateOptimistic } = useIoBrokerStates();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
   const [layoutMode, setLayoutMode] = useState(false);
+  const activePageIndex = Math.max(0, dashboardPages.findIndex((page) => page.id === activePageId));
+
+  const pageConfigs = useMemo(
+    () =>
+      dashboardPages.map((page) => ({
+        ...config,
+        title: page.title,
+        widgets: page.widgets,
+        activePageId: page.id,
+      })),
+    [config, dashboardPages]
+  );
+
+  useEffect(() => {
+    if (!horizontalPagerRef.current) {
+      return;
+    }
+
+    horizontalPagerRef.current.scrollTo({ x: width * activePageIndex, animated: true });
+  }, [activePageIndex, width]);
 
   const addWidgetByType = (type: WidgetType) => {
     const widget = buildWidgetTemplate(type, config.widgets.length, { columns: config.grid.columns });
@@ -54,6 +85,18 @@ export function DashboardScreen() {
   const editingWidget: WidgetConfig | null =
     config.widgets.find((widget) => widget.id === editingWidgetId) || null;
 
+  const handlePageScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!width) {
+      return;
+    }
+
+    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+    const nextPage = dashboardPages[nextIndex];
+    if (nextPage) {
+      setActivePage(nextPage.id);
+    }
+  };
+
   return (
     <View style={styles.root}>
       <BackgroundLayer
@@ -62,30 +105,45 @@ export function DashboardScreen() {
         mode={config.backgroundMode}
       />
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
         style={[styles.scroll, isCompact ? styles.scrollCompact : null]}
+        horizontal
+        pagingEnabled
+        ref={horizontalPagerRef}
+        scrollEventThrottle={16}
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handlePageScrollEnd}
       >
-        <TopBar
-          isOnline={isOnline}
-          isLayoutMode={layoutMode}
-          statusDetail={error || config.iobroker.baseUrl}
-          onAddWidget={() => setLibraryOpen(true)}
-          onOpenSettings={() => setSettingsOpen(true)}
-          onToggleLayoutMode={() => setLayoutMode((current) => !current)}
-          title={config.title}
-        />
-        <GridCanvas
-          client={client}
-          config={config}
-          isLayoutMode={layoutMode}
-          onEditWidget={setEditingWidgetId}
-          onRemoveWidget={removeWidget}
-          onUpdateWidget={handleUpdateWidget}
-          onWriteState={writeStateOptimistic}
-          states={states}
-        />
+        {pageConfigs.map((pageConfig) => (
+          <View key={pageConfig.activePageId} style={[styles.page, { width }]}>
+            <ScrollView contentContainerStyle={styles.scrollContent} style={styles.pageScroll}>
+              <TopBar
+                activePageId={activePageId}
+                isOnline={isOnline}
+                isLayoutMode={layoutMode}
+                pageTitles={dashboardPages.map((page) => ({ id: page.id, title: page.title }))}
+                statusDetail={error || config.iobroker.baseUrl}
+                onAddWidget={() => setLibraryOpen(true)}
+                onOpenSettings={() => setSettingsOpen(true)}
+                onSelectPage={setActivePage}
+                onToggleLayoutMode={() => setLayoutMode((current) => !current)}
+                title={pageConfig.title}
+              />
+              <GridCanvas
+                client={client}
+                config={pageConfig}
+                isLayoutMode={layoutMode}
+                onEditWidget={setEditingWidgetId}
+                onRemoveWidget={removeWidget}
+                onUpdateWidget={handleUpdateWidget}
+                onWriteState={writeStateOptimistic}
+                states={states}
+              />
+            </ScrollView>
+          </View>
+        ))}
       </ScrollView>
       <WidgetLibraryModal
+        onCreateDashboard={createDashboardPage}
         onClose={() => setLibraryOpen(false)}
         onSelectType={addWidgetByType}
         visible={libraryOpen}
@@ -177,5 +235,11 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 96,
     paddingTop: 6,
+  },
+  page: {
+    flex: 1,
+  },
+  pageScroll: {
+    flex: 1,
   },
 });

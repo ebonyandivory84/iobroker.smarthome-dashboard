@@ -4,22 +4,28 @@ import { palette } from "../utils/theme";
 
 type TopBarProps = {
   title: string;
+  pageTitles: Array<{ id: string; title: string }>;
+  activePageId: string;
   isOnline: boolean;
   isLayoutMode: boolean;
   statusDetail: string;
   onToggleLayoutMode: () => void;
   onOpenSettings: () => void;
   onAddWidget: () => void;
+  onSelectPage: (pageId: string) => void;
 };
 
 export function TopBar({
   title,
+  pageTitles,
+  activePageId,
   isOnline,
   isLayoutMode,
   statusDetail,
   onToggleLayoutMode,
   onOpenSettings,
   onAddWidget,
+  onSelectPage,
 }: TopBarProps) {
   const { width } = useWindowDimensions();
   const isCompact = width < 700;
@@ -29,7 +35,21 @@ export function TopBar({
       <View>
         <View style={styles.titleRow}>
           <Text style={styles.kicker}>My Home</Text>
-          <MaterialCommunityIcons color={palette.text} name="chevron-down" size={18} />
+          <View style={styles.pageTabs}>
+            {pageTitles
+              .filter((page) => page.id !== activePageId)
+              .map((page) => (
+                <Pressable
+                  key={page.id}
+                  onPress={() => onSelectPage(page.id)}
+                  style={styles.pageTab}
+                >
+                  <Text numberOfLines={1} style={styles.pageTabLabel}>
+                    {page.title}
+                  </Text>
+                </Pressable>
+              ))}
+          </View>
         </View>
         <Text style={styles.title}>{title}</Text>
         <View style={[styles.statusRow, isCompact ? styles.statusRowCompact : null]}>
@@ -84,7 +104,8 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 2,
+    gap: 10,
+    flexWrap: "wrap",
   },
   kicker: {
     color: palette.text,
@@ -93,9 +114,29 @@ const styles = StyleSheet.create({
   },
   title: {
     color: palette.textMuted,
-    fontSize: 0,
-    marginTop: 0,
-    height: 0,
+    fontSize: 13,
+    marginTop: 4,
+    fontWeight: "700",
+  },
+  pageTabs: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    flexShrink: 1,
+  },
+  pageTab: {
+    maxWidth: 132,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  pageTabLabel: {
+    color: palette.textMuted,
+    fontSize: 11,
+    fontWeight: "700",
   },
   statusRow: {
     marginTop: 6,

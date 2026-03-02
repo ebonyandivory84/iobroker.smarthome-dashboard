@@ -7,12 +7,14 @@ import {
   useMemo,
   useState,
 } from "react";
-import { DashboardSettings, WidgetConfig } from "../types/dashboard";
+import { DashboardPage, DashboardSettings, WidgetConfig } from "../types/dashboard";
 import { defaultConfig } from "../utils/defaultConfig";
 
 type DashboardConfigContextValue = {
   config: DashboardSettings;
   rawJson: string;
+  dashboardPages: DashboardPage[];
+  activePageId: string;
   savedDashboards: string[];
   updateConfigFromJson: (nextJson: string) => { ok: boolean; error?: string };
   patchConfig: (partial: Partial<DashboardSettings>) => void;
@@ -21,6 +23,8 @@ type DashboardConfigContextValue = {
   updateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void;
   addWidget: (widget: WidgetConfig) => void;
   removeWidget: (widgetId: string) => void;
+  setActivePage: (pageId: string) => void;
+  createDashboardPage: () => void;
   refreshSavedDashboards: () => Promise<void>;
   saveNamedDashboard: (name: string) => Promise<{ ok: boolean; error?: string }>;
   loadNamedDashboard: (name: string) => Promise<{ ok: boolean; error?: string }>;
@@ -55,7 +59,7 @@ function migrateConfig(input: DashboardSettings): DashboardSettings {
     }),
   };
 
-  return nextConfig;
+  return normalizeDashboardPages(nextConfig);
 }
 
 export function DashboardConfigProvider({ children }: PropsWithChildren) {
@@ -124,8 +128,9 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
   }, []);
 
   const persist = async (nextConfig: DashboardSettings) => {
-    setConfig(nextConfig);
-    const json = JSON.stringify(nextConfig, null, 2);
+    const normalizedConfig = normalizeDashboardPages(nextConfig);
+    setConfig(normalizedConfig);
+    const json = JSON.stringify(normalizedConfig, null, 2);
     setRawJson(json);
     try {
       await AsyncStorage.setItem(STORAGE_KEY, json);
@@ -143,6 +148,8 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
     () => ({
       config,
       rawJson,
+      dashboardPages: config.pages || [],
+      activePageId: config.activePageId || (config.pages?.[0]?.id ?? "home"),
       savedDashboards,
       updateConfigFromJson(nextJson) {
         try {
@@ -154,44 +161,58 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
         }
       },
       patchConfig(partial) {
-        const nextConfig: DashboardSettings = {
-          ...config,
-          ...partial,
-        };
-        persist(nextConfig);
+        persist(syncActivePage(config, partial));
       },
       resetConfig() {
         persist(defaultConfig);
       },
       replaceWidgets(widgets) {
-        const nextConfig: DashboardSettings = {
-          ...config,
-          widgets,
-        };
-        persist(nextConfig);
+        persist(syncActivePage(config, { widgets }));
       },
       updateWidget(widgetId, partial) {
-        const nextConfig: DashboardSettings = {
-          ...config,
-          widgets: config.widgets.map((widget) =>
+        const widgets = config.widgets.map((widget) =>
             widget.id === widgetId ? ({ ...widget, ...partial } as WidgetConfig) : widget
-          ),
-        };
-        persist(nextConfig);
+          );
+        persist(syncActivePage(config, { widgets }));
       },
       addWidget(widget) {
-        const nextConfig: DashboardSettings = {
-          ...config,
-          widgets: [...config.widgets, widget],
-        };
-        persist(nextConfig);
+        persist(syncActivePage(config, { widgets: [...config.widgets, widget] }));
       },
       removeWidget(widgetId) {
-        const nextConfig: DashboardSettings = {
+        persist(syncActivePage(config, { widgets: config.widgets.filter((widget) => widget.id !== widgetId) }));
+      },
+      setActivePage(pageId) {
+        if (!pageId || pageId === config.activePageId) {
+          return;
+        }
+        const nextPage = (config.pages || []).find((page) => page.id === pageId);
+        if (!nextPage) {
+          return;
+        }
+
+        persist({
           ...config,
-          widgets: config.widgets.filter((widget) => widget.id !== widgetId),
+          activePageId: nextPage.id,
+          title: nextPage.title,
+          widgets: nextPage.widgets,
+        });
+      },
+      createDashboardPage() {
+        const existingPages = config.pages || [];
+        const suffix = existingPages.length + 1;
+        const nextPage: DashboardPage = {
+          id: `dashboard-${Date.now()}`,
+          title: `Dashboard ${suffix}`,
+          widgets: [],
         };
-        persist(nextConfig);
+
+        persist({
+          ...config,
+          pages: [...existingPages, nextPage],
+          activePageId: nextPage.id,
+          title: nextPage.title,
+          widgets: nextPage.widgets,
+        });
       },
       async refreshSavedDashboards() {
         try {
@@ -337,4 +358,53 @@ export function useDashboardConfig() {
     throw new Error("useDashboardConfig must be used inside DashboardConfigProvider");
   }
   return value;
+}
+
+function normalizeDashboardPages(input: DashboardSettings): DashboardSettings {
+  const basePages = Array.isArray(input.pages) && input.pages.length
+    ? input.pages.map((page, index) => ({
+        id: page.id || `dashboard-${index + 1}`,
+        title: page.title || `Dashboard ${index + 1}`,
+        widgets: Array.isArray(page.widgets) ? page.widgets : [],
+      }))
+    : [
+        {
+          id: input.activePageId || "home",
+          title: input.title || "Dashboard",
+          widgets: Array.isArray(input.widgets) ? input.widgets : [],
+        },
+      ];
+
+  const activePage =
+    basePages.find((page) => page.id === input.activePageId) ||
+    basePages[0];
+
+  return {
+    ...input,
+    title: activePage.title,
+    widgets: activePage.widgets,
+    pages: basePages,
+    activePageId: activePage.id,
+  };
+}
+
+function syncActivePage(
+  current: DashboardSettings,
+  partial: Partial<DashboardSettings>
+): DashboardSettings {
+  const nextPages = (current.pages || []).map((page) =>
+    page.id === current.activePageId
+      ? {
+          ...page,
+          title: typeof partial.title === "string" ? partial.title : page.title,
+          widgets: Array.isArray(partial.widgets) ? partial.widgets : page.widgets,
+        }
+      : page
+  );
+
+  return {
+    ...current,
+    ...partial,
+    pages: nextPages,
+  };
 }

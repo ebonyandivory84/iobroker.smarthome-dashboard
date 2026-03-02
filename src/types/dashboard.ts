@@ -173,6 +173,12 @@ export type ThemeSettings = {
   };
 };
 
+export type DashboardPage = {
+  id: string;
+  title: string;
+  widgets: WidgetConfig[];
+};
+
 export type DashboardSettings = {
   title: string;
   backgroundMode: BackgroundMode;
@@ -192,6 +198,8 @@ export type DashboardSettings = {
     token?: string;
     adapterBasePath?: string;
   };
+  pages?: DashboardPage[];
+  activePageId?: string;
   widgets: WidgetConfig[];
 };
 
