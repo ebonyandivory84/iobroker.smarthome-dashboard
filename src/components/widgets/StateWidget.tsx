@@ -59,7 +59,7 @@ export function StateWidget({ config, value, addonValue, onToggle }: StateWidget
           veryCompactTile ? styles.textBlockVeryCompact : null,
         ]}
       >
-        <Text numberOfLines={2} style={[styles.value, { color: mutedTextColor }]}>
+        <Text ellipsizeMode="tail" numberOfLines={3} style={[styles.value, { color: mutedTextColor }]}>
           {hasValue ? resolveStateLabel(config, value, active) : "Keine Daten"}
         </Text>
       </View>
@@ -387,6 +387,7 @@ const styles = StyleSheet.create({
     right: 14,
     bottom: 12,
     alignItems: "flex-start",
+    justifyContent: "flex-end",
   },
   textBlockCompact: {
     left: 12,
@@ -404,6 +405,7 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     textAlign: "left",
     fontWeight: "700",
+    alignSelf: "stretch",
   },
   addonCircle: {
     position: "absolute",
