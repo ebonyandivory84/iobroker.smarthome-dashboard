@@ -243,6 +243,7 @@ function SolarFlowScene({
   const carBox = resolveNodeBox(effectiveNodeLayout?.car, defaults.car, sceneLayout);
   const flowDotSize = veryCompactMode ? 8 : compactMode ? 10 : 12;
   const lineGap = veryCompactMode ? 8 : compactMode ? 10 : 2;
+  const verticalGap = veryCompactMode ? 10 : compactMode ? 14 : 10;
   const homeMidX = homeBox.x + homeBox.w / 2;
   const batteryMidY = batteryBox.y + batteryBox.h / 2;
   const homeMidY = homeBox.y + homeBox.h / 2;
@@ -250,8 +251,8 @@ function SolarFlowScene({
   const topLineLeft = Math.round(homeMidX) - 2;
   const bottomLineLeft = Math.round(homeMidX) - 2;
 
-  const topLineStart = pvBox.y + pvBox.h + lineGap;
-  const topLineEnd = homeBox.y - lineGap;
+  const topLineStart = pvBox.y + pvBox.h + verticalGap;
+  const topLineEnd = homeBox.y - verticalGap;
   const topLineHeight = Math.max(12, topLineEnd - topLineStart);
   const leftLineTop = Math.round((batteryMidY + homeMidY) / 2) - 2;
   const rightLineTop = Math.round((gridMidY + homeMidY) / 2) - 2;
@@ -261,8 +262,8 @@ function SolarFlowScene({
   const rightLineStart = homeBox.x + homeBox.w + lineGap;
   const rightLineEnd = gridBox.x - lineGap;
   const rightLineWidth = Math.max(16, rightLineEnd - rightLineStart);
-  const bottomLineStart = homeBox.y + homeBox.h + lineGap;
-  const bottomLineEnd = carBox.y - lineGap;
+  const bottomLineStart = homeBox.y + homeBox.h + verticalGap;
+  const bottomLineEnd = carBox.y - verticalGap;
   const bottomLineHeight = Math.max(12, bottomLineEnd - bottomLineStart);
 
   return (
