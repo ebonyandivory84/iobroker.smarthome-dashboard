@@ -1,5 +1,5 @@
 import { createElement, useEffect, useMemo, useRef, useState } from "react";
-import { Image, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Linking, Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { CameraWidgetConfig } from "../../types/dashboard";
 import { palette } from "../../utils/theme";
 
@@ -15,6 +15,19 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
   const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
+  const fullscreenPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_event, gestureState) =>
+          Math.abs(gestureState.dy) > 12 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onPanResponderRelease: (_event, gestureState) => {
+          if (gestureState.dy > 80 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx)) {
+            setFullscreenOpen(false);
+          }
+        },
+      }),
+    []
+  );
 
   useEffect(() => {
     const timer = setInterval(() => setTick((current) => current + 1), config.refreshMs || 2000);
@@ -145,7 +158,7 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
           <Pressable onPress={() => setFullscreenOpen(false)} style={styles.fullscreenClose}>
             <Text style={styles.fullscreenCloseLabel}>X</Text>
           </Pressable>
-          <View style={styles.fullscreenStage}>
+          <View {...fullscreenPanResponder.panHandlers} style={styles.fullscreenStage}>
             {displayUrl
               ? Platform.OS === "web"
                 ? createElement("img", {
