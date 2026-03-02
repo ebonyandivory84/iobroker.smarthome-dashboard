@@ -242,15 +242,13 @@ function SolarFlowScene({
   const carBox = resolveNodeBox(nodeLayout?.car, defaults.car, sceneLayout);
   const beamLength = 18;
   const connectorInset = 18;
-  const topMidX = pvBox.x + pvBox.w / 2;
   const homeMidX = homeBox.x + homeBox.w / 2;
-  const carMidX = carBox.x + carBox.w / 2;
   const batteryMidY = batteryBox.y + batteryBox.h / 2;
   const homeMidY = homeBox.y + homeBox.h / 2;
   const gridMidY = gridBox.y + gridBox.h / 2;
-  const topLineLeft = Math.round((topMidX + homeMidX) / 2) - 2;
+  const topLineLeft = Math.round(homeMidX) - 2;
   const topBeamLeft = topLineLeft - 2;
-  const bottomLineLeft = Math.round((carMidX + homeMidX) / 2) - 2;
+  const bottomLineLeft = Math.round(homeMidX) - 2;
   const bottomBeamLeft = bottomLineLeft - 2;
 
   const topLineStart = pvBox.y + pvBox.h + connectorInset;
@@ -724,21 +722,21 @@ function getDefaultNodeLayout(
 
   if (compactSingleColumn) {
     return {
-      pv: { x: 0.41, y: 0.0, w: 0.17, h: 0.14 },
-      home: { x: 0.37, y: 0.4, w: 0.26, h: 0.17 },
+      pv: { x: 0.41, y: 0.0, w: 0.16, h: 0.11 },
+      home: { x: 0.39, y: 0.42, w: 0.22, h: 0.15 },
       battery: { x: 0.04, y: 0.44, w: 0.14, h: 0.11 },
       grid: { x: 0.82, y: 0.44, w: 0.14, h: 0.11 },
-      car: { x: 0.42, y: 0.88, w: 0.14, h: 0.11 },
+      car: { x: 0.42, y: 0.92, w: 0.14, h: 0.1 },
     };
   }
 
   if (compactTablet) {
     return {
-      pv: { x: 0.42, y: 0.0, w: 0.14, h: 0.14 },
-      home: { x: 0.4, y: 0.39, w: 0.19, h: 0.17 },
+      pv: { x: 0.43, y: 0.0, w: 0.12, h: 0.11 },
+      home: { x: 0.41, y: 0.41, w: 0.17, h: 0.15 },
       battery: { x: 0.06, y: 0.43, w: 0.11, h: 0.11 },
       grid: { x: 0.83, y: 0.43, w: 0.11, h: 0.11 },
-      car: { x: 0.445, y: 0.87, w: 0.11, h: 0.11 },
+      car: { x: 0.445, y: 0.92, w: 0.1, h: 0.1 },
     };
   }
 

@@ -343,7 +343,7 @@ function getAutoLayoutSpec(
       return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(mainColumnWidth / ratio)) };
     }
     case "solar":
-      return { w: mainColumnWidth, h: roundGridUnit(options?.isTabletLikeWeb ? 4.5 : 3.2) };
+      return { w: mainColumnWidth, h: roundGridUnit(options?.isTabletLikeWeb ? 5.5 : 3.2) };
     case "grafana":
       return { w: mainColumnWidth, h: roundGridUnit(2.2) };
     case "weather":
