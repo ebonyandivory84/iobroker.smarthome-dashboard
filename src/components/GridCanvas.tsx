@@ -38,13 +38,16 @@ export function GridCanvas({
   const { width: windowWidth } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
   const isCompactWeb = Platform.OS === "web" && windowWidth < 700;
+  const isTabletLikeWeb = Platform.OS === "web" && windowWidth >= 700 && windowWidth < 1100;
   const displayColumns = isCompactWeb ? 1 : 9;
   const effectiveLayoutMode = isLayoutMode;
   const displayGap = Platform.OS === "web" && !isCompactWeb ? Math.max(config.grid.gap, 18) : config.grid.gap;
   const mainColumnExtraGap = Platform.OS === "web" && !isCompactWeb ? displayGap * 2 : 0;
   const displayConfig = useMemo(
     () => {
-      const next = buildResponsiveAutoLayoutConfig(config, displayColumns);
+      const next = buildResponsiveAutoLayoutConfig(config, displayColumns, {
+        isTabletLikeWeb,
+      });
       return {
         ...next,
         grid: {
@@ -53,7 +56,7 @@ export function GridCanvas({
         },
       };
     },
-    [config, displayColumns, displayGap]
+    [config, displayColumns, displayGap, isTabletLikeWeb]
   );
   const useStructuredGridSizing = true;
   const canvasInset = Platform.OS === "web" ? 64 : 60;
@@ -152,9 +155,15 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function buildResponsiveAutoLayoutConfig(config: DashboardSettings, columns: number): DashboardSettings {
+function buildResponsiveAutoLayoutConfig(
+  config: DashboardSettings,
+  columns: number,
+  options?: {
+    isTabletLikeWeb?: boolean;
+  }
+): DashboardSettings {
   if (columns === 9) {
-    return buildDesktopAutoLayoutConfig(config);
+    return buildDesktopAutoLayoutConfig(config, options);
   }
 
   const sortedWidgets = [...config.widgets].sort((a, b) => {
@@ -169,7 +178,7 @@ function buildResponsiveAutoLayoutConfig(config: DashboardSettings, columns: num
 
   const columnHeights = Array.from({ length: columns }, () => 0);
   const widgets = sortedWidgets.map((widget) => {
-    const spec = getAutoLayoutSpec(widget, columns);
+    const spec = getAutoLayoutSpec(widget, columns, options);
     const desiredStart = clamp(Math.round(widget.position.x), 0, Math.max(0, columns - spec.w));
     const desiredY = Math.max(0, widget.position.y);
     const bestStart = desiredStart;
@@ -201,7 +210,12 @@ function buildResponsiveAutoLayoutConfig(config: DashboardSettings, columns: num
   };
 }
 
-function buildDesktopAutoLayoutConfig(config: DashboardSettings): DashboardSettings {
+function buildDesktopAutoLayoutConfig(
+  config: DashboardSettings,
+  options?: {
+    isTabletLikeWeb?: boolean;
+  }
+): DashboardSettings {
   const sourceColumns = Math.max(1, config.grid.columns);
   const mainColumnWidth = 3;
   const subColumnHeights = Array.from({ length: 9 }, () => 0);
@@ -216,7 +230,7 @@ function buildDesktopAutoLayoutConfig(config: DashboardSettings): DashboardSetti
   });
 
   const widgets = sortedWidgets.map((widget) => {
-    const spec = getAutoLayoutSpec(widget, 9);
+    const spec = getAutoLayoutSpec(widget, 9, options);
     const desiredY = Math.max(0, widget.position.y);
 
     if (spec.w === 1) {
@@ -285,7 +299,13 @@ function getPreferredDesktopSection(widget: WidgetConfig, sourceColumns: number)
   return clamp(Math.floor(center / Math.max(1, sectionWidth)), 0, 2);
 }
 
-function getAutoLayoutSpec(widget: WidgetConfig, columns: number) {
+function getAutoLayoutSpec(
+  widget: WidgetConfig,
+  columns: number,
+  options?: {
+    isTabletLikeWeb?: boolean;
+  }
+) {
   const fallbackHeight = widget.position.h;
 
   if (columns === 1) {
@@ -320,7 +340,7 @@ function getAutoLayoutSpec(widget: WidgetConfig, columns: number) {
       return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(mainColumnWidth / ratio)) };
     }
     case "solar":
-      return { w: mainColumnWidth, h: roundGridUnit(3.2) };
+      return { w: mainColumnWidth, h: roundGridUnit(options?.isTabletLikeWeb ? 4.5 : 3.2) };
     case "grafana":
       return { w: mainColumnWidth, h: roundGridUnit(2.2) };
     case "weather":
