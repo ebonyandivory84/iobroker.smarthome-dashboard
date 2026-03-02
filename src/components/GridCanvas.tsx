@@ -1,4 +1,4 @@
-import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { IoBrokerClient } from "../services/iobroker";
@@ -99,32 +99,6 @@ export function GridCanvas({
       />
     ) : (
       <View style={[styles.canvas, { height: canvasHeight }]}>
-        <View pointerEvents="none" style={styles.gridOverlay}>
-          {Array.from({ length: Math.round(displayConfig.grid.columns / GRID_SNAP) + 1 }).map((_, index) => (
-            <View
-              key={`col-${index}`}
-              style={[
-                styles.gridLine,
-                {
-                  left: displayOffset(index * GRID_SNAP, cellWidth, displayConfig.grid.gap, mainColumnExtraGap),
-                },
-              ]}
-            />
-          ))}
-          {Array.from({ length: Math.round(canvasHeight / ((renderRowHeight + displayConfig.grid.gap) * GRID_SNAP)) + 1 }).map(
-            (_, index) => (
-              <View
-                key={`row-${index}`}
-                style={[
-                  styles.gridRowLine,
-                  {
-                    top: fineGridOffset(index, renderRowHeight, displayConfig.grid.gap),
-                  },
-                ]}
-              />
-            )
-          )}
-        </View>
         {displayConfig.widgets.map((widget) => {
           const style = {
             left: displayOffset(widget.position.x, cellWidth, displayConfig.grid.gap, mainColumnExtraGap),
@@ -463,24 +437,6 @@ function WebGridCanvas({
 
   return (
     <div style={{ ...webCanvasStyle, height: canvasHeight }}>
-      {Array.from({ length: Math.round(config.grid.columns / GRID_SNAP) + 1 }).map((_, index) => (
-        <div
-          key={`v-${index}`}
-          style={{
-            ...webVerticalLineStyle,
-            left: displayOffset(index * GRID_SNAP, cellWidth, config.grid.gap, mainColumnExtraGap),
-          }}
-        />
-      ))}
-      {Array.from({ length: Math.round(canvasHeight / (stepY * GRID_SNAP)) + 1 }).map((_, index) => (
-        <div
-          key={`h-${index}`}
-          style={{
-            ...webHorizontalLineStyle,
-            top: fineGridOffset(index, rowHeight, config.grid.gap),
-          }}
-        />
-      ))}
       {config.widgets.map((widget) => (
         <WebWidgetShell
           key={widget.id}
@@ -558,7 +514,7 @@ function WebWidgetShell({
   }, [widget.position]);
 
   useEffect(() => {
-    const handleMove = (event: MouseEvent) => {
+    const handleMove = (event: PointerEvent) => {
       const active = interaction.current;
       if (!active) {
         return;
@@ -599,19 +555,22 @@ function WebWidgetShell({
       }
     };
 
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+    window.addEventListener("pointercancel", handleUp);
     return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      window.removeEventListener("pointercancel", handleUp);
     };
   }, [config.grid.columns, onUpdateWidget, preview, stepX, stepY, widget.id]);
 
   const begin =
     (mode: "drag" | "resize") =>
-    (event: ReactMouseEvent<HTMLDivElement>) => {
+    (event: ReactPointerEvent<HTMLDivElement>) => {
       event.preventDefault();
       event.stopPropagation();
+      event.currentTarget.setPointerCapture?.(event.pointerId);
       interaction.current = {
         mode,
         startX: event.clientX,
@@ -665,7 +624,7 @@ function WebWidgetShell({
 
   return (
     <div style={shellStyle}>
-      {isLayoutMode && allowManualLayout ? <div onMouseDown={begin("drag")} style={webWidgetDragSurfaceStyle} /> : null}
+      {isLayoutMode && allowManualLayout ? <div onPointerDown={begin("drag")} style={webWidgetDragSurfaceStyle} /> : null}
       {showHeaderTitle ? (
         <div style={webTitleBadgeStyle}>
           <div style={{ ...webTitleStyle, color: widget.appearance?.textColor || palette.text }}>{widget.title}</div>
@@ -686,7 +645,7 @@ function WebWidgetShell({
       </View>
       {isLayoutMode && allowManualLayout && allowResize ? (
         <div style={webFooterOverlayStyle}>
-          <div onMouseDown={begin("resize")} style={webResizeHandleStyle} title="Skalieren" />
+          <div onPointerDown={begin("resize")} style={webResizeHandleStyle} title="Skalieren" />
         </div>
       ) : null}
     </div>
@@ -756,11 +715,11 @@ const styles = StyleSheet.create({
   canvas: {
     position: "relative",
     margin: 20,
-    borderRadius: 28,
+    borderRadius: 0,
     padding: 10,
-    backgroundColor: "rgba(4, 8, 14, 0.28)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.03)",
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    borderColor: "transparent",
   },
   gridOverlay: {
     ...StyleSheet.absoluteFillObject,

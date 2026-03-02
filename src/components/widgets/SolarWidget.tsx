@@ -254,7 +254,7 @@ function SolarFlowScene({
     return () => loop.stop();
   }, [progress]);
 
-  const defaults = getDefaultNodeLayout();
+  const defaults = getDefaultNodeLayout(sceneLayout);
   const pvBox = resolveNodeBox(nodeLayout?.pv, defaults.pv, sceneLayout);
   const homeBox = resolveNodeBox(nodeLayout?.home, defaults.home, sceneLayout);
   const batteryBox = resolveNodeBox(nodeLayout?.battery, defaults.battery, sceneLayout);
@@ -665,7 +665,30 @@ function resolveBatteryIcon(soc: number | null): keyof typeof MaterialCommunityI
   return "battery-outline";
 }
 
-function getDefaultNodeLayout(): SolarLayoutConfig {
+function getDefaultNodeLayout(scene: { width: number; height: number }): SolarLayoutConfig {
+  const compactSingleColumn = scene.width <= 420;
+  const compactTablet = scene.width > 420 && scene.width <= 620;
+
+  if (compactSingleColumn) {
+    return {
+      pv: { x: 0.41, y: 0.06, w: 0.18, h: 0.16 },
+      home: { x: 0.37, y: 0.41, w: 0.26, h: 0.18 },
+      battery: { x: 0.04, y: 0.45, w: 0.16, h: 0.13 },
+      grid: { x: 0.8, y: 0.45, w: 0.16, h: 0.13 },
+      car: { x: 0.42, y: 0.8, w: 0.16, h: 0.13 },
+    };
+  }
+
+  if (compactTablet) {
+    return {
+      pv: { x: 0.42, y: 0.06, w: 0.15, h: 0.17 },
+      home: { x: 0.4, y: 0.41, w: 0.2, h: 0.18 },
+      battery: { x: 0.08, y: 0.44, w: 0.13, h: 0.13 },
+      grid: { x: 0.79, y: 0.44, w: 0.13, h: 0.13 },
+      car: { x: 0.435, y: 0.79, w: 0.13, h: 0.13 },
+    };
+  }
+
   return {
     pv: { x: 0.44, y: 0.07, w: 0.12, h: 0.18 },
     home: { x: 0.44, y: 0.41, w: 0.12, h: 0.18 },
