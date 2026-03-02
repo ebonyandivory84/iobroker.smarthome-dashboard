@@ -36,19 +36,20 @@ export function TopBar({
         <View style={styles.titleRow}>
           <Text style={styles.kicker}>My Home</Text>
           <View style={styles.pageTabs}>
-            {pageTitles
-              .filter((page) => page.id !== activePageId)
-              .map((page) => (
+            {pageTitles.map((page) => {
+              const activePage = page.id === activePageId;
+              return (
                 <Pressable
                   key={page.id}
                   onPress={() => onSelectPage(page.id)}
-                  style={styles.pageTab}
+                  style={[styles.pageTab, activePage ? styles.pageTabActive : null]}
                 >
-                  <Text numberOfLines={1} style={styles.pageTabLabel}>
+                  <Text numberOfLines={1} style={[styles.pageTabLabel, activePage ? styles.pageTabLabelActive : null]}>
                     {page.title}
                   </Text>
                 </Pressable>
-              ))}
+              );
+            })}
           </View>
         </View>
         <Text style={styles.title}>{title}</Text>
@@ -121,22 +122,32 @@ const styles = StyleSheet.create({
   pageTabs: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6,
+    gap: 8,
     flexShrink: 1,
   },
   pageTab: {
-    maxWidth: 132,
+    maxWidth: 168,
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    minHeight: 34,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
     borderColor: palette.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pageTabActive: {
+    backgroundColor: palette.accent,
+    borderColor: "rgba(77, 226, 177, 0.55)",
   },
   pageTabLabel: {
     color: palette.textMuted,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "700",
+  },
+  pageTabLabelActive: {
+    color: "#041019",
   },
   statusRow: {
     marginTop: 6,
