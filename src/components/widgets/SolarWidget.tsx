@@ -863,10 +863,12 @@ const styles = StyleSheet.create({
   nodeCardCompact: {
     borderRadius: 16,
     padding: 8,
+    alignItems: "stretch",
   },
   nodeCardVeryCompact: {
     borderRadius: 14,
     padding: 6,
+    alignItems: "stretch",
   },
   nodeCardActive: {
     shadowOpacity: 0.2,
@@ -883,14 +885,16 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.06)",
   },
   nodeIconCompact: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignSelf: "flex-start",
   },
   nodeIconVeryCompact: {
-    width: 28,
-    height: 28,
-    borderRadius: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    alignSelf: "flex-start",
   },
   nodeIconActive: {
     borderColor: "rgba(255,255,255,0.12)",
@@ -904,14 +908,14 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.05)",
   },
   nodeIconInnerCompact: {
-    width: 26,
-    height: 26,
-    borderRadius: 10,
-  },
-  nodeIconInnerVeryCompact: {
     width: 22,
     height: 22,
     borderRadius: 8,
+  },
+  nodeIconInnerVeryCompact: {
+    width: 18,
+    height: 18,
+    borderRadius: 6,
   },
   nodeLabel: {
     marginTop: 8,
