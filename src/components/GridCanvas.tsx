@@ -22,6 +22,7 @@ type GridCanvasProps = {
   onEditWidget: (widgetId: string) => void;
   onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void;
   onRemoveWidget: (widgetId: string) => void;
+  onWriteState: (stateId: string, value: unknown) => void | Promise<void>;
   onLayoutMeasured?: (width: number) => void;
 };
 
@@ -33,6 +34,7 @@ export function GridCanvas({
   onEditWidget,
   onUpdateWidget,
   onRemoveWidget,
+  onWriteState,
   onLayoutMeasured,
 }: GridCanvasProps) {
   const { width: windowWidth } = useWindowDimensions();
@@ -98,6 +100,7 @@ export function GridCanvas({
         onEditWidget={onEditWidget}
         onRemoveWidget={onRemoveWidget}
         onUpdateWidget={onUpdateWidget}
+        onWriteState={onWriteState}
         states={states}
       />
     ) : (
@@ -129,7 +132,7 @@ export function GridCanvas({
                 rowHeight={renderRowHeight}
                 widget={widget}
               >
-                {renderWidget(widget, states, client, onUpdateWidget, displayConfig.theme)}
+                {renderWidget(widget, states, client, onUpdateWidget, onWriteState, displayConfig.theme)}
               </WidgetFrame>
             </View>
           );
@@ -437,6 +440,7 @@ function WebGridCanvas({
   onEditWidget,
   onUpdateWidget,
   onRemoveWidget,
+  onWriteState,
 }: {
   config: DashboardSettings;
   mainColumnExtraGap: number;
@@ -451,6 +455,7 @@ function WebGridCanvas({
   onEditWidget: (widgetId: string) => void;
   onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void;
   onRemoveWidget: (widgetId: string) => void;
+  onWriteState: (stateId: string, value: unknown) => void | Promise<void>;
 }) {
   const stepX = cellWidth + config.grid.gap;
   const stepY = rowHeight + config.grid.gap;
@@ -469,6 +474,7 @@ function WebGridCanvas({
           onEditWidget={onEditWidget}
           onRemoveWidget={onRemoveWidget}
           onUpdateWidget={onUpdateWidget}
+          onWriteState={onWriteState}
           allowManualLayout={true}
           allowResize={false}
           mainColumnExtraGap={mainColumnExtraGap}
@@ -497,6 +503,7 @@ function WebWidgetShell({
   onEditWidget,
   onUpdateWidget,
   onRemoveWidget,
+  onWriteState,
   allowManualLayout = true,
   allowResize = true,
   mainColumnExtraGap,
@@ -515,6 +522,7 @@ function WebWidgetShell({
   onEditWidget: (widgetId: string) => void;
   onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void;
   onRemoveWidget: (widgetId: string) => void;
+  onWriteState: (stateId: string, value: unknown) => void | Promise<void>;
   allowManualLayout?: boolean;
   allowResize?: boolean;
   mainColumnExtraGap: number;
@@ -661,7 +669,7 @@ function WebWidgetShell({
         </div>
       ) : null}
       <View style={contentStyle}>
-        {renderWidget(widget, states, client, onUpdateWidget, config.theme)}
+        {renderWidget(widget, states, client, onUpdateWidget, onWriteState, config.theme)}
       </View>
       {isLayoutMode && allowManualLayout && allowResize ? (
         <div style={webFooterOverlayStyle}>
@@ -677,6 +685,7 @@ function renderWidget(
   states: StateSnapshot,
   client: IoBrokerClient,
   onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void,
+  onWriteState: (stateId: string, value: unknown) => void | Promise<void>,
   theme?: DashboardSettings["theme"]
 ) {
   if (widget.type === "state") {
@@ -685,7 +694,7 @@ function renderWidget(
         addonValue={widget.addonStateId ? states[widget.addonStateId] : undefined}
         config={widget}
         value={states[widget.stateId]}
-        onToggle={() => client.writeState(widget.stateId, resolveStateNextValue(widget, states[widget.stateId]))}
+        onToggle={() => onWriteState(widget.stateId, resolveStateNextValue(widget, states[widget.stateId]))}
       />
     );
   }

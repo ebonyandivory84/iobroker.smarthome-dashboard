@@ -76,7 +76,6 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
     first: config.stats?.first?.stateId ? states[config.stats.first.stateId] : undefined,
     second: config.stats?.second?.stateId ? states[config.stats.second.stateId] : undefined,
     third: config.stats?.third?.stateId ? states[config.stats.third.stateId] : undefined,
-    fourth: config.stats?.fourth?.stateId ? states[config.stats.fourth.stateId] : undefined,
   };
   const statCards = [
     {
@@ -90,10 +89,6 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
     {
       label: config.stats?.third?.label || "Autarkie",
       value: resolveSolarStatValue(customStatValues.third, autarkPct === null ? "—" : `${Math.round(autarkPct)} %`),
-    },
-    {
-      label: config.stats?.fourth?.label || "PV Gesamt",
-      value: resolveSolarStatValue(customStatValues.fourth, fmtKWh(pvTotalKWh)),
     },
   ];
 

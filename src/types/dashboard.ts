@@ -139,7 +139,6 @@ export type SolarWidgetConfig = WidgetBase & {
     first?: SolarStatConfig;
     second?: SolarStatConfig;
     third?: SolarStatConfig;
-    fourth?: SolarStatConfig;
   };
 };
 

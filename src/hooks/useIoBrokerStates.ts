@@ -31,6 +31,9 @@ const pickStateIds = (widgets: ReturnType<typeof useDashboardConfig>["config"]["
         withPrefix(widget.keys.daySelf),
         withPrefix(widget.keys.pvTotal),
         withPrefix(widget.keys.battTemp),
+        widget.stats?.first?.stateId || "",
+        widget.stats?.second?.stateId || "",
+        widget.stats?.third?.stateId || "",
       ];
     }
     return [];
@@ -72,10 +75,20 @@ export function useIoBrokerStates() {
     };
   }, [client, config]);
 
+  const writeStateOptimistic = async (stateId: string, value: unknown) => {
+    setStates((current) => ({
+      ...current,
+      [stateId]: value,
+    }));
+
+    await client.writeState(stateId, value);
+  };
+
   return {
     client,
     error,
     isOnline,
     states,
+    writeStateOptimistic,
   };
 }

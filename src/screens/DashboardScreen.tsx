@@ -16,7 +16,7 @@ export function DashboardScreen() {
   const { width } = useWindowDimensions();
   const isCompact = width < 700;
   const { addWidget, config, removeWidget, replaceWidgets, updateWidget } = useDashboardConfig();
-  const { client, error, isOnline, states } = useIoBrokerStates();
+  const { client, error, isOnline, states, writeStateOptimistic } = useIoBrokerStates();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
@@ -81,6 +81,7 @@ export function DashboardScreen() {
           onEditWidget={setEditingWidgetId}
           onRemoveWidget={removeWidget}
           onUpdateWidget={handleUpdateWidget}
+          onWriteState={writeStateOptimistic}
           states={states}
         />
       </ScrollView>

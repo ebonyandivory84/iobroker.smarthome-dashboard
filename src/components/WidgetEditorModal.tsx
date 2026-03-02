@@ -141,8 +141,6 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       stat2StateId: widget.stats?.second?.stateId || "",
       stat3Label: widget.stats?.third?.label || "Autarkie",
       stat3StateId: widget.stats?.third?.stateId || "",
-      stat4Label: widget.stats?.fourth?.label || "PV Gesamt",
-      stat4StateId: widget.stats?.fourth?.stateId || "",
       nodePvX: formatNodeValue(widget.nodeLayout?.pv?.x, 0.44),
       nodePvY: formatNodeValue(widget.nodeLayout?.pv?.y, 0.02),
       nodePvW: formatNodeValue(widget.nodeLayout?.pv?.w, 0.12),
@@ -876,23 +874,6 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     />
                   </Field>
                 </View>
-                <View style={styles.splitRow}>
-                  <Field label="Stat 4 Label">
-                    <TextInput
-                      onChangeText={(value) => setDraft((current) => ({ ...current, stat4Label: value }))}
-                      style={styles.input}
-                      value={draft.stat4Label || ""}
-                    />
-                  </Field>
-                  <Field label="Stat 4 Datenpunkt">
-                    <StateFieldInput
-                      browseLabel="Objekt"
-                      onBrowse={() => setPickerField("stat4StateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, stat4StateId: value }))}
-                      value={draft.stat4StateId || ""}
-                    />
-                  </Field>
-                </View>
                 <Text style={styles.mappingHint}>
                   Leer lassen, um den bisherigen Standardwert des Solar-Widgets zu nutzen. Wenn ein Datenpunkt gesetzt ist,
                   wird dessen aktueller Wert direkt angezeigt.
@@ -1222,10 +1203,6 @@ function buildSolarStats(draft: Record<string, string>) {
     third: {
       label: (draft.stat3Label || "Autarkie").trim() || "Autarkie",
       stateId: (draft.stat3StateId || "").trim() || undefined,
-    },
-    fourth: {
-      label: (draft.stat4Label || "PV Gesamt").trim() || "PV Gesamt",
-      stateId: (draft.stat4StateId || "").trim() || undefined,
     },
   };
 }
