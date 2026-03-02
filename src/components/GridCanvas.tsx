@@ -41,7 +41,7 @@ export function GridCanvas({
   const displayColumns = isCompactWeb ? 1 : 9;
   const effectiveLayoutMode = isLayoutMode;
   const displayGap = Platform.OS === "web" && !isCompactWeb ? Math.max(config.grid.gap, 18) : config.grid.gap;
-  const mainColumnExtraGap = Platform.OS === "web" && !isCompactWeb ? displayGap : 0;
+  const mainColumnExtraGap = Platform.OS === "web" && !isCompactWeb ? displayGap * 2 : 0;
   const displayConfig = useMemo(
     () => {
       const next = buildResponsiveAutoLayoutConfig(config, displayColumns);
@@ -411,9 +411,22 @@ function displayOffset(x: number, cellWidth: number, gap: number, mainColumnExtr
 }
 
 function displaySpan(x: number, w: number, cellWidth: number, gap: number, mainColumnExtraGap: number) {
-  const start = displayOffset(x, cellWidth, gap, mainColumnExtraGap);
-  const end = displayOffset(x + w, cellWidth, gap, mainColumnExtraGap) - gap;
-  return Math.max(cellWidth, end - start);
+  const baseWidth = w * cellWidth + Math.max(0, w - 1) * gap;
+  if (mainColumnExtraGap <= 0) {
+    return baseWidth;
+  }
+
+  const startBoundary = x;
+  const endBoundary = x + w;
+  let extraInside = 0;
+
+  for (const boundary of [3, 6]) {
+    if (boundary > startBoundary && boundary < endBoundary) {
+      extraInside += mainColumnExtraGap;
+    }
+  }
+
+  return Math.max(cellWidth, baseWidth + extraInside);
 }
 
 function WebGridCanvas({
