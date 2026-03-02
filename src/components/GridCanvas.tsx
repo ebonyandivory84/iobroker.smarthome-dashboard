@@ -399,10 +399,10 @@ function displayOffset(x: number, cellWidth: number, gap: number, mainColumnExtr
   let offset = fullUnits * cellWidth + Math.max(0, fullUnits) * gap;
 
   if (mainColumnExtraGap > 0) {
-    if (x > 3) {
+    if (x >= 3) {
       offset += mainColumnExtraGap;
     }
-    if (x > 6) {
+    if (x >= 6) {
       offset += mainColumnExtraGap;
     }
   }
