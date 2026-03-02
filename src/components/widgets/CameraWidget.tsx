@@ -153,7 +153,7 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
           </Pressable>
         ) : null}
       </View>
-      <Modal animationType="fade" transparent visible={fullscreenOpen}>
+      <Modal animationType={Platform.OS === "web" ? "fade" : "none"} transparent visible={fullscreenOpen}>
         <View style={styles.fullscreenBackdrop}>
           <Pressable onPress={() => setFullscreenOpen(false)} style={styles.fullscreenClose}>
             <Text style={styles.fullscreenCloseLabel}>X</Text>
