@@ -41,6 +41,7 @@ export function GridCanvas({
   const displayColumns = isCompactWeb ? 1 : 9;
   const effectiveLayoutMode = isLayoutMode;
   const displayGap = Platform.OS === "web" && !isCompactWeb ? Math.max(config.grid.gap, 18) : config.grid.gap;
+  const mainColumnExtraGap = Platform.OS === "web" && !isCompactWeb ? displayGap : 0;
   const displayConfig = useMemo(
     () => {
       const next = buildResponsiveAutoLayoutConfig(config, displayColumns);
@@ -60,8 +61,9 @@ export function GridCanvas({
   const canvasWidth = Math.max(320, availableWidth - canvasInset);
   const cellWidth = useMemo(() => {
     const totalGap = (displayConfig.grid.columns - 1) * displayConfig.grid.gap;
-    return (canvasWidth - totalGap) / displayConfig.grid.columns;
-  }, [canvasWidth, displayConfig.grid.columns, displayConfig.grid.gap]);
+    const totalMainExtraGap = mainColumnExtraGap * 2;
+    return (canvasWidth - totalGap - totalMainExtraGap) / displayConfig.grid.columns;
+  }, [canvasWidth, displayConfig.grid.columns, displayConfig.grid.gap, mainColumnExtraGap]);
   const renderRowHeight = useStructuredGridSizing ? cellWidth : displayConfig.grid.rowHeight;
 
   const canvasHeight = useMemo(() => {
@@ -85,6 +87,7 @@ export function GridCanvas({
         cellWidth={cellWidth}
         client={client}
         config={displayConfig}
+        mainColumnExtraGap={mainColumnExtraGap}
         sourceColumns={config.grid.columns}
         rowHeight={renderRowHeight}
         theme={resolveThemeSettings(displayConfig.theme)}
@@ -103,7 +106,7 @@ export function GridCanvas({
               style={[
                 styles.gridLine,
                 {
-                  left: fineGridOffset(index, cellWidth, displayConfig.grid.gap),
+                  left: displayOffset(index * GRID_SNAP, cellWidth, displayConfig.grid.gap, mainColumnExtraGap),
                 },
               ]}
             />
@@ -124,9 +127,9 @@ export function GridCanvas({
         </View>
         {displayConfig.widgets.map((widget) => {
           const style = {
-            left: widget.position.x * (cellWidth + displayConfig.grid.gap),
+            left: displayOffset(widget.position.x, cellWidth, displayConfig.grid.gap, mainColumnExtraGap),
             top: widget.position.y * (renderRowHeight + displayConfig.grid.gap),
-            width: widget.position.w * cellWidth + (widget.position.w - 1) * displayConfig.grid.gap,
+            width: displaySpan(widget.position.x, widget.position.w, cellWidth, displayConfig.grid.gap, mainColumnExtraGap),
             height: widget.position.h * renderRowHeight + (widget.position.h - 1) * displayConfig.grid.gap,
           };
 
@@ -345,7 +348,7 @@ function getAutoLayoutSpec(widget: WidgetConfig, columns: number) {
     case "solar":
       return { w: mainColumnWidth, h: roundGridUnit(3.2) };
     case "grafana":
-      return { w: wideWidgetWidth, h: roundGridUnit(2.8) };
+      return { w: mainColumnWidth, h: roundGridUnit(2.2) };
     case "weather":
       return { w: mainColumnWidth, h: roundGridUnit(2.2) };
     case "energy":
@@ -390,8 +393,32 @@ function mapDisplayPositionToSourceHint(position: WidgetConfig["position"], disp
   };
 }
 
+function displayOffset(x: number, cellWidth: number, gap: number, mainColumnExtraGap: number) {
+  const fullUnits = Math.floor(x);
+  const partial = x - fullUnits;
+  let offset = fullUnits * cellWidth + Math.max(0, fullUnits) * gap;
+
+  if (mainColumnExtraGap > 0) {
+    if (x > 3) {
+      offset += mainColumnExtraGap;
+    }
+    if (x > 6) {
+      offset += mainColumnExtraGap;
+    }
+  }
+
+  return offset + partial * (cellWidth + gap);
+}
+
+function displaySpan(x: number, w: number, cellWidth: number, gap: number, mainColumnExtraGap: number) {
+  const start = displayOffset(x, cellWidth, gap, mainColumnExtraGap);
+  const end = displayOffset(x + w, cellWidth, gap, mainColumnExtraGap) - gap;
+  return Math.max(cellWidth, end - start);
+}
+
 function WebGridCanvas({
   config,
+  mainColumnExtraGap,
   sourceColumns,
   theme,
   states,
@@ -405,6 +432,7 @@ function WebGridCanvas({
   onRemoveWidget,
 }: {
   config: DashboardSettings;
+  mainColumnExtraGap: number;
   sourceColumns: number;
   theme: ReturnType<typeof resolveThemeSettings>;
   states: StateSnapshot;
@@ -427,7 +455,7 @@ function WebGridCanvas({
           key={`v-${index}`}
           style={{
             ...webVerticalLineStyle,
-            left: fineGridOffset(index, cellWidth, config.grid.gap),
+            left: displayOffset(index * GRID_SNAP, cellWidth, config.grid.gap, mainColumnExtraGap),
           }}
         />
       ))}
@@ -454,6 +482,7 @@ function WebGridCanvas({
           onUpdateWidget={onUpdateWidget}
           allowManualLayout={true}
           allowResize={false}
+          mainColumnExtraGap={mainColumnExtraGap}
           sourceColumns={sourceColumns}
           states={states}
           stepX={stepX}
@@ -481,6 +510,7 @@ function WebWidgetShell({
   onRemoveWidget,
   allowManualLayout = true,
   allowResize = true,
+  mainColumnExtraGap,
   sourceColumns,
 }: {
   widget: WidgetConfig;
@@ -498,6 +528,7 @@ function WebWidgetShell({
   onRemoveWidget: (widgetId: string) => void;
   allowManualLayout?: boolean;
   allowResize?: boolean;
+  mainColumnExtraGap: number;
   sourceColumns: number;
 }) {
   const [preview, setPreview] = useState(widget.position);
@@ -589,9 +620,9 @@ function WebWidgetShell({
           isolation: "isolate",
         }
       : null),
-    left: preview.x * stepX,
+    left: displayOffset(preview.x, cellWidth, config.grid.gap, mainColumnExtraGap),
     top: preview.y * stepY,
-    width: preview.w * cellWidth + (preview.w - 1) * config.grid.gap,
+    width: displaySpan(preview.x, preview.w, cellWidth, config.grid.gap, mainColumnExtraGap),
     height: preview.h * rowHeight + (preview.h - 1) * config.grid.gap,
     boxShadow: isLayoutMode ? "inset 0 0 0 1px rgba(77, 226, 177, 0.22)" : undefined,
   };
