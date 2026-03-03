@@ -303,6 +303,7 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
+    minHeight: 0,
     marginVertical: 18,
     borderRadius: 22,
     backgroundColor: palette.panelStrong,
@@ -458,6 +459,7 @@ const styles = StyleSheet.create({
   },
   editorWrap: {
     flex: 1,
+    minHeight: 0,
   },
   input: {
     borderRadius: 14,
