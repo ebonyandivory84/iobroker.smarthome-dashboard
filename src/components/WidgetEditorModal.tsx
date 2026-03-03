@@ -24,6 +24,13 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
   const { config } = useDashboardConfig();
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [soundDraft, setSoundDraft] = useState<Record<string, string[]>>({});
+  const [weatherSuggestions, setWeatherSuggestions] = useState<Array<{
+    label: string;
+    latitude: number;
+    longitude: number;
+    query: string;
+  }>>([]);
+  const [weatherSearchBusy, setWeatherSearchBusy] = useState(false);
   const [pickerField, setPickerField] = useState<string | null>(null);
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const theme = resolveThemeSettings(config.theme);
@@ -93,6 +100,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
 
     if (widget.type === "energy") {
       setSoundDraft({});
+      setWeatherSuggestions([]);
+      setWeatherSearchBusy(false);
       setDraft({
         title: widget.title,
         showTitle: widget.showTitle === false ? "false" : "true",
@@ -137,6 +146,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     }
 
     setSoundDraft({});
+    setWeatherSuggestions([]);
+    setWeatherSearchBusy(false);
     setDraft({
       title: widget.title,
       showTitle: widget.showTitle === false ? "false" : "true",
@@ -165,6 +176,73 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       ...appearanceDraft,
     });
   }, [visible, widget]);
+
+  useEffect(() => {
+    if (!visible || widget?.type !== "weather") {
+      return;
+    }
+
+    const query = (draft.locationQuery || "").trim();
+    if (query.length < 2) {
+      setWeatherSuggestions([]);
+      setWeatherSearchBusy(false);
+      return;
+    }
+
+    let active = true;
+    setWeatherSearchBusy(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({
+          name: query,
+          count: "5",
+          language: "de",
+          format: "json",
+        });
+        const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?${params.toString()}`);
+        if (!response.ok) {
+          throw new Error(`Geocoding failed (${response.status})`);
+        }
+
+        const payload = (await response.json()) as {
+          results?: Array<{
+            name: string;
+            latitude: number;
+            longitude: number;
+            country?: string;
+            admin1?: string;
+          }>;
+        };
+
+        if (!active) {
+          return;
+        }
+
+        setWeatherSuggestions(
+          (payload.results || []).map((entry) => ({
+            label: [entry.name, entry.admin1, entry.country].filter(Boolean).join(", "),
+            latitude: entry.latitude,
+            longitude: entry.longitude,
+            query: entry.name,
+          }))
+        );
+      } catch {
+        if (active) {
+          setWeatherSuggestions([]);
+        }
+      } finally {
+        if (active) {
+          setWeatherSearchBusy(false);
+        }
+      }
+    }, 260);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [draft.locationQuery, visible, widget?.type]);
 
   if (!widget) {
     return null;
@@ -740,6 +818,32 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     style={styles.input}
                     value={draft.locationQuery || ""}
                   />
+                  {weatherSearchBusy ? <Text style={styles.mappingHint}>Suche Orte...</Text> : null}
+                  {weatherSuggestions.length ? (
+                    <View style={styles.weatherSuggestionList}>
+                      {weatherSuggestions.map((entry) => (
+                        <Pressable
+                          key={`${entry.label}-${entry.latitude}-${entry.longitude}`}
+                          onPress={() => {
+                            setDraft((current) => ({
+                              ...current,
+                              locationQuery: entry.query,
+                              locationName: entry.label,
+                              latitude: String(entry.latitude),
+                              longitude: String(entry.longitude),
+                            }));
+                            setWeatherSuggestions([]);
+                          }}
+                          style={styles.weatherSuggestionItem}
+                        >
+                          <Text style={styles.weatherSuggestionLabel}>{entry.label}</Text>
+                          <Text style={styles.weatherSuggestionMeta}>
+                            {entry.latitude.toFixed(2)}, {entry.longitude.toFixed(2)}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : null}
                 </Field>
                 <View style={styles.splitRow}>
                   <Field label="Latitude">
@@ -1548,6 +1652,30 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 12,
     fontWeight: "700",
+  },
+  weatherSuggestionList: {
+    marginTop: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    overflow: "hidden",
+  },
+  weatherSuggestionItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.05)",
+    gap: 2,
+  },
+  weatherSuggestionLabel: {
+    color: palette.text,
+    fontWeight: "700",
+  },
+  weatherSuggestionMeta: {
+    color: palette.textMuted,
+    fontSize: 12,
+    fontWeight: "600",
   },
   iconPreviewRow: {
     flexDirection: "row",
