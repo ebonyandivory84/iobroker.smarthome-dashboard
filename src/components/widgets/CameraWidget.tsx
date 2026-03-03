@@ -106,36 +106,8 @@ export function CameraWidget({ config, maximizeStateValue, onAspectRatioDetected
   }, [config.snapshotUrl, tick]);
 
   useEffect(() => {
-    if (!snapshotUrl) {
-      setDisplayUrl(null);
-      return;
-    }
-
-    let active = true;
-
-    if (!displayUrl) {
-      setDisplayUrl(snapshotUrl);
-      return () => {
-        active = false;
-      };
-    }
-
-    preloadSnapshot(snapshotUrl)
-      .then(() => {
-        if (active) {
-          setDisplayUrl(snapshotUrl);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setDisplayUrl(snapshotUrl);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [displayUrl, snapshotUrl]);
+    setDisplayUrl(snapshotUrl);
+  }, [snapshotUrl]);
 
   return (
     <>
@@ -313,20 +285,6 @@ function normalizeBoolean(value: unknown) {
   }
 
   return null;
-}
-
-async function preloadSnapshot(uri: string) {
-  if (Platform.OS === "web" && typeof window !== "undefined") {
-    await new Promise<void>((resolve, reject) => {
-      const img = new window.Image();
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error("Snapshot preload failed"));
-      img.src = uri;
-    });
-    return;
-  }
-
-  await Image.prefetch(uri);
 }
 
 const styles = StyleSheet.create({
