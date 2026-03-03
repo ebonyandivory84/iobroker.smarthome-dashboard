@@ -21,9 +21,20 @@ export function DashboardScreen() {
   const horizontalOffsetRef = useRef(0);
   const pageSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pageOffsetsRef = useRef<Record<string, number>>({});
-  const pullGestureRef = useRef<{ pageId: string | null; startY: number | null }>({
+  const pullGestureRef = useRef<{
+    pageId: string | null;
+    startX: number | null;
+    startY: number | null;
+    lastX: number | null;
+    lastY: number | null;
+    armed: boolean;
+  }>({
     pageId: null,
+    startX: null,
     startY: null,
+    lastX: null,
+    lastY: null,
+    armed: false,
   });
   const {
     addWidget,
@@ -228,14 +239,57 @@ export function DashboardScreen() {
 
       const currentOffset = pageOffsetsRef.current[pageId] || 0;
       if (currentOffset > 0) {
-        pullGestureRef.current = { pageId: null, startY: null };
+        pullGestureRef.current = {
+          pageId: null,
+          startX: null,
+          startY: null,
+          lastX: null,
+          lastY: null,
+          armed: false,
+        };
         return;
       }
 
+      const point = extractTouchPoint(event);
       pullGestureRef.current = {
         pageId,
-        startY: extractTouchPageY(event),
+        startX: point?.pageX ?? null,
+        startY: point?.pageY ?? null,
+        lastX: point?.pageX ?? null,
+        lastY: point?.pageY ?? null,
+        armed: false,
       };
+    };
+
+  const handlePageTouchMove =
+    (pageId: string) =>
+    (event: unknown) => {
+      if (!isTouchLayout) {
+        return;
+      }
+
+      const activeGesture = pullGestureRef.current;
+      if (activeGesture.pageId !== pageId || activeGesture.startY === null || activeGesture.startX === null) {
+        return;
+      }
+
+      const point = extractTouchPoint(event);
+      if (!point) {
+        return;
+      }
+
+      activeGesture.lastX = point.pageX;
+      activeGesture.lastY = point.pageY;
+
+      const currentOffset = pageOffsetsRef.current[pageId] || 0;
+      if (currentOffset > 0) {
+        activeGesture.armed = false;
+        return;
+      }
+
+      const deltaY = point.pageY - activeGesture.startY;
+      const deltaX = point.pageX - activeGesture.startX;
+      activeGesture.armed = deltaY > 96 && deltaY > Math.abs(deltaX) + 32;
     };
 
   const handlePageTouchEnd =
@@ -247,14 +301,20 @@ export function DashboardScreen() {
 
       const activeGesture = pullGestureRef.current;
       const currentOffset = pageOffsetsRef.current[pageId] || 0;
-      const endY = extractTouchPageY(event);
+      const endPoint = extractTouchPoint(event);
+      const endY = endPoint?.pageY ?? activeGesture.lastY;
+      const endX = endPoint?.pageX ?? activeGesture.lastX;
+      const deltaY =
+        activeGesture.startY !== null && endY !== null ? endY - activeGesture.startY : 0;
+      const deltaX =
+        activeGesture.startX !== null && endX !== null ? endX - activeGesture.startX : 0;
 
       if (
         activeGesture.pageId === pageId &&
-        activeGesture.startY !== null &&
-        endY !== null &&
+        activeGesture.armed &&
         currentOffset <= 0 &&
-        endY - activeGesture.startY > 96
+        deltaY > 96 &&
+        deltaY > Math.abs(deltaX) + 32
       ) {
         playConfiguredUiSound(config.uiSounds?.pageSounds?.pullToRefresh, "page", "global:pullToRefresh");
         window.setTimeout(() => {
@@ -262,7 +322,14 @@ export function DashboardScreen() {
         }, 140);
       }
 
-      pullGestureRef.current = { pageId: null, startY: null };
+      pullGestureRef.current = {
+        pageId: null,
+        startX: null,
+        startY: null,
+        lastX: null,
+        lastY: null,
+        armed: false,
+      };
     };
 
   return (
@@ -315,6 +382,7 @@ export function DashboardScreen() {
               onMomentumScrollEnd={handleContentScrollEnd}
               onScrollEndDrag={handleContentScrollEnd}
               onTouchStart={handlePageTouchStart(pageConfig.activePageId)}
+              onTouchMove={handlePageTouchMove(pageConfig.activePageId)}
               onTouchEnd={handlePageTouchEnd(pageConfig.activePageId)}
             >
               <GridCanvas
@@ -350,7 +418,7 @@ export function DashboardScreen() {
   );
 }
 
-function extractTouchPageY(event: unknown) {
+function extractTouchPoint(event: unknown) {
   if (!event || typeof event !== "object" || !("nativeEvent" in event)) {
     return null;
   }
@@ -360,19 +428,26 @@ function extractTouchPageY(event: unknown) {
     return null;
   }
 
-  const touches = "touches" in nativeEvent ? (nativeEvent as { touches?: Array<{ pageY?: number }> }).touches : undefined;
+  const touches =
+    "touches" in nativeEvent
+      ? (nativeEvent as { touches?: Array<{ pageX?: number; pageY?: number }> }).touches
+      : undefined;
   const changedTouches =
     "changedTouches" in nativeEvent
-      ? (nativeEvent as { changedTouches?: Array<{ pageY?: number }> }).changedTouches
+      ? (nativeEvent as { changedTouches?: Array<{ pageX?: number; pageY?: number }> }).changedTouches
       : undefined;
 
+  const directPageX = "pageX" in nativeEvent ? (nativeEvent as { pageX?: number }).pageX : undefined;
   const directPageY = "pageY" in nativeEvent ? (nativeEvent as { pageY?: number }).pageY : undefined;
 
-  return (
-    touches?.[0]?.pageY ??
-    changedTouches?.[0]?.pageY ??
-    (typeof directPageY === "number" ? directPageY : null)
-  );
+  const pageX = touches?.[0]?.pageX ?? changedTouches?.[0]?.pageX ?? directPageX;
+  const pageY = touches?.[0]?.pageY ?? changedTouches?.[0]?.pageY ?? directPageY;
+
+  if (typeof pageX !== "number" || typeof pageY !== "number") {
+    return null;
+  }
+
+  return { pageX, pageY };
 }
 
 function BackgroundLayer({
