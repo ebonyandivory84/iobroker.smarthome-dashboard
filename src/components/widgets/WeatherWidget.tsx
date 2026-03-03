@@ -9,6 +9,7 @@ type WeatherPayload = {
     temperature: number;
     weathercode: number;
     windspeed: number;
+    is_day?: number;
   };
   daily?: {
     time: string[];
@@ -18,33 +19,69 @@ type WeatherPayload = {
   };
 };
 
+type GeocodingPayload = {
+  results?: Array<{
+    name: string;
+    latitude: number;
+    longitude: number;
+    country?: string;
+    admin1?: string;
+  }>;
+};
+
 type WeatherWidgetProps = {
   config: WeatherWidgetConfig;
 };
 
 export function WeatherWidget({ config }: WeatherWidgetProps) {
   const [data, setData] = useState<WeatherPayload | null>(null);
+  const [resolvedCoords, setResolvedCoords] = useState<{ latitude: number; longitude: number; label: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
-
-  const endpoint = useMemo(() => {
-    const params = new URLSearchParams({
-      latitude: String(config.latitude),
-      longitude: String(config.longitude),
-      current_weather: "true",
-      daily: "weathercode,temperature_2m_max,temperature_2m_min",
-      forecast_days: "5",
-      timezone: config.timezone || "auto",
-    });
-    return `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
-  }, [config.latitude, config.longitude, config.timezone]);
+  const locationQuery = config.locationQuery?.trim() || "";
 
   useEffect(() => {
     let active = true;
 
     const load = async () => {
       try {
+        let latitude = config.latitude;
+        let longitude = config.longitude;
+        let resolvedLabel = config.locationName || config.title;
+
+        if (locationQuery) {
+          const geocodingParams = new URLSearchParams({
+            name: locationQuery,
+            count: "1",
+            language: "de",
+            format: "json",
+          });
+          const geocodingResponse = await fetch(`https://geocoding-api.open-meteo.com/v1/search?${geocodingParams.toString()}`);
+          if (!geocodingResponse.ok) {
+            throw new Error(`Ortsabfrage fehlgeschlagen (${geocodingResponse.status})`);
+          }
+
+          const geocodingPayload = (await geocodingResponse.json()) as GeocodingPayload;
+          const match = geocodingPayload.results?.[0];
+          if (!match) {
+            throw new Error("Ort nicht gefunden");
+          }
+
+          latitude = match.latitude;
+          longitude = match.longitude;
+          resolvedLabel = [match.name, match.admin1, match.country].filter(Boolean).join(", ");
+        }
+
+        const params = new URLSearchParams({
+          latitude: String(latitude),
+          longitude: String(longitude),
+          current_weather: "true",
+          daily: "weathercode,temperature_2m_max,temperature_2m_min",
+          forecast_days: "5",
+          timezone: config.timezone || "auto",
+        });
+        const endpoint = `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
         const response = await fetch(endpoint);
         if (!response.ok) {
           throw new Error(`Weather request failed (${response.status})`);
@@ -53,10 +90,12 @@ export function WeatherWidget({ config }: WeatherWidgetProps) {
         const payload = (await response.json()) as WeatherPayload;
         if (active) {
           setData(payload);
+          setResolvedCoords({ latitude, longitude, label: resolvedLabel });
           setError(null);
         }
       } catch (loadError) {
         if (active) {
+          setResolvedCoords(null);
           setError(loadError instanceof Error ? loadError.message : "Wetter konnte nicht geladen werden");
         }
       }
@@ -69,7 +108,7 @@ export function WeatherWidget({ config }: WeatherWidgetProps) {
       active = false;
       clearInterval(timer);
     };
-  }, [config.refreshMs, endpoint]);
+  }, [config.latitude, config.locationName, config.refreshMs, config.timezone, config.title, config.longitude, locationQuery]);
 
   const current = data?.current_weather;
   const forecastDays = (data?.daily?.time || []).slice(0, 5).map((date, index) => ({
@@ -79,6 +118,11 @@ export function WeatherWidget({ config }: WeatherWidgetProps) {
     min: data?.daily?.temperature_2m_min?.[index],
   }));
 
+  const currentIsDay = current?.is_day !== 0;
+  const displayLabel = resolvedCoords?.label || config.locationName || locationQuery || config.title;
+  const displayLatitude = resolvedCoords?.latitude ?? config.latitude;
+  const displayLongitude = resolvedCoords?.longitude ?? config.longitude;
+
   return (
     <View style={styles.container}>
       <View style={styles.hero}>
@@ -86,7 +130,7 @@ export function WeatherWidget({ config }: WeatherWidgetProps) {
         <View style={styles.heroTop}>
           <View style={styles.heroMeta}>
             <Text numberOfLines={1} style={[styles.location, { color: textColor }]}>
-              {config.locationName || config.title}
+              {displayLabel}
             </Text>
             <Text style={[styles.summary, { color: textColor }]}>
               {current ? describeWeather(current.weathercode) : error || "Lade Wetter..."}
@@ -103,8 +147,8 @@ export function WeatherWidget({ config }: WeatherWidgetProps) {
         <View style={styles.sunWrap}>
           <View style={styles.sunHalo} />
           <MaterialCommunityIcons
-            color={iconColorForCode(current?.weathercode)}
-            name={iconForCode(current?.weathercode)}
+            color={iconColorForCode(current?.weathercode, currentIsDay)}
+            name={iconForCode(current?.weathercode, currentIsDay)}
             size={76}
           />
         </View>
@@ -115,7 +159,7 @@ export function WeatherWidget({ config }: WeatherWidgetProps) {
           Wind {current ? `${Math.round(current.windspeed)} km/h` : "—"}
         </Text>
         <Text style={[styles.meta, { color: mutedTextColor }]}>
-          {config.latitude.toFixed(2)}, {config.longitude.toFixed(2)}
+          {displayLatitude.toFixed(2)}, {displayLongitude.toFixed(2)}
         </Text>
       </View>
 
@@ -123,7 +167,7 @@ export function WeatherWidget({ config }: WeatherWidgetProps) {
         {forecastDays.map((day) => (
           <View key={day.date} style={styles.dayCard}>
             <Text style={[styles.dayLabel, { color: textColor }]}>{weekday(day.date)}</Text>
-            <MaterialCommunityIcons color={iconColorForCode(day.code)} name={iconForCode(day.code)} size={22} />
+            <MaterialCommunityIcons color={iconColorForCode(day.code, true)} name={iconForCode(day.code, true)} size={22} />
             <Text style={[styles.dayTemp, { color: textColor }]}>
               {day.max !== undefined ? `${Math.round(day.max)}°` : "—"}
             </Text>
@@ -142,15 +186,15 @@ function weekday(value: string) {
   return date.toLocaleDateString("de-DE", { weekday: "short" });
 }
 
-function iconForCode(code?: number) {
+function iconForCode(code?: number, isDay = true) {
   if (code === undefined) {
     return "weather-cloudy-alert";
   }
   if (code === 0) {
-    return "weather-sunny";
+    return isDay ? "weather-sunny" : "weather-night";
   }
   if ([1, 2].includes(code)) {
-    return "weather-partly-cloudy";
+    return isDay ? "weather-partly-cloudy" : "weather-night-partly-cloudy";
   }
   if (code === 3) {
     return "weather-cloudy";
@@ -173,9 +217,9 @@ function iconForCode(code?: number) {
   return "weather-cloudy";
 }
 
-function iconColorForCode(code?: number) {
+function iconColorForCode(code?: number, isDay = true) {
   if (code === 0) {
-    return "#ffd166";
+    return isDay ? "#ffd166" : "#b7c4ff";
   }
   if (code !== undefined && [95, 96, 99].includes(code)) {
     return "#c9a0ff";

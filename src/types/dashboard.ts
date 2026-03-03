@@ -92,6 +92,7 @@ export type WeatherWidgetConfig = WidgetBase & {
   latitude: number;
   longitude: number;
   locationName?: string;
+  locationQuery?: string;
   timezone?: string;
   refreshMs?: number;
 };

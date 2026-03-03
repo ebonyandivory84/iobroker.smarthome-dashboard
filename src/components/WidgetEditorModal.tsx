@@ -126,6 +126,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         title: widget.title,
         showTitle: widget.showTitle === false ? "false" : "true",
         locationName: widget.locationName || "",
+        locationQuery: widget.locationQuery || "",
         latitude: String(widget.latitude),
         longitude: String(widget.longitude),
         timezone: widget.timezone || "auto",
@@ -247,6 +248,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         title: draft.title,
         showTitle: draft.showTitle !== "false",
         locationName: draft.locationName || undefined,
+        locationQuery: draft.locationQuery || undefined,
         latitude: clampFloat(draft.latitude, widget.latitude),
         longitude: clampFloat(draft.longitude, widget.longitude),
         timezone: draft.timezone || "auto",
@@ -730,6 +732,15 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={draft.locationName || ""}
                   />
                 </Field>
+                <Field label="Ort suchen (statt Koordinaten)">
+                  <TextInput
+                    onChangeText={(value) => setDraft((current) => ({ ...current, locationQuery: value }))}
+                    placeholder="z. B. Berlin, Hamburg, Muenchen"
+                    placeholderTextColor={palette.textMuted}
+                    style={styles.input}
+                    value={draft.locationQuery || ""}
+                  />
+                </Field>
                 <View style={styles.splitRow}>
                   <Field label="Latitude">
                     <TextInput
@@ -750,6 +761,10 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     />
                   </Field>
                 </View>
+                <Text style={styles.mappingHint}>
+                  Wenn `Ort suchen` gesetzt ist, werden die Koordinaten automatisch ueber Open-Meteo ermittelt.
+                  Latitude/Longitude bleiben dann nur als Fallback erhalten.
+                </Text>
                 <Field label="Timezone">
                   <TextInput
                     autoCapitalize="none"

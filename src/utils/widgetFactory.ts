@@ -99,6 +99,7 @@ export function buildWidgetTemplate(
       type: "weather",
       title: `Wetter ${suffix}`,
       locationName: "Zuhause",
+      locationQuery: "",
       latitude: 52.52,
       longitude: 13.41,
       timezone: "auto",
