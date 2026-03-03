@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useState } from "react";
 import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from "react-native";
 import { StateWidgetConfig } from "../../types/dashboard";
+import { playUiSound } from "../../utils/uiSounds";
 import { palette } from "../../utils/theme";
 
 type StateWidgetProps = {
@@ -69,7 +70,13 @@ export function StateWidget({ config, value, addonValue, onToggle }: StateWidget
   return (
     <View style={[styles.container, hasTitle ? styles.containerWithTitle : null]}>
       {config.writeable ? (
-        <Pressable onPress={onToggle} style={styles.tapArea}>
+        <Pressable
+          onPress={() => {
+            playUiSound("toggle");
+            onToggle();
+          }}
+          style={styles.tapArea}
+        >
           {content}
         </Pressable>
       ) : (

@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 import { GrafanaWidgetConfig } from "../../types/dashboard";
+import { playUiSound } from "../../utils/uiSounds";
 import { palette } from "../../utils/theme";
 
 type GrafanaWidgetProps = {
@@ -34,15 +35,22 @@ export function GrafanaWidget({ config }: GrafanaWidgetProps) {
     );
   }
 
-  return createElement("iframe", {
-    src: iframeUrl,
-    style: webFrameStyle,
-    sandbox: sandboxValue,
-    allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
-    allowFullScreen: true,
-    loading: "eager",
-    referrerPolicy: "no-referrer",
-  });
+  return createElement(
+    "div",
+    {
+      onPointerDown: () => playUiSound("panel"),
+      style: webFrameWrapStyle,
+    },
+    createElement("iframe", {
+      src: iframeUrl,
+      style: webFrameStyle,
+      sandbox: sandboxValue,
+      allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
+      allowFullScreen: true,
+      loading: "eager",
+      referrerPolicy: "no-referrer",
+    })
+  );
 }
 
 function normalizeGrafanaUrl(value?: string) {
@@ -124,6 +132,11 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 });
+
+const webFrameWrapStyle = {
+  width: "100%",
+  height: "100%",
+};
 
 const webFrameStyle = {
   width: "100%",

@@ -9,6 +9,7 @@ import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { useIoBrokerStates } from "../hooks/useIoBrokerStates";
 import { BackgroundMode, WidgetConfig, WidgetType } from "../types/dashboard";
 import { constrainToPrimarySections, normalizeWidgetLayout, resolveWidgetPosition } from "../utils/gridLayout";
+import { playUiSound } from "../utils/uiSounds";
 import { buildWidgetTemplate } from "../utils/widgetFactory";
 import { palette } from "../utils/theme";
 
@@ -109,6 +110,9 @@ export function DashboardScreen() {
   const handlePageScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const nextPage = resolvePageFromOffset(event.nativeEvent.contentOffset.x);
     if (nextPage) {
+      if (nextPage.id !== activePageId) {
+        playUiSound("swipe");
+      }
       setVisiblePageId(nextPage.id);
       setActivePage(nextPage.id);
     }

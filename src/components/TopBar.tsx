@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { playUiSound } from "../utils/uiSounds";
 import { palette } from "../utils/theme";
 
 type TopBarProps = {
@@ -40,7 +41,10 @@ export function TopBar({
               return (
                 <Pressable
                   key={page.id}
-                  onPress={() => onSelectPage(page.id)}
+                  onPress={() => {
+                    playUiSound("page");
+                    onSelectPage(page.id);
+                  }}
                   style={[styles.pageTab, activePage ? styles.pageTabActive : null]}
                 >
                   <Text numberOfLines={1} style={[styles.pageTabLabel, activePage ? styles.pageTabLabelActive : null]}>

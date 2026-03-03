@@ -1,6 +1,7 @@
 import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { Image, Linking, Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { CameraWidgetConfig } from "../../types/dashboard";
+import { playUiSound } from "../../utils/uiSounds";
 import { palette } from "../../utils/theme";
 
 type CameraWidgetProps = {
@@ -22,6 +23,7 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
           Math.abs(gestureState.dy) > 12 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
         onPanResponderRelease: (_event, gestureState) => {
           if (gestureState.dy > 80 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx)) {
+            playUiSound("swipe");
             setFullscreenOpen(false);
           }
         },
@@ -97,7 +99,10 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
       <View style={styles.container}>
         <Pressable
           disabled={!displayUrl}
-          onPress={() => setFullscreenOpen(true)}
+          onPress={() => {
+            playUiSound("open");
+            setFullscreenOpen(true);
+          }}
           style={styles.preview}
         >
         {displayUrl ? (
@@ -148,14 +153,26 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
           <Text style={[styles.hint, { color: mutedTextColor }]}>Widget ist noch nicht konfiguriert.</Text>
         ) : null}
         {config.rtspUrl && !displayUrl ? (
-          <Pressable onPress={() => Linking.openURL(config.rtspUrl!)} style={styles.button}>
+          <Pressable
+            onPress={() => {
+              playUiSound("tap");
+              Linking.openURL(config.rtspUrl!);
+            }}
+            style={styles.button}
+          >
             <Text style={[styles.buttonLabel, { color: textColor }]}>RTSP Stream oeffnen</Text>
           </Pressable>
         ) : null}
       </View>
       <Modal animationType={Platform.OS === "web" ? "fade" : "none"} transparent visible={fullscreenOpen}>
         <View style={styles.fullscreenBackdrop}>
-          <Pressable onPress={() => setFullscreenOpen(false)} style={styles.fullscreenClose}>
+          <Pressable
+            onPress={() => {
+              playUiSound("close");
+              setFullscreenOpen(false);
+            }}
+            style={styles.fullscreenClose}
+          >
             <Text style={styles.fullscreenCloseLabel}>X</Text>
           </Pressable>
           <View {...fullscreenPanResponder.panHandlers} style={styles.fullscreenStage}>
