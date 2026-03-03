@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { SoundPickerField } from "./SoundPickerField";
 import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { UiSoundSet } from "../types/dashboard";
 import { palette } from "../utils/theme";
@@ -27,6 +28,9 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [soundVolume, setSoundVolume] = useState("55");
   const [soundSet, setSoundSet] = useState<UiSoundSet>("voyager");
+  const [pageTabSounds, setPageTabSounds] = useState<string[]>([]);
+  const [pageSwipeSounds, setPageSwipeSounds] = useState<string[]>([]);
+  const [pageContentScrollSounds, setPageContentScrollSounds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -40,6 +44,9 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     setSoundEnabled(config.uiSounds?.enabled !== false);
     setSoundVolume(String(config.uiSounds?.volume ?? 55));
     setSoundSet(config.uiSounds?.soundSet || "voyager");
+    setPageTabSounds(config.uiSounds?.pageSounds?.tabPress || []);
+    setPageSwipeSounds(config.uiSounds?.pageSounds?.swipe || []);
+    setPageContentScrollSounds(config.uiSounds?.pageSounds?.contentScroll || []);
     setError(null);
     refreshSavedDashboards();
   }, [config.homeLabel, config.title, rawJson, visible]);
@@ -60,6 +67,11 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
         enabled: soundEnabled,
         volume: Math.max(0, Math.min(100, normalizedVolume)),
         soundSet,
+        pageSounds: {
+          tabPress: pageTabSounds,
+          swipe: pageSwipeSounds,
+          contentScroll: pageContentScrollSounds,
+        },
       };
       nextDraft = JSON.stringify(parsed, null, 2);
     } catch {
@@ -186,6 +198,18 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                   </Pressable>
                 ))}
               </View>
+            </View>
+            <View style={styles.soundSetBlock}>
+              <Text style={styles.fieldLabel}>Seiten-Tabs</Text>
+              <SoundPickerField onChange={setPageTabSounds} value={pageTabSounds} />
+            </View>
+            <View style={styles.soundSetBlock}>
+              <Text style={styles.fieldLabel}>Dashboard wischen</Text>
+              <SoundPickerField onChange={setPageSwipeSounds} value={pageSwipeSounds} />
+            </View>
+            <View style={styles.soundSetBlock}>
+              <Text style={styles.fieldLabel}>Seite scrollen</Text>
+              <SoundPickerField onChange={setPageContentScrollSounds} value={pageContentScrollSounds} />
             </View>
           </View>
           <View style={styles.libraryCard}>

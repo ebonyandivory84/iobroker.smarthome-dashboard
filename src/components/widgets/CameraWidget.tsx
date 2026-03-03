@@ -1,7 +1,7 @@
 import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { Image, Linking, Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { CameraWidgetConfig } from "../../types/dashboard";
-import { playUiSound } from "../../utils/uiSounds";
+import { playConfiguredUiSound } from "../../utils/uiSounds";
 import { palette } from "../../utils/theme";
 
 type CameraWidgetProps = {
@@ -23,12 +23,12 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
           Math.abs(gestureState.dy) > 12 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
         onPanResponderRelease: (_event, gestureState) => {
           if (gestureState.dy > 80 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx)) {
-            playUiSound("swipe");
+            playConfiguredUiSound(config.interactionSounds?.scroll, "swipe", `${config.id}:scroll`);
             setFullscreenOpen(false);
           }
         },
       }),
-    []
+    [config.id, config.interactionSounds?.scroll]
   );
 
   useEffect(() => {
@@ -100,7 +100,7 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
         <Pressable
           disabled={!displayUrl}
           onPress={() => {
-            playUiSound("open");
+            playConfiguredUiSound(config.interactionSounds?.open, "open", `${config.id}:open`);
             setFullscreenOpen(true);
           }}
           style={styles.preview}
@@ -155,7 +155,7 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
         {config.rtspUrl && !displayUrl ? (
           <Pressable
             onPress={() => {
-              playUiSound("tap");
+              playConfiguredUiSound(config.interactionSounds?.press, "tap", `${config.id}:press`);
               Linking.openURL(config.rtspUrl!);
             }}
             style={styles.button}
@@ -168,7 +168,7 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
         <View style={styles.fullscreenBackdrop}>
           <Pressable
             onPress={() => {
-              playUiSound("close");
+              playConfiguredUiSound(config.interactionSounds?.close, "close", `${config.id}:close`);
               setFullscreenOpen(false);
             }}
             style={styles.fullscreenClose}

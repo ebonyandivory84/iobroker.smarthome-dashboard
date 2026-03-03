@@ -42,6 +42,15 @@ export type WidgetBase = {
   iconPair?: IconPair;
   position: GridPosition;
   appearance?: WidgetAppearance;
+  interactionSounds?: WidgetInteractionSounds;
+};
+
+export type WidgetInteractionSounds = {
+  press?: string[];
+  confirm?: string[];
+  open?: string[];
+  close?: string[];
+  scroll?: string[];
 };
 
 export type StateWidgetConfig = WidgetBase & {
@@ -185,6 +194,11 @@ export type UiSoundSettings = {
   enabled: boolean;
   volume: number;
   soundSet: UiSoundSet;
+  pageSounds?: {
+    tabPress?: string[];
+    swipe?: string[];
+    contentScroll?: string[];
+  };
 };
 
 export type DashboardSettings = {

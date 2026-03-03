@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import { UiSoundSettings, UiSoundSet } from "../types/dashboard";
+import { normalizeSoundSelection, resolveLcarsSoundUri } from "./lcarsSounds";
 
 export type UiSound = "tap" | "toggle" | "panel" | "page" | "open" | "close" | "swipe";
 
@@ -16,6 +17,11 @@ const DEFAULT_UI_SOUND_SETTINGS: UiSoundSettings = {
   enabled: true,
   volume: 55,
   soundSet: "voyager",
+  pageSounds: {
+    tabPress: [],
+    swipe: [],
+    contentScroll: [],
+  },
 };
 
 const SOUND_LIBRARY_BY_SET: Record<UiSoundSet, Record<UiSound, SoundLayer[]>> = {
@@ -114,6 +120,7 @@ const SOUND_LIBRARY_BY_SET: Record<UiSoundSet, Record<UiSound, SoundLayer[]>> = 
 let audioContext: AudioContext | null = null;
 let masterGainNode: GainNode | null = null;
 let uiSoundSettings: UiSoundSettings = DEFAULT_UI_SOUND_SETTINGS;
+const soundCursor = new Map<string, number>();
 
 export function configureUiSounds(settings?: UiSoundSettings) {
   uiSoundSettings = normalizeUiSoundSettings(settings);
@@ -128,6 +135,51 @@ export function playUiSound(sound: UiSound = "tap") {
     return;
   }
 
+  playSynthSound(sound);
+}
+
+export function playConfiguredUiSound(soundIds: string[] | undefined, fallback: UiSound, cycleKey: string) {
+  if (!uiSoundSettings.enabled) {
+    return;
+  }
+
+  const normalizedSelection = normalizeSoundSelection(soundIds);
+  if (!normalizedSelection.length) {
+    playSynthSound(fallback);
+    return;
+  }
+
+  if (Platform.OS !== "web" || typeof window === "undefined") {
+    playSynthSound(fallback);
+    return;
+  }
+
+  const soundIndex = soundCursor.get(cycleKey) || 0;
+  const selectedId = normalizedSelection[soundIndex % normalizedSelection.length];
+  soundCursor.set(cycleKey, (soundIndex + 1) % normalizedSelection.length);
+
+  if (!playAudioAsset(selectedId)) {
+    playSynthSound(fallback);
+  }
+}
+
+function playAudioAsset(soundId: string) {
+  const uri = resolveLcarsSoundUri(soundId);
+  if (!uri || typeof window === "undefined" || typeof window.Audio !== "function") {
+    return false;
+  }
+
+  try {
+    const audio = new window.Audio(uri);
+    audio.volume = Math.max(0, Math.min(1, uiSoundSettings.volume / 100));
+    void audio.play().catch(() => undefined);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function playSynthSound(sound: UiSound) {
   const context = getAudioContext();
   const masterGain = masterGainNode;
   if (!context || !masterGain) {
@@ -201,14 +253,20 @@ function normalizeUiSoundSettings(settings?: UiSoundSettings): UiSoundSettings {
     soundSet === "ops" || soundSet === "soft" || soundSet === "voyager"
       ? soundSet
       : DEFAULT_UI_SOUND_SETTINGS.soundSet;
-  const volumeValue = typeof settings?.volume === "number" && Number.isFinite(settings.volume)
-    ? Math.round(settings.volume)
-    : DEFAULT_UI_SOUND_SETTINGS.volume;
+  const volumeValue =
+    typeof settings?.volume === "number" && Number.isFinite(settings.volume)
+      ? Math.round(settings.volume)
+      : DEFAULT_UI_SOUND_SETTINGS.volume;
 
   return {
     enabled: settings?.enabled !== false,
     volume: Math.max(0, Math.min(100, volumeValue)),
     soundSet: normalizedSoundSet,
+    pageSounds: {
+      tabPress: normalizeSoundSelection(settings?.pageSounds?.tabPress),
+      swipe: normalizeSoundSelection(settings?.pageSounds?.swipe),
+      contentScroll: normalizeSoundSelection(settings?.pageSounds?.contentScroll),
+    },
   };
 }
 

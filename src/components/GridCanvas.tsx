@@ -1,6 +1,7 @@
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { StateWriteFeedback } from "../hooks/useIoBrokerStates";
 import { IoBrokerClient } from "../services/iobroker";
 import { DashboardSettings, StateSnapshot, WidgetConfig } from "../types/dashboard";
 import { constrainToPrimarySections, GRID_SNAP } from "../utils/gridLayout";
@@ -23,6 +24,7 @@ type GridCanvasProps = {
   onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void;
   onRemoveWidget: (widgetId: string) => void;
   onWriteState: (stateId: string, value: unknown) => void | Promise<void>;
+  stateWrites?: Record<string, StateWriteFeedback>;
   onLayoutMeasured?: (width: number) => void;
 };
 
@@ -35,6 +37,7 @@ export function GridCanvas({
   onUpdateWidget,
   onRemoveWidget,
   onWriteState,
+  stateWrites,
   onLayoutMeasured,
 }: GridCanvasProps) {
   const { width: windowWidth } = useWindowDimensions();
@@ -101,6 +104,7 @@ export function GridCanvas({
         onRemoveWidget={onRemoveWidget}
         onUpdateWidget={onUpdateWidget}
         onWriteState={onWriteState}
+        stateWrites={stateWrites}
         states={states}
       />
     ) : (
@@ -132,7 +136,7 @@ export function GridCanvas({
                 rowHeight={renderRowHeight}
                 widget={widget}
               >
-                {renderWidget(widget, states, client, onUpdateWidget, onWriteState, displayConfig.theme)}
+                {renderWidget(widget, states, client, onUpdateWidget, onWriteState, displayConfig.theme, stateWrites)}
               </WidgetFrame>
             </View>
           );
@@ -441,6 +445,7 @@ function WebGridCanvas({
   onUpdateWidget,
   onRemoveWidget,
   onWriteState,
+  stateWrites,
 }: {
   config: DashboardSettings;
   mainColumnExtraGap: number;
@@ -456,6 +461,7 @@ function WebGridCanvas({
   onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void;
   onRemoveWidget: (widgetId: string) => void;
   onWriteState: (stateId: string, value: unknown) => void | Promise<void>;
+  stateWrites?: Record<string, StateWriteFeedback>;
 }) {
   const stepX = cellWidth + config.grid.gap;
   const stepY = rowHeight + config.grid.gap;
@@ -475,6 +481,7 @@ function WebGridCanvas({
           onRemoveWidget={onRemoveWidget}
           onUpdateWidget={onUpdateWidget}
           onWriteState={onWriteState}
+          stateWrites={stateWrites}
           allowManualLayout={true}
           allowResize={false}
           mainColumnExtraGap={mainColumnExtraGap}
@@ -504,6 +511,7 @@ function WebWidgetShell({
   onUpdateWidget,
   onRemoveWidget,
   onWriteState,
+  stateWrites,
   allowManualLayout = true,
   allowResize = true,
   mainColumnExtraGap,
@@ -523,6 +531,7 @@ function WebWidgetShell({
   onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void;
   onRemoveWidget: (widgetId: string) => void;
   onWriteState: (stateId: string, value: unknown) => void | Promise<void>;
+  stateWrites?: Record<string, StateWriteFeedback>;
   allowManualLayout?: boolean;
   allowResize?: boolean;
   mainColumnExtraGap: number;
@@ -669,7 +678,7 @@ function WebWidgetShell({
         </div>
       ) : null}
       <View style={contentStyle}>
-        {renderWidget(widget, states, client, onUpdateWidget, onWriteState, config.theme)}
+        {renderWidget(widget, states, client, onUpdateWidget, onWriteState, config.theme, stateWrites)}
       </View>
       {isLayoutMode && allowManualLayout && allowResize ? (
         <div style={webFooterOverlayStyle}>
@@ -686,13 +695,15 @@ function renderWidget(
   client: IoBrokerClient,
   onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void,
   onWriteState: (stateId: string, value: unknown) => void | Promise<void>,
-  theme?: DashboardSettings["theme"]
+  theme?: DashboardSettings["theme"],
+  stateWrites?: Record<string, StateWriteFeedback>
 ) {
   if (widget.type === "state") {
     return (
       <StateWidget
         addonValue={widget.addonStateId ? states[widget.addonStateId] : undefined}
         config={widget}
+        interactionState={stateWrites?.[widget.stateId]?.status || "idle"}
         value={states[widget.stateId]}
         onToggle={() => onWriteState(widget.stateId, resolveStateNextValue(widget, states[widget.stateId]))}
       />

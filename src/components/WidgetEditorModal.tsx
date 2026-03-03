@@ -3,9 +3,11 @@ import { createElement, useEffect, useMemo, useState, type Dispatch, type SetSta
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { ImagePickerModal } from "./ImagePickerModal";
 import { ObjectPickerModal } from "./ObjectPickerModal";
+import { SoundPickerField } from "./SoundPickerField";
 import { IoBrokerClient } from "../services/iobroker";
 import { WidgetAppearance, WidgetConfig } from "../types/dashboard";
 import { useDashboardConfig } from "../context/DashboardConfigContext";
+import { normalizeSoundSelection } from "../utils/lcarsSounds";
 import { resolveThemeSettings } from "../utils/themeConfig";
 import { stateIconOptions } from "../utils/stateIcons";
 import { palette } from "../utils/theme";
@@ -21,6 +23,7 @@ type WidgetEditorModalProps = {
 export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: WidgetEditorModalProps) {
   const { config } = useDashboardConfig();
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const [soundDraft, setSoundDraft] = useState<Record<string, string[]>>({});
   const [pickerField, setPickerField] = useState<string | null>(null);
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const theme = resolveThemeSettings(config.theme);
@@ -38,6 +41,10 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     const appearanceDraft = buildAppearanceDraft(widget, theme);
 
     if (widget.type === "state") {
+      setSoundDraft({
+        press: normalizeSoundSelection(widget.interactionSounds?.press),
+        confirm: normalizeSoundSelection(widget.interactionSounds?.confirm),
+      });
       setDraft({
         title: widget.title,
         showTitle: widget.showTitle === false ? "false" : "true",
@@ -66,6 +73,12 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     }
 
     if (widget.type === "camera") {
+      setSoundDraft({
+        press: normalizeSoundSelection(widget.interactionSounds?.press),
+        open: normalizeSoundSelection(widget.interactionSounds?.open),
+        close: normalizeSoundSelection(widget.interactionSounds?.close),
+        scroll: normalizeSoundSelection(widget.interactionSounds?.scroll),
+      });
       setDraft({
         title: widget.title,
         showTitle: widget.showTitle === false ? "false" : "true",
@@ -78,6 +91,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     }
 
     if (widget.type === "energy") {
+      setSoundDraft({});
       setDraft({
         title: widget.title,
         showTitle: widget.showTitle === false ? "false" : "true",
@@ -91,6 +105,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     }
 
     if (widget.type === "grafana") {
+      setSoundDraft({
+        press: normalizeSoundSelection(widget.interactionSounds?.press),
+      });
       setDraft({
         title: widget.title,
         showTitle: widget.showTitle === false ? "false" : "true",
@@ -103,6 +120,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     }
 
     if (widget.type === "weather") {
+      setSoundDraft({});
       setDraft({
         title: widget.title,
         showTitle: widget.showTitle === false ? "false" : "true",
@@ -116,6 +134,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       return;
     }
 
+    setSoundDraft({});
     setDraft({
       title: widget.title,
       showTitle: widget.showTitle === false ? "false" : "true",
@@ -174,6 +193,10 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         addonColor: draft.addonColor || undefined,
         addonIcon: draft.addonIcon || undefined,
         addonUseStateValue: draft.addonUseStateValue === "true",
+        interactionSounds: {
+          press: normalizeSoundSelection(soundDraft.press),
+          confirm: normalizeSoundSelection(soundDraft.confirm),
+        },
         appearance,
       });
     } else if (widget.type === "camera") {
@@ -183,6 +206,12 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         snapshotUrl: draft.snapshotUrl || undefined,
         rtspUrl: draft.rtspUrl || undefined,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 250),
+        interactionSounds: {
+          press: normalizeSoundSelection(soundDraft.press),
+          open: normalizeSoundSelection(soundDraft.open),
+          close: normalizeSoundSelection(soundDraft.close),
+          scroll: normalizeSoundSelection(soundDraft.scroll),
+        },
         appearance,
       });
     } else if (widget.type === "energy") {
@@ -202,6 +231,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         url: draft.url || widget.url,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 10000, 1000),
         allowInteractions: draft.allowInteractions !== "false",
+        interactionSounds: {
+          press: normalizeSoundSelection(soundDraft.press),
+        },
         appearance,
       });
     } else if (widget.type === "weather") {
@@ -540,6 +572,20 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     </>
                   ) : null}
                 </Field>
+                <Field label="Sounds bei Interaktion">
+                  <Field label="Beim Druecken">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, press: value }))}
+                      value={soundDraft.press}
+                    />
+                  </Field>
+                  <Field label="Bei Bestaetigung">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, confirm: value }))}
+                      value={soundDraft.confirm}
+                    />
+                  </Field>
+                </Field>
               </>
             ) : null}
             {widget.type === "camera" ? (
@@ -567,6 +613,32 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     style={styles.input}
                     value={draft.refreshMs || ""}
                   />
+                </Field>
+                <Field label="Sounds bei Interaktion">
+                  <Field label="RTSP Taste">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, press: value }))}
+                      value={soundDraft.press}
+                    />
+                  </Field>
+                  <Field label="Maximieren">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, open: value }))}
+                      value={soundDraft.open}
+                    />
+                  </Field>
+                  <Field label="Schliessen">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, close: value }))}
+                      value={soundDraft.close}
+                    />
+                  </Field>
+                  <Field label="Wischen">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, scroll: value }))}
+                      value={soundDraft.scroll}
+                    />
+                  </Field>
                 </Field>
               </>
             ) : null}
@@ -625,6 +697,12 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     options={["true", "false"]}
                     value={draft.allowInteractions || "true"}
                     onSelect={(value) => setDraft((current) => ({ ...current, allowInteractions: value }))}
+                  />
+                </Field>
+                <Field label="Sounds bei Interaktion">
+                  <SoundPickerField
+                    onChange={(value) => setSoundDraft((current) => ({ ...current, press: value }))}
+                    value={soundDraft.press}
                   />
                 </Field>
               </>

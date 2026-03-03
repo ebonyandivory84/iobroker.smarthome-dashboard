@@ -9,6 +9,7 @@ import {
 } from "react";
 import { DashboardPage, DashboardSettings, UiSoundSettings, WidgetConfig } from "../types/dashboard";
 import { defaultConfig } from "../utils/defaultConfig";
+import { normalizeSoundSelection } from "../utils/lcarsSounds";
 
 type DashboardConfigContextValue = {
   config: DashboardSettings;
@@ -47,8 +48,13 @@ function migrateConfig(input: DashboardSettings): DashboardSettings {
       baseUrl: input.iobroker.baseUrl === LEGACY_DEMO_BASE_URL ? "" : input.iobroker.baseUrl,
     },
     widgets: input.widgets.map((widget) => {
+      const normalizedInteractionSounds = normalizeWidgetInteractionSounds(widget.interactionSounds);
+
       if (widget.type !== "camera") {
-        return widget;
+        return {
+          ...widget,
+          interactionSounds: normalizedInteractionSounds,
+        };
       }
 
       const legacySnapshot =
@@ -56,7 +62,9 @@ function migrateConfig(input: DashboardSettings): DashboardSettings {
         (widget.snapshotUrl === `${LEGACY_DEMO_BASE_URL}/cam/einfahrt.jpg` ||
           widget.snapshotUrl === `${LEGACY_DEMO_BASE_URL}/cam/snapshot.jpg`);
 
-      return legacySnapshot ? { ...widget, snapshotUrl: "" } : widget;
+      return legacySnapshot
+        ? { ...widget, snapshotUrl: "", interactionSounds: normalizedInteractionSounds }
+        : { ...widget, interactionSounds: normalizedInteractionSounds };
     }),
   };
 
@@ -366,13 +374,13 @@ function normalizeDashboardPages(input: DashboardSettings): DashboardSettings {
     ? input.pages.map((page, index) => ({
         id: page.id || `dashboard-${index + 1}`,
         title: page.title || `Dashboard ${index + 1}`,
-        widgets: Array.isArray(page.widgets) ? page.widgets : [],
+        widgets: normalizeWidgetConfigList(page.widgets),
       }))
     : [
         {
           id: input.activePageId || "home",
           title: input.title || "Dashboard",
-          widgets: Array.isArray(input.widgets) ? input.widgets : [],
+          widgets: normalizeWidgetConfigList(input.widgets),
         },
       ];
 
@@ -420,5 +428,37 @@ function normalizeUiSoundSettings(input?: UiSoundSettings): UiSoundSettings {
         ? Math.max(0, Math.min(100, Math.round(input.volume)))
         : 55,
     soundSet: soundSet === "ops" || soundSet === "soft" || soundSet === "voyager" ? soundSet : "voyager",
+    pageSounds: {
+      tabPress: normalizeSoundSelection(input?.pageSounds?.tabPress),
+      swipe: normalizeSoundSelection(input?.pageSounds?.swipe),
+      contentScroll: normalizeSoundSelection(input?.pageSounds?.contentScroll),
+    },
   };
+}
+
+function normalizeWidgetInteractionSounds(
+  input?: DashboardSettings["widgets"][number]["interactionSounds"]
+) {
+  if (!input) {
+    return undefined;
+  }
+
+  return {
+    press: normalizeSoundSelection(input.press),
+    confirm: normalizeSoundSelection(input.confirm),
+    open: normalizeSoundSelection(input.open),
+    close: normalizeSoundSelection(input.close),
+    scroll: normalizeSoundSelection(input.scroll),
+  };
+}
+
+function normalizeWidgetConfigList(input: DashboardSettings["widgets"] | undefined) {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+
+  return input.map((widget) => ({
+    ...widget,
+    interactionSounds: normalizeWidgetInteractionSounds(widget.interactionSounds),
+  }));
 }

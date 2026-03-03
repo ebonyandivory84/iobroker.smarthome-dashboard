@@ -1,8 +1,8 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from "react-native";
 import { StateWidgetConfig } from "../../types/dashboard";
-import { playUiSound } from "../../utils/uiSounds";
+import { playConfiguredUiSound } from "../../utils/uiSounds";
 import { palette } from "../../utils/theme";
 
 type StateWidgetProps = {
@@ -10,10 +10,12 @@ type StateWidgetProps = {
   value: unknown;
   addonValue?: unknown;
   onToggle: () => void;
+  interactionState?: "idle" | "pending" | "confirmed" | "error";
 };
 
-export function StateWidget({ config, value, addonValue, onToggle }: StateWidgetProps) {
+export function StateWidget({ config, value, addonValue, onToggle, interactionState = "idle" }: StateWidgetProps) {
   const [tileLayout, setTileLayout] = useState({ width: 0, height: 0 });
+  const [showConfirmedPulse, setShowConfirmedPulse] = useState(false);
   const hasValue = value !== null && value !== undefined;
   const hasTitle = config.showTitle !== false && Boolean(config.title?.trim());
   const active = resolveStateActive(config, value);
@@ -29,6 +31,20 @@ export function StateWidget({ config, value, addonValue, onToggle }: StateWidget
   const compactTile = tileLayout.width > 0 && (tileLayout.width < 220 || tileLayout.height < 180);
   const veryCompactTile = tileLayout.width > 0 && (tileLayout.width < 170 || tileLayout.height < 140);
   const iconSize = veryCompactTile ? 34 : compactTile ? 38 : 44;
+  const showStatus = interactionState === "pending" || interactionState === "error" || showConfirmedPulse;
+
+  useEffect(() => {
+    if (interactionState !== "confirmed") {
+      return;
+    }
+
+    playConfiguredUiSound(config.interactionSounds?.confirm, "tap", `${config.id}:confirm`);
+    setShowConfirmedPulse(true);
+    const timer = setTimeout(() => setShowConfirmedPulse(false), 1600);
+
+    return () => clearTimeout(timer);
+  }, [config.id, config.interactionSounds?.confirm, interactionState]);
+
   const content = (
     <View
       onLayout={(event: LayoutChangeEvent) => setTileLayout(event.nativeEvent.layout)}
@@ -39,7 +55,8 @@ export function StateWidget({ config, value, addonValue, onToggle }: StateWidget
         { backgroundColor: tileBackground },
       ]}
     >
-      <AddonChip config={config} value={resolvedAddonValue} />
+      {!showStatus ? <AddonChip config={config} value={resolvedAddonValue} /> : null}
+      {showStatus ? <InteractionStatusChip state={interactionState === "confirmed" ? "confirmed" : interactionState} /> : null}
       <View
         style={[
           styles.iconWrap,
@@ -72,7 +89,7 @@ export function StateWidget({ config, value, addonValue, onToggle }: StateWidget
       {config.writeable ? (
         <Pressable
           onPress={() => {
-            playUiSound("toggle");
+            playConfiguredUiSound(config.interactionSounds?.press, "toggle", `${config.id}:press`);
             onToggle();
           }}
           style={styles.tapArea}
@@ -82,6 +99,25 @@ export function StateWidget({ config, value, addonValue, onToggle }: StateWidget
       ) : (
         content
       )}
+    </View>
+  );
+}
+
+function InteractionStatusChip({ state }: { state: "pending" | "confirmed" | "error" | "idle" }) {
+  if (state === "idle") {
+    return null;
+  }
+
+  const descriptor =
+    state === "pending"
+      ? { label: "...", backgroundColor: "rgba(247, 181, 74, 0.92)" }
+      : state === "confirmed"
+        ? { label: "OK", backgroundColor: "rgba(52, 211, 153, 0.92)" }
+        : { label: "!", backgroundColor: "rgba(239, 68, 68, 0.92)" };
+
+  return (
+    <View style={[styles.statusChip, { backgroundColor: descriptor.backgroundColor }]}>
+      <Text style={styles.statusChipLabel}>{descriptor.label}</Text>
     </View>
   );
 }
@@ -454,5 +490,22 @@ const styles = StyleSheet.create({
   addonBar: {
     width: 5,
     borderRadius: 2,
+  },
+  statusChip: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    minWidth: 34,
+    height: 34,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
+  },
+  statusChipLabel: {
+    color: "#041019",
+    fontSize: 13,
+    fontWeight: "900",
   },
 });

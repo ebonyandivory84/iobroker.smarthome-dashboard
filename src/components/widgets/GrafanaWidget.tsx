@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 import { GrafanaWidgetConfig } from "../../types/dashboard";
-import { playUiSound } from "../../utils/uiSounds";
+import { playConfiguredUiSound } from "../../utils/uiSounds";
 import { palette } from "../../utils/theme";
 
 type GrafanaWidgetProps = {
@@ -38,7 +38,7 @@ export function GrafanaWidget({ config }: GrafanaWidgetProps) {
   return createElement(
     "div",
     {
-      onPointerDown: () => playUiSound("panel"),
+      onPointerDown: () => playConfiguredUiSound(config.interactionSounds?.press, "panel", `${config.id}:press`),
       style: webFrameWrapStyle,
     },
     createElement("iframe", {

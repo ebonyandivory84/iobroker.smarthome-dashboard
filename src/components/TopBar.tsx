@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
-import { playUiSound } from "../utils/uiSounds";
+import { playConfiguredUiSound } from "../utils/uiSounds";
 import { palette } from "../utils/theme";
 
 type TopBarProps = {
@@ -13,6 +13,7 @@ type TopBarProps = {
   onOpenSettings: () => void;
   onAddWidget: () => void;
   onSelectPage: (pageId: string) => void;
+  pageTabSounds?: string[];
 };
 
 export function TopBar({
@@ -25,6 +26,7 @@ export function TopBar({
   onOpenSettings,
   onAddWidget,
   onSelectPage,
+  pageTabSounds,
 }: TopBarProps) {
   const { width } = useWindowDimensions();
   const isCompact = width < 700;
@@ -42,7 +44,7 @@ export function TopBar({
                 <Pressable
                   key={page.id}
                   onPress={() => {
-                    playUiSound("page");
+                    playConfiguredUiSound(pageTabSounds, "page", `page-tab:${page.id}`);
                     onSelectPage(page.id);
                   }}
                   style={[styles.pageTab, activePage ? styles.pageTabActive : null]}

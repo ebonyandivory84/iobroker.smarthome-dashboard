@@ -93,6 +93,11 @@ export const defaultConfig: DashboardSettings = {
     enabled: true,
     volume: 55,
     soundSet: "voyager",
+    pageSounds: {
+      tabPress: [],
+      swipe: [],
+      contentScroll: [],
+    },
   },
   iobroker: {
     baseUrl: "",
