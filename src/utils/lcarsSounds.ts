@@ -135,9 +135,26 @@ function normalizeWebAssetUri(uri: string) {
     return uri;
   }
 
+  if (uri.startsWith("/assets/")) {
+    const hostedBasePath = resolveHostedBasePath();
+    return `${window.location.origin}${hostedBasePath}${uri}`;
+  }
+
   try {
     return new URL(uri, window.location.href).toString();
   } catch {
     return uri;
   }
+}
+
+function resolveHostedBasePath() {
+  const pathname = window.location.pathname || "/";
+  const hostedSegment = "/smarthome-dashboard";
+  const segmentIndex = pathname.indexOf(hostedSegment);
+
+  if (segmentIndex >= 0) {
+    return hostedSegment;
+  }
+
+  return "";
 }
