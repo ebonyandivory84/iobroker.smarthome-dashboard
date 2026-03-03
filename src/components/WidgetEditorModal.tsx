@@ -85,6 +85,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         snapshotUrl: widget.snapshotUrl || "",
         rtspUrl: widget.rtspUrl || "",
         refreshMs: String(widget.refreshMs || 2000),
+        fullscreenRefreshMs: String(widget.fullscreenRefreshMs || widget.refreshMs || 1000),
         ...appearanceDraft,
       });
       return;
@@ -206,6 +207,11 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         snapshotUrl: draft.snapshotUrl || undefined,
         rtspUrl: draft.rtspUrl || undefined,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 250),
+        fullscreenRefreshMs: clampInt(
+          draft.fullscreenRefreshMs,
+          widget.fullscreenRefreshMs || widget.refreshMs || 1000,
+          100
+        ),
         interactionSounds: {
           press: normalizeSoundSelection(soundDraft.press),
           open: normalizeSoundSelection(soundDraft.open),
@@ -612,6 +618,14 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     onChangeText={(value) => setDraft((current) => ({ ...current, refreshMs: value }))}
                     style={styles.input}
                     value={draft.refreshMs || ""}
+                  />
+                </Field>
+                <Field label="Refresh Vollbild (ms)">
+                  <TextInput
+                    keyboardType="numeric"
+                    onChangeText={(value) => setDraft((current) => ({ ...current, fullscreenRefreshMs: value }))}
+                    style={styles.input}
+                    value={draft.fullscreenRefreshMs || ""}
                   />
                 </Field>
                 <Field label="Sounds bei Interaktion">

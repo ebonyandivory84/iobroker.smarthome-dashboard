@@ -16,6 +16,9 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
   const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
+  const activeRefreshMs = fullscreenOpen
+    ? Math.max(100, config.fullscreenRefreshMs || config.refreshMs || 2000)
+    : Math.max(100, config.refreshMs || 2000);
   const fullscreenPanResponder = useMemo(
     () =>
       PanResponder.create({
@@ -32,9 +35,9 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
   );
 
   useEffect(() => {
-    const timer = setInterval(() => setTick((current) => current + 1), config.refreshMs || 2000);
+    const timer = setInterval(() => setTick((current) => current + 1), activeRefreshMs);
     return () => clearInterval(timer);
-  }, [config.refreshMs]);
+  }, [activeRefreshMs]);
 
   const reportAspectRatio = (width: number, height: number) => {
     if (!onAspectRatioDetected || hasReportedAspectRatio.current || !width || !height) {

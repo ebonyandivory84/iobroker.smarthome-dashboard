@@ -76,6 +76,7 @@ export type CameraWidgetConfig = WidgetBase & {
   snapshotUrl?: string;
   rtspUrl?: string;
   refreshMs?: number;
+  fullscreenRefreshMs?: number;
   snapshotAspectRatio?: number;
 };
 
