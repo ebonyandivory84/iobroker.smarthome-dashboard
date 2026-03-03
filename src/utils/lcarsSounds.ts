@@ -1,3 +1,5 @@
+import { Asset } from "expo-asset";
+
 export type LcarsSoundOption = {
   id: string;
   label: string;
@@ -107,6 +109,18 @@ export function resolveLcarsSoundUri(id: string) {
     if (defaultUri) {
       return defaultUri;
     }
+  }
+
+  try {
+    const asset = Asset.fromModule(source as never);
+    if (asset?.uri) {
+      return asset.uri;
+    }
+    if (asset?.localUri) {
+      return asset.localUri;
+    }
+  } catch {
+    // Ignore and fall through to null.
   }
 
   return null;
