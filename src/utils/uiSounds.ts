@@ -121,6 +121,7 @@ let audioContext: AudioContext | null = null;
 let masterGainNode: GainNode | null = null;
 let uiSoundSettings: UiSoundSettings = DEFAULT_UI_SOUND_SETTINGS;
 const soundCursor = new Map<string, number>();
+let activeHtmlAudio: HTMLAudioElement | null = null;
 
 export function configureUiSounds(settings?: UiSoundSettings) {
   uiSoundSettings = normalizeUiSoundSettings(settings);
@@ -180,9 +181,20 @@ function playAudioAsset(soundId: string) {
   }
 
   try {
+    if (activeHtmlAudio) {
+      activeHtmlAudio.pause();
+      activeHtmlAudio.currentTime = 0;
+    }
+
     const audio = new window.Audio(uri);
     audio.volume = Math.max(0, Math.min(1, uiSoundSettings.volume / 100));
+    activeHtmlAudio = audio;
     void audio.play().catch(() => undefined);
+    audio.onended = () => {
+      if (activeHtmlAudio === audio) {
+        activeHtmlAudio = null;
+      }
+    };
     return true;
   } catch {
     return false;

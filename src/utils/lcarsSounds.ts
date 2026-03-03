@@ -1,9 +1,7 @@
-import { Image } from "react-native";
-
 export type LcarsSoundOption = {
   id: string;
   label: string;
-  module: number;
+  module: unknown;
 };
 
 export const LCARS_SOUND_OPTIONS: LcarsSoundOption[] = [
@@ -85,6 +83,31 @@ export function resolveLcarsSoundUri(id: string) {
     return null;
   }
 
-  const asset = Image.resolveAssetSource(option.module);
-  return asset?.uri || null;
+  const source = option.module;
+
+  if (typeof source === "string") {
+    return source;
+  }
+
+  if (source && typeof source === "object") {
+    const uri = "uri" in source && typeof source.uri === "string" ? source.uri : null;
+    if (uri) {
+      return uri;
+    }
+
+    const defaultUri =
+      "default" in source &&
+      source.default &&
+      typeof source.default === "object" &&
+      "uri" in source.default &&
+      typeof source.default.uri === "string"
+        ? source.default.uri
+        : null;
+
+    if (defaultUri) {
+      return defaultUri;
+    }
+  }
+
+  return null;
 }
