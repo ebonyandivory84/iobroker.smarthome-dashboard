@@ -121,7 +121,7 @@ let audioContext: AudioContext | null = null;
 let masterGainNode: GainNode | null = null;
 let uiSoundSettings: UiSoundSettings = DEFAULT_UI_SOUND_SETTINGS;
 const soundCursor = new Map<string, number>();
-let activeHtmlAudio: HTMLAudioElement | null = null;
+const decodedAudioCache = new Map<string, Promise<AudioBuffer | null>>();
 
 export function configureUiSounds(settings?: UiSoundSettings) {
   uiSoundSettings = normalizeUiSoundSettings(settings);
@@ -158,10 +158,7 @@ export function playConfiguredUiSound(soundIds: string[] | undefined, fallback: 
   const soundIndex = soundCursor.get(cycleKey) || 0;
   const selectedId = normalizedSelection[soundIndex % normalizedSelection.length];
   soundCursor.set(cycleKey, (soundIndex + 1) % normalizedSelection.length);
-
-  if (!playAudioAsset(selectedId)) {
-    playSynthSound(fallback);
-  }
+  playDecodedAudio(selectedId, fallback);
 }
 
 export function playSoundPreview(soundId: string) {
@@ -169,38 +166,17 @@ export function playSoundPreview(soundId: string) {
     return;
   }
 
-  if (!playAudioAsset(soundId)) {
-    playSynthSound("tap");
-  }
+  playDecodedAudio(soundId, "tap");
 }
 
-function playAudioAsset(soundId: string) {
-  const uri = resolveLcarsSoundUri(soundId);
-  if (!uri || typeof window === "undefined" || typeof window.Audio !== "function") {
-    return false;
+export function primeConfiguredSounds(soundIds: string[]) {
+  if (Platform.OS !== "web" || typeof window === "undefined") {
+    return;
   }
 
-  try {
-    if (activeHtmlAudio) {
-      activeHtmlAudio.pause();
-      activeHtmlAudio.currentTime = 0;
-    }
-
-    const audio = new window.Audio(uri);
-    audio.preload = "auto";
-    (audio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
-    audio.volume = Math.max(0, Math.min(1, uiSoundSettings.volume / 100));
-    activeHtmlAudio = audio;
-    void audio.play().catch(() => undefined);
-    audio.onended = () => {
-      if (activeHtmlAudio === audio) {
-        activeHtmlAudio = null;
-      }
-    };
-    return true;
-  } catch {
-    return false;
-  }
+  normalizeSoundSelection(soundIds, Number.MAX_SAFE_INTEGER).forEach((soundId) => {
+    void loadDecodedAudio(soundId);
+  });
 }
 
 function playSynthSound(sound: UiSound) {
@@ -246,6 +222,63 @@ function playSynthSound(sound: UiSound) {
   } catch {
     // Ignore audio failures; the UI must remain responsive even when audio is blocked.
   }
+}
+
+function playDecodedAudio(soundId: string, fallback: UiSound) {
+  const context = getAudioContext();
+  const masterGain = masterGainNode;
+
+  if (!context || !masterGain) {
+    playSynthSound(fallback);
+    return;
+  }
+
+  if (context.state === "suspended") {
+    void context.resume();
+  }
+
+  void loadDecodedAudio(soundId)
+    .then((buffer) => {
+      if (!buffer) {
+        playSynthSound(fallback);
+        return;
+      }
+
+      const source = context.createBufferSource();
+      source.buffer = buffer;
+      source.connect(masterGain);
+      source.start();
+    })
+    .catch(() => {
+      playSynthSound(fallback);
+    });
+}
+
+function loadDecodedAudio(soundId: string) {
+  const cached = decodedAudioCache.get(soundId);
+  if (cached) {
+    return cached;
+  }
+
+  const context = getAudioContext();
+  const uri = resolveLcarsSoundUri(soundId);
+
+  if (!context || !uri || typeof fetch !== "function") {
+    return Promise.resolve(null);
+  }
+
+  const loader = fetch(uri)
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`Audio fetch failed (${response.status})`);
+      }
+      return response.arrayBuffer();
+    })
+    .then((buffer) => context.decodeAudioData(buffer.slice(0)))
+    .catch(() => null);
+
+  decodedAudioCache.set(soundId, loader);
+  return loader;
 }
 
 function getAudioContext() {

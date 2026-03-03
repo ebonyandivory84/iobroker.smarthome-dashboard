@@ -9,7 +9,7 @@ import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { useIoBrokerStates } from "../hooks/useIoBrokerStates";
 import { BackgroundMode, WidgetConfig, WidgetType } from "../types/dashboard";
 import { constrainToPrimarySections, normalizeWidgetLayout, resolveWidgetPosition } from "../utils/gridLayout";
-import { configureUiSounds, playUiSound } from "../utils/uiSounds";
+import { configureUiSounds, playConfiguredUiSound, primeConfiguredSounds } from "../utils/uiSounds";
 import { buildWidgetTemplate } from "../utils/widgetFactory";
 import { palette } from "../utils/theme";
 
@@ -28,12 +28,13 @@ export function DashboardScreen() {
     setActivePage,
     updateWidget,
   } = useDashboardConfig();
-  const { client, error, isOnline, states, writeStateOptimistic } = useIoBrokerStates();
+  const { client, error, isOnline, states, stateWrites, writeStateTracked } = useIoBrokerStates();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
   const [layoutMode, setLayoutMode] = useState(false);
   const [visiblePageId, setVisiblePageId] = useState(activePageId);
+  const lastContentScrollAt = useRef(0);
   const activePageIndex = Math.max(0, dashboardPages.findIndex((page) => page.id === activePageId));
 
   const pageConfigs = useMemo(
@@ -62,6 +63,25 @@ export function DashboardScreen() {
   useEffect(() => {
     configureUiSounds(config.uiSounds);
   }, [config.uiSounds]);
+
+  useEffect(() => {
+    const configuredSoundIds = [
+      ...(config.uiSounds?.pageSounds?.tabPress || []),
+      ...(config.uiSounds?.pageSounds?.swipe || []),
+      ...(config.uiSounds?.pageSounds?.contentScroll || []),
+      ...dashboardPages.flatMap((page) =>
+        page.widgets.flatMap((widget) => [
+          ...(widget.interactionSounds?.press || []),
+          ...(widget.interactionSounds?.confirm || []),
+          ...(widget.interactionSounds?.open || []),
+          ...(widget.interactionSounds?.close || []),
+          ...(widget.interactionSounds?.scroll || []),
+        ])
+      ),
+    ];
+
+    primeConfiguredSounds(configuredSoundIds);
+  }, [config.uiSounds, dashboardPages]);
 
   const addWidgetByType = (type: WidgetType) => {
     const widget = buildWidgetTemplate(type, config.widgets.length, { columns: config.grid.columns });
@@ -115,11 +135,25 @@ export function DashboardScreen() {
     const nextPage = resolvePageFromOffset(event.nativeEvent.contentOffset.x);
     if (nextPage) {
       if (nextPage.id !== activePageId) {
-        playUiSound("swipe");
+        playConfiguredUiSound(config.uiSounds?.pageSounds?.swipe, "swipe", "global:pageSwipe");
       }
       setVisiblePageId(nextPage.id);
       setActivePage(nextPage.id);
     }
+  };
+
+  const handleContentScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (event.nativeEvent.contentOffset.y <= 12) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastContentScrollAt.current < 280) {
+      return;
+    }
+
+    lastContentScrollAt.current = now;
+    playConfiguredUiSound(config.uiSounds?.pageSounds?.contentScroll, "tap", "global:pageContentScroll");
   };
 
   return (
@@ -134,6 +168,7 @@ export function DashboardScreen() {
         activePageId={visiblePageId}
         isOnline={isOnline}
         isLayoutMode={layoutMode}
+        pageTabSounds={config.uiSounds?.pageSounds?.tabPress}
         pageTitles={dashboardPages.map((page) => ({ id: page.id, title: page.title }))}
         onAddWidget={() => setLibraryOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
@@ -156,7 +191,12 @@ export function DashboardScreen() {
       >
         {pageConfigs.map((pageConfig) => (
           <View key={pageConfig.activePageId} style={[styles.page, { width }]}>
-            <ScrollView contentContainerStyle={styles.scrollContent} style={styles.pageScroll}>
+            <ScrollView
+              contentContainerStyle={styles.scrollContent}
+              style={styles.pageScroll}
+              onMomentumScrollEnd={handleContentScrollEnd}
+              onScrollEndDrag={handleContentScrollEnd}
+            >
               <GridCanvas
                 client={client}
                 config={pageConfig}
@@ -164,7 +204,8 @@ export function DashboardScreen() {
                 onEditWidget={setEditingWidgetId}
                 onRemoveWidget={removeWidget}
                 onUpdateWidget={handleUpdateWidget}
-                onWriteState={writeStateOptimistic}
+                onWriteState={writeStateTracked}
+                stateWrites={stateWrites}
                 states={states}
               />
             </ScrollView>
