@@ -803,9 +803,11 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
             ) : null}
             {widget.type === "weather" ? (
               <>
-                <Field label="Ort">
+                <Field label="Friendly Name">
                   <TextInput
                     onChangeText={(value) => setDraft((current) => ({ ...current, locationName: value }))}
+                    placeholder="z. B. Zuhause, Buero, Ferienhaus"
+                    placeholderTextColor={palette.textMuted}
                     style={styles.input}
                     value={draft.locationName || ""}
                   />
@@ -828,7 +830,6 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                             setDraft((current) => ({
                               ...current,
                               locationQuery: entry.query,
-                              locationName: entry.label,
                               latitude: String(entry.latitude),
                               longitude: String(entry.longitude),
                             }));
