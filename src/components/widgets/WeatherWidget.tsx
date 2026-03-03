@@ -119,7 +119,7 @@ export function WeatherWidget({ config }: WeatherWidgetProps) {
   }));
 
   const currentIsDay = current?.is_day !== 0;
-  const displayLabel = resolvedCoords?.label || config.locationName || locationQuery || config.title;
+  const displayLabel = config.locationName || resolvedCoords?.label || locationQuery || config.title;
   const displayLatitude = resolvedCoords?.latitude ?? config.latitude;
   const displayLongitude = resolvedCoords?.longitude ?? config.longitude;
 
