@@ -16,7 +16,8 @@ import { palette } from "../utils/theme";
 export function DashboardScreen() {
   const { width } = useWindowDimensions();
   const isCompact = width < 700;
-  const isTouchLayout = width < 1100;
+  const [isTouchCapableWeb, setIsTouchCapableWeb] = useState(false);
+  const isTouchLayout = width < 1100 || isTouchCapableWeb;
   const horizontalPagerRef = useRef<ScrollView | null>(null);
   const horizontalOffsetRef = useRef(0);
   const pageOffsetsRef = useRef<Record<string, number>>({});
@@ -66,6 +67,19 @@ export function DashboardScreen() {
       })),
     [config, dashboardPages]
   );
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") {
+      setIsTouchCapableWeb(false);
+      return;
+    }
+
+    const touchCapable =
+      (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0) ||
+      ("matchMedia" in window && window.matchMedia("(pointer: coarse)").matches);
+
+    setIsTouchCapableWeb(Boolean(touchCapable));
+  }, []);
 
   useEffect(() => {
     if (!horizontalPagerRef.current) {
