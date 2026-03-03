@@ -433,6 +433,7 @@ function normalizeUiSoundSettings(input?: UiSoundSettings): UiSoundSettings {
       tabPress: normalizeSoundSelection(input?.pageSounds?.tabPress),
       swipe: normalizeSoundSelection(input?.pageSounds?.swipe),
       contentScroll: normalizeSoundSelection(input?.pageSounds?.contentScroll),
+      pullToRefresh: normalizeSoundSelection(input?.pageSounds?.pullToRefresh),
       layoutToggle: normalizeSoundSelection(input?.pageSounds?.layoutToggle),
       addWidget: normalizeSoundSelection(input?.pageSounds?.addWidget),
       openSettings: normalizeSoundSelection(input?.pageSounds?.openSettings),

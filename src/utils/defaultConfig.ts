@@ -98,6 +98,7 @@ export const defaultConfig: DashboardSettings = {
       tabPress: [],
       swipe: [],
       contentScroll: [],
+      pullToRefresh: [],
       layoutToggle: [],
       addWidget: [],
       openSettings: [],

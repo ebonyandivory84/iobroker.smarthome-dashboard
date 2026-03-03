@@ -201,6 +201,7 @@ export type UiSoundSettings = {
     tabPress?: string[];
     swipe?: string[];
     contentScroll?: string[];
+    pullToRefresh?: string[];
     layoutToggle?: string[];
     addWidget?: string[];
     openSettings?: string[];

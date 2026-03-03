@@ -82,6 +82,7 @@ export function DashboardScreen() {
       ...(config.uiSounds?.pageSounds?.tabPress || []),
       ...(config.uiSounds?.pageSounds?.swipe || []),
       ...(config.uiSounds?.pageSounds?.contentScroll || []),
+      ...(config.uiSounds?.pageSounds?.pullToRefresh || []),
       ...(config.uiSounds?.pageSounds?.layoutToggle || []),
       ...(config.uiSounds?.pageSounds?.addWidget || []),
       ...(config.uiSounds?.pageSounds?.openSettings || []),
@@ -215,7 +216,10 @@ export function DashboardScreen() {
         currentOffset <= 0 &&
         endY - activeGesture.startY > 96
       ) {
-        window.location.reload();
+        playConfiguredUiSound(config.uiSounds?.pageSounds?.pullToRefresh, "page", "global:pullToRefresh");
+        window.setTimeout(() => {
+          window.location.reload();
+        }, 140);
       }
 
       pullGestureRef.current = { pageId: null, startY: null };

@@ -31,6 +31,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const [pageTabSounds, setPageTabSounds] = useState<string[]>([]);
   const [pageSwipeSounds, setPageSwipeSounds] = useState<string[]>([]);
   const [pageContentScrollSounds, setPageContentScrollSounds] = useState<string[]>([]);
+  const [pullToRefreshSounds, setPullToRefreshSounds] = useState<string[]>([]);
   const [layoutToggleSounds, setLayoutToggleSounds] = useState<string[]>([]);
   const [addWidgetSounds, setAddWidgetSounds] = useState<string[]>([]);
   const [openSettingsSounds, setOpenSettingsSounds] = useState<string[]>([]);
@@ -50,6 +51,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     setPageTabSounds(config.uiSounds?.pageSounds?.tabPress || []);
     setPageSwipeSounds(config.uiSounds?.pageSounds?.swipe || []);
     setPageContentScrollSounds(config.uiSounds?.pageSounds?.contentScroll || []);
+    setPullToRefreshSounds(config.uiSounds?.pageSounds?.pullToRefresh || []);
     setLayoutToggleSounds(config.uiSounds?.pageSounds?.layoutToggle || []);
     setAddWidgetSounds(config.uiSounds?.pageSounds?.addWidget || []);
     setOpenSettingsSounds(config.uiSounds?.pageSounds?.openSettings || []);
@@ -77,6 +79,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
           tabPress: pageTabSounds,
           swipe: pageSwipeSounds,
           contentScroll: pageContentScrollSounds,
+          pullToRefresh: pullToRefreshSounds,
           layoutToggle: layoutToggleSounds,
           addWidget: addWidgetSounds,
           openSettings: openSettingsSounds,
@@ -220,6 +223,10 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
             <View style={styles.soundSetBlock}>
               <Text style={styles.fieldLabel}>Seite scrollen</Text>
               <SoundPickerField onChange={setPageContentScrollSounds} value={pageContentScrollSounds} />
+            </View>
+            <View style={styles.soundSetBlock}>
+              <Text style={styles.fieldLabel}>Pull To Refresh</Text>
+              <SoundPickerField onChange={setPullToRefreshSounds} value={pullToRefreshSounds} />
             </View>
             <View style={styles.soundSetBlock}>
               <Text style={styles.fieldLabel}>Stift / Layout</Text>
