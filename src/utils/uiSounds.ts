@@ -17,10 +17,14 @@ const DEFAULT_UI_SOUND_SETTINGS: UiSoundSettings = {
   enabled: true,
   volume: 55,
   soundSet: "voyager",
+  widgetTypeDefaults: {},
   pageSounds: {
     tabPress: [],
     swipe: [],
     contentScroll: [],
+    layoutToggle: [],
+    addWidget: [],
+    openSettings: [],
   },
 };
 
@@ -319,10 +323,14 @@ function normalizeUiSoundSettings(settings?: UiSoundSettings): UiSoundSettings {
     enabled: settings?.enabled !== false,
     volume: Math.max(0, Math.min(100, volumeValue)),
     soundSet: normalizedSoundSet,
+    widgetTypeDefaults: settings?.widgetTypeDefaults || {},
     pageSounds: {
       tabPress: normalizeSoundSelection(settings?.pageSounds?.tabPress),
       swipe: normalizeSoundSelection(settings?.pageSounds?.swipe),
       contentScroll: normalizeSoundSelection(settings?.pageSounds?.contentScroll),
+      layoutToggle: normalizeSoundSelection(settings?.pageSounds?.layoutToggle),
+      addWidget: normalizeSoundSelection(settings?.pageSounds?.addWidget),
+      openSettings: normalizeSoundSelection(settings?.pageSounds?.openSettings),
     },
   };
 }

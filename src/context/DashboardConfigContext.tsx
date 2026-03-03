@@ -428,6 +428,7 @@ function normalizeUiSoundSettings(input?: UiSoundSettings): UiSoundSettings {
         ? Math.max(0, Math.min(100, Math.round(input.volume)))
         : 55,
     soundSet: soundSet === "ops" || soundSet === "soft" || soundSet === "voyager" ? soundSet : "voyager",
+    widgetTypeDefaults: normalizeWidgetTypeSoundDefaults(input?.widgetTypeDefaults),
     pageSounds: {
       tabPress: normalizeSoundSelection(input?.pageSounds?.tabPress),
       swipe: normalizeSoundSelection(input?.pageSounds?.swipe),
@@ -452,6 +453,23 @@ function normalizeWidgetInteractionSounds(
     open: normalizeSoundSelection(input.open),
     close: normalizeSoundSelection(input.close),
     scroll: normalizeSoundSelection(input.scroll),
+  };
+}
+
+function normalizeWidgetTypeSoundDefaults(
+  input?: UiSoundSettings["widgetTypeDefaults"]
+) {
+  if (!input) {
+    return {};
+  }
+
+  return {
+    state: normalizeWidgetInteractionSounds(input.state),
+    camera: normalizeWidgetInteractionSounds(input.camera),
+    energy: normalizeWidgetInteractionSounds(input.energy),
+    solar: normalizeWidgetInteractionSounds(input.solar),
+    grafana: normalizeWidgetInteractionSounds(input.grafana),
+    weather: normalizeWidgetInteractionSounds(input.weather),
   };
 }
 

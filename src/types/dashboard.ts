@@ -196,6 +196,7 @@ export type UiSoundSettings = {
   enabled: boolean;
   volume: number;
   soundSet: UiSoundSet;
+  widgetTypeDefaults?: Partial<Record<WidgetType, WidgetInteractionSounds>>;
   pageSounds?: {
     tabPress?: string[];
     swipe?: string[];

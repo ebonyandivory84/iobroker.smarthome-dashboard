@@ -93,6 +93,7 @@ export const defaultConfig: DashboardSettings = {
     enabled: true,
     volume: 55,
     soundSet: "voyager",
+    widgetTypeDefaults: {},
     pageSounds: {
       tabPress: [],
       swipe: [],

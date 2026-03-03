@@ -66,6 +66,13 @@ export function DashboardScreen() {
 
   useEffect(() => {
     const configuredSoundIds = [
+      ...(config.uiSounds?.widgetTypeDefaults?.state?.press || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.state?.confirm || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.camera?.press || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.camera?.open || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.camera?.close || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.camera?.scroll || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.grafana?.press || []),
       ...(config.uiSounds?.pageSounds?.tabPress || []),
       ...(config.uiSounds?.pageSounds?.swipe || []),
       ...(config.uiSounds?.pageSounds?.contentScroll || []),

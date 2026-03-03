@@ -3,7 +3,7 @@ import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { StateWriteFeedback } from "../hooks/useIoBrokerStates";
 import { IoBrokerClient } from "../services/iobroker";
-import { DashboardSettings, StateSnapshot, WidgetConfig } from "../types/dashboard";
+import { DashboardSettings, StateSnapshot, WidgetConfig, WidgetInteractionSounds, WidgetType } from "../types/dashboard";
 import { constrainToPrimarySections, GRID_SNAP } from "../utils/gridLayout";
 import { resolveThemeSettings } from "../utils/themeConfig";
 import { palette } from "../utils/theme";
@@ -136,7 +136,16 @@ export function GridCanvas({
                 rowHeight={renderRowHeight}
                 widget={widget}
               >
-                {renderWidget(widget, states, client, onUpdateWidget, onWriteState, displayConfig.theme, stateWrites)}
+                {renderWidget(
+                  widget,
+                  states,
+                  client,
+                  onUpdateWidget,
+                  onWriteState,
+                  displayConfig.theme,
+                  stateWrites,
+                  displayConfig.uiSounds?.widgetTypeDefaults
+                )}
               </WidgetFrame>
             </View>
           );
@@ -678,7 +687,16 @@ function WebWidgetShell({
         </div>
       ) : null}
       <View style={contentStyle}>
-        {renderWidget(widget, states, client, onUpdateWidget, onWriteState, config.theme, stateWrites)}
+        {renderWidget(
+          widget,
+          states,
+          client,
+          onUpdateWidget,
+          onWriteState,
+          config.theme,
+          stateWrites,
+          config.uiSounds?.widgetTypeDefaults
+        )}
       </View>
       {isLayoutMode && allowManualLayout && allowResize ? (
         <div style={webFooterOverlayStyle}>
@@ -696,26 +714,34 @@ function renderWidget(
   onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void,
   onWriteState: (stateId: string, value: unknown) => void | Promise<void>,
   theme?: DashboardSettings["theme"],
-  stateWrites?: Record<string, StateWriteFeedback>
+  stateWrites?: Record<string, StateWriteFeedback>,
+  widgetTypeDefaults?: Partial<Record<WidgetType, WidgetInteractionSounds>>
 ) {
-  if (widget.type === "state") {
+  const effectiveWidget = mergeWidgetInteractionSounds(widget, widgetTypeDefaults?.[widget.type]);
+
+  if (effectiveWidget.type === "state") {
     return (
       <StateWidget
-        addonValue={widget.addonStateId ? states[widget.addonStateId] : undefined}
-        config={widget}
-        interactionState={stateWrites?.[widget.stateId]?.status || "idle"}
-        value={states[widget.stateId]}
-        onToggle={() => onWriteState(widget.stateId, resolveStateNextValue(widget, states[widget.stateId]))}
+        addonValue={effectiveWidget.addonStateId ? states[effectiveWidget.addonStateId] : undefined}
+        config={effectiveWidget}
+        interactionState={stateWrites?.[effectiveWidget.stateId]?.status || "idle"}
+        value={states[effectiveWidget.stateId]}
+        onToggle={() =>
+          onWriteState(
+            effectiveWidget.stateId,
+            resolveStateNextValue(effectiveWidget, states[effectiveWidget.stateId])
+          )
+        }
       />
     );
   }
 
-  if (widget.type === "camera") {
+  if (effectiveWidget.type === "camera") {
     return (
       <CameraWidget
-        config={widget}
+        config={effectiveWidget}
         onAspectRatioDetected={(ratio) => {
-          if (widget.snapshotAspectRatio) {
+          if (effectiveWidget.snapshotAspectRatio) {
             return;
           }
 
@@ -723,26 +749,26 @@ function renderWidget(
             return;
           }
 
-          onUpdateWidget(widget.id, { snapshotAspectRatio: ratio });
+          onUpdateWidget(effectiveWidget.id, { snapshotAspectRatio: ratio });
         }}
       />
     );
   }
 
-  if (widget.type === "energy") {
-    return <EnergyWidget config={widget} states={states} />;
+  if (effectiveWidget.type === "energy") {
+    return <EnergyWidget config={effectiveWidget} states={states} />;
   }
 
-  if (widget.type === "solar") {
-    return <SolarWidget config={widget} states={states} theme={theme} />;
+  if (effectiveWidget.type === "solar") {
+    return <SolarWidget config={effectiveWidget} states={states} theme={theme} />;
   }
 
-  if (widget.type === "grafana") {
-    return <GrafanaWidget config={widget} />;
+  if (effectiveWidget.type === "grafana") {
+    return <GrafanaWidget config={effectiveWidget} />;
   }
 
-  if (widget.type === "weather") {
-    return <WeatherWidget config={widget} />;
+  if (effectiveWidget.type === "weather") {
+    return <WeatherWidget config={effectiveWidget} />;
   }
 
   return null;
@@ -797,6 +823,26 @@ const styles = StyleSheet.create({
     height: "100%",
   },
 });
+
+function mergeWidgetInteractionSounds(
+  widget: WidgetConfig,
+  defaults?: WidgetInteractionSounds
+): WidgetConfig {
+  if (!defaults) {
+    return widget;
+  }
+
+  return {
+    ...widget,
+    interactionSounds: {
+      press: widget.interactionSounds?.press?.length ? widget.interactionSounds.press : defaults.press,
+      confirm: widget.interactionSounds?.confirm?.length ? widget.interactionSounds.confirm : defaults.confirm,
+      open: widget.interactionSounds?.open?.length ? widget.interactionSounds.open : defaults.open,
+      close: widget.interactionSounds?.close?.length ? widget.interactionSounds.close : defaults.close,
+      scroll: widget.interactionSounds?.scroll?.length ? widget.interactionSounds.scroll : defaults.scroll,
+    },
+  } as WidgetConfig;
+}
 
 function snapUnits(value: number) {
   return Math.round(value / GRID_SNAP) * GRID_SNAP;

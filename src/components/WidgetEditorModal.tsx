@@ -5,7 +5,7 @@ import { ImagePickerModal } from "./ImagePickerModal";
 import { ObjectPickerModal } from "./ObjectPickerModal";
 import { SoundPickerField } from "./SoundPickerField";
 import { IoBrokerClient } from "../services/iobroker";
-import { WidgetAppearance, WidgetConfig } from "../types/dashboard";
+import { WidgetAppearance, WidgetConfig, WidgetInteractionSounds } from "../types/dashboard";
 import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { normalizeSoundSelection } from "../utils/lcarsSounds";
 import { resolveThemeSettings } from "../utils/themeConfig";
@@ -21,7 +21,7 @@ type WidgetEditorModalProps = {
 };
 
 export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: WidgetEditorModalProps) {
-  const { config } = useDashboardConfig();
+  const { config, patchConfig } = useDashboardConfig();
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [soundDraft, setSoundDraft] = useState<Record<string, string[]>>({});
   const [weatherSuggestions, setWeatherSuggestions] = useState<Array<{
@@ -49,8 +49,12 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
 
     if (widget.type === "state") {
       setSoundDraft({
-        press: normalizeSoundSelection(widget.interactionSounds?.press),
-        confirm: normalizeSoundSelection(widget.interactionSounds?.confirm),
+        press: normalizeSoundSelection(
+          widget.interactionSounds?.press || config.uiSounds?.widgetTypeDefaults?.state?.press
+        ),
+        confirm: normalizeSoundSelection(
+          widget.interactionSounds?.confirm || config.uiSounds?.widgetTypeDefaults?.state?.confirm
+        ),
       });
       setDraft({
         title: widget.title,
@@ -81,10 +85,18 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
 
     if (widget.type === "camera") {
       setSoundDraft({
-        press: normalizeSoundSelection(widget.interactionSounds?.press),
-        open: normalizeSoundSelection(widget.interactionSounds?.open),
-        close: normalizeSoundSelection(widget.interactionSounds?.close),
-        scroll: normalizeSoundSelection(widget.interactionSounds?.scroll),
+        press: normalizeSoundSelection(
+          widget.interactionSounds?.press || config.uiSounds?.widgetTypeDefaults?.camera?.press
+        ),
+        open: normalizeSoundSelection(
+          widget.interactionSounds?.open || config.uiSounds?.widgetTypeDefaults?.camera?.open
+        ),
+        close: normalizeSoundSelection(
+          widget.interactionSounds?.close || config.uiSounds?.widgetTypeDefaults?.camera?.close
+        ),
+        scroll: normalizeSoundSelection(
+          widget.interactionSounds?.scroll || config.uiSounds?.widgetTypeDefaults?.camera?.scroll
+        ),
       });
       setDraft({
         title: widget.title,
@@ -116,7 +128,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
 
     if (widget.type === "grafana") {
       setSoundDraft({
-        press: normalizeSoundSelection(widget.interactionSounds?.press),
+        press: normalizeSoundSelection(
+          widget.interactionSounds?.press || config.uiSounds?.widgetTypeDefaults?.grafana?.press
+        ),
       });
       setDraft({
         title: widget.title,
@@ -175,7 +189,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       stat3StateId: widget.stats?.third?.stateId || "",
       ...appearanceDraft,
     });
-  }, [visible, widget]);
+  }, [config.uiSounds?.widgetTypeDefaults, visible, widget]);
 
   useEffect(() => {
     if (!visible || widget?.type !== "weather") {
@@ -273,10 +287,11 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         addonColor: draft.addonColor || undefined,
         addonIcon: draft.addonIcon || undefined,
         addonUseStateValue: draft.addonUseStateValue === "true",
-        interactionSounds: {
-          press: normalizeSoundSelection(soundDraft.press),
-          confirm: normalizeSoundSelection(soundDraft.confirm),
-        },
+        interactionSounds: buildStoredInteractionSounds(
+          widget.type,
+          soundDraft,
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]
+        ),
         appearance,
       });
     } else if (widget.type === "camera") {
@@ -291,12 +306,11 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           widget.fullscreenRefreshMs || widget.refreshMs || 1000,
           100
         ),
-        interactionSounds: {
-          press: normalizeSoundSelection(soundDraft.press),
-          open: normalizeSoundSelection(soundDraft.open),
-          close: normalizeSoundSelection(soundDraft.close),
-          scroll: normalizeSoundSelection(soundDraft.scroll),
-        },
+        interactionSounds: buildStoredInteractionSounds(
+          widget.type,
+          soundDraft,
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]
+        ),
         appearance,
       });
     } else if (widget.type === "energy") {
@@ -316,9 +330,11 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         url: draft.url || widget.url,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 10000, 1000),
         allowInteractions: draft.allowInteractions !== "false",
-        interactionSounds: {
-          press: normalizeSoundSelection(soundDraft.press),
-        },
+        interactionSounds: buildStoredInteractionSounds(
+          widget.type,
+          soundDraft,
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]
+        ),
         appearance,
       });
     } else if (widget.type === "weather") {
@@ -362,6 +378,33 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     }
 
     onClose();
+  };
+
+  const saveSoundsAsTypeDefault = () => {
+    if (widget.type !== "state" && widget.type !== "camera" && widget.type !== "grafana") {
+      return;
+    }
+
+    const nextDefault: WidgetInteractionSounds = {
+      press: normalizeSoundSelection(soundDraft.press),
+      confirm: normalizeSoundSelection(soundDraft.confirm),
+      open: normalizeSoundSelection(soundDraft.open),
+      close: normalizeSoundSelection(soundDraft.close),
+      scroll: normalizeSoundSelection(soundDraft.scroll),
+    };
+
+    patchConfig({
+      uiSounds: {
+        enabled: config.uiSounds?.enabled !== false,
+        volume: config.uiSounds?.volume ?? 55,
+        soundSet: config.uiSounds?.soundSet || "voyager",
+        widgetTypeDefaults: {
+          ...(config.uiSounds?.widgetTypeDefaults || {}),
+          [widget.type]: nextDefault,
+        },
+        pageSounds: config.uiSounds?.pageSounds,
+      },
+    });
   };
 
   return (
@@ -671,6 +714,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       value={soundDraft.confirm}
                     />
                   </Field>
+                  <Pressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
+                    <Text style={styles.inlineActionLabel}>Als Default fuer alle State-Widgets verwenden</Text>
+                  </Pressable>
                 </Field>
               </>
             ) : null}
@@ -733,6 +779,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       value={soundDraft.scroll}
                     />
                   </Field>
+                  <Pressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
+                    <Text style={styles.inlineActionLabel}>Als Default fuer alle Camera-Widgets verwenden</Text>
+                  </Pressable>
                 </Field>
               </>
             ) : null}
@@ -798,6 +847,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     onChange={(value) => setSoundDraft((current) => ({ ...current, press: value }))}
                     value={soundDraft.press}
                   />
+                  <Pressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
+                    <Text style={styles.inlineActionLabel}>Als Default fuer alle Grafana-Widgets verwenden</Text>
+                  </Pressable>
                 </Field>
               </>
             ) : null}
@@ -1588,6 +1640,52 @@ function parseValueLabels(raw: string | undefined) {
   }
 }
 
+function buildStoredInteractionSounds(
+  widgetType: WidgetConfig["type"],
+  draft: Record<string, string[]>,
+  defaults?: WidgetInteractionSounds
+) {
+  if (widgetType !== "state" && widgetType !== "camera" && widgetType !== "grafana") {
+    return undefined;
+  }
+
+  const next: WidgetInteractionSounds = {};
+  const press = normalizeSoundSelection(draft.press);
+  const confirm = normalizeSoundSelection(draft.confirm);
+  const open = normalizeSoundSelection(draft.open);
+  const close = normalizeSoundSelection(draft.close);
+  const scroll = normalizeSoundSelection(draft.scroll);
+
+  if (!areSoundSelectionsEqual(press, defaults?.press)) {
+    next.press = press;
+  }
+  if (!areSoundSelectionsEqual(confirm, defaults?.confirm)) {
+    next.confirm = confirm;
+  }
+  if (!areSoundSelectionsEqual(open, defaults?.open)) {
+    next.open = open;
+  }
+  if (!areSoundSelectionsEqual(close, defaults?.close)) {
+    next.close = close;
+  }
+  if (!areSoundSelectionsEqual(scroll, defaults?.scroll)) {
+    next.scroll = scroll;
+  }
+
+  return Object.keys(next).length ? next : undefined;
+}
+
+function areSoundSelectionsEqual(left?: string[], right?: string[]) {
+  const normalizedLeft = normalizeSoundSelection(left);
+  const normalizedRight = normalizeSoundSelection(right);
+
+  if (normalizedLeft.length !== normalizedRight.length) {
+    return false;
+  }
+
+  return normalizedLeft.every((value, index) => value === normalizedRight[index]);
+}
+
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
@@ -1677,6 +1775,22 @@ const styles = StyleSheet.create({
     color: palette.textMuted,
     fontSize: 12,
     fontWeight: "600",
+  },
+  inlineActionButton: {
+    marginTop: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(92, 124, 255, 0.24)",
+    backgroundColor: "rgba(92, 124, 255, 0.12)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  inlineActionLabel: {
+    color: palette.text,
+    fontSize: 12,
+    fontWeight: "800",
+    textAlign: "center",
   },
   iconPreviewRow: {
     flexDirection: "row",
