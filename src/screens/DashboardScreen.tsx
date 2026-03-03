@@ -18,6 +18,8 @@ export function DashboardScreen() {
   const isCompact = width < 700;
   const isTouchLayout = width < 1100;
   const horizontalPagerRef = useRef<ScrollView | null>(null);
+  const horizontalOffsetRef = useRef(0);
+  const pageSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pageOffsetsRef = useRef<Record<string, number>>({});
   const pullGestureRef = useRef<{ pageId: string | null; startY: number | null }>({
     pageId: null,
@@ -61,6 +63,15 @@ export function DashboardScreen() {
 
     horizontalPagerRef.current.scrollTo({ x: width * activePageIndex, animated: true });
   }, [activePageIndex, width]);
+
+  useEffect(
+    () => () => {
+      if (pageSettleTimerRef.current) {
+        clearTimeout(pageSettleTimerRef.current);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     setVisiblePageId(activePageId);
@@ -142,14 +153,16 @@ export function DashboardScreen() {
   };
 
   const handlePageScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const nextPage = resolvePageFromOffset(event.nativeEvent.contentOffset.x);
+    const offsetX = event.nativeEvent.contentOffset.x;
+    horizontalOffsetRef.current = offsetX;
+    const nextPage = resolvePageFromOffset(offsetX);
     if (nextPage && nextPage.id !== visiblePageId) {
       setVisiblePageId(nextPage.id);
     }
   };
 
-  const handlePageScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const nextPage = resolvePageFromOffset(event.nativeEvent.contentOffset.x);
+  const commitPageByOffset = (offsetX: number) => {
+    const nextPage = resolvePageFromOffset(offsetX);
     if (nextPage) {
       if (nextPage.id !== activePageId) {
         playConfiguredUiSound(config.uiSounds?.pageSounds?.swipe, "swipe", "global:pageSwipe");
@@ -157,6 +170,33 @@ export function DashboardScreen() {
       setVisiblePageId(nextPage.id);
       setActivePage(nextPage.id);
     }
+  };
+
+  const schedulePageCommit = (delayMs: number) => {
+    if (pageSettleTimerRef.current) {
+      clearTimeout(pageSettleTimerRef.current);
+    }
+
+    pageSettleTimerRef.current = setTimeout(() => {
+      pageSettleTimerRef.current = null;
+      commitPageByOffset(horizontalOffsetRef.current);
+    }, delayMs);
+  };
+
+  const handlePageMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (pageSettleTimerRef.current) {
+      clearTimeout(pageSettleTimerRef.current);
+      pageSettleTimerRef.current = null;
+    }
+
+    const offsetX = event.nativeEvent.contentOffset.x;
+    horizontalOffsetRef.current = offsetX;
+    commitPageByOffset(offsetX);
+  };
+
+  const handlePageDragEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    horizontalOffsetRef.current = event.nativeEvent.contentOffset.x;
+    schedulePageCommit(140);
   };
 
   const handleContentScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -245,6 +285,11 @@ export function DashboardScreen() {
         onAddWidget={() => setLibraryOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
         onSelectPage={(pageId) => {
+          const nextIndex = dashboardPages.findIndex((page) => page.id === pageId);
+          if (nextIndex >= 0) {
+            horizontalOffsetRef.current = width * nextIndex;
+            horizontalPagerRef.current?.scrollTo({ x: width * nextIndex, animated: true });
+          }
           setVisiblePageId(pageId);
           setActivePage(pageId);
         }}
@@ -258,8 +303,8 @@ export function DashboardScreen() {
         scrollEventThrottle={16}
         showsHorizontalScrollIndicator={false}
         onScroll={handlePageScroll}
-        onMomentumScrollEnd={handlePageScrollEnd}
-        onScrollEndDrag={handlePageScrollEnd}
+        onMomentumScrollEnd={handlePageMomentumEnd}
+        onScrollEndDrag={handlePageDragEnd}
       >
         {pageConfigs.map((pageConfig) => (
           <View key={pageConfig.activePageId} style={[styles.page, { width }]}>
