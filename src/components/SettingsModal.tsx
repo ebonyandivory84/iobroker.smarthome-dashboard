@@ -31,6 +31,9 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const [pageTabSounds, setPageTabSounds] = useState<string[]>([]);
   const [pageSwipeSounds, setPageSwipeSounds] = useState<string[]>([]);
   const [pageContentScrollSounds, setPageContentScrollSounds] = useState<string[]>([]);
+  const [layoutToggleSounds, setLayoutToggleSounds] = useState<string[]>([]);
+  const [addWidgetSounds, setAddWidgetSounds] = useState<string[]>([]);
+  const [openSettingsSounds, setOpenSettingsSounds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,6 +50,9 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     setPageTabSounds(config.uiSounds?.pageSounds?.tabPress || []);
     setPageSwipeSounds(config.uiSounds?.pageSounds?.swipe || []);
     setPageContentScrollSounds(config.uiSounds?.pageSounds?.contentScroll || []);
+    setLayoutToggleSounds(config.uiSounds?.pageSounds?.layoutToggle || []);
+    setAddWidgetSounds(config.uiSounds?.pageSounds?.addWidget || []);
+    setOpenSettingsSounds(config.uiSounds?.pageSounds?.openSettings || []);
     setError(null);
     refreshSavedDashboards();
   }, [config.homeLabel, config.title, rawJson, visible]);
@@ -71,6 +77,9 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
           tabPress: pageTabSounds,
           swipe: pageSwipeSounds,
           contentScroll: pageContentScrollSounds,
+          layoutToggle: layoutToggleSounds,
+          addWidget: addWidgetSounds,
+          openSettings: openSettingsSounds,
         },
       };
       nextDraft = JSON.stringify(parsed, null, 2);
@@ -208,11 +217,23 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
                 <Text style={styles.fieldLabel}>Dashboard wischen</Text>
                 <SoundPickerField onChange={setPageSwipeSounds} value={pageSwipeSounds} />
               </View>
-              <View style={styles.soundSetBlock}>
-                <Text style={styles.fieldLabel}>Seite scrollen</Text>
-                <SoundPickerField onChange={setPageContentScrollSounds} value={pageContentScrollSounds} />
-              </View>
+            <View style={styles.soundSetBlock}>
+              <Text style={styles.fieldLabel}>Seite scrollen</Text>
+              <SoundPickerField onChange={setPageContentScrollSounds} value={pageContentScrollSounds} />
             </View>
+            <View style={styles.soundSetBlock}>
+              <Text style={styles.fieldLabel}>Stift / Layout</Text>
+              <SoundPickerField onChange={setLayoutToggleSounds} value={layoutToggleSounds} />
+            </View>
+            <View style={styles.soundSetBlock}>
+              <Text style={styles.fieldLabel}>Plus / Widget</Text>
+              <SoundPickerField onChange={setAddWidgetSounds} value={addWidgetSounds} />
+            </View>
+            <View style={styles.soundSetBlock}>
+              <Text style={styles.fieldLabel}>Zahnrad / Einstellungen</Text>
+              <SoundPickerField onChange={setOpenSettingsSounds} value={openSettingsSounds} />
+            </View>
+          </View>
             <View style={styles.libraryCard}>
               <Text style={styles.sectionTitle}>Gespeicherte Dashboards</Text>
               <View style={styles.saveRow}>

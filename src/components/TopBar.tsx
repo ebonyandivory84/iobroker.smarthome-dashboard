@@ -14,6 +14,9 @@ type TopBarProps = {
   onAddWidget: () => void;
   onSelectPage: (pageId: string) => void;
   pageTabSounds?: string[];
+  layoutToggleSounds?: string[];
+  addWidgetSounds?: string[];
+  openSettingsSounds?: string[];
 };
 
 export function TopBar({
@@ -27,6 +30,9 @@ export function TopBar({
   onAddWidget,
   onSelectPage,
   pageTabSounds,
+  layoutToggleSounds,
+  addWidgetSounds,
+  openSettingsSounds,
 }: TopBarProps) {
   const { width } = useWindowDimensions();
   const isCompact = width < 700;
@@ -60,15 +66,30 @@ export function TopBar({
       </View>
       <View style={[styles.actions, isCompact ? styles.actionsCompact : null]}>
         <Pressable
-          onPress={onToggleLayoutMode}
+          onPress={() => {
+            playConfiguredUiSound(layoutToggleSounds, "panel", "topbar:layoutToggle");
+            onToggleLayoutMode();
+          }}
           style={[styles.actionButton, isLayoutMode ? styles.layoutActiveButton : null]}
         >
           <MaterialCommunityIcons color={palette.text} name="pencil-outline" size={18} />
         </Pressable>
-        <Pressable onPress={onAddWidget} style={styles.actionButton}>
+        <Pressable
+          onPress={() => {
+            playConfiguredUiSound(addWidgetSounds, "tap", "topbar:addWidget");
+            onAddWidget();
+          }}
+          style={styles.actionButton}
+        >
           <MaterialCommunityIcons color={palette.text} name="plus" size={18} />
         </Pressable>
-        <Pressable onPress={onOpenSettings} style={styles.actionButton}>
+        <Pressable
+          onPress={() => {
+            playConfiguredUiSound(openSettingsSounds, "open", "topbar:openSettings");
+            onOpenSettings();
+          }}
+          style={styles.actionButton}
+        >
           <MaterialCommunityIcons color={palette.text} name="cog-outline" size={18} />
         </Pressable>
       </View>

@@ -97,6 +97,9 @@ export const defaultConfig: DashboardSettings = {
       tabPress: [],
       swipe: [],
       contentScroll: [],
+      layoutToggle: [],
+      addWidget: [],
+      openSettings: [],
     },
   },
   iobroker: {

@@ -69,6 +69,9 @@ export function DashboardScreen() {
       ...(config.uiSounds?.pageSounds?.tabPress || []),
       ...(config.uiSounds?.pageSounds?.swipe || []),
       ...(config.uiSounds?.pageSounds?.contentScroll || []),
+      ...(config.uiSounds?.pageSounds?.layoutToggle || []),
+      ...(config.uiSounds?.pageSounds?.addWidget || []),
+      ...(config.uiSounds?.pageSounds?.openSettings || []),
       ...dashboardPages.flatMap((page) =>
         page.widgets.flatMap((widget) => [
           ...(widget.interactionSounds?.press || []),
@@ -169,6 +172,9 @@ export function DashboardScreen() {
         isOnline={isOnline}
         isLayoutMode={layoutMode}
         pageTabSounds={config.uiSounds?.pageSounds?.tabPress}
+        layoutToggleSounds={config.uiSounds?.pageSounds?.layoutToggle}
+        addWidgetSounds={config.uiSounds?.pageSounds?.addWidget}
+        openSettingsSounds={config.uiSounds?.pageSounds?.openSettings}
         pageTitles={dashboardPages.map((page) => ({ id: page.id, title: page.title }))}
         onAddWidget={() => setLibraryOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
