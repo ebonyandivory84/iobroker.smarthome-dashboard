@@ -89,6 +89,11 @@ export const defaultConfig: DashboardSettings = {
     gap: 12,
   },
   pollingMs: 2000,
+  uiSounds: {
+    enabled: true,
+    volume: 55,
+    soundSet: "voyager",
+  },
   iobroker: {
     baseUrl: "",
     adapterBasePath: "/smarthome-dashboard/api",

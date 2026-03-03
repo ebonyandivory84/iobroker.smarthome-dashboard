@@ -179,6 +179,14 @@ export type DashboardPage = {
   widgets: WidgetConfig[];
 };
 
+export type UiSoundSet = "voyager" | "ops" | "soft";
+
+export type UiSoundSettings = {
+  enabled: boolean;
+  volume: number;
+  soundSet: UiSoundSet;
+};
+
 export type DashboardSettings = {
   title: string;
   homeLabel?: string;
@@ -192,6 +200,7 @@ export type DashboardSettings = {
     gap: number;
   };
   pollingMs: number;
+  uiSounds?: UiSoundSettings;
   iobroker: {
     baseUrl: string;
     username?: string;

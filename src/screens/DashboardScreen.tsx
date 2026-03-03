@@ -9,7 +9,7 @@ import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { useIoBrokerStates } from "../hooks/useIoBrokerStates";
 import { BackgroundMode, WidgetConfig, WidgetType } from "../types/dashboard";
 import { constrainToPrimarySections, normalizeWidgetLayout, resolveWidgetPosition } from "../utils/gridLayout";
-import { playUiSound } from "../utils/uiSounds";
+import { configureUiSounds, playUiSound } from "../utils/uiSounds";
 import { buildWidgetTemplate } from "../utils/widgetFactory";
 import { palette } from "../utils/theme";
 
@@ -58,6 +58,10 @@ export function DashboardScreen() {
   useEffect(() => {
     setVisiblePageId(activePageId);
   }, [activePageId]);
+
+  useEffect(() => {
+    configureUiSounds(config.uiSounds);
+  }, [config.uiSounds]);
 
   const addWidgetByType = (type: WidgetType) => {
     const widget = buildWidgetTemplate(type, config.widgets.length, { columns: config.grid.columns });

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useDashboardConfig } from "../context/DashboardConfigContext";
+import { UiSoundSet } from "../types/dashboard";
 import { palette } from "../utils/theme";
 
 type SettingsModalProps = {
@@ -23,6 +24,9 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const [draft, setDraft] = useState(rawJson);
   const [dashboardName, setDashboardName] = useState("");
   const [homeLabel, setHomeLabel] = useState("");
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundVolume, setSoundVolume] = useState("55");
+  const [soundSet, setSoundSet] = useState<UiSoundSet>("voyager");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,16 +37,30 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     setDraft(rawJson);
     setDashboardName(config.title || "");
     setHomeLabel(config.homeLabel || "My Home");
+    setSoundEnabled(config.uiSounds?.enabled !== false);
+    setSoundVolume(String(config.uiSounds?.volume ?? 55));
+    setSoundSet(config.uiSounds?.soundSet || "voyager");
     setError(null);
     refreshSavedDashboards();
   }, [config.homeLabel, config.title, rawJson, visible]);
 
   const save = () => {
     let nextDraft = draft;
+    const normalizedVolume = Number.parseInt(soundVolume, 10);
+
+    if (!Number.isFinite(normalizedVolume)) {
+      setError("Lautstaerke muss eine Zahl von 0 bis 100 sein");
+      return;
+    }
 
     try {
       const parsed = JSON.parse(draft) as Record<string, unknown>;
       parsed.homeLabel = (homeLabel || "").trim() || "My Home";
+      parsed.uiSounds = {
+        enabled: soundEnabled,
+        volume: Math.max(0, Math.min(100, normalizedVolume)),
+        soundSet,
+      };
       nextDraft = JSON.stringify(parsed, null, 2);
     } catch {
       // Let the existing JSON validation path surface the error.
@@ -113,6 +131,62 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
               style={styles.input}
               value={homeLabel}
             />
+          </View>
+          <View style={styles.libraryCard}>
+            <Text style={styles.sectionTitle}>UI-Sounds</Text>
+            <Text style={styles.helperInline}>
+              Steuert Tastentoene fuer klickbare Widgets, Seitenwechsel und Kamera-Interaktionen.
+            </Text>
+            <View style={styles.choiceRow}>
+              <Pressable
+                onPress={() => setSoundEnabled(true)}
+                style={[styles.choiceChip, soundEnabled ? styles.choiceChipActive : null]}
+              >
+                <Text style={[styles.choiceChipLabel, soundEnabled ? styles.choiceChipLabelActive : null]}>Ein</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setSoundEnabled(false)}
+                style={[styles.choiceChip, !soundEnabled ? styles.choiceChipActive : null]}
+              >
+                <Text style={[styles.choiceChipLabel, !soundEnabled ? styles.choiceChipLabelActive : null]}>Aus</Text>
+              </Pressable>
+            </View>
+            <View style={styles.soundVolumeRow}>
+              <Text style={styles.fieldLabel}>Lautstaerke (0-100)</Text>
+              <TextInput
+                keyboardType="number-pad"
+                onChangeText={setSoundVolume}
+                placeholder="55"
+                placeholderTextColor={palette.textMuted}
+                style={[styles.input, styles.volumeInput]}
+                value={soundVolume}
+              />
+            </View>
+            <View style={styles.soundSetBlock}>
+              <Text style={styles.fieldLabel}>Soundset</Text>
+              <View style={styles.choiceRow}>
+                {([
+                  { key: "voyager", label: "Voyager" },
+                  { key: "ops", label: "Ops" },
+                  { key: "soft", label: "Soft" },
+                ] as const).map((option) => (
+                  <Pressable
+                    key={option.key}
+                    onPress={() => setSoundSet(option.key)}
+                    style={[styles.choiceChip, soundSet === option.key ? styles.choiceChipActive : null]}
+                  >
+                    <Text
+                      style={[
+                        styles.choiceChipLabel,
+                        soundSet === option.key ? styles.choiceChipLabelActive : null,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
           </View>
           <View style={styles.libraryCard}>
             <Text style={styles.sectionTitle}>Gespeicherte Dashboards</Text>
@@ -251,6 +325,58 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 15,
     fontWeight: "800",
+  },
+  helperInline: {
+    color: palette.textMuted,
+    lineHeight: 18,
+  },
+  fieldLabel: {
+    color: palette.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  choiceRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  choiceChip: {
+    minHeight: 38,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: palette.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  choiceChipActive: {
+    backgroundColor: palette.accent,
+    borderColor: "rgba(77, 226, 177, 0.55)",
+  },
+  choiceChipLabel: {
+    color: palette.text,
+    fontWeight: "700",
+  },
+  choiceChipLabelActive: {
+    color: "#041019",
+  },
+  soundVolumeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  volumeInput: {
+    minWidth: 96,
+    textAlign: "center",
+  },
+  soundSetBlock: {
+    gap: 8,
   },
   saveRow: {
     flexDirection: "row",

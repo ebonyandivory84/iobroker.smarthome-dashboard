@@ -7,7 +7,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { DashboardPage, DashboardSettings, WidgetConfig } from "../types/dashboard";
+import { DashboardPage, DashboardSettings, UiSoundSettings, WidgetConfig } from "../types/dashboard";
 import { defaultConfig } from "../utils/defaultConfig";
 
 type DashboardConfigContextValue = {
@@ -41,6 +41,7 @@ const DashboardConfigContext = createContext<DashboardConfigContextValue | null>
 function migrateConfig(input: DashboardSettings): DashboardSettings {
   const nextConfig: DashboardSettings = {
     ...input,
+    uiSounds: normalizeUiSoundSettings(input.uiSounds),
     iobroker: {
       ...input.iobroker,
       baseUrl: input.iobroker.baseUrl === LEGACY_DEMO_BASE_URL ? "" : input.iobroker.baseUrl,
@@ -406,5 +407,18 @@ function syncActivePage(
     ...current,
     ...partial,
     pages: nextPages,
+  };
+}
+
+function normalizeUiSoundSettings(input?: UiSoundSettings): UiSoundSettings {
+  const soundSet = input?.soundSet;
+
+  return {
+    enabled: input?.enabled !== false,
+    volume:
+      typeof input?.volume === "number" && Number.isFinite(input.volume)
+        ? Math.max(0, Math.min(100, Math.round(input.volume)))
+        : 55,
+    soundSet: soundSet === "ops" || soundSet === "soft" || soundSet === "voyager" ? soundSet : "voyager",
   };
 }
