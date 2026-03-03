@@ -137,13 +137,13 @@ function normalizeWebAssetUri(uri: string) {
 
   if (uri.startsWith("/assets/")) {
     const hostedBasePath = resolveHostedBasePath();
-    return `${window.location.origin}${hostedBasePath}${uri}`;
+    return encodeURI(`${window.location.origin}${hostedBasePath}${uri}`);
   }
 
   try {
-    return new URL(uri, window.location.href).toString();
+    return encodeURI(new URL(uri, window.location.href).toString());
   } catch {
-    return uri;
+    return encodeURI(uri);
   }
 }
 
