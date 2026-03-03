@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { playSoundPreview } from "../utils/uiSounds";
 import { LCARS_SOUND_OPTIONS, normalizeSoundSelection, resolveLcarsSoundLabel } from "../utils/lcarsSounds";
 import { palette } from "../utils/theme";
 
@@ -65,17 +66,24 @@ export function SoundPickerField({ value, onChange, maxItems = 5 }: SoundPickerF
                 const disabled = !active && selected.length >= maxItems;
 
                 return (
-                  <Pressable
+                  <View
                     key={option.id}
-                    onPress={() => toggle(option.id)}
                     style={[
-                      styles.option,
+                      styles.optionRow,
                       active ? styles.optionActive : null,
                       disabled ? styles.optionDisabled : null,
                     ]}
                   >
-                    <Text style={[styles.optionLabel, active ? styles.optionLabelActive : null]}>{option.label}</Text>
-                  </Pressable>
+                    <Pressable onPress={() => toggle(option.id)} style={styles.optionSelect}>
+                      <Text style={[styles.optionLabel, active ? styles.optionLabelActive : null]}>{option.label}</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => playSoundPreview(option.id)}
+                      style={[styles.previewButton, active ? styles.previewButtonActive : null]}
+                    >
+                      <Text style={[styles.previewLabel, active ? styles.previewLabelActive : null]}>▶</Text>
+                    </Pressable>
+                  </View>
                 );
               })}
             </ScrollView>
@@ -163,13 +171,13 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingBottom: 8,
   },
-  option: {
+  optionRow: {
     borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
     backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
     borderColor: palette.border,
+    flexDirection: "row",
+    alignItems: "stretch",
   },
   optionActive: {
     backgroundColor: palette.accent,
@@ -178,11 +186,37 @@ const styles = StyleSheet.create({
   optionDisabled: {
     opacity: 0.45,
   },
+  optionSelect: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    justifyContent: "center",
+  },
   optionLabel: {
     color: palette.text,
     fontWeight: "700",
   },
   optionLabelActive: {
+    color: "#041019",
+  },
+  previewButton: {
+    width: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderLeftWidth: 1,
+    borderLeftColor: palette.border,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  previewButtonActive: {
+    borderLeftColor: "rgba(4, 16, 25, 0.16)",
+    backgroundColor: "rgba(4, 16, 25, 0.08)",
+  },
+  previewLabel: {
+    color: palette.text,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  previewLabelActive: {
     color: "#041019",
   },
 });

@@ -163,6 +163,16 @@ export function playConfiguredUiSound(soundIds: string[] | undefined, fallback: 
   }
 }
 
+export function playSoundPreview(soundId: string) {
+  if (!uiSoundSettings.enabled) {
+    return;
+  }
+
+  if (!playAudioAsset(soundId)) {
+    playSynthSound("tap");
+  }
+}
+
 function playAudioAsset(soundId: string) {
   const uri = resolveLcarsSoundUri(soundId);
   if (!uri || typeof window === "undefined" || typeof window.Audio !== "function") {
