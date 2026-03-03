@@ -284,9 +284,11 @@ const styles = StyleSheet.create({
   },
   heroMeta: {
     flex: 1,
+    paddingRight: 92,
   },
   location: {
-    fontSize: 20,
+    fontSize: 16,
+    lineHeight: 19,
     fontWeight: "800",
   },
   summary: {
