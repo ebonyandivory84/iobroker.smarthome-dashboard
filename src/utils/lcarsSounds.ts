@@ -88,13 +88,13 @@ export function resolveLcarsSoundUri(id: string) {
   const source = option.module;
 
   if (typeof source === "string") {
-    return source;
+    return normalizeWebAssetUri(source);
   }
 
   if (source && typeof source === "object") {
     const uri = "uri" in source && typeof source.uri === "string" ? source.uri : null;
     if (uri) {
-      return uri;
+      return normalizeWebAssetUri(uri);
     }
 
     const defaultUri =
@@ -107,21 +107,37 @@ export function resolveLcarsSoundUri(id: string) {
         : null;
 
     if (defaultUri) {
-      return defaultUri;
+      return normalizeWebAssetUri(defaultUri);
     }
   }
 
   try {
     const asset = Asset.fromModule(source as never);
     if (asset?.uri) {
-      return asset.uri;
+      return normalizeWebAssetUri(asset.uri);
     }
     if (asset?.localUri) {
-      return asset.localUri;
+      return normalizeWebAssetUri(asset.localUri);
     }
   } catch {
     // Ignore and fall through to null.
   }
 
   return null;
+}
+
+function normalizeWebAssetUri(uri: string) {
+  if (typeof window === "undefined") {
+    return uri;
+  }
+
+  if (/^(data:|blob:|https?:)/i.test(uri)) {
+    return uri;
+  }
+
+  try {
+    return new URL(uri, window.location.href).toString();
+  } catch {
+    return uri;
+  }
 }

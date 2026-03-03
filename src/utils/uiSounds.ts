@@ -187,6 +187,8 @@ function playAudioAsset(soundId: string) {
     }
 
     const audio = new window.Audio(uri);
+    audio.preload = "auto";
+    (audio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
     audio.volume = Math.max(0, Math.min(1, uiSoundSettings.volume / 100));
     activeHtmlAudio = audio;
     void audio.play().catch(() => undefined);
