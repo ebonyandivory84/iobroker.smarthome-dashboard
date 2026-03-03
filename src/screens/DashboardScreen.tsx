@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { NativeScrollEvent, NativeSyntheticEvent, Platform, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { GridCanvas } from "../components/GridCanvas";
 import { SettingsModal } from "../components/SettingsModal";
 import { TopBar } from "../components/TopBar";
@@ -16,7 +16,13 @@ import { palette } from "../utils/theme";
 export function DashboardScreen() {
   const { width } = useWindowDimensions();
   const isCompact = width < 700;
+  const isTouchLayout = width < 1100;
   const horizontalPagerRef = useRef<ScrollView | null>(null);
+  const pageOffsetsRef = useRef<Record<string, number>>({});
+  const pullGestureRef = useRef<{ pageId: string | null; startY: number | null }>({
+    pageId: null,
+    startY: null,
+  });
   const {
     addWidget,
     config,
@@ -166,6 +172,55 @@ export function DashboardScreen() {
     playConfiguredUiSound(config.uiSounds?.pageSounds?.contentScroll, "tap", "global:pageContentScroll");
   };
 
+  const handlePageContentScroll =
+    (pageId: string) =>
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      pageOffsetsRef.current[pageId] = event.nativeEvent.contentOffset.y;
+    };
+
+  const handlePageTouchStart =
+    (pageId: string) =>
+    (event: unknown) => {
+      if (!isTouchLayout) {
+        return;
+      }
+
+      const currentOffset = pageOffsetsRef.current[pageId] || 0;
+      if (currentOffset > 0) {
+        pullGestureRef.current = { pageId: null, startY: null };
+        return;
+      }
+
+      pullGestureRef.current = {
+        pageId,
+        startY: extractTouchPageY(event),
+      };
+    };
+
+  const handlePageTouchEnd =
+    (pageId: string) =>
+    (event: unknown) => {
+      if (!isTouchLayout || Platform.OS !== "web" || typeof window === "undefined") {
+        return;
+      }
+
+      const activeGesture = pullGestureRef.current;
+      const currentOffset = pageOffsetsRef.current[pageId] || 0;
+      const endY = extractTouchPageY(event);
+
+      if (
+        activeGesture.pageId === pageId &&
+        activeGesture.startY !== null &&
+        endY !== null &&
+        currentOffset <= 0 &&
+        endY - activeGesture.startY > 96
+      ) {
+        window.location.reload();
+      }
+
+      pullGestureRef.current = { pageId: null, startY: null };
+    };
+
   return (
     <View style={styles.root}>
       <BackgroundLayer
@@ -207,8 +262,11 @@ export function DashboardScreen() {
             <ScrollView
               contentContainerStyle={styles.scrollContent}
               style={styles.pageScroll}
+              onScroll={handlePageContentScroll(pageConfig.activePageId)}
               onMomentumScrollEnd={handleContentScrollEnd}
               onScrollEndDrag={handleContentScrollEnd}
+              onTouchStart={handlePageTouchStart(pageConfig.activePageId)}
+              onTouchEnd={handlePageTouchEnd(pageConfig.activePageId)}
             >
               <GridCanvas
                 client={client}
@@ -240,6 +298,31 @@ export function DashboardScreen() {
       />
       <SettingsModal onClose={() => setSettingsOpen(false)} visible={settingsOpen} />
     </View>
+  );
+}
+
+function extractTouchPageY(event: unknown) {
+  if (!event || typeof event !== "object" || !("nativeEvent" in event)) {
+    return null;
+  }
+
+  const nativeEvent = (event as { nativeEvent?: unknown }).nativeEvent;
+  if (!nativeEvent || typeof nativeEvent !== "object") {
+    return null;
+  }
+
+  const touches = "touches" in nativeEvent ? (nativeEvent as { touches?: Array<{ pageY?: number }> }).touches : undefined;
+  const changedTouches =
+    "changedTouches" in nativeEvent
+      ? (nativeEvent as { changedTouches?: Array<{ pageY?: number }> }).changedTouches
+      : undefined;
+
+  const directPageY = "pageY" in nativeEvent ? (nativeEvent as { pageY?: number }).pageY : undefined;
+
+  return (
+    touches?.[0]?.pageY ??
+    changedTouches?.[0]?.pageY ??
+    (typeof directPageY === "number" ? directPageY : null)
   );
 }
 
