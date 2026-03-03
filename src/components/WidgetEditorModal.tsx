@@ -111,6 +111,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         rtspUrl: widget.rtspUrl || "",
         refreshMs: String(widget.refreshMs || 2000),
         fullscreenRefreshMs: String(widget.fullscreenRefreshMs || widget.refreshMs || 1000),
+        maximizeStateId: widget.maximizeStateId || "",
+        maximizeTriggerFormat: widget.maximizeTriggerFormat || "boolean",
+        maximizeTriggerValue: widget.maximizeTriggerValue || "",
         ...appearanceDraft,
       });
       return;
@@ -313,6 +316,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           widget.fullscreenRefreshMs || widget.refreshMs || 1000,
           100
         ),
+        maximizeStateId: draft.maximizeStateId || undefined,
+        maximizeTriggerFormat: normalizeStateFormat(draft.maximizeTriggerFormat),
+        maximizeTriggerValue: draft.maximizeTriggerValue || undefined,
         interactionSounds: buildStoredInteractionSounds(
           widget.type,
           soundDraft,
@@ -759,6 +765,36 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     onChangeText={(value) => setDraft((current) => ({ ...current, fullscreenRefreshMs: value }))}
                     style={styles.input}
                     value={draft.fullscreenRefreshMs || ""}
+                  />
+                </Field>
+                <Field label="Maximieren per Datenpunkt">
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("maximizeStateId")}
+                    onChangeText={(value) => setDraft((current) => ({ ...current, maximizeStateId: value }))}
+                    value={draft.maximizeStateId || ""}
+                  />
+                </Field>
+                <Field label="Trigger Format">
+                  <ChoiceRow
+                    options={["boolean", "number", "text"]}
+                    value={draft.maximizeTriggerFormat || "boolean"}
+                    onSelect={(value) => setDraft((current) => ({ ...current, maximizeTriggerFormat: value }))}
+                  />
+                </Field>
+                <Field label="Trigger Wert">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) => setDraft((current) => ({ ...current, maximizeTriggerValue: value }))}
+                    placeholder={
+                      (draft.maximizeTriggerFormat || "boolean") === "boolean"
+                        ? "true oder false"
+                        : (draft.maximizeTriggerFormat || "boolean") === "number"
+                          ? "z. B. 1"
+                          : "z. B. Klingel"
+                    }
+                    placeholderTextColor={palette.textMuted}
+                    style={styles.input}
+                    value={draft.maximizeTriggerValue || ""}
                   />
                 </Field>
                 <Field label="Sounds bei Interaktion">

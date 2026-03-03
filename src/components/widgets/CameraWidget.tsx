@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { Image, Linking, Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { CameraWidgetConfig } from "../../types/dashboard";
@@ -6,19 +7,36 @@ import { palette } from "../../utils/theme";
 
 type CameraWidgetProps = {
   config: CameraWidgetConfig;
+  maximizeStateValue?: unknown;
   onAspectRatioDetected?: (ratio: number) => void;
 };
 
-export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProps) {
+const MAX_FULLSCREEN_DURATION_MS = 30_000;
+const pinnedColor = "#f3c84a";
+
+export function CameraWidget({ config, maximizeStateValue, onAspectRatioDetected }: CameraWidgetProps) {
   const [tick, setTick] = useState(0);
   const [displayUrl, setDisplayUrl] = useState<string | null>(null);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const [pinned, setPinned] = useState(false);
   const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
+  const lastTriggerMatchRef = useRef(false);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const activeRefreshMs = fullscreenOpen
     ? Math.max(100, config.fullscreenRefreshMs || config.refreshMs || 2000)
     : Math.max(100, config.refreshMs || 2000);
+
+  const closeFullscreen = () => {
+    setFullscreenOpen(false);
+    setPinned(false);
+  };
+
+  const openFullscreen = () => {
+    setPinned(false);
+    setFullscreenOpen(true);
+  };
+
   const fullscreenPanResponder = useMemo(
     () =>
       PanResponder.create({
@@ -27,7 +45,7 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
         onPanResponderRelease: (_event, gestureState) => {
           if (gestureState.dy > 80 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx)) {
             playConfiguredUiSound(config.interactionSounds?.scroll, "swipe", `${config.id}:scroll`);
-            setFullscreenOpen(false);
+            closeFullscreen();
           }
         },
       }),
@@ -38,6 +56,28 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
     const timer = setInterval(() => setTick((current) => current + 1), activeRefreshMs);
     return () => clearInterval(timer);
   }, [activeRefreshMs]);
+
+  useEffect(() => {
+    if (!fullscreenOpen || pinned) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      closeFullscreen();
+    }, MAX_FULLSCREEN_DURATION_MS);
+
+    return () => clearTimeout(timer);
+  }, [fullscreenOpen, pinned]);
+
+  useEffect(() => {
+    const nextMatch = matchesMaximizeTrigger(config, maximizeStateValue);
+    const previousMatch = lastTriggerMatchRef.current;
+    lastTriggerMatchRef.current = nextMatch;
+
+    if (nextMatch && !previousMatch && !fullscreenOpen) {
+      openFullscreen();
+    }
+  }, [config, fullscreenOpen, maximizeStateValue]);
 
   const reportAspectRatio = (width: number, height: number) => {
     if (!onAspectRatioDetected || hasReportedAspectRatio.current || !width || !height) {
@@ -104,7 +144,7 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
           disabled={!displayUrl}
           onPress={() => {
             playConfiguredUiSound(config.interactionSounds?.open, "open", `${config.id}:open`);
-            setFullscreenOpen(true);
+            openFullscreen();
           }}
           style={styles.preview}
         >
@@ -169,15 +209,27 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
       </View>
       <Modal animationType={Platform.OS === "web" ? "fade" : "none"} transparent visible={fullscreenOpen}>
         <View style={styles.fullscreenBackdrop}>
-          <Pressable
-            onPress={() => {
-              playConfiguredUiSound(config.interactionSounds?.close, "close", `${config.id}:close`);
-              setFullscreenOpen(false);
-            }}
-            style={styles.fullscreenClose}
-          >
-            <Text style={styles.fullscreenCloseLabel}>X</Text>
-          </Pressable>
+          <View style={styles.fullscreenActions}>
+            <Pressable
+              onPress={() => setPinned((current) => !current)}
+              style={[styles.fullscreenActionButton, styles.fullscreenActionSpacing, pinned ? styles.fullscreenPinActive : null]}
+            >
+              <MaterialCommunityIcons
+                color={pinned ? pinnedColor : palette.text}
+                name={pinned ? "pin" : "pin-outline"}
+                size={18}
+              />
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                playConfiguredUiSound(config.interactionSounds?.close, "close", `${config.id}:close`);
+                closeFullscreen();
+              }}
+              style={styles.fullscreenActionButton}
+            >
+              <MaterialCommunityIcons color={palette.text} name="close" size={20} />
+            </Pressable>
+          </View>
           <View {...fullscreenPanResponder.panHandlers} style={styles.fullscreenStage}>
             {displayUrl
               ? Platform.OS === "web"
@@ -201,6 +253,66 @@ export function CameraWidget({ config, onAspectRatioDetected }: CameraWidgetProp
       </Modal>
     </>
   );
+}
+
+function matchesMaximizeTrigger(config: CameraWidgetConfig, value: unknown) {
+  if (!config.maximizeStateId) {
+    return false;
+  }
+
+  const triggerFormat = config.maximizeTriggerFormat || "boolean";
+  const rawExpected = (config.maximizeTriggerValue || "").trim();
+
+  if (triggerFormat === "boolean") {
+    const expected = normalizeBoolean(rawExpected || "true");
+    const actual = normalizeBoolean(value);
+    return expected !== null && actual !== null && expected === actual;
+  }
+
+  if (triggerFormat === "number") {
+    if (!rawExpected) {
+      return false;
+    }
+    const expected = Number(rawExpected);
+    const actual = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(expected) && Number.isFinite(actual) && expected === actual;
+  }
+
+  if (!rawExpected || value === null || value === undefined) {
+    return false;
+  }
+
+  return String(value).trim() === rawExpected;
+}
+
+function normalizeBoolean(value: unknown) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    if (value === 1) {
+      return true;
+    }
+    if (value === 0) {
+      return false;
+    }
+    return null;
+  }
+
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (["true", "1", "on", "yes"].includes(normalized)) {
+    return true;
+  }
+
+  if (["false", "0", "off", "no"].includes(normalized)) {
+    return false;
+  }
+
+  return null;
 }
 
 async function preloadSnapshot(uri: string) {
@@ -299,11 +411,14 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  fullscreenClose: {
+  fullscreenActions: {
     position: "absolute",
     top: 24,
     right: 24,
     zIndex: 20,
+    flexDirection: "row",
+  },
+  fullscreenActionButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -311,10 +426,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(4, 8, 14, 0.54)",
   },
-  fullscreenCloseLabel: {
-    color: palette.text,
-    fontSize: 18,
-    fontWeight: "800",
+  fullscreenActionSpacing: {
+    marginRight: 10,
+  },
+  fullscreenPinActive: {
+    backgroundColor: "rgba(243, 200, 74, 0.18)",
   },
   fullscreenTitle: {
     position: "absolute",

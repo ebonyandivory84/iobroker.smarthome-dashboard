@@ -78,6 +78,9 @@ export type CameraWidgetConfig = WidgetBase & {
   refreshMs?: number;
   fullscreenRefreshMs?: number;
   snapshotAspectRatio?: number;
+  maximizeStateId?: string;
+  maximizeTriggerFormat?: "boolean" | "number" | "text";
+  maximizeTriggerValue?: string;
 };
 
 export type GrafanaWidgetConfig = WidgetBase & {

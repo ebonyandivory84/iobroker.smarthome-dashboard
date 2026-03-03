@@ -740,6 +740,7 @@ function renderWidget(
     return (
       <CameraWidget
         config={effectiveWidget}
+        maximizeStateValue={effectiveWidget.maximizeStateId ? states[effectiveWidget.maximizeStateId] : undefined}
         onAspectRatioDetected={(ratio) => {
           if (effectiveWidget.snapshotAspectRatio) {
             return;
