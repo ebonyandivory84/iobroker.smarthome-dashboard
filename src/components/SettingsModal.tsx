@@ -117,167 +117,169 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   return (
     <Modal animationType="slide" transparent visible={visible}>
       <View style={styles.backdrop}>
-        <View style={styles.card}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Dashboard JSON</Text>
-            <Pressable onPress={onClose}>
-              <Text style={styles.close}>Schliessen</Text>
-            </Pressable>
-          </View>
-          <Text style={styles.helper}>
-            Die gesamte Dashboard-Konfiguration ist JSON-basiert. Hier bearbeitest du Titel, Grid,
-            ioBroker-Ziele, Widget-Typen und alle Widget-Einstellungen direkt in einer Datei.
-          </Text>
-          <View style={styles.metaRow}>
-            <MetaPill label="Home" value={config.homeLabel || "My Home"} />
-            <MetaPill label="Titel" value={config.title} />
-            <MetaPill label="Widgets" value={String(config.widgets.length)} />
-            <MetaPill label="API" value={config.iobroker.adapterBasePath || "/smarthome-dashboard/api"} />
-          </View>
-          <View style={styles.libraryCard}>
-            <Text style={styles.sectionTitle}>Kopfzeile</Text>
-            <TextInput
-              onChangeText={setHomeLabel}
-              placeholder="Name links oben"
-              placeholderTextColor={palette.textMuted}
-              style={styles.input}
-              value={homeLabel}
-            />
-          </View>
-          <View style={styles.libraryCard}>
-            <Text style={styles.sectionTitle}>UI-Sounds</Text>
-            <Text style={styles.helperInline}>
-              Steuert Tastentoene fuer klickbare Widgets, Seitenwechsel und Kamera-Interaktionen.
-            </Text>
-            <View style={styles.choiceRow}>
-              <Pressable
-                onPress={() => setSoundEnabled(true)}
-                style={[styles.choiceChip, soundEnabled ? styles.choiceChipActive : null]}
-              >
-                <Text style={[styles.choiceChipLabel, soundEnabled ? styles.choiceChipLabelActive : null]}>Ein</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setSoundEnabled(false)}
-                style={[styles.choiceChip, !soundEnabled ? styles.choiceChipActive : null]}
-              >
-                <Text style={[styles.choiceChipLabel, !soundEnabled ? styles.choiceChipLabelActive : null]}>Aus</Text>
+        <ScrollView contentContainerStyle={styles.modalScrollContent} style={styles.modalScroll}>
+          <View style={styles.card}>
+            <View style={styles.header}>
+              <Text style={styles.title}>Dashboard JSON</Text>
+              <Pressable onPress={onClose}>
+                <Text style={styles.close}>Schliessen</Text>
               </Pressable>
             </View>
-            <View style={styles.soundVolumeRow}>
-              <Text style={styles.fieldLabel}>Lautstaerke (0-100)</Text>
+            <Text style={styles.helper}>
+              Die gesamte Dashboard-Konfiguration ist JSON-basiert. Hier bearbeitest du Titel, Grid,
+              ioBroker-Ziele, Widget-Typen und alle Widget-Einstellungen direkt in einer Datei.
+            </Text>
+            <View style={styles.metaRow}>
+              <MetaPill label="Home" value={config.homeLabel || "My Home"} />
+              <MetaPill label="Titel" value={config.title} />
+              <MetaPill label="Widgets" value={String(config.widgets.length)} />
+              <MetaPill label="API" value={config.iobroker.adapterBasePath || "/smarthome-dashboard/api"} />
+            </View>
+            <View style={styles.libraryCard}>
+              <Text style={styles.sectionTitle}>Kopfzeile</Text>
               <TextInput
-                keyboardType="number-pad"
-                onChangeText={setSoundVolume}
-                placeholder="55"
+                onChangeText={setHomeLabel}
+                placeholder="Name links oben"
                 placeholderTextColor={palette.textMuted}
-                style={[styles.input, styles.volumeInput]}
-                value={soundVolume}
+                style={styles.input}
+                value={homeLabel}
               />
             </View>
-            <View style={styles.soundSetBlock}>
-              <Text style={styles.fieldLabel}>Soundset</Text>
+            <View style={styles.libraryCard}>
+              <Text style={styles.sectionTitle}>UI-Sounds</Text>
+              <Text style={styles.helperInline}>
+                Steuert Tastentoene fuer klickbare Widgets, Seitenwechsel und Kamera-Interaktionen.
+              </Text>
               <View style={styles.choiceRow}>
-                {([
-                  { key: "voyager", label: "Voyager" },
-                  { key: "ops", label: "Ops" },
-                  { key: "soft", label: "Soft" },
-                ] as const).map((option) => (
-                  <Pressable
-                    key={option.key}
-                    onPress={() => setSoundSet(option.key)}
-                    style={[styles.choiceChip, soundSet === option.key ? styles.choiceChipActive : null]}
-                  >
-                    <Text
-                      style={[
-                        styles.choiceChipLabel,
-                        soundSet === option.key ? styles.choiceChipLabelActive : null,
-                      ]}
+                <Pressable
+                  onPress={() => setSoundEnabled(true)}
+                  style={[styles.choiceChip, soundEnabled ? styles.choiceChipActive : null]}
+                >
+                  <Text style={[styles.choiceChipLabel, soundEnabled ? styles.choiceChipLabelActive : null]}>Ein</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setSoundEnabled(false)}
+                  style={[styles.choiceChip, !soundEnabled ? styles.choiceChipActive : null]}
+                >
+                  <Text style={[styles.choiceChipLabel, !soundEnabled ? styles.choiceChipLabelActive : null]}>Aus</Text>
+                </Pressable>
+              </View>
+              <View style={styles.soundVolumeRow}>
+                <Text style={styles.fieldLabel}>Lautstaerke (0-100)</Text>
+                <TextInput
+                  keyboardType="number-pad"
+                  onChangeText={setSoundVolume}
+                  placeholder="55"
+                  placeholderTextColor={palette.textMuted}
+                  style={[styles.input, styles.volumeInput]}
+                  value={soundVolume}
+                />
+              </View>
+              <View style={styles.soundSetBlock}>
+                <Text style={styles.fieldLabel}>Soundset</Text>
+                <View style={styles.choiceRow}>
+                  {([
+                    { key: "voyager", label: "Voyager" },
+                    { key: "ops", label: "Ops" },
+                    { key: "soft", label: "Soft" },
+                  ] as const).map((option) => (
+                    <Pressable
+                      key={option.key}
+                      onPress={() => setSoundSet(option.key)}
+                      style={[styles.choiceChip, soundSet === option.key ? styles.choiceChipActive : null]}
                     >
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                ))}
+                      <Text
+                        style={[
+                          styles.choiceChipLabel,
+                          soundSet === option.key ? styles.choiceChipLabelActive : null,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+              <View style={styles.soundSetBlock}>
+                <Text style={styles.fieldLabel}>Seiten-Tabs</Text>
+                <SoundPickerField onChange={setPageTabSounds} value={pageTabSounds} />
+              </View>
+              <View style={styles.soundSetBlock}>
+                <Text style={styles.fieldLabel}>Dashboard wischen</Text>
+                <SoundPickerField onChange={setPageSwipeSounds} value={pageSwipeSounds} />
+              </View>
+              <View style={styles.soundSetBlock}>
+                <Text style={styles.fieldLabel}>Seite scrollen</Text>
+                <SoundPickerField onChange={setPageContentScrollSounds} value={pageContentScrollSounds} />
               </View>
             </View>
-            <View style={styles.soundSetBlock}>
-              <Text style={styles.fieldLabel}>Seiten-Tabs</Text>
-              <SoundPickerField onChange={setPageTabSounds} value={pageTabSounds} />
+            <View style={styles.libraryCard}>
+              <Text style={styles.sectionTitle}>Gespeicherte Dashboards</Text>
+              <View style={styles.saveRow}>
+                <TextInput
+                  onChangeText={setDashboardName}
+                  placeholder="Dashboard-Name"
+                  placeholderTextColor={palette.textMuted}
+                  style={[styles.input, styles.nameInput]}
+                  value={dashboardName}
+                />
+                <Pressable onPress={saveCurrentAsNamed} style={[styles.button, styles.secondaryButton]}>
+                  <Text style={styles.secondaryLabel}>Unter Namen speichern</Text>
+                </Pressable>
+              </View>
+              <View style={styles.savedList}>
+                {savedDashboards.length ? (
+                  savedDashboards.map((name) => (
+                    <View key={name} style={styles.savedItem}>
+                      <Text numberOfLines={1} style={styles.savedName}>
+                        {name}
+                      </Text>
+                      <View style={styles.savedActions}>
+                        <Pressable onPress={() => loadSaved(name)} style={[styles.button, styles.primaryButtonSmall]}>
+                          <Text style={styles.primaryLabel}>Laden</Text>
+                        </Pressable>
+                        <Pressable onPress={() => removeSaved(name)} style={[styles.button, styles.warningButtonSmall]}>
+                          <Text style={styles.warningLabel}>Loeschen</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.emptyText}>Noch keine Dashboards im Adapter gespeichert.</Text>
+                )}
+              </View>
             </View>
-            <View style={styles.soundSetBlock}>
-              <Text style={styles.fieldLabel}>Dashboard wischen</Text>
-              <SoundPickerField onChange={setPageSwipeSounds} value={pageSwipeSounds} />
-            </View>
-            <View style={styles.soundSetBlock}>
-              <Text style={styles.fieldLabel}>Seite scrollen</Text>
-              <SoundPickerField onChange={setPageContentScrollSounds} value={pageContentScrollSounds} />
-            </View>
-          </View>
-          <View style={styles.libraryCard}>
-            <Text style={styles.sectionTitle}>Gespeicherte Dashboards</Text>
-            <View style={styles.saveRow}>
+            <View style={styles.editorWrap}>
               <TextInput
-                onChangeText={setDashboardName}
-                placeholder="Dashboard-Name"
-                placeholderTextColor={palette.textMuted}
-                style={[styles.input, styles.nameInput]}
-                value={dashboardName}
+                autoCapitalize="none"
+                autoCorrect={false}
+                multiline
+                onChangeText={setDraft}
+                style={styles.editor}
+                textAlignVertical="top"
+                value={draft}
               />
-              <Pressable onPress={saveCurrentAsNamed} style={[styles.button, styles.secondaryButton]}>
-                <Text style={styles.secondaryLabel}>Unter Namen speichern</Text>
+            </View>
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <View style={styles.footer}>
+              <Pressable
+                onPress={() => {
+                  resetConfig();
+                  onClose();
+                }}
+                style={[styles.button, styles.warningButton]}
+              >
+                <Text style={styles.warningLabel}>Demo laden</Text>
+              </Pressable>
+              <Pressable onPress={onClose} style={[styles.button, styles.secondaryButton]}>
+                <Text style={styles.secondaryLabel}>Abbrechen</Text>
+              </Pressable>
+              <Pressable onPress={save} style={[styles.button, styles.primaryButton]}>
+                <Text style={styles.primaryLabel}>Speichern</Text>
               </Pressable>
             </View>
-            <View style={styles.savedList}>
-              {savedDashboards.length ? (
-                savedDashboards.map((name) => (
-                  <View key={name} style={styles.savedItem}>
-                    <Text numberOfLines={1} style={styles.savedName}>
-                      {name}
-                    </Text>
-                    <View style={styles.savedActions}>
-                      <Pressable onPress={() => loadSaved(name)} style={[styles.button, styles.primaryButtonSmall]}>
-                        <Text style={styles.primaryLabel}>Laden</Text>
-                      </Pressable>
-                      <Pressable onPress={() => removeSaved(name)} style={[styles.button, styles.warningButtonSmall]}>
-                        <Text style={styles.warningLabel}>Loeschen</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                ))
-              ) : (
-                <Text style={styles.emptyText}>Noch keine Dashboards im Adapter gespeichert.</Text>
-              )}
-            </View>
           </View>
-          <ScrollView style={styles.editorWrap}>
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              multiline
-              onChangeText={setDraft}
-              style={styles.editor}
-              textAlignVertical="top"
-              value={draft}
-            />
-          </ScrollView>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          <View style={styles.footer}>
-            <Pressable
-              onPress={() => {
-                resetConfig();
-                onClose();
-              }}
-              style={[styles.button, styles.warningButton]}
-            >
-              <Text style={styles.warningLabel}>Demo laden</Text>
-            </Pressable>
-            <Pressable onPress={onClose} style={[styles.button, styles.secondaryButton]}>
-              <Text style={styles.secondaryLabel}>Abbrechen</Text>
-            </Pressable>
-            <Pressable onPress={save} style={[styles.button, styles.primaryButton]}>
-              <Text style={styles.primaryLabel}>Speichern</Text>
-            </Pressable>
-          </View>
-        </View>
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -301,9 +303,14 @@ const styles = StyleSheet.create({
     padding: 22,
     justifyContent: "center",
   },
-  card: {
+  modalScroll: {
     flex: 1,
-    minHeight: 0,
+  },
+  modalScrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+  },
+  card: {
     marginVertical: 18,
     borderRadius: 22,
     backgroundColor: palette.panelStrong,
@@ -458,8 +465,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   editorWrap: {
-    flex: 1,
-    minHeight: 0,
+    marginTop: 2,
   },
   input: {
     borderRadius: 14,
