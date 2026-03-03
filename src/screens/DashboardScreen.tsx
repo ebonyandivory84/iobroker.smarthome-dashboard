@@ -19,7 +19,6 @@ export function DashboardScreen() {
   const isTouchLayout = width < 1100;
   const horizontalPagerRef = useRef<ScrollView | null>(null);
   const horizontalOffsetRef = useRef(0);
-  const pageSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pageOffsetsRef = useRef<Record<string, number>>({});
   const pullGestureRef = useRef<{
     pageId: string | null;
@@ -47,6 +46,7 @@ export function DashboardScreen() {
     setActivePage,
     updateWidget,
   } = useDashboardConfig();
+  const committedPageIdRef = useRef(activePageId);
   const { client, error, isOnline, states, stateWrites, writeStateTracked } = useIoBrokerStates();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -75,17 +75,9 @@ export function DashboardScreen() {
     horizontalPagerRef.current.scrollTo({ x: width * activePageIndex, animated: true });
   }, [activePageIndex, width]);
 
-  useEffect(
-    () => () => {
-      if (pageSettleTimerRef.current) {
-        clearTimeout(pageSettleTimerRef.current);
-      }
-    },
-    []
-  );
-
   useEffect(() => {
     setVisiblePageId(activePageId);
+    committedPageIdRef.current = activePageId;
   }, [activePageId]);
 
   useEffect(() => {
@@ -175,39 +167,25 @@ export function DashboardScreen() {
   const commitPageByOffset = (offsetX: number) => {
     const nextPage = resolvePageFromOffset(offsetX);
     if (nextPage) {
-      if (nextPage.id !== activePageId) {
+      if (nextPage.id !== committedPageIdRef.current) {
         playConfiguredUiSound(config.uiSounds?.pageSounds?.swipe, "swipe", "global:pageSwipe");
       }
+      committedPageIdRef.current = nextPage.id;
       setVisiblePageId(nextPage.id);
       setActivePage(nextPage.id);
     }
   };
 
-  const schedulePageCommit = (delayMs: number) => {
-    if (pageSettleTimerRef.current) {
-      clearTimeout(pageSettleTimerRef.current);
-    }
-
-    pageSettleTimerRef.current = setTimeout(() => {
-      pageSettleTimerRef.current = null;
-      commitPageByOffset(horizontalOffsetRef.current);
-    }, delayMs);
-  };
-
   const handlePageMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (pageSettleTimerRef.current) {
-      clearTimeout(pageSettleTimerRef.current);
-      pageSettleTimerRef.current = null;
-    }
-
     const offsetX = event.nativeEvent.contentOffset.x;
     horizontalOffsetRef.current = offsetX;
     commitPageByOffset(offsetX);
   };
 
   const handlePageDragEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    horizontalOffsetRef.current = event.nativeEvent.contentOffset.x;
-    schedulePageCommit(140);
+    const offsetX = event.nativeEvent.contentOffset.x;
+    horizontalOffsetRef.current = offsetX;
+    commitPageByOffset(offsetX);
   };
 
   const handleContentScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
