@@ -159,10 +159,9 @@ export function playConfiguredUiSound(soundIds: string[] | undefined, fallback: 
     return;
   }
 
-  const soundIndex = soundCursor.get(cycleKey) || 0;
-  const selectedId = normalizedSelection[soundIndex % normalizedSelection.length];
-  soundCursor.set(cycleKey, (soundIndex + 1) % normalizedSelection.length);
-  playDecodedAudio(selectedId, fallback);
+  const cursorKey = `${cycleKey}::${normalizedSelection.join("|")}`;
+  const startIndex = soundCursor.get(cursorKey) || 0;
+  void playNextConfiguredSound(normalizedSelection, startIndex, fallback, cursorKey);
 }
 
 export function playSoundPreview(soundId: string) {
@@ -229,33 +228,7 @@ function playSynthSound(sound: UiSound) {
 }
 
 function playDecodedAudio(soundId: string, fallback: UiSound) {
-  const context = getAudioContext();
-  const masterGain = masterGainNode;
-
-  if (!context || !masterGain) {
-    playSynthSound(fallback);
-    return;
-  }
-
-  if (context.state === "suspended") {
-    void context.resume();
-  }
-
-  void loadDecodedAudio(soundId)
-    .then((buffer) => {
-      if (!buffer) {
-        playSynthSound(fallback);
-        return;
-      }
-
-      const source = context.createBufferSource();
-      source.buffer = buffer;
-      source.connect(masterGain);
-      source.start();
-    })
-    .catch(() => {
-      playSynthSound(fallback);
-    });
+  void playSingleDecodedAudio(soundId, fallback);
 }
 
 function loadDecodedAudio(soundId: string) {
@@ -283,6 +256,62 @@ function loadDecodedAudio(soundId: string) {
 
   decodedAudioCache.set(soundId, loader);
   return loader;
+}
+
+async function playNextConfiguredSound(
+  selection: string[],
+  startIndex: number,
+  fallback: UiSound,
+  cursorKey: string
+) {
+  for (let offset = 0; offset < selection.length; offset += 1) {
+    const index = (startIndex + offset) % selection.length;
+    const didPlay = await playSingleDecodedAudio(selection[index], undefined);
+    if (didPlay) {
+      soundCursor.set(cursorKey, (index + 1) % selection.length);
+      return;
+    }
+  }
+
+  soundCursor.set(cursorKey, 0);
+  playSynthSound(fallback);
+}
+
+async function playSingleDecodedAudio(soundId: string, fallback?: UiSound) {
+  const context = getAudioContext();
+  const masterGain = masterGainNode;
+
+  if (!context || !masterGain) {
+    if (fallback) {
+      playSynthSound(fallback);
+    }
+    return false;
+  }
+
+  if (context.state === "suspended") {
+    void context.resume();
+  }
+
+  try {
+    const buffer = await loadDecodedAudio(soundId);
+    if (!buffer) {
+      if (fallback) {
+        playSynthSound(fallback);
+      }
+      return false;
+    }
+
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(masterGain);
+    source.start();
+    return true;
+  } catch {
+    if (fallback) {
+      playSynthSound(fallback);
+    }
+    return false;
+  }
 }
 
 function getAudioContext() {
