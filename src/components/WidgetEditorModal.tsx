@@ -49,11 +49,13 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
 
     if (widget.type === "state") {
       setSoundDraft({
-        press: normalizeSoundSelection(
-          widget.interactionSounds?.press || config.uiSounds?.widgetTypeDefaults?.state?.press
+        press: resolveDraftSoundValue(
+          widget.interactionSounds?.press,
+          config.uiSounds?.widgetTypeDefaults?.state?.press
         ),
-        confirm: normalizeSoundSelection(
-          widget.interactionSounds?.confirm || config.uiSounds?.widgetTypeDefaults?.state?.confirm
+        confirm: resolveDraftSoundValue(
+          widget.interactionSounds?.confirm,
+          config.uiSounds?.widgetTypeDefaults?.state?.confirm
         ),
       });
       setDraft({
@@ -85,17 +87,21 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
 
     if (widget.type === "camera") {
       setSoundDraft({
-        press: normalizeSoundSelection(
-          widget.interactionSounds?.press || config.uiSounds?.widgetTypeDefaults?.camera?.press
+        press: resolveDraftSoundValue(
+          widget.interactionSounds?.press,
+          config.uiSounds?.widgetTypeDefaults?.camera?.press
         ),
-        open: normalizeSoundSelection(
-          widget.interactionSounds?.open || config.uiSounds?.widgetTypeDefaults?.camera?.open
+        open: resolveDraftSoundValue(
+          widget.interactionSounds?.open,
+          config.uiSounds?.widgetTypeDefaults?.camera?.open
         ),
-        close: normalizeSoundSelection(
-          widget.interactionSounds?.close || config.uiSounds?.widgetTypeDefaults?.camera?.close
+        close: resolveDraftSoundValue(
+          widget.interactionSounds?.close,
+          config.uiSounds?.widgetTypeDefaults?.camera?.close
         ),
-        scroll: normalizeSoundSelection(
-          widget.interactionSounds?.scroll || config.uiSounds?.widgetTypeDefaults?.camera?.scroll
+        scroll: resolveDraftSoundValue(
+          widget.interactionSounds?.scroll,
+          config.uiSounds?.widgetTypeDefaults?.camera?.scroll
         ),
       });
       setDraft({
@@ -128,8 +134,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
 
     if (widget.type === "grafana") {
       setSoundDraft({
-        press: normalizeSoundSelection(
-          widget.interactionSounds?.press || config.uiSounds?.widgetTypeDefaults?.grafana?.press
+        press: resolveDraftSoundValue(
+          widget.interactionSounds?.press,
+          config.uiSounds?.widgetTypeDefaults?.grafana?.press
         ),
       });
       setDraft({
@@ -1684,6 +1691,15 @@ function areSoundSelectionsEqual(left?: string[], right?: string[]) {
   }
 
   return normalizedLeft.every((value, index) => value === normalizedRight[index]);
+}
+
+function resolveDraftSoundValue(primary?: string[], fallback?: string[]) {
+  const normalizedPrimary = normalizeSoundSelection(primary);
+  if (normalizedPrimary.length) {
+    return normalizedPrimary;
+  }
+
+  return normalizeSoundSelection(fallback);
 }
 
 const styles = StyleSheet.create({
