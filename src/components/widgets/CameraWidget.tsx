@@ -14,6 +14,7 @@ type CameraWidgetProps = {
 };
 
 const MAX_FULLSCREEN_DURATION_MS = 30_000;
+const FRAME_OVERLAY_HOLD_MS = 140;
 const pinnedColor = "#f3c84a";
 
 export function CameraWidget({
@@ -26,11 +27,13 @@ export function CameraWidget({
   const [tick, setTick] = useState(0);
   const [displayUrl, setDisplayUrl] = useState<string | null>(null);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  const [transitionUrl, setTransitionUrl] = useState<string | null>(null);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [pinned, setPinned] = useState(false);
   const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
   const lastTriggerMatchRef = useRef(false);
   const pendingUrlRef = useRef<string | null>(null);
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fullscreenVisibilityCallbackRef = useRef(onFullscreenVisibilityChange);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
@@ -163,14 +166,23 @@ export function CameraWidget({
     if (width && height) {
       reportAspectRatio(width, height);
     }
+    if (transitionTimerRef.current) {
+      clearTimeout(transitionTimerRef.current);
+    }
+    setTransitionUrl(loadedUrl);
     setDisplayUrl(loadedUrl);
     setPendingUrl(null);
+    transitionTimerRef.current = setTimeout(() => {
+      setTransitionUrl(null);
+      transitionTimerRef.current = null;
+    }, FRAME_OVERLAY_HOLD_MS);
   };
 
   useEffect(() => {
     if (!snapshotUrl) {
       setDisplayUrl(null);
       setPendingUrl(null);
+      setTransitionUrl(null);
       return;
     }
 
@@ -187,6 +199,16 @@ export function CameraWidget({
 
     setPendingUrl(snapshotUrl);
   }, [displayUrl, snapshotUrl]);
+
+  useEffect(
+    () => () => {
+      if (transitionTimerRef.current) {
+        clearTimeout(transitionTimerRef.current);
+        transitionTimerRef.current = null;
+      }
+    },
+    []
+  );
 
   return (
     <>
@@ -232,6 +254,21 @@ export function CameraWidget({
                     style={styles.image}
                   />
                 )
+              : null}
+            {!fullscreenOpen && transitionUrl
+              ? Platform.OS === "web"
+                ? createElement("img", {
+                    alt: "",
+                    "aria-hidden": true,
+                    decoding: "async",
+                    draggable: false,
+                    loading: "eager",
+                    src: transitionUrl,
+                    style: webOverlayImageStyle,
+                  })
+                : (
+                    <Image resizeMode="contain" source={{ uri: transitionUrl }} style={styles.overlayImage} />
+                  )
               : null}
             {pendingUrl && pendingUrl !== displayUrl
               ? Platform.OS === "web"
@@ -340,6 +377,21 @@ export function CameraWidget({
                   })
                 : (
                     <Image resizeMode="contain" source={{ uri: displayUrl }} style={styles.fullscreenImage} />
+                  )
+              : null}
+            {transitionUrl
+              ? Platform.OS === "web"
+                ? createElement("img", {
+                    alt: "",
+                    "aria-hidden": true,
+                    decoding: "async",
+                    draggable: false,
+                    loading: "eager",
+                    src: transitionUrl,
+                    style: fullscreenWebOverlayImageStyle,
+                  })
+                : (
+                    <Image resizeMode="contain" source={{ uri: transitionUrl }} style={styles.fullscreenOverlayImage} />
                   )
               : null}
           </View>
@@ -455,6 +507,14 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  overlayImage: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    width: "100%",
+    height: "100%",
+    pointerEvents: "none",
+  },
   preloadImage: {
     position: "absolute",
     width: 1,
@@ -502,6 +562,14 @@ const styles = StyleSheet.create({
   fullscreenImage: {
     width: "100%",
     height: "100%",
+  },
+  fullscreenOverlayImage: {
+    position: "absolute",
+    left: 18,
+    top: 18,
+    right: 18,
+    bottom: 18,
+    pointerEvents: "none",
   },
   fullscreenActions: {
     position: "absolute",
@@ -560,4 +628,28 @@ const webPreloadImageStyle = {
   pointerEvents: "none",
   left: 0,
   top: 0,
+} as const;
+
+const webOverlayImageStyle = {
+  position: "absolute",
+  left: 0,
+  top: 0,
+  width: "100%",
+  height: "100%",
+  objectFit: "contain",
+  display: "block",
+  backgroundColor: "transparent",
+  pointerEvents: "none",
+} as const;
+
+const fullscreenWebOverlayImageStyle = {
+  position: "absolute",
+  left: 18,
+  top: 18,
+  right: 18,
+  bottom: 18,
+  objectFit: "contain",
+  display: "block",
+  backgroundColor: "transparent",
+  pointerEvents: "none",
 } as const;
