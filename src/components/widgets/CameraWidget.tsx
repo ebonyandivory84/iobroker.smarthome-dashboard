@@ -156,60 +156,8 @@ export function CameraWidget({
       return;
     }
 
-    if (!displayUrl) {
-      setDisplayUrl(snapshotUrl);
-      return;
-    }
-
-    if (snapshotUrl === displayUrl) {
-      return;
-    }
-
-    if (Platform.OS !== "web" || typeof window === "undefined") {
-      setDisplayUrl(snapshotUrl);
-      return;
-    }
-
-    let active = true;
-    let completed = false;
-    const preloader = new window.Image();
-
-    const timeout = window.setTimeout(() => {
-      if (!active || completed) {
-        return;
-      }
-      completed = true;
-      setDisplayUrl(snapshotUrl);
-    }, 2600);
-
-    preloader.onload = () => {
-      if (!active || completed) {
-        return;
-      }
-      completed = true;
-      reportAspectRatio(preloader.naturalWidth, preloader.naturalHeight);
-      setDisplayUrl(snapshotUrl);
-      window.clearTimeout(timeout);
-    };
-
-    preloader.onerror = () => {
-      if (!active || completed) {
-        return;
-      }
-      completed = true;
-      setDisplayUrl(snapshotUrl);
-      window.clearTimeout(timeout);
-    };
-
-    preloader.src = snapshotUrl;
-
-    return () => {
-      active = false;
-      window.clearTimeout(timeout);
-      preloader.onload = null;
-      preloader.onerror = null;
-    };
-  }, [displayUrl, snapshotUrl]);
+    setDisplayUrl(snapshotUrl);
+  }, [snapshotUrl]);
 
   return (
     <>
@@ -231,6 +179,13 @@ export function CameraWidget({
                     decoding: "async",
                     draggable: false,
                     loading: "eager",
+                    onLoad: (event: Event) => {
+                      const target = event.currentTarget as HTMLImageElement | null;
+                      if (!target) {
+                        return;
+                      }
+                      reportAspectRatio(target.naturalWidth, target.naturalHeight);
+                    },
                     src: displayUrl,
                     style: webImageStyle,
                   })
