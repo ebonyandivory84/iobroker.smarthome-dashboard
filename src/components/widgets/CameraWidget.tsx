@@ -156,6 +156,15 @@ export function CameraWidget({
       return;
     }
 
+    if (!displayUrl) {
+      setDisplayUrl(snapshotUrl);
+      return;
+    }
+
+    if (snapshotUrl === displayUrl) {
+      return;
+    }
+
     if (Platform.OS !== "web" || typeof window === "undefined") {
       setDisplayUrl(snapshotUrl);
       return;
@@ -200,7 +209,7 @@ export function CameraWidget({
       preloader.onload = null;
       preloader.onerror = null;
     };
-  }, [snapshotUrl]);
+  }, [displayUrl, snapshotUrl]);
 
   return (
     <>
@@ -250,7 +259,9 @@ export function CameraWidget({
           </View>
         ) : (
           <View style={styles.empty}>
-            <Text style={[styles.emptyText, { color: mutedTextColor }]}>Kein Snapshot konfiguriert</Text>
+            <Text style={[styles.emptyText, { color: mutedTextColor }]}>
+              {config.snapshotUrl ? "Snapshot wird geladen..." : "Kein Snapshot konfiguriert"}
+            </Text>
           </View>
         )}
         </Pressable>
