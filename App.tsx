@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Platform, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, View } from "react-native";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import { DashboardConfigProvider } from "./src/context/DashboardConfigContext";
@@ -10,6 +11,33 @@ applyDefaultFont(Text as unknown as { defaultProps?: Record<string, unknown> });
 applyDefaultFont(TextInput as unknown as { defaultProps?: Record<string, unknown> });
 
 export default function App() {
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") {
+      return;
+    }
+
+    const targets = [
+      document.documentElement,
+      document.body,
+      document.getElementById("root"),
+    ].filter(Boolean) as HTMLElement[];
+
+    const previous = targets.map((target) => ({
+      target,
+      overscrollBehaviorY: target.style.overscrollBehaviorY,
+    }));
+
+    targets.forEach((target) => {
+      target.style.overscrollBehaviorY = "none";
+    });
+
+    return () => {
+      previous.forEach(({ target, overscrollBehaviorY }) => {
+        target.style.overscrollBehaviorY = overscrollBehaviorY;
+      });
+    };
+  }, []);
+
   return (
     <DashboardConfigProvider>
       <SafeAreaView style={styles.safeArea}>
