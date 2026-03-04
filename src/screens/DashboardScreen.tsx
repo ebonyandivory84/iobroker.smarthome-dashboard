@@ -28,6 +28,8 @@ export function DashboardScreen() {
     lastX: number | null;
     lastY: number | null;
     armed: boolean;
+    startedAt: number;
+    movedAt: number;
   }>({
     pageId: null,
     startX: null,
@@ -35,6 +37,8 @@ export function DashboardScreen() {
     lastX: null,
     lastY: null,
     armed: false,
+    startedAt: 0,
+    movedAt: 0,
   });
   const {
     addWidget,
@@ -114,6 +118,8 @@ export function DashboardScreen() {
       ...(config.uiSounds?.pageSounds?.layoutToggle || []),
       ...(config.uiSounds?.pageSounds?.addWidget || []),
       ...(config.uiSounds?.pageSounds?.openSettings || []),
+      ...(config.uiSounds?.pageSounds?.widgetEdit || []),
+      ...(config.uiSounds?.pageSounds?.editorButton || []),
       ...dashboardPages.flatMap((page) =>
         page.widgets.flatMap((widget) => [
           ...(widget.interactionSounds?.press || []),
@@ -238,6 +244,8 @@ export function DashboardScreen() {
           lastX: null,
           lastY: null,
           armed: false,
+          startedAt: 0,
+          movedAt: 0,
         };
         return;
       }
@@ -250,6 +258,8 @@ export function DashboardScreen() {
         lastX: point?.pageX ?? null,
         lastY: point?.pageY ?? null,
         armed: false,
+        startedAt: Date.now(),
+        movedAt: 0,
       };
     };
 
@@ -282,6 +292,7 @@ export function DashboardScreen() {
       const deltaY = point.pageY - activeGesture.startY;
       const deltaX = point.pageX - activeGesture.startX;
       activeGesture.armed = deltaY > 96 && deltaY > Math.abs(deltaX) + 32;
+      activeGesture.movedAt = Date.now();
     };
 
   const handlePageTouchEnd =
@@ -294,16 +305,25 @@ export function DashboardScreen() {
       const activeGesture = pullGestureRef.current;
       const currentOffset = pageOffsetsRef.current[pageId] || 0;
       const endPoint = extractTouchPoint(event);
+      const now = Date.now();
       const endY = endPoint?.pageY ?? activeGesture.lastY;
       const endX = endPoint?.pageX ?? activeGesture.lastX;
       const deltaY =
         activeGesture.startY !== null && endY !== null ? endY - activeGesture.startY : 0;
       const deltaX =
         activeGesture.startX !== null && endX !== null ? endX - activeGesture.startX : 0;
+      const isFreshGesture =
+        activeGesture.startedAt > 0 &&
+        now - activeGesture.startedAt <= 2500 &&
+        activeGesture.movedAt > 0 &&
+        now - activeGesture.movedAt <= 600;
 
       if (
         activeGesture.pageId === pageId &&
+        activeGesture.startX !== null &&
+        activeGesture.startY !== null &&
         activeGesture.armed &&
+        isFreshGesture &&
         currentOffset <= 0 &&
         deltaY > 96 &&
         deltaY > Math.abs(deltaX) + 32
@@ -321,6 +341,8 @@ export function DashboardScreen() {
         lastX: null,
         lastY: null,
         armed: false,
+        startedAt: 0,
+        movedAt: 0,
       };
     };
 
