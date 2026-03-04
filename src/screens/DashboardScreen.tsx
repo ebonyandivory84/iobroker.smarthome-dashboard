@@ -438,7 +438,7 @@ export function DashboardScreen() {
                 config={pageConfig}
                 isLayoutMode={layoutMode}
                 onCameraFullscreenSwipeClose={() => {
-                  pullRefreshBlockedUntilRef.current = Date.now() + 1200;
+                  pullRefreshBlockedUntilRef.current = Date.now() + 2500;
                   pullGestureRef.current = {
                     pageId: null,
                     startX: null,
@@ -453,7 +453,7 @@ export function DashboardScreen() {
                 onCameraFullscreenVisibilityChange={(widgetId, open) => {
                   fullscreenCameraMapRef.current[widgetId] = open;
                   if (!open) {
-                    pullRefreshBlockedUntilRef.current = Date.now() + 1500;
+                    pullRefreshBlockedUntilRef.current = Date.now() + 2500;
                   }
                   pullGestureRef.current = {
                     pageId: null,

@@ -29,6 +29,7 @@ export function CameraWidget({
   const [pinned, setPinned] = useState(false);
   const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
   const lastTriggerMatchRef = useRef(false);
+  const fullscreenVisibilityCallbackRef = useRef(onFullscreenVisibilityChange);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const activeRefreshMs = fullscreenOpen
@@ -67,6 +68,10 @@ export function CameraWidget({
   }, [activeRefreshMs]);
 
   useEffect(() => {
+    fullscreenVisibilityCallbackRef.current = onFullscreenVisibilityChange;
+  }, [onFullscreenVisibilityChange]);
+
+  useEffect(() => {
     if (!fullscreenOpen || pinned) {
       return;
     }
@@ -79,15 +84,8 @@ export function CameraWidget({
   }, [fullscreenOpen, pinned]);
 
   useEffect(() => {
-    onFullscreenVisibilityChange?.(fullscreenOpen);
-  }, [fullscreenOpen, onFullscreenVisibilityChange]);
-
-  useEffect(
-    () => () => {
-      onFullscreenVisibilityChange?.(false);
-    },
-    [onFullscreenVisibilityChange]
-  );
+    fullscreenVisibilityCallbackRef.current?.(fullscreenOpen);
+  }, [fullscreenOpen]);
 
   useEffect(() => {
     const nextMatch = matchesMaximizeTrigger(config, maximizeStateValue);
