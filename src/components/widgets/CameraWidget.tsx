@@ -25,10 +25,12 @@ export function CameraWidget({
 }: CameraWidgetProps) {
   const [tick, setTick] = useState(0);
   const [displayUrl, setDisplayUrl] = useState<string | null>(null);
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [pinned, setPinned] = useState(false);
   const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
   const lastTriggerMatchRef = useRef(false);
+  const pendingUrlRef = useRef<string | null>(null);
   const fullscreenVisibilityCallbackRef = useRef(onFullscreenVisibilityChange);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
@@ -151,13 +153,40 @@ export function CameraWidget({
   }, [config.snapshotUrl, tick]);
 
   useEffect(() => {
+    pendingUrlRef.current = pendingUrl;
+  }, [pendingUrl]);
+
+  const commitPendingSnapshot = (loadedUrl: string, width?: number, height?: number) => {
+    if (!loadedUrl || pendingUrlRef.current !== loadedUrl) {
+      return;
+    }
+    if (width && height) {
+      reportAspectRatio(width, height);
+    }
+    setDisplayUrl(loadedUrl);
+    setPendingUrl(null);
+  };
+
+  useEffect(() => {
     if (!snapshotUrl) {
       setDisplayUrl(null);
+      setPendingUrl(null);
       return;
     }
 
-    setDisplayUrl(snapshotUrl);
-  }, [snapshotUrl]);
+    if (!displayUrl) {
+      setDisplayUrl(snapshotUrl);
+      setPendingUrl(null);
+      return;
+    }
+
+    if (snapshotUrl === displayUrl) {
+      setPendingUrl(null);
+      return;
+    }
+
+    setPendingUrl(snapshotUrl);
+  }, [displayUrl, snapshotUrl]);
 
   return (
     <>
@@ -203,6 +232,46 @@ export function CameraWidget({
                     style={styles.image}
                   />
                 )
+              : null}
+            {pendingUrl && pendingUrl !== displayUrl
+              ? Platform.OS === "web"
+                ? createElement("img", {
+                    alt: "",
+                    "aria-hidden": true,
+                    decoding: "async",
+                    draggable: false,
+                    loading: "eager",
+                    onError: () => {
+                      if (pendingUrlRef.current === pendingUrl) {
+                        setPendingUrl(null);
+                      }
+                    },
+                    onLoad: (event: Event) => {
+                      const target = event.currentTarget as HTMLImageElement | null;
+                      if (!target) {
+                        return;
+                      }
+                      commitPendingSnapshot(pendingUrl, target.naturalWidth, target.naturalHeight);
+                    },
+                    src: pendingUrl,
+                    style: webPreloadImageStyle,
+                  })
+                : (
+                    <Image
+                      onError={() => {
+                        if (pendingUrlRef.current === pendingUrl) {
+                          setPendingUrl(null);
+                        }
+                      }}
+                      onLoad={(event) => {
+                        const source = event.nativeEvent.source;
+                        commitPendingSnapshot(pendingUrl, source?.width, source?.height);
+                      }}
+                      resizeMode="contain"
+                      source={{ uri: pendingUrl }}
+                      style={styles.preloadImage}
+                    />
+                  )
               : null}
             {config.showTitle !== false && config.title ? (
               <View style={styles.titleBadge}>
@@ -386,6 +455,13 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  preloadImage: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    opacity: 0,
+    pointerEvents: "none",
+  },
   empty: {
     flex: 1,
     alignItems: "center",
@@ -474,4 +550,14 @@ const fullscreenWebImageStyle = {
   objectFit: "contain",
   display: "block",
   backgroundColor: "#000000",
+} as const;
+
+const webPreloadImageStyle = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  opacity: 0,
+  pointerEvents: "none",
+  left: 0,
+  top: 0,
 } as const;
