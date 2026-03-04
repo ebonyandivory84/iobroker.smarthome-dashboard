@@ -32,7 +32,7 @@ export function CameraWidget({
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const activeRefreshMs = fullscreenOpen
-    ? Math.max(100, config.fullscreenRefreshMs || config.refreshMs || 2000)
+    ? Math.max(180, config.fullscreenRefreshMs || config.refreshMs || 2000)
     : Math.max(100, config.refreshMs || 2000);
 
   const closeFullscreen = () => {
@@ -162,34 +162,38 @@ export function CameraWidget({
         >
         {snapshotUrl ? (
           <View style={styles.snapshotWrap}>
-            {Platform.OS === "web"
-              ? createElement("img", {
-                  alt: config.title || "Camera snapshot",
-                  draggable: false,
-                  onLoad: (event: Event) => {
-                    const target = event.currentTarget as HTMLImageElement | null;
-                    if (!target) {
-                      return;
-                    }
-                    reportAspectRatio(target.naturalWidth, target.naturalHeight);
-                  },
-                  src: snapshotUrl,
-                  style: webImageStyle,
-                })
-              : (
-                  <Image
-                    onLoad={(event) => {
-                      const source = event.nativeEvent.source;
-                      if (!source) {
+            {!fullscreenOpen
+              ? Platform.OS === "web"
+                ? createElement("img", {
+                    alt: config.title || "Camera snapshot",
+                    decoding: "async",
+                    draggable: false,
+                    loading: "eager",
+                    onLoad: (event: Event) => {
+                      const target = event.currentTarget as HTMLImageElement | null;
+                      if (!target) {
                         return;
                       }
-                      reportAspectRatio(source.width, source.height);
-                    }}
-                    resizeMode="contain"
-                    source={{ uri: snapshotUrl }}
-                    style={styles.image}
-                  />
-                )}
+                      reportAspectRatio(target.naturalWidth, target.naturalHeight);
+                    },
+                    src: snapshotUrl,
+                    style: webImageStyle,
+                  })
+                : (
+                    <Image
+                      onLoad={(event) => {
+                        const source = event.nativeEvent.source;
+                        if (!source) {
+                          return;
+                        }
+                        reportAspectRatio(source.width, source.height);
+                      }}
+                      resizeMode="contain"
+                      source={{ uri: snapshotUrl }}
+                      style={styles.image}
+                    />
+                  )
+              : null}
             {config.showTitle !== false && config.title ? (
               <View style={styles.titleBadge}>
                 <Text numberOfLines={1} style={[styles.titleBadgeLabel, { color: textColor }]}>
@@ -247,7 +251,9 @@ export function CameraWidget({
               ? Platform.OS === "web"
                 ? createElement("img", {
                     alt: config.title || "Camera snapshot fullscreen",
+                    decoding: "async",
                     draggable: false,
+                    loading: "eager",
                     src: snapshotUrl,
                     style: fullscreenWebImageStyle,
                   })
