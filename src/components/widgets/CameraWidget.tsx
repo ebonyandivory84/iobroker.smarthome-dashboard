@@ -183,6 +183,9 @@ export function CameraWidget({
         reportAspectRatio(width, height);
       }
 
+      // Keep the imperative ref in sync immediately so any follow-up schedule
+      // in this same tick always targets the opposite (hidden) layer.
+      activeLayerRef.current = layer;
       setActiveLayer(layer);
       setLoadingLayer(null);
       loadingJobRef.current = null;
