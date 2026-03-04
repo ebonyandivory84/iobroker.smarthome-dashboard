@@ -24,7 +24,6 @@ export function CameraWidget({
   onFullscreenVisibilityChange,
 }: CameraWidgetProps) {
   const [tick, setTick] = useState(0);
-  const [displayUrl, setDisplayUrl] = useState<string | null>(null);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [pinned, setPinned] = useState(false);
   const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
@@ -37,11 +36,13 @@ export function CameraWidget({
     : Math.max(100, config.refreshMs || 2000);
 
   const closeFullscreen = () => {
+    fullscreenVisibilityCallbackRef.current?.(false);
     setFullscreenOpen(false);
     setPinned(false);
   };
 
   const openFullscreen = () => {
+    fullscreenVisibilityCallbackRef.current?.(true);
     setPinned(false);
     setFullscreenOpen(true);
   };
@@ -88,6 +89,31 @@ export function CameraWidget({
   }, [fullscreenOpen]);
 
   useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined" || !fullscreenOpen) {
+      return;
+    }
+
+    const targets = [document.documentElement, document.body];
+    const previous = targets.map((target) => ({
+      target,
+      overscrollBehaviorY: target.style.overscrollBehaviorY,
+      touchAction: target.style.touchAction,
+    }));
+
+    targets.forEach((target) => {
+      target.style.overscrollBehaviorY = "none";
+      target.style.touchAction = "none";
+    });
+
+    return () => {
+      previous.forEach(({ target, overscrollBehaviorY, touchAction }) => {
+        target.style.overscrollBehaviorY = overscrollBehaviorY;
+        target.style.touchAction = touchAction;
+      });
+    };
+  }, [fullscreenOpen]);
+
+  useEffect(() => {
     const nextMatch = matchesMaximizeTrigger(config, maximizeStateValue);
     const previousMatch = lastTriggerMatchRef.current;
     lastTriggerMatchRef.current = nextMatch;
@@ -123,22 +149,18 @@ export function CameraWidget({
     return `${config.snapshotUrl}${separator}t=${tick}`;
   }, [config.snapshotUrl, tick]);
 
-  useEffect(() => {
-    setDisplayUrl(snapshotUrl);
-  }, [snapshotUrl]);
-
   return (
     <>
       <View style={styles.container}>
         <Pressable
-          disabled={!displayUrl}
+          disabled={!snapshotUrl}
           onPress={() => {
             playConfiguredUiSound(config.interactionSounds?.open, "open", `${config.id}:open`);
             openFullscreen();
           }}
           style={styles.preview}
         >
-        {displayUrl ? (
+        {snapshotUrl ? (
           <View style={styles.snapshotWrap}>
             {Platform.OS === "web"
               ? createElement("img", {
@@ -151,7 +173,7 @@ export function CameraWidget({
                     }
                     reportAspectRatio(target.naturalWidth, target.naturalHeight);
                   },
-                  src: displayUrl,
+                  src: snapshotUrl,
                   style: webImageStyle,
                 })
               : (
@@ -164,7 +186,7 @@ export function CameraWidget({
                       reportAspectRatio(source.width, source.height);
                     }}
                     resizeMode="contain"
-                    source={{ uri: displayUrl }}
+                    source={{ uri: snapshotUrl }}
                     style={styles.image}
                   />
                 )}
@@ -182,10 +204,10 @@ export function CameraWidget({
           </View>
         )}
         </Pressable>
-        {!displayUrl && !config.snapshotUrl && !config.rtspUrl ? (
+        {!snapshotUrl && !config.snapshotUrl && !config.rtspUrl ? (
           <Text style={[styles.hint, { color: mutedTextColor }]}>Widget ist noch nicht konfiguriert.</Text>
         ) : null}
-        {config.rtspUrl && !displayUrl ? (
+        {config.rtspUrl && !snapshotUrl ? (
           <Pressable
             onPress={() => {
               playConfiguredUiSound(config.interactionSounds?.press, "tap", `${config.id}:press`);
@@ -221,16 +243,16 @@ export function CameraWidget({
             </Pressable>
           </View>
           <View {...fullscreenPanResponder.panHandlers} style={styles.fullscreenStage}>
-            {displayUrl
+            {snapshotUrl
               ? Platform.OS === "web"
                 ? createElement("img", {
                     alt: config.title || "Camera snapshot fullscreen",
                     draggable: false,
-                    src: displayUrl,
+                    src: snapshotUrl,
                     style: fullscreenWebImageStyle,
                   })
                 : (
-                    <Image resizeMode="contain" source={{ uri: displayUrl }} style={styles.fullscreenImage} />
+                    <Image resizeMode="contain" source={{ uri: snapshotUrl }} style={styles.fullscreenImage} />
                   )
               : null}
           </View>
