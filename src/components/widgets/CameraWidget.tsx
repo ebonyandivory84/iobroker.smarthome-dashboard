@@ -14,7 +14,7 @@ type CameraWidgetProps = {
 };
 
 const MAX_FULLSCREEN_DURATION_MS = 30_000;
-const LAYER_FADE_MS = 120;
+const LAYER_FADE_MS = 0;
 const pinnedColor = "#f3c84a";
 
 export function CameraWidget({
@@ -258,7 +258,7 @@ export function CameraWidget({
                     ? createElement("img", {
                         alt: isVisible ? config.title || "Camera snapshot" : "",
                         "aria-hidden": !isVisible,
-                        decoding: "async",
+                        decoding: "sync",
                         draggable: false,
                         key: `preview-web-layer-${layer}`,
                         loading: "eager",
@@ -386,7 +386,7 @@ export function CameraWidget({
                 ? createElement("img", {
                     alt: isVisible ? config.title || "Camera snapshot fullscreen" : "",
                     "aria-hidden": !isVisible,
-                    decoding: "async",
+                    decoding: "sync",
                     draggable: false,
                     key: `fullscreen-web-layer-${layer}`,
                     loading: "eager",
@@ -639,6 +639,8 @@ function getWebLayerStyle(visible: boolean) {
   return {
     ...baseWebLayerStyle,
     opacity: visible ? 1 : 0,
+    visibility: visible ? "visible" : "hidden",
+    zIndex: visible ? 2 : 1,
   } as const;
 }
 
@@ -646,6 +648,8 @@ function getFullscreenWebLayerStyle(visible: boolean) {
   return {
     ...baseFullscreenWebLayerStyle,
     opacity: visible ? 1 : 0,
+    visibility: visible ? "visible" : "hidden",
+    zIndex: visible ? 2 : 1,
   } as const;
 }
 
@@ -658,7 +662,7 @@ const baseWebLayerStyle = {
   objectFit: "contain",
   display: "block",
   backgroundColor: "#000000",
-  transition: `opacity ${LAYER_FADE_MS}ms linear`,
+  transition: LAYER_FADE_MS > 0 ? `opacity ${LAYER_FADE_MS}ms linear` : "none",
   pointerEvents: "none",
 } as const;
 
@@ -671,6 +675,6 @@ const baseFullscreenWebLayerStyle = {
   objectFit: "contain",
   display: "block",
   backgroundColor: "#000000",
-  transition: `opacity ${LAYER_FADE_MS}ms linear`,
+  transition: LAYER_FADE_MS > 0 ? `opacity ${LAYER_FADE_MS}ms linear` : "none",
   pointerEvents: "none",
 } as const;
