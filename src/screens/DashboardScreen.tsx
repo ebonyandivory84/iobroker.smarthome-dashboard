@@ -21,6 +21,7 @@ export function DashboardScreen() {
   const horizontalPagerRef = useRef<ScrollView | null>(null);
   const horizontalOffsetRef = useRef(0);
   const pageOffsetsRef = useRef<Record<string, number>>({});
+  const pullRefreshBlockedUntilRef = useRef(0);
   const pullGestureRef = useRef<{
     pageId: string | null;
     startX: number | null;
@@ -234,6 +235,19 @@ export function DashboardScreen() {
       if (!isTouchLayout) {
         return;
       }
+      if (Date.now() < pullRefreshBlockedUntilRef.current) {
+        pullGestureRef.current = {
+          pageId: null,
+          startX: null,
+          startY: null,
+          lastX: null,
+          lastY: null,
+          armed: false,
+          startedAt: 0,
+          movedAt: 0,
+        };
+        return;
+      }
 
       const currentOffset = pageOffsetsRef.current[pageId] || 0;
       if (currentOffset > 0) {
@@ -306,6 +320,19 @@ export function DashboardScreen() {
       const currentOffset = pageOffsetsRef.current[pageId] || 0;
       const endPoint = extractTouchPoint(event);
       const now = Date.now();
+      if (now < pullRefreshBlockedUntilRef.current) {
+        pullGestureRef.current = {
+          pageId: null,
+          startX: null,
+          startY: null,
+          lastX: null,
+          lastY: null,
+          armed: false,
+          startedAt: 0,
+          movedAt: 0,
+        };
+        return;
+      }
       const endY = endPoint?.pageY ?? activeGesture.lastY;
       const endX = endPoint?.pageX ?? activeGesture.lastX;
       const deltaY =
@@ -403,6 +430,19 @@ export function DashboardScreen() {
                 client={client}
                 config={pageConfig}
                 isLayoutMode={layoutMode}
+                onCameraFullscreenSwipeClose={() => {
+                  pullRefreshBlockedUntilRef.current = Date.now() + 1200;
+                  pullGestureRef.current = {
+                    pageId: null,
+                    startX: null,
+                    startY: null,
+                    lastX: null,
+                    lastY: null,
+                    armed: false,
+                    startedAt: 0,
+                    movedAt: 0,
+                  };
+                }}
                 onEditWidget={setEditingWidgetId}
                 onRemoveWidget={removeWidget}
                 onUpdateWidget={handleUpdateWidget}

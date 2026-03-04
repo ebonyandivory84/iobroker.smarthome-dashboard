@@ -9,12 +9,18 @@ type CameraWidgetProps = {
   config: CameraWidgetConfig;
   maximizeStateValue?: unknown;
   onAspectRatioDetected?: (ratio: number) => void;
+  onFullscreenSwipeClose?: () => void;
 };
 
 const MAX_FULLSCREEN_DURATION_MS = 30_000;
 const pinnedColor = "#f3c84a";
 
-export function CameraWidget({ config, maximizeStateValue, onAspectRatioDetected }: CameraWidgetProps) {
+export function CameraWidget({
+  config,
+  maximizeStateValue,
+  onAspectRatioDetected,
+  onFullscreenSwipeClose,
+}: CameraWidgetProps) {
   const [tick, setTick] = useState(0);
   const [displayUrl, setDisplayUrl] = useState<string | null>(null);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
@@ -45,11 +51,12 @@ export function CameraWidget({ config, maximizeStateValue, onAspectRatioDetected
         onPanResponderRelease: (_event, gestureState) => {
           if (gestureState.dy > 80 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx)) {
             playConfiguredUiSound(config.interactionSounds?.scroll, "swipe", `${config.id}:scroll`);
+            onFullscreenSwipeClose?.();
             closeFullscreen();
           }
         },
       }),
-    [config.id, config.interactionSounds?.scroll]
+    [config.id, config.interactionSounds?.scroll, onFullscreenSwipeClose]
   );
 
   useEffect(() => {
