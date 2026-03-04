@@ -437,6 +437,8 @@ function normalizeUiSoundSettings(input?: UiSoundSettings): UiSoundSettings {
       layoutToggle: normalizeSoundSelection(input?.pageSounds?.layoutToggle),
       addWidget: normalizeSoundSelection(input?.pageSounds?.addWidget),
       openSettings: normalizeSoundSelection(input?.pageSounds?.openSettings),
+      widgetEdit: normalizeSoundSelection(input?.pageSounds?.widgetEdit),
+      editorButton: normalizeSoundSelection(input?.pageSounds?.editorButton),
     },
   };
 }
@@ -471,6 +473,7 @@ function normalizeWidgetTypeSoundDefaults(
     solar: normalizeWidgetInteractionSounds(input.solar),
     grafana: normalizeWidgetInteractionSounds(input.grafana),
     weather: normalizeWidgetInteractionSounds(input.weather),
+    numpad: normalizeWidgetInteractionSounds(input.numpad),
   };
 }
 

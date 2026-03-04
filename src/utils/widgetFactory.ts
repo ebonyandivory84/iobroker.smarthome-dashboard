@@ -13,7 +13,18 @@ export function buildWidgetTemplate(
   const basePosition = {
     x: 0,
     y: count + 2,
-    w: type === "camera" ? 6 : type === "solar" ? 8 : type === "grafana" ? 6 : type === "weather" ? 4 : 3,
+    w:
+      type === "camera"
+        ? 6
+        : type === "solar"
+          ? 8
+          : type === "grafana"
+            ? 6
+            : type === "weather"
+              ? 4
+              : type === "numpad"
+                ? 6
+                : 3,
     h:
       type === "camera"
         ? 4
@@ -25,6 +36,8 @@ export function buildWidgetTemplate(
               ? 4
               : type === "weather"
                 ? 3
+                : type === "numpad"
+                  ? 4
                 : 2,
   };
 
@@ -107,6 +120,18 @@ export function buildWidgetTemplate(
       position: {
         ...basePosition,
         w: Math.min(4, grid.columns),
+      },
+    };
+  }
+
+  if (type === "numpad") {
+    return {
+      id: `numpad-${suffix}`,
+      type: "numpad",
+      title: `Numpad ${suffix}`,
+      position: {
+        ...basePosition,
+        w: Math.min(6, grid.columns),
       },
     };
   }

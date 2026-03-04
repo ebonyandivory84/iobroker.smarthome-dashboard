@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { createElement, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from "react-native";
 import { ImagePickerModal } from "./ImagePickerModal";
 import { ObjectPickerModal } from "./ObjectPickerModal";
 import { SoundPickerField } from "./SoundPickerField";
@@ -8,6 +8,7 @@ import { IoBrokerClient } from "../services/iobroker";
 import { WidgetAppearance, WidgetConfig, WidgetInteractionSounds } from "../types/dashboard";
 import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { normalizeSoundSelection } from "../utils/lcarsSounds";
+import { playConfiguredUiSound } from "../utils/uiSounds";
 import { resolveThemeSettings } from "../utils/themeConfig";
 import { stateIconOptions } from "../utils/stateIcons";
 import { palette } from "../utils/theme";
@@ -148,6 +149,21 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         url: widget.url || "",
         refreshMs: String(widget.refreshMs || 10000),
         allowInteractions: widget.allowInteractions === false ? "false" : "true",
+        ...appearanceDraft,
+      });
+      return;
+    }
+
+    if (widget.type === "numpad") {
+      setSoundDraft({
+        press: resolveDraftSoundValue(
+          widget.interactionSounds?.press,
+          config.uiSounds?.widgetTypeDefaults?.numpad?.press
+        ),
+      });
+      setDraft({
+        title: widget.title,
+        showTitle: widget.showTitle === false ? "false" : "true",
         ...appearanceDraft,
       });
       return;
@@ -350,6 +366,17 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ),
         appearance,
       });
+    } else if (widget.type === "numpad") {
+      onSave(widget.id, {
+        title: draft.title,
+        showTitle: draft.showTitle !== "false",
+        interactionSounds: buildStoredInteractionSounds(
+          widget.type,
+          soundDraft,
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]
+        ),
+        appearance,
+      });
     } else if (widget.type === "weather") {
       onSave(widget.id, {
         title: draft.title,
@@ -394,7 +421,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
   };
 
   const saveSoundsAsTypeDefault = () => {
-    if (widget.type !== "state" && widget.type !== "camera" && widget.type !== "grafana") {
+    if (widget.type !== "state" && widget.type !== "camera" && widget.type !== "grafana" && widget.type !== "numpad") {
       return;
     }
 
@@ -426,9 +453,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         <View style={styles.card}>
           <View style={styles.header}>
             <Text style={styles.title}>Widget bearbeiten</Text>
-            <Pressable onPress={onClose}>
+            <EditorButtonPressable onPress={onClose}>
               <Text style={styles.close}>Schliessen</Text>
-            </Pressable>
+            </EditorButtonPressable>
           </View>
           <ScrollView>
             <Field label="Titel">
@@ -540,9 +567,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                             style={[styles.input, styles.stateFieldInput]}
                             value={draft.backgroundImage || ""}
                           />
-                          <Pressable onPress={() => setImagePickerOpen(true)} style={styles.stateBrowseButton}>
+                          <EditorButtonPressable onPress={() => setImagePickerOpen(true)} style={styles.stateBrowseButton}>
                             <Text style={styles.stateBrowseLabel}>Bild waehlen</Text>
-                          </Pressable>
+                          </EditorButtonPressable>
                         </View>
                         <Field label="Bild Unschärfe">
                           <BlurControl
@@ -727,9 +754,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       value={soundDraft.confirm}
                     />
                   </Field>
-                  <Pressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
+                  <EditorButtonPressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
                     <Text style={styles.inlineActionLabel}>Als Default fuer alle State-Widgets verwenden</Text>
-                  </Pressable>
+                  </EditorButtonPressable>
                 </Field>
               </>
             ) : null}
@@ -822,11 +849,24 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       value={soundDraft.scroll}
                     />
                   </Field>
-                  <Pressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
+                  <EditorButtonPressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
                     <Text style={styles.inlineActionLabel}>Als Default fuer alle Camera-Widgets verwenden</Text>
-                  </Pressable>
+                  </EditorButtonPressable>
                 </Field>
               </>
+            ) : null}
+            {widget.type === "numpad" ? (
+              <Field label="Sounds bei Interaktion">
+                <Field label="Beim Druecken">
+                  <SoundPickerField
+                    onChange={(value) => setSoundDraft((current) => ({ ...current, press: value }))}
+                    value={soundDraft.press}
+                  />
+                </Field>
+                <EditorButtonPressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
+                  <Text style={styles.inlineActionLabel}>Als Default fuer alle Numpad-Widgets verwenden</Text>
+                </EditorButtonPressable>
+              </Field>
             ) : null}
             {widget.type === "energy" ? (
               <>
@@ -890,9 +930,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     onChange={(value) => setSoundDraft((current) => ({ ...current, press: value }))}
                     value={soundDraft.press}
                   />
-                  <Pressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
+                  <EditorButtonPressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
                     <Text style={styles.inlineActionLabel}>Als Default fuer alle Grafana-Widgets verwenden</Text>
-                  </Pressable>
+                  </EditorButtonPressable>
                 </Field>
               </>
             ) : null}
@@ -919,7 +959,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   {weatherSuggestions.length ? (
                     <View style={styles.weatherSuggestionList}>
                       {weatherSuggestions.map((entry) => (
-                        <Pressable
+                        <EditorButtonPressable
                           key={`${entry.label}-${entry.latitude}-${entry.longitude}`}
                           onPress={() => {
                             setDraft((current) => ({
@@ -936,7 +976,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                           <Text style={styles.weatherSuggestionMeta}>
                             {entry.latitude.toFixed(2)}, {entry.longitude.toFixed(2)}
                           </Text>
-                        </Pressable>
+                        </EditorButtonPressable>
                       ))}
                     </View>
                   ) : null}
@@ -996,7 +1036,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 <Field label="Tageswerte Einheit">
                   <View style={styles.modeRow}>
                     {["auto", "Wh", "kWh"].map((unit) => (
-                      <Pressable
+                      <EditorButtonPressable
                         key={unit}
                         onPress={() => setDraft((current) => ({ ...current, dailyEnergyUnit: unit }))}
                         style={[
@@ -1005,7 +1045,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                         ]}
                       >
                         <Text style={styles.modeLabel}>{unit}</Text>
-                      </Pressable>
+                      </EditorButtonPressable>
                     ))}
                   </View>
                 </Field>
@@ -1168,9 +1208,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
             ) : null}
           </ScrollView>
           <View style={styles.footer}>
-            <Pressable onPress={save} style={styles.saveButton}>
+            <EditorButtonPressable onPress={save} style={styles.saveButton}>
               <Text style={styles.saveLabel}>Speichern</Text>
-            </Pressable>
+            </EditorButtonPressable>
           </View>
         </View>
       </View>
@@ -1211,6 +1251,30 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+function EditorButtonPressable({
+  children,
+  onPress,
+  style,
+}: {
+  children: React.ReactNode;
+  onPress: () => void;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const { config } = useDashboardConfig();
+
+  return (
+    <Pressable
+      onPress={() => {
+        playConfiguredUiSound(config.uiSounds?.pageSounds?.editorButton, "panel", "global:widgetEditorButtons");
+        onPress();
+      }}
+      style={style}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
 function ChoiceRow({
   options,
   value,
@@ -1223,13 +1287,13 @@ function ChoiceRow({
   return (
     <View style={styles.modeRow}>
       {options.map((option) => (
-        <Pressable
+        <EditorButtonPressable
           key={option}
           onPress={() => onSelect(option)}
           style={[styles.modeButton, value === option ? styles.modeButtonActive : null]}
         >
           <Text style={styles.modeLabel}>{option}</Text>
-        </Pressable>
+        </EditorButtonPressable>
       ))}
     </View>
   );
@@ -1249,9 +1313,9 @@ function StateFieldInput({
   return (
     <View style={styles.stateFieldRow}>
       <TextInput autoCapitalize="none" onChangeText={onChangeText} style={[styles.input, styles.stateFieldInput]} value={value} />
-      <Pressable onPress={onBrowse} style={styles.stateBrowseButton}>
+      <EditorButtonPressable onPress={onBrowse} style={styles.stateBrowseButton}>
         <Text style={styles.stateBrowseLabel}>{browseLabel}</Text>
-      </Pressable>
+      </EditorButtonPressable>
     </View>
   );
 }
@@ -1275,7 +1339,7 @@ function IconPickerRow({
             const active = selected === value;
 
             return (
-              <Pressable
+              <EditorButtonPressable
                 key={`${label}-${option.label}`}
                 onPress={() => onSelect(value)}
                 style={[styles.iconChip, active ? styles.iconChipActive : null]}
@@ -1286,7 +1350,7 @@ function IconPickerRow({
                   size={18}
                 />
                 <Text style={[styles.iconChipLabel, active ? styles.iconChipLabelActive : null]}>{option.label}</Text>
-              </Pressable>
+              </EditorButtonPressable>
             );
           })}
         </View>
@@ -1497,6 +1561,17 @@ function getWidgetAppearanceDefaults(
     };
   }
 
+  if (widget.type === "numpad") {
+    return {
+      widgetColor: "#d8bea7",
+      widgetColor2: "#ad7a52",
+      textColor: "#1f1207",
+      mutedTextColor: "#5b3d27",
+      cardColor: "#040404",
+      cardColor2: "#c79e7a",
+    };
+  }
+
   return {
     widgetColor: theme.widgetTones.solarStart,
     widgetColor2: theme.widgetTones.solarEnd,
@@ -1596,12 +1671,12 @@ function ColorField({
           style={[styles.input, styles.colorTextInput]}
           value={value}
         />
-        <Pressable onPress={() => onChange("transparent")} style={styles.colorActionButton}>
+        <EditorButtonPressable onPress={() => onChange("transparent")} style={styles.colorActionButton}>
           <Text style={styles.colorActionLabel}>Transparent</Text>
-        </Pressable>
-        <Pressable onPress={() => onChange("")} style={styles.colorActionButton}>
+        </EditorButtonPressable>
+        <EditorButtonPressable onPress={() => onChange("")} style={styles.colorActionButton}>
           <Text style={styles.colorActionLabel}>Reset</Text>
-        </Pressable>
+        </EditorButtonPressable>
       </View>
     </Field>
   );
@@ -1688,7 +1763,7 @@ function buildStoredInteractionSounds(
   draft: Record<string, string[]>,
   defaults?: WidgetInteractionSounds
 ) {
-  if (widgetType !== "state" && widgetType !== "camera" && widgetType !== "grafana") {
+  if (widgetType !== "state" && widgetType !== "camera" && widgetType !== "grafana" && widgetType !== "numpad") {
     return undefined;
   }
 

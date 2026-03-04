@@ -113,6 +113,8 @@ export function DashboardScreen() {
       ...(config.uiSounds?.widgetTypeDefaults?.camera?.close || []),
       ...(config.uiSounds?.widgetTypeDefaults?.camera?.scroll || []),
       ...(config.uiSounds?.widgetTypeDefaults?.grafana?.press || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.numpad?.press || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.numpad?.confirm || []),
       ...(config.uiSounds?.pageSounds?.tabPress || []),
       ...(config.uiSounds?.pageSounds?.swipe || []),
       ...(config.uiSounds?.pageSounds?.contentScroll || []),

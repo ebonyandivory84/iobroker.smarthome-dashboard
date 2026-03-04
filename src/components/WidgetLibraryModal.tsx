@@ -52,6 +52,12 @@ const OPTIONS: Array<{
     description: "Aktuelles Wetter und kurze Vorhersage per Koordinaten anzeigen.",
     icon: "weather-partly-cloudy",
   },
+  {
+    type: "numpad",
+    title: "Numpad",
+    description: "LCARS-inspiriertes Tastenfeld mit 0-9, Stern und Raute.",
+    icon: "dialpad",
+  },
 ];
 
 export function WidgetLibraryModal({

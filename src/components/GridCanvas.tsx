@@ -11,6 +11,7 @@ import { WidgetFrame } from "./WidgetFrame";
 import { CameraWidget } from "./widgets/CameraWidget";
 import { EnergyWidget } from "./widgets/EnergyWidget";
 import { GrafanaWidget } from "./widgets/GrafanaWidget";
+import { NumpadWidget } from "./widgets/NumpadWidget";
 import { SolarWidget } from "./widgets/SolarWidget";
 import { resolveStateNextValue, StateWidget } from "./widgets/StateWidget";
 import { WeatherWidget } from "./widgets/WeatherWidget";
@@ -346,6 +347,8 @@ function getAutoLayoutSpec(
         return { w: 1, h: roundGridUnit(1.8) };
       case "energy":
         return { w: 1, h: roundGridUnit(2) };
+      case "numpad":
+        return { w: 1, h: roundGridUnit(3) };
     }
 
     return { w: 1, h: Math.max(1.5, roundGridUnit(fallbackHeight)) };
@@ -369,6 +372,8 @@ function getAutoLayoutSpec(
       return { w: mainColumnWidth, h: roundGridUnit(2.2) };
     case "energy":
       return { w: mainColumnWidth, h: roundGridUnit(2.4) };
+    case "numpad":
+      return { w: mainColumnWidth, h: roundGridUnit(3.2) };
   }
 
   return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
@@ -668,6 +673,7 @@ function WebWidgetShell({
     widget.type !== "camera" &&
     widget.type !== "solar" &&
     widget.type !== "state" &&
+    widget.type !== "numpad" &&
     widget.type !== "grafana"
       ? styles.webContentInset
       : null,
@@ -780,6 +786,10 @@ function renderWidget(
 
   if (effectiveWidget.type === "weather") {
     return <WeatherWidget config={effectiveWidget} />;
+  }
+
+  if (effectiveWidget.type === "numpad") {
+    return <NumpadWidget config={effectiveWidget} />;
   }
 
   return null;
@@ -1015,6 +1025,13 @@ function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThe
     return {
       background: "linear-gradient(135deg, rgba(34,128,214,0.92), rgba(21,73,167,0.96))",
       border: "1px solid rgba(173, 219, 255, 0.18)",
+    };
+  }
+  if (type === "numpad") {
+    return {
+      background: "linear-gradient(135deg, rgba(214, 188, 166, 0.94), rgba(173, 122, 82, 0.92))",
+      border: "1px solid rgba(255, 220, 184, 0.24)",
+      boxShadow: "0 16px 26px rgba(54, 28, 10, 0.28)",
     };
   }
   return {};
