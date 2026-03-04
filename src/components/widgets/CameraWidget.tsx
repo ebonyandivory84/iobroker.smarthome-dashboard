@@ -24,6 +24,7 @@ export function CameraWidget({
   onFullscreenVisibilityChange,
 }: CameraWidgetProps) {
   const [tick, setTick] = useState(0);
+  const [displayUrl, setDisplayUrl] = useState<string | null>(null);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [pinned, setPinned] = useState(false);
   const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
@@ -149,18 +150,70 @@ export function CameraWidget({
     return `${config.snapshotUrl}${separator}t=${tick}`;
   }, [config.snapshotUrl, tick]);
 
+  useEffect(() => {
+    if (!snapshotUrl) {
+      setDisplayUrl(null);
+      return;
+    }
+
+    if (Platform.OS !== "web" || typeof window === "undefined") {
+      setDisplayUrl(snapshotUrl);
+      return;
+    }
+
+    let active = true;
+    let completed = false;
+    const preloader = new window.Image();
+
+    const timeout = window.setTimeout(() => {
+      if (!active || completed) {
+        return;
+      }
+      completed = true;
+      setDisplayUrl(snapshotUrl);
+    }, 2600);
+
+    preloader.onload = () => {
+      if (!active || completed) {
+        return;
+      }
+      completed = true;
+      reportAspectRatio(preloader.naturalWidth, preloader.naturalHeight);
+      setDisplayUrl(snapshotUrl);
+      window.clearTimeout(timeout);
+    };
+
+    preloader.onerror = () => {
+      if (!active || completed) {
+        return;
+      }
+      completed = true;
+      setDisplayUrl(snapshotUrl);
+      window.clearTimeout(timeout);
+    };
+
+    preloader.src = snapshotUrl;
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+      preloader.onload = null;
+      preloader.onerror = null;
+    };
+  }, [snapshotUrl]);
+
   return (
     <>
       <View style={styles.container}>
         <Pressable
-          disabled={!snapshotUrl}
+          disabled={!displayUrl}
           onPress={() => {
             playConfiguredUiSound(config.interactionSounds?.open, "open", `${config.id}:open`);
             openFullscreen();
           }}
           style={styles.preview}
         >
-        {snapshotUrl ? (
+        {displayUrl ? (
           <View style={styles.snapshotWrap}>
             {!fullscreenOpen
               ? Platform.OS === "web"
@@ -169,30 +222,23 @@ export function CameraWidget({
                     decoding: "async",
                     draggable: false,
                     loading: "eager",
-                    onLoad: (event: Event) => {
-                      const target = event.currentTarget as HTMLImageElement | null;
-                      if (!target) {
-                        return;
-                      }
-                      reportAspectRatio(target.naturalWidth, target.naturalHeight);
-                    },
-                    src: snapshotUrl,
+                    src: displayUrl,
                     style: webImageStyle,
                   })
                 : (
                     <Image
                       onLoad={(event) => {
                         const source = event.nativeEvent.source;
-                        if (!source) {
-                          return;
-                        }
-                        reportAspectRatio(source.width, source.height);
-                      }}
-                      resizeMode="contain"
-                      source={{ uri: snapshotUrl }}
-                      style={styles.image}
-                    />
-                  )
+                      if (!source) {
+                        return;
+                      }
+                      reportAspectRatio(source.width, source.height);
+                    }}
+                    resizeMode="contain"
+                    source={{ uri: displayUrl }}
+                    style={styles.image}
+                  />
+                )
               : null}
             {config.showTitle !== false && config.title ? (
               <View style={styles.titleBadge}>
@@ -208,10 +254,10 @@ export function CameraWidget({
           </View>
         )}
         </Pressable>
-        {!snapshotUrl && !config.snapshotUrl && !config.rtspUrl ? (
+        {!displayUrl && !config.snapshotUrl && !config.rtspUrl ? (
           <Text style={[styles.hint, { color: mutedTextColor }]}>Widget ist noch nicht konfiguriert.</Text>
         ) : null}
-        {config.rtspUrl && !snapshotUrl ? (
+        {config.rtspUrl && !displayUrl ? (
           <Pressable
             onPress={() => {
               playConfiguredUiSound(config.interactionSounds?.press, "tap", `${config.id}:press`);
@@ -247,18 +293,18 @@ export function CameraWidget({
             </Pressable>
           </View>
           <View {...fullscreenPanResponder.panHandlers} style={styles.fullscreenStage}>
-            {snapshotUrl
+            {displayUrl
               ? Platform.OS === "web"
                 ? createElement("img", {
                     alt: config.title || "Camera snapshot fullscreen",
                     decoding: "async",
                     draggable: false,
                     loading: "eager",
-                    src: snapshotUrl,
+                    src: displayUrl,
                     style: fullscreenWebImageStyle,
                   })
                 : (
-                    <Image resizeMode="contain" source={{ uri: snapshotUrl }} style={styles.fullscreenImage} />
+                    <Image resizeMode="contain" source={{ uri: displayUrl }} style={styles.fullscreenImage} />
                   )
               : null}
           </View>
