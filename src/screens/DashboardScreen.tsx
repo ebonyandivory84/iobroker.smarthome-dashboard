@@ -22,6 +22,7 @@ export function DashboardScreen() {
   const horizontalOffsetRef = useRef(0);
   const pageOffsetsRef = useRef<Record<string, number>>({});
   const pullRefreshBlockedUntilRef = useRef(0);
+  const fullscreenCameraMapRef = useRef<Record<string, boolean>>({});
   const pullGestureRef = useRef<{
     pageId: string | null;
     startX: number | null;
@@ -235,7 +236,8 @@ export function DashboardScreen() {
       if (!isTouchLayout) {
         return;
       }
-      if (Date.now() < pullRefreshBlockedUntilRef.current) {
+      const hasFullscreenCamera = Object.values(fullscreenCameraMapRef.current).some(Boolean);
+      if (hasFullscreenCamera || Date.now() < pullRefreshBlockedUntilRef.current) {
         pullGestureRef.current = {
           pageId: null,
           startX: null,
@@ -283,6 +285,10 @@ export function DashboardScreen() {
       if (!isTouchLayout) {
         return;
       }
+      const hasFullscreenCamera = Object.values(fullscreenCameraMapRef.current).some(Boolean);
+      if (hasFullscreenCamera || Date.now() < pullRefreshBlockedUntilRef.current) {
+        return;
+      }
 
       const activeGesture = pullGestureRef.current;
       if (activeGesture.pageId !== pageId || activeGesture.startY === null || activeGesture.startX === null) {
@@ -320,7 +326,8 @@ export function DashboardScreen() {
       const currentOffset = pageOffsetsRef.current[pageId] || 0;
       const endPoint = extractTouchPoint(event);
       const now = Date.now();
-      if (now < pullRefreshBlockedUntilRef.current) {
+      const hasFullscreenCamera = Object.values(fullscreenCameraMapRef.current).some(Boolean);
+      if (hasFullscreenCamera || now < pullRefreshBlockedUntilRef.current) {
         pullGestureRef.current = {
           pageId: null,
           startX: null,
@@ -432,6 +439,22 @@ export function DashboardScreen() {
                 isLayoutMode={layoutMode}
                 onCameraFullscreenSwipeClose={() => {
                   pullRefreshBlockedUntilRef.current = Date.now() + 1200;
+                  pullGestureRef.current = {
+                    pageId: null,
+                    startX: null,
+                    startY: null,
+                    lastX: null,
+                    lastY: null,
+                    armed: false,
+                    startedAt: 0,
+                    movedAt: 0,
+                  };
+                }}
+                onCameraFullscreenVisibilityChange={(widgetId, open) => {
+                  fullscreenCameraMapRef.current[widgetId] = open;
+                  if (!open) {
+                    pullRefreshBlockedUntilRef.current = Date.now() + 1500;
+                  }
                   pullGestureRef.current = {
                     pageId: null,
                     startX: null,

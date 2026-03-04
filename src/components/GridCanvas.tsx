@@ -27,6 +27,7 @@ type GridCanvasProps = {
   stateWrites?: Record<string, StateWriteFeedback>;
   onLayoutMeasured?: (width: number) => void;
   onCameraFullscreenSwipeClose?: () => void;
+  onCameraFullscreenVisibilityChange?: (widgetId: string, open: boolean) => void;
 };
 
 export function GridCanvas({
@@ -41,6 +42,7 @@ export function GridCanvas({
   stateWrites,
   onLayoutMeasured,
   onCameraFullscreenSwipeClose,
+  onCameraFullscreenVisibilityChange,
 }: GridCanvasProps) {
   const { width: windowWidth } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
@@ -147,7 +149,8 @@ export function GridCanvas({
                   displayConfig.theme,
                   stateWrites,
                   displayConfig.uiSounds?.widgetTypeDefaults,
-                  onCameraFullscreenSwipeClose
+                  onCameraFullscreenSwipeClose,
+                  onCameraFullscreenVisibilityChange
                 )}
               </WidgetFrame>
             </View>
@@ -719,7 +722,8 @@ function renderWidget(
   theme?: DashboardSettings["theme"],
   stateWrites?: Record<string, StateWriteFeedback>,
   widgetTypeDefaults?: Partial<Record<WidgetType, WidgetInteractionSounds>>,
-  onCameraFullscreenSwipeClose?: () => void
+  onCameraFullscreenSwipeClose?: () => void,
+  onCameraFullscreenVisibilityChange?: (widgetId: string, open: boolean) => void
 ) {
   const effectiveWidget = mergeWidgetInteractionSounds(widget, widgetTypeDefaults?.[widget.type]);
 
@@ -746,6 +750,7 @@ function renderWidget(
         config={effectiveWidget}
         maximizeStateValue={effectiveWidget.maximizeStateId ? states[effectiveWidget.maximizeStateId] : undefined}
         onFullscreenSwipeClose={onCameraFullscreenSwipeClose}
+        onFullscreenVisibilityChange={(open) => onCameraFullscreenVisibilityChange?.(effectiveWidget.id, open)}
         onAspectRatioDetected={(ratio) => {
           if (effectiveWidget.snapshotAspectRatio) {
             return;

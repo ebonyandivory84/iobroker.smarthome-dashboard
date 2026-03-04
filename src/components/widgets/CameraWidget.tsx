@@ -10,6 +10,7 @@ type CameraWidgetProps = {
   maximizeStateValue?: unknown;
   onAspectRatioDetected?: (ratio: number) => void;
   onFullscreenSwipeClose?: () => void;
+  onFullscreenVisibilityChange?: (open: boolean) => void;
 };
 
 const MAX_FULLSCREEN_DURATION_MS = 30_000;
@@ -20,6 +21,7 @@ export function CameraWidget({
   maximizeStateValue,
   onAspectRatioDetected,
   onFullscreenSwipeClose,
+  onFullscreenVisibilityChange,
 }: CameraWidgetProps) {
   const [tick, setTick] = useState(0);
   const [displayUrl, setDisplayUrl] = useState<string | null>(null);
@@ -75,6 +77,17 @@ export function CameraWidget({
 
     return () => clearTimeout(timer);
   }, [fullscreenOpen, pinned]);
+
+  useEffect(() => {
+    onFullscreenVisibilityChange?.(fullscreenOpen);
+  }, [fullscreenOpen, onFullscreenVisibilityChange]);
+
+  useEffect(
+    () => () => {
+      onFullscreenVisibilityChange?.(false);
+    },
+    [onFullscreenVisibilityChange]
+  );
 
   useEffect(() => {
     const nextMatch = matchesMaximizeTrigger(config, maximizeStateValue);
