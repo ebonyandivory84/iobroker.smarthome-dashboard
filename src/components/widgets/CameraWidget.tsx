@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { createElement, useEffect, useMemo, useRef, useState } from "react";
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Image, Linking, Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { CameraWidgetConfig } from "../../types/dashboard";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
@@ -24,18 +24,19 @@ export function CameraWidget({
   onFullscreenVisibilityChange,
 }: CameraWidgetProps) {
   const [tick, setTick] = useState(0);
-  const [layerUrls, setLayerUrls] = useState<[string | null, string | null]>([null, null]);
-  const [activeLayer, setActiveLayer] = useState<0 | 1>(0);
-  const [loadingLayer, setLoadingLayer] = useState<0 | 1 | null>(null);
+  const [displayUrl, setDisplayUrl] = useState<string | null>(null);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [pinned, setPinned] = useState(false);
   const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
   const lastTriggerMatchRef = useRef(false);
-  const pendingTargetUrlRef = useRef<string | null>(null);
+  const latestRequestedUrlRef = useRef<string | null>(null);
+  const displayUrlRef = useRef<string | null>(null);
+  const preloadingUrlRef = useRef<string | null>(null);
+  const preloadCleanupRef = useRef<(() => void) | null>(null);
+  const mountedRef = useRef(true);
   const fullscreenVisibilityCallbackRef = useRef(onFullscreenVisibilityChange);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
-  const displayUrl = layerUrls[activeLayer];
   const activeRefreshMs = fullscreenOpen
     ? Math.max(180, config.fullscreenRefreshMs || config.refreshMs || 2000)
     : Math.max(100, config.refreshMs || 2000);
@@ -128,7 +129,7 @@ export function CameraWidget({
     }
   }, [config, fullscreenOpen, maximizeStateValue]);
 
-  const reportAspectRatio = (width: number, height: number) => {
+  const reportAspectRatio = useCallback((width: number, height: number) => {
     if (!onAspectRatioDetected || hasReportedAspectRatio.current || !width || !height) {
       return;
     }
@@ -140,7 +141,7 @@ export function CameraWidget({
 
     hasReportedAspectRatio.current = true;
     onAspectRatioDetected(ratio);
-  };
+  }, [onAspectRatioDetected]);
 
   const snapshotUrl = useMemo(() => {
     if (!config.snapshotUrl) {
@@ -154,54 +155,121 @@ export function CameraWidget({
     return `${config.snapshotUrl}${separator}t=${tick}`;
   }, [config.snapshotUrl, tick]);
 
-  const commitLayerLoad = (layer: 0 | 1, loadedUrl: string, width?: number, height?: number) => {
-    if (!loadedUrl || pendingTargetUrlRef.current !== loadedUrl) {
+  useEffect(() => {
+    displayUrlRef.current = displayUrl;
+  }, [displayUrl]);
+
+  const maybeStartPreload = useCallback(() => {
+    if (!mountedRef.current) {
       return;
     }
 
-    if (width && height) {
-      reportAspectRatio(width, height);
+    const latest = latestRequestedUrlRef.current;
+    const currentDisplay = displayUrlRef.current;
+    if (!latest || latest === currentDisplay || preloadingUrlRef.current) {
+      return;
     }
 
-    setActiveLayer(layer);
-    setLoadingLayer(null);
-    pendingTargetUrlRef.current = null;
-  };
+    const targetUrl = latest;
+    preloadingUrlRef.current = targetUrl;
+    preloadCleanupRef.current?.();
+    preloadCleanupRef.current = null;
+
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      let settled = false;
+      const loader = new window.Image();
+
+      const finish = (loaded: boolean) => {
+        if (settled || !mountedRef.current) {
+          return;
+        }
+        settled = true;
+        preloadingUrlRef.current = null;
+        preloadCleanupRef.current = null;
+
+        if (loaded) {
+          reportAspectRatio(loader.naturalWidth, loader.naturalHeight);
+          displayUrlRef.current = targetUrl;
+          setDisplayUrl(targetUrl);
+        }
+
+        if (latestRequestedUrlRef.current && latestRequestedUrlRef.current !== targetUrl) {
+          maybeStartPreload();
+        }
+      };
+
+      loader.onload = () => finish(true);
+      loader.onerror = () => finish(false);
+      loader.src = targetUrl;
+
+      preloadCleanupRef.current = () => {
+        settled = true;
+        loader.onload = null;
+        loader.onerror = null;
+      };
+      return;
+    }
+
+    let cancelled = false;
+    Image.prefetch(targetUrl)
+      .then(() => {
+        if (cancelled || !mountedRef.current) {
+          return;
+        }
+        preloadingUrlRef.current = null;
+        preloadCleanupRef.current = null;
+        displayUrlRef.current = targetUrl;
+        setDisplayUrl(targetUrl);
+        if (latestRequestedUrlRef.current && latestRequestedUrlRef.current !== targetUrl) {
+          maybeStartPreload();
+        }
+      })
+      .catch(() => {
+        if (cancelled || !mountedRef.current) {
+          return;
+        }
+        preloadingUrlRef.current = null;
+        preloadCleanupRef.current = null;
+        if (latestRequestedUrlRef.current && latestRequestedUrlRef.current !== targetUrl) {
+          maybeStartPreload();
+        }
+      });
+
+    preloadCleanupRef.current = () => {
+      cancelled = true;
+    };
+  }, [reportAspectRatio]);
 
   useEffect(() => {
+    latestRequestedUrlRef.current = snapshotUrl;
+
     if (!snapshotUrl) {
-      setLayerUrls([null, null]);
-      setActiveLayer(0);
-      setLoadingLayer(null);
-      pendingTargetUrlRef.current = null;
+      preloadCleanupRef.current?.();
+      preloadCleanupRef.current = null;
+      preloadingUrlRef.current = null;
+      displayUrlRef.current = null;
+      setDisplayUrl(null);
       return;
     }
 
-    const currentActiveUrl = layerUrls[activeLayer];
-    if (!currentActiveUrl) {
-      setLayerUrls((current) => {
-        const next: [string | null, string | null] = [...current] as [string | null, string | null];
-        next[activeLayer] = snapshotUrl;
-        return next;
-      });
-      setLoadingLayer(null);
-      pendingTargetUrlRef.current = null;
+    if (!displayUrlRef.current) {
+      displayUrlRef.current = snapshotUrl;
+      setDisplayUrl(snapshotUrl);
       return;
     }
 
-    if (snapshotUrl === currentActiveUrl || snapshotUrl === pendingTargetUrlRef.current) {
-      return;
-    }
+    maybeStartPreload();
+  }, [snapshotUrl, maybeStartPreload]);
 
-    const nextLayer: 0 | 1 = activeLayer === 0 ? 1 : 0;
-    setLayerUrls((current) => {
-      const next: [string | null, string | null] = [...current] as [string | null, string | null];
-      next[nextLayer] = snapshotUrl;
-      return next;
-    });
-    setLoadingLayer(nextLayer);
-    pendingTargetUrlRef.current = snapshotUrl;
-  }, [activeLayer, layerUrls, snapshotUrl]);
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+      preloadCleanupRef.current?.();
+      preloadCleanupRef.current = null;
+      preloadingUrlRef.current = null;
+    },
+    []
+  );
 
   return (
     <>
@@ -217,75 +285,36 @@ export function CameraWidget({
         {displayUrl ? (
           <View style={styles.snapshotWrap}>
             {!fullscreenOpen
-              ? ([0, 1] as const).map((layer) => {
-                  const url = layerUrls[layer];
-                  if (!url) {
-                    return null;
-                  }
-                  const isVisible = layer === activeLayer;
-                  const isLoader = layer === loadingLayer;
-                  return Platform.OS === "web"
-                    ? createElement("img", {
-                        alt: isVisible ? config.title || "Camera snapshot" : "",
-                        "aria-hidden": !isVisible,
-                        decoding: "async",
-                        draggable: false,
-                        loading: "eager",
-                        onError: () => {
-                          if (!isLoader) {
-                            return;
-                          }
-                          if (pendingTargetUrlRef.current === url) {
-                            setLoadingLayer(null);
-                            pendingTargetUrlRef.current = null;
-                          }
-                        },
-                        onLoad: (event: Event) => {
-                          const target = event.currentTarget as HTMLImageElement | null;
-                          if (!target) {
-                            return;
-                          }
-                          if (isLoader) {
-                            commitLayerLoad(layer, url, target.naturalWidth, target.naturalHeight);
-                            return;
-                          }
-                          if (isVisible) {
-                            reportAspectRatio(target.naturalWidth, target.naturalHeight);
-                          }
-                        },
-                        src: url,
-                        style: isVisible
-                          ? { ...webLayerBaseStyle, ...webLayerVisibleStyle }
-                          : { ...webLayerBaseStyle, ...webLayerHiddenStyle },
-                      })
-                    : (
-                        <Image
-                          key={`preview-layer-${layer}`}
-                          onError={() => {
-                            if (!isLoader) {
-                              return;
-                            }
-                            if (pendingTargetUrlRef.current === url) {
-                              setLoadingLayer(null);
-                              pendingTargetUrlRef.current = null;
-                            }
-                          }}
-                          onLoad={(event) => {
-                            const source = event.nativeEvent.source;
-                            if (isLoader) {
-                              commitLayerLoad(layer, url, source?.width, source?.height);
-                              return;
-                            }
-                            if (source?.width && source?.height && isVisible) {
-                              reportAspectRatio(source.width, source.height);
-                            }
-                          }}
-                          resizeMode="contain"
-                          source={{ uri: url }}
-                          style={[styles.imageLayer, isVisible ? styles.imageVisible : styles.imageHidden]}
-                        />
-                      );
-                })
+              ? Platform.OS === "web"
+                ? createElement("img", {
+                    alt: config.title || "Camera snapshot",
+                    decoding: "async",
+                    draggable: false,
+                    loading: "eager",
+                    onLoad: (event: Event) => {
+                      const target = event.currentTarget as HTMLImageElement | null;
+                      if (!target) {
+                        return;
+                      }
+                      reportAspectRatio(target.naturalWidth, target.naturalHeight);
+                    },
+                    src: displayUrl,
+                    style: webImageStyle,
+                  })
+                : (
+                    <Image
+                      onLoad={(event) => {
+                        const source = event.nativeEvent.source;
+                        if (!source) {
+                          return;
+                        }
+                        reportAspectRatio(source.width, source.height);
+                      }}
+                      resizeMode="contain"
+                      source={{ uri: displayUrl }}
+                      style={styles.image}
+                    />
+                  )
               : null}
             {config.showTitle !== false && config.title ? (
               <View style={styles.titleBadge}>
@@ -342,62 +371,20 @@ export function CameraWidget({
             </Pressable>
           </View>
           <View {...fullscreenPanResponder.panHandlers} style={styles.fullscreenStage}>
-            {([0, 1] as const).map((layer) => {
-              const url = layerUrls[layer];
-              if (!url) {
-                return null;
-              }
-              const isVisible = layer === activeLayer;
-              const isLoader = layer === loadingLayer;
-              return Platform.OS === "web"
+            {displayUrl
+              ? Platform.OS === "web"
                 ? createElement("img", {
-                    alt: isVisible ? config.title || "Camera snapshot fullscreen" : "",
-                    "aria-hidden": !isVisible,
+                    alt: config.title || "Camera snapshot fullscreen",
                     decoding: "async",
                     draggable: false,
                     loading: "eager",
-                    onError: () => {
-                      if (!isLoader) {
-                        return;
-                      }
-                      if (pendingTargetUrlRef.current === url) {
-                        setLoadingLayer(null);
-                        pendingTargetUrlRef.current = null;
-                      }
-                    },
-                    onLoad: () => {
-                      if (isLoader) {
-                        commitLayerLoad(layer, url);
-                      }
-                    },
-                    src: url,
-                    style: isVisible
-                      ? { ...fullscreenWebLayerBaseStyle, ...webLayerVisibleStyle }
-                      : { ...fullscreenWebLayerBaseStyle, ...webLayerHiddenStyle },
+                    src: displayUrl,
+                    style: fullscreenWebImageStyle,
                   })
                 : (
-                    <Image
-                      key={`fullscreen-layer-${layer}`}
-                      onError={() => {
-                        if (!isLoader) {
-                          return;
-                        }
-                        if (pendingTargetUrlRef.current === url) {
-                          setLoadingLayer(null);
-                          pendingTargetUrlRef.current = null;
-                        }
-                      }}
-                      onLoad={() => {
-                        if (isLoader) {
-                          commitLayerLoad(layer, url);
-                        }
-                      }}
-                      resizeMode="contain"
-                      source={{ uri: url }}
-                      style={[styles.fullscreenImageLayer, isVisible ? styles.imageVisible : styles.imageHidden]}
-                    />
-                  );
-            })}
+                    <Image resizeMode="contain" source={{ uri: displayUrl }} style={styles.fullscreenImage} />
+                  )
+              : null}
           </View>
           {config.showTitle !== false && config.title ? (
             <View style={styles.fullscreenTitle}>
@@ -507,18 +494,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
   },
-  imageLayer: {
-    position: "absolute",
-    left: 0,
-    top: 0,
+  image: {
     width: "100%",
     height: "100%",
-  },
-  imageVisible: {
-    opacity: 1,
-  },
-  imageHidden: {
-    opacity: 0,
   },
   empty: {
     flex: 1,
@@ -557,15 +535,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 18,
   },
-  fullscreenImageLayer: {
-    position: "absolute",
-    left: 18,
-    top: 18,
-    right: 18,
-    bottom: 18,
-    width: undefined,
-    height: undefined,
-    pointerEvents: "none",
+  fullscreenImage: {
+    width: "100%",
+    height: "100%",
   },
   fullscreenActions: {
     position: "absolute",
@@ -600,36 +572,18 @@ const styles = StyleSheet.create({
   },
 });
 
-const webLayerBaseStyle = {
-  position: "absolute",
-  left: 0,
-  top: 0,
+const webImageStyle = {
   width: "100%",
   height: "100%",
   objectFit: "contain",
   display: "block",
   backgroundColor: "#000000",
-  transition: "opacity 150ms linear",
-  pointerEvents: "none",
 } as const;
 
-const fullscreenWebLayerBaseStyle = {
-  position: "absolute",
-  left: 0,
-  top: 0,
+const fullscreenWebImageStyle = {
   width: "100%",
   height: "100%",
   objectFit: "contain",
   display: "block",
   backgroundColor: "#000000",
-  transition: "opacity 150ms linear",
-  pointerEvents: "none",
-} as const;
-
-const webLayerVisibleStyle = {
-  opacity: 1,
-} as const;
-
-const webLayerHiddenStyle = {
-  opacity: 0,
 } as const;
