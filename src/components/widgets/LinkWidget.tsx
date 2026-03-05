@@ -47,11 +47,17 @@ export function LinkWidget({ config }: LinkWidgetProps) {
             playConfiguredUiSound(config.interactionSounds?.press, "tap", `${config.id}:press`);
             openOverlay();
           }}
-          style={styles.openButton}
+          style={[styles.openButton, iconUri ? styles.openButtonImageMode : null]}
         >
-          {iconUri ? <Image source={{ uri: iconUri }} style={styles.iconImage} /> : <View style={styles.iconFallback} />}
-          <Text numberOfLines={1} style={[styles.openButtonLabel, { color: textColor }]}>{config.title || "Link"}</Text>
-          <Text numberOfLines={1} style={[styles.urlLabel, { color: mutedTextColor }]}>{resolvedUrl}</Text>
+          {iconUri ? (
+            <Image source={{ uri: iconUri }} style={styles.fullImage} />
+          ) : (
+            <>
+              <View style={styles.iconFallback} />
+              <Text numberOfLines={1} style={[styles.openButtonLabel, { color: textColor }]}>{config.title || "Link"}</Text>
+              <Text numberOfLines={1} style={[styles.urlLabel, { color: mutedTextColor }]}>{resolvedUrl}</Text>
+            </>
+          )}
         </Pressable>
       </View>
 
@@ -122,7 +128,7 @@ const styles = StyleSheet.create({
   openButton: {
     width: "100%",
     height: "100%",
-    borderRadius: 18,
+    borderRadius: 0,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.15)",
     backgroundColor: "rgba(8, 18, 36, 0.62)",
@@ -132,11 +138,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  iconImage: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    marginBottom: 2,
+  openButtonImageMode: {
+    borderWidth: 0,
+    borderColor: "transparent",
+    backgroundColor: "transparent",
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    gap: 0,
+  },
+  fullImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 0,
   },
   iconFallback: {
     width: 34,
