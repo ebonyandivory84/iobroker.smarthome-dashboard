@@ -22,6 +22,7 @@ export function DashboardScreen() {
   const horizontalOffsetRef = useRef(0);
   const pageOffsetsRef = useRef<Record<string, number>>({});
   const pullRefreshBlockedUntilRef = useRef(0);
+  const edgeTransferCooldownRef = useRef(0);
   const fullscreenCameraMapRef = useRef<Record<string, boolean>>({});
   const pullGestureRef = useRef<{
     pageId: string | null;
@@ -48,6 +49,7 @@ export function DashboardScreen() {
     dashboardPages,
     activePageId,
     createDashboardPage,
+    moveWidgetToPage,
     removeWidget,
     replaceWidgets,
     setActivePage,
@@ -168,6 +170,36 @@ export function DashboardScreen() {
     }
 
     updateWidget(widgetId, partial);
+  };
+
+  const handleDragAcrossPageEdge = (
+    sourcePageId: string,
+    direction: "left" | "right",
+    widgetId: string,
+    position: WidgetConfig["position"]
+  ) => {
+    const now = Date.now();
+    if (now - edgeTransferCooldownRef.current < 520) {
+      return;
+    }
+
+    const sourceIndex = dashboardPages.findIndex((page) => page.id === sourcePageId);
+    if (sourceIndex < 0) {
+      return;
+    }
+
+    const targetIndex = direction === "left" ? sourceIndex - 1 : sourceIndex + 1;
+    const targetPage = dashboardPages[targetIndex];
+    if (!targetPage) {
+      return;
+    }
+
+    edgeTransferCooldownRef.current = now;
+    moveWidgetToPage(widgetId, targetPage.id, position);
+    setVisiblePageId(targetPage.id);
+    horizontalOffsetRef.current = width * targetIndex;
+    horizontalPagerRef.current?.scrollTo({ x: width * targetIndex, animated: true });
+    playConfiguredUiSound(config.uiSounds?.pageSounds?.swipe, "swipe", "global:dragEdgePageTransfer");
   };
 
   const editingWidget: WidgetConfig | null =
@@ -475,6 +507,9 @@ export function DashboardScreen() {
                 onRemoveWidget={removeWidget}
                 onUpdateWidget={handleUpdateWidget}
                 onWriteState={writeStateTracked}
+                onDragAcrossPageEdge={(direction, widgetId, position) =>
+                  handleDragAcrossPageEdge(pageConfig.activePageId, direction, widgetId, position)
+                }
                 stateWrites={stateWrites}
                 states={states}
               />

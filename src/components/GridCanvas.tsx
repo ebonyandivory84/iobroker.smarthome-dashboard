@@ -30,6 +30,7 @@ type GridCanvasProps = {
   onLayoutMeasured?: (width: number) => void;
   onCameraFullscreenSwipeClose?: () => void;
   onCameraFullscreenVisibilityChange?: (widgetId: string, open: boolean) => void;
+  onDragAcrossPageEdge?: (direction: "left" | "right", widgetId: string, position: WidgetConfig["position"]) => void;
 };
 
 export function GridCanvas({
@@ -45,6 +46,7 @@ export function GridCanvas({
   onLayoutMeasured,
   onCameraFullscreenSwipeClose,
   onCameraFullscreenVisibilityChange,
+  onDragAcrossPageEdge,
 }: GridCanvasProps) {
   const { width: windowWidth } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
@@ -110,6 +112,7 @@ export function GridCanvas({
         onRemoveWidget={onRemoveWidget}
         onUpdateWidget={onUpdateWidget}
         onWriteState={onWriteState}
+        onDragAcrossPageEdge={onDragAcrossPageEdge}
         stateWrites={stateWrites}
         states={states}
       />
@@ -470,6 +473,7 @@ function WebGridCanvas({
   onUpdateWidget,
   onRemoveWidget,
   onWriteState,
+  onDragAcrossPageEdge,
   stateWrites,
 }: {
   config: DashboardSettings;
@@ -486,6 +490,7 @@ function WebGridCanvas({
   onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void;
   onRemoveWidget: (widgetId: string) => void;
   onWriteState: (stateId: string, value: unknown) => void | Promise<void>;
+  onDragAcrossPageEdge?: (direction: "left" | "right", widgetId: string, position: WidgetConfig["position"]) => void;
   stateWrites?: Record<string, StateWriteFeedback>;
 }) {
   const stepX = cellWidth + config.grid.gap;
@@ -506,6 +511,7 @@ function WebGridCanvas({
           onRemoveWidget={onRemoveWidget}
           onUpdateWidget={onUpdateWidget}
           onWriteState={onWriteState}
+          onDragAcrossPageEdge={onDragAcrossPageEdge}
           stateWrites={stateWrites}
           allowManualLayout={true}
           allowResize={false}
@@ -536,6 +542,7 @@ function WebWidgetShell({
   onUpdateWidget,
   onRemoveWidget,
   onWriteState,
+  onDragAcrossPageEdge,
   stateWrites,
   allowManualLayout = true,
   allowResize = true,
@@ -556,6 +563,7 @@ function WebWidgetShell({
   onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void;
   onRemoveWidget: (widgetId: string) => void;
   onWriteState: (stateId: string, value: unknown) => void | Promise<void>;
+  onDragAcrossPageEdge?: (direction: "left" | "right", widgetId: string, position: WidgetConfig["position"]) => void;
   stateWrites?: Record<string, StateWriteFeedback>;
   allowManualLayout?: boolean;
   allowResize?: boolean;
@@ -570,6 +578,7 @@ function WebWidgetShell({
     startY: number;
     startPosition: WidgetConfig["position"];
   } | null>(null);
+  const edgeDirectionRef = useRef<"left" | "right" | null>(null);
 
   useEffect(() => {
     setPreview(widget.position);
@@ -590,11 +599,33 @@ function WebWidgetShell({
       }
 
       if (active.mode === "drag") {
-        setPreview(constrainToPrimarySections({
+        const nextPreview = constrainToPrimarySections({
           ...active.startPosition,
           x: clamp(active.startPosition.x + dx, 0, config.grid.columns - active.startPosition.w),
           y: Math.max(0, active.startPosition.y + dy),
-        }, config.grid.columns));
+        }, config.grid.columns);
+        setPreview(nextPreview);
+
+        if (isLayoutMode && onDragAcrossPageEdge) {
+          const edgeThresholdPx = 72;
+          const nextDirection =
+            event.clientX <= edgeThresholdPx
+              ? "left"
+              : event.clientX >= window.innerWidth - edgeThresholdPx
+                ? "right"
+                : null;
+
+          if (!nextDirection) {
+            edgeDirectionRef.current = null;
+          } else if (edgeDirectionRef.current !== nextDirection) {
+            edgeDirectionRef.current = nextDirection;
+            onDragAcrossPageEdge(
+              nextDirection,
+              widget.id,
+              mapDisplayPositionToSourceHint(nextPreview, config.grid.columns, sourceColumns)
+            );
+          }
+        }
       } else {
         setPreview(constrainToPrimarySections({
           ...active.startPosition,
@@ -610,6 +641,7 @@ function WebWidgetShell({
         return;
       }
       interaction.current = null;
+      edgeDirectionRef.current = null;
       if (allowManualLayout) {
         onUpdateWidget(widget.id, {
           position: mapDisplayPositionToSourceHint(preview, config.grid.columns, sourceColumns),
@@ -625,7 +657,7 @@ function WebWidgetShell({
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleUp);
     };
-  }, [config.grid.columns, onUpdateWidget, preview, stepX, stepY, widget.id]);
+  }, [config.grid.columns, isLayoutMode, onDragAcrossPageEdge, onUpdateWidget, preview, sourceColumns, stepX, stepY, widget.id]);
 
   const begin =
     (mode: "drag" | "resize") =>
@@ -639,6 +671,7 @@ function WebWidgetShell({
         startY: event.clientY,
         startPosition: preview,
       };
+      edgeDirectionRef.current = null;
     };
 
   const shellStyle: CSSProperties = {

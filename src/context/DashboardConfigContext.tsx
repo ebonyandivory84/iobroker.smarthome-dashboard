@@ -24,6 +24,7 @@ type DashboardConfigContextValue = {
   updateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void;
   addWidget: (widget: WidgetConfig) => void;
   removeWidget: (widgetId: string) => void;
+  moveWidgetToPage: (widgetId: string, targetPageId: string, position?: WidgetConfig["position"]) => void;
   setActivePage: (pageId: string) => void;
   createDashboardPage: () => void;
   refreshSavedDashboards: () => Promise<void>;
@@ -189,6 +190,55 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
       },
       removeWidget(widgetId) {
         persist(syncActivePage(config, { widgets: config.widgets.filter((widget) => widget.id !== widgetId) }));
+      },
+      moveWidgetToPage(widgetId, targetPageId, position) {
+        const pages = config.pages || [];
+        const targetPage = pages.find((page) => page.id === targetPageId);
+        if (!targetPage) {
+          return;
+        }
+
+        const sourcePage = pages.find((page) => page.widgets.some((widget) => widget.id === widgetId));
+        if (!sourcePage || sourcePage.id === targetPage.id) {
+          return;
+        }
+
+        const sourceWidget = sourcePage.widgets.find((widget) => widget.id === widgetId);
+        if (!sourceWidget) {
+          return;
+        }
+
+        const movedWidget: WidgetConfig = {
+          ...sourceWidget,
+          position: position || sourceWidget.position,
+        };
+
+        const nextPages = pages.map((page) => {
+          if (page.id === sourcePage.id) {
+            return {
+              ...page,
+              widgets: page.widgets.filter((widget) => widget.id !== widgetId),
+            };
+          }
+
+          if (page.id === targetPage.id) {
+            return {
+              ...page,
+              widgets: [...page.widgets.filter((widget) => widget.id !== widgetId), movedWidget],
+            };
+          }
+
+          return page;
+        });
+
+        const nextActive = nextPages.find((page) => page.id === targetPage.id) || targetPage;
+        persist({
+          ...config,
+          pages: nextPages,
+          activePageId: nextActive.id,
+          title: nextActive.title,
+          widgets: nextActive.widgets,
+        });
       },
       setActivePage(pageId) {
         if (!pageId || pageId === config.activePageId) {
