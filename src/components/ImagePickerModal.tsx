@@ -8,6 +8,8 @@ type ImagePickerModalProps = {
   client: IoBrokerClient;
   visible: boolean;
   selectedName?: string;
+  title?: string;
+  helperText?: string;
   onClose: () => void;
   onSelect: (entry: WidgetImageEntry) => void;
 };
@@ -16,6 +18,8 @@ export function ImagePickerModal({
   client,
   visible,
   selectedName,
+  title,
+  helperText,
   onClose,
   onSelect,
 }: ImagePickerModalProps) {
@@ -60,12 +64,12 @@ export function ImagePickerModal({
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <View style={styles.header}>
-            <Text style={styles.title}>Solar-Hintergrund waehlen</Text>
+            <Text style={styles.title}>{title || "Solar-Hintergrund waehlen"}</Text>
             <Pressable onPress={onClose}>
               <Text style={styles.close}>Schliessen</Text>
             </Pressable>
           </View>
-          <Text style={styles.helper}>Verwendet den festen Ordner `assets/` im Adapter-Paket.</Text>
+          <Text style={styles.helper}>{helperText || "Verwendet den festen Ordner `assets/` im Adapter-Paket."}</Text>
           {loading ? <ActivityIndicator color={palette.accent} size="small" /> : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <ScrollView contentContainerStyle={styles.grid}>

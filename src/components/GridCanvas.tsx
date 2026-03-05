@@ -351,7 +351,7 @@ function getAutoLayoutSpec(
       case "numpad":
         return { w: 1, h: roundGridUnit(3) };
       case "link":
-        return { w: 1, h: roundGridUnit(1.8) };
+        return { w: 1, h: 1 };
     }
 
     return { w: 1, h: Math.max(1.5, roundGridUnit(fallbackHeight)) };
@@ -378,7 +378,7 @@ function getAutoLayoutSpec(
     case "numpad":
       return { w: mainColumnWidth, h: roundGridUnit(3.2) };
     case "link":
-      return { w: mainColumnWidth, h: roundGridUnit(2) };
+      return { w: 1, h: 1 };
   }
 
   return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };

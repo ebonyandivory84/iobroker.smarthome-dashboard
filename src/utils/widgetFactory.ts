@@ -20,12 +20,10 @@ export function buildWidgetTemplate(
           ? 8
           : type === "grafana"
             ? 6
-            : type === "weather"
-              ? 4
-              : type === "numpad"
-                ? 6
-                : type === "link"
-                  ? 4
+              : type === "weather"
+                ? 4
+                : type === "numpad"
+                  ? 6
                 : 3,
     h:
       type === "camera"
@@ -36,12 +34,10 @@ export function buildWidgetTemplate(
             ? 3
             : type === "grafana"
               ? 4
-              : type === "weather"
-                ? 3
+                : type === "weather"
+                  ? 3
                 : type === "numpad"
                   ? 4
-                  : type === "link"
-                    ? 2
                 : 2,
   };
 
@@ -148,7 +144,6 @@ export function buildWidgetTemplate(
       url: "",
       position: {
         ...basePosition,
-        w: Math.min(4, grid.columns),
       },
     };
   }

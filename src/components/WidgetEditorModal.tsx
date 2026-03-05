@@ -33,7 +33,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
   }>>([]);
   const [weatherSearchBusy, setWeatherSearchBusy] = useState(false);
   const [pickerField, setPickerField] = useState<string | null>(null);
-  const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const [imagePickerField, setImagePickerField] = useState<"backgroundImage" | "iconImage" | null>(null);
   const theme = resolveThemeSettings(config.theme);
   const iconPreview = useMemo(() => {
     const active = (draft.iconActive || widget?.iconPair?.active || "toggle-switch-outline") as keyof typeof MaterialCommunityIcons.glyphMap;
@@ -188,6 +188,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         title: widget.title,
         showTitle: widget.showTitle === false ? "false" : "true",
         url: widget.url || "",
+        iconImage: widget.iconImage || "",
         ...appearanceDraft,
       });
       return;
@@ -406,6 +407,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         title: draft.title,
         showTitle: draft.showTitle !== "false",
         url: draft.url || undefined,
+        iconImage: draft.iconImage || undefined,
         interactionSounds: buildStoredInteractionSounds(
           widget.type,
           soundDraft,
@@ -609,7 +611,10 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                             style={[styles.input, styles.stateFieldInput]}
                             value={draft.backgroundImage || ""}
                           />
-                          <EditorButtonPressable onPress={() => setImagePickerOpen(true)} style={styles.stateBrowseButton}>
+                          <EditorButtonPressable
+                            onPress={() => setImagePickerField("backgroundImage")}
+                            style={styles.stateBrowseButton}
+                          >
                             <Text style={styles.stateBrowseLabel}>Bild waehlen</Text>
                           </EditorButtonPressable>
                         </View>
@@ -921,6 +926,18 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     style={styles.input}
                     value={draft.url || ""}
                   />
+                </Field>
+                <Field label="Icon (PNG)">
+                  <View style={styles.stateFieldRow}>
+                    <TextInput
+                      editable={false}
+                      style={[styles.input, styles.stateFieldInput]}
+                      value={draft.iconImage || ""}
+                    />
+                    <EditorButtonPressable onPress={() => setImagePickerField("iconImage")} style={styles.stateBrowseButton}>
+                      <Text style={styles.stateBrowseLabel}>Bild waehlen</Text>
+                    </EditorButtonPressable>
+                  </View>
                 </Field>
                 <Field label="Sounds bei Interaktion">
                   <Field label="Beim Druecken">
@@ -1305,17 +1322,31 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       />
       <ImagePickerModal
         client={client}
-        onClose={() => setImagePickerOpen(false)}
+        title={imagePickerField === "iconImage" ? "Link-Icon waehlen" : "Solar-Hintergrund waehlen"}
+        helperText={
+          imagePickerField === "iconImage"
+            ? "Waehle eine PNG-Datei aus dem Ordner `assets/`."
+            : "Verwendet den festen Ordner `assets/` im Adapter-Paket."
+        }
+        onClose={() => setImagePickerField(null)}
         onSelect={(entry) => {
-          setDraft((current) => ({
-            ...current,
-            backgroundMode: "image",
-            backgroundImage: entry.name,
-          }));
-          setImagePickerOpen(false);
+          setDraft((current) => {
+            if (imagePickerField === "iconImage") {
+              return {
+                ...current,
+                iconImage: entry.name,
+              };
+            }
+            return {
+              ...current,
+              backgroundMode: "image",
+              backgroundImage: entry.name,
+            };
+          });
+          setImagePickerField(null);
         }}
-        selectedName={draft.backgroundImage}
-        visible={imagePickerOpen}
+        selectedName={imagePickerField === "iconImage" ? draft.iconImage : draft.backgroundImage}
+        visible={Boolean(imagePickerField)}
       />
     </Modal>
   );

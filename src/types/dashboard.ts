@@ -107,6 +107,7 @@ export type NumpadWidgetConfig = WidgetBase & {
 export type LinkWidgetConfig = WidgetBase & {
   type: "link";
   url?: string;
+  iconImage?: string;
 };
 
 export type SolarNodeLayout = {

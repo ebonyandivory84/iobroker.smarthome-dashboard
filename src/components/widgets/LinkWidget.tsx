@@ -1,5 +1,5 @@
 import { createElement, useState } from "react";
-import { Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { LinkWidgetConfig } from "../../types/dashboard";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
 import { palette } from "../../utils/theme";
@@ -13,6 +13,9 @@ export function LinkWidget({ config }: LinkWidgetProps) {
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const resolvedUrl = normalizeUrl(config.url);
+  const iconUri = config.iconImage
+    ? `/smarthome-dashboard/widget-assets/${encodeURIComponent(config.iconImage)}`
+    : null;
 
   const close = () => {
     playConfiguredUiSound(config.interactionSounds?.close, "close", `${config.id}:close`);
@@ -46,12 +49,9 @@ export function LinkWidget({ config }: LinkWidgetProps) {
           }}
           style={styles.openButton}
         >
-          <Text numberOfLines={1} style={[styles.openButtonLabel, { color: textColor }]}>
-            {config.title || "Seite oeffnen"}
-          </Text>
-          <Text numberOfLines={1} style={[styles.urlLabel, { color: mutedTextColor }]}>
-            {resolvedUrl}
-          </Text>
+          {iconUri ? <Image source={{ uri: iconUri }} style={styles.iconImage} /> : <View style={styles.iconFallback} />}
+          <Text numberOfLines={1} style={[styles.openButtonLabel, { color: textColor }]}>{config.title || "Link"}</Text>
+          <Text numberOfLines={1} style={[styles.urlLabel, { color: mutedTextColor }]}>{resolvedUrl}</Text>
         </Pressable>
       </View>
 
@@ -117,29 +117,45 @@ function normalizeUrl(raw?: string) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
+    padding: 0,
   },
   openButton: {
     width: "100%",
+    height: "100%",
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.15)",
-    backgroundColor: "rgba(8, 18, 36, 0.72)",
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    gap: 4,
+    backgroundColor: "rgba(8, 18, 36, 0.62)",
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    gap: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconImage: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    marginBottom: 2,
+  },
+  iconFallback: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    marginBottom: 2,
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
   openButtonLabel: {
     color: palette.text,
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: "800",
+    textAlign: "center",
   },
   urlLabel: {
     color: palette.textMuted,
-    fontSize: 12,
+    fontSize: 9,
     fontWeight: "600",
+    textAlign: "center",
   },
   empty: {
     flex: 1,
