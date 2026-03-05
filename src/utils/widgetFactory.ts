@@ -24,6 +24,8 @@ export function buildWidgetTemplate(
               ? 4
               : type === "numpad"
                 ? 6
+                : type === "link"
+                  ? 4
                 : 3,
     h:
       type === "camera"
@@ -38,6 +40,8 @@ export function buildWidgetTemplate(
                 ? 3
                 : type === "numpad"
                   ? 4
+                  : type === "link"
+                    ? 2
                 : 2,
   };
 
@@ -132,6 +136,19 @@ export function buildWidgetTemplate(
       position: {
         ...basePosition,
         w: Math.min(6, grid.columns),
+      },
+    };
+  }
+
+  if (type === "link") {
+    return {
+      id: `link-${suffix}`,
+      type: "link",
+      title: `Link ${suffix}`,
+      url: "",
+      position: {
+        ...basePosition,
+        w: Math.min(4, grid.columns),
       },
     };
   }

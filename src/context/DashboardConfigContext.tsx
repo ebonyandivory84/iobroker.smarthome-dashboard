@@ -474,6 +474,7 @@ function normalizeWidgetTypeSoundDefaults(
     grafana: normalizeWidgetInteractionSounds(input.grafana),
     weather: normalizeWidgetInteractionSounds(input.weather),
     numpad: normalizeWidgetInteractionSounds(input.numpad),
+    link: normalizeWidgetInteractionSounds(input.link),
   };
 }
 

@@ -1,0 +1,225 @@
+import { createElement, useState } from "react";
+import { Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { LinkWidgetConfig } from "../../types/dashboard";
+import { playConfiguredUiSound } from "../../utils/uiSounds";
+import { palette } from "../../utils/theme";
+
+type LinkWidgetProps = {
+  config: LinkWidgetConfig;
+};
+
+export function LinkWidget({ config }: LinkWidgetProps) {
+  const [open, setOpen] = useState(false);
+  const textColor = config.appearance?.textColor || palette.text;
+  const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
+  const resolvedUrl = normalizeUrl(config.url);
+
+  const close = () => {
+    playConfiguredUiSound(config.interactionSounds?.close, "close", `${config.id}:close`);
+    setOpen(false);
+  };
+
+  const openOverlay = () => {
+    if (!resolvedUrl) {
+      return;
+    }
+    playConfiguredUiSound(config.interactionSounds?.open, "open", `${config.id}:open`);
+    setOpen(true);
+  };
+
+  if (!resolvedUrl) {
+    return (
+      <View style={styles.empty}>
+        <Text style={[styles.emptyTitle, { color: textColor }]}>Link-URL fehlt</Text>
+        <Text style={[styles.emptyMeta, { color: mutedTextColor }]}>Trage im Widget eine URL ein.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      <View style={styles.container}>
+        <Pressable
+          onPress={() => {
+            playConfiguredUiSound(config.interactionSounds?.press, "tap", `${config.id}:press`);
+            openOverlay();
+          }}
+          style={styles.openButton}
+        >
+          <Text numberOfLines={1} style={[styles.openButtonLabel, { color: textColor }]}>
+            {config.title || "Seite oeffnen"}
+          </Text>
+          <Text numberOfLines={1} style={[styles.urlLabel, { color: mutedTextColor }]}>
+            {resolvedUrl}
+          </Text>
+        </Pressable>
+      </View>
+
+      <Modal animationType={Platform.OS === "web" ? "fade" : "slide"} transparent visible={open}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSurface}>
+            <View style={styles.modalHeader}>
+              <Text numberOfLines={1} style={[styles.modalTitle, { color: textColor }]}>
+                {config.title || "Link"}
+              </Text>
+              <View style={styles.modalActions}>
+                {Platform.OS !== "web" ? (
+                  <Pressable
+                    onPress={() => Linking.openURL(resolvedUrl)}
+                    style={[styles.modalButton, styles.modalButtonSecondary]}
+                  >
+                    <Text style={[styles.modalButtonLabel, { color: textColor }]}>Im Browser</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable onPress={close} style={styles.modalButton}>
+                  <Text style={[styles.modalButtonLabel, { color: textColor }]}>Schliessen</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            {Platform.OS === "web"
+              ? createElement("iframe", {
+                  src: resolvedUrl,
+                  style: webFrameStyle,
+                  allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
+                  allowFullScreen: true,
+                  loading: "eager",
+                  referrerPolicy: "no-referrer",
+                })
+              : (
+                  <View style={styles.nativeFallback}>
+                    <Text style={[styles.emptyMeta, { color: mutedTextColor }]}>
+                      In Native bitte im Browser oeffnen.
+                    </Text>
+                    <Pressable onPress={() => Linking.openURL(resolvedUrl)} style={[styles.modalButton, styles.modalButtonSecondary]}>
+                      <Text style={[styles.modalButtonLabel, { color: textColor }]}>URL oeffnen</Text>
+                    </Pressable>
+                  </View>
+                )}
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
+function normalizeUrl(raw?: string) {
+  const value = (raw || "").trim();
+  if (!value) {
+    return "";
+  }
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+  return `https://${value}`;
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  openButton: {
+    width: "100%",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "rgba(8, 18, 36, 0.72)",
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    gap: 4,
+  },
+  openButtonLabel: {
+    color: palette.text,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  urlLabel: {
+    color: palette.textMuted,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  empty: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 14,
+  },
+  emptyTitle: {
+    color: palette.text,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  emptyMeta: {
+    marginTop: 6,
+    color: palette.textMuted,
+    textAlign: "center",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.94)",
+    padding: 18,
+  },
+  modalSurface: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: "rgba(4, 10, 18, 1)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  modalHeader: {
+    height: 56,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
+  },
+  modalTitle: {
+    flex: 1,
+    marginRight: 12,
+    color: palette.text,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  modalButton: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  modalButtonSecondary: {
+    backgroundColor: "rgba(76, 134, 255, 0.16)",
+    borderColor: "rgba(76, 134, 255, 0.35)",
+  },
+  modalButtonLabel: {
+    color: palette.text,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  nativeFallback: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 14,
+    padding: 16,
+  },
+});
+
+const webFrameStyle = {
+  width: "100%",
+  height: "calc(100% - 56px)",
+  border: "0",
+  display: "block",
+  background: "transparent",
+} as const;

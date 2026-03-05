@@ -58,6 +58,12 @@ const OPTIONS: Array<{
     description: "LCARS-inspiriertes Tastenfeld mit 0-9, Stern und Raute.",
     icon: "dialpad",
   },
+  {
+    type: "link",
+    title: "Link",
+    description: "Button, der eine Website im Dashboard-Overlay oeffnet.",
+    icon: "link-variant",
+  },
 ];
 
 export function WidgetLibraryModal({

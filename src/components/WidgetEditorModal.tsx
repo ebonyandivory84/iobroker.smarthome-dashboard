@@ -169,6 +169,30 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       return;
     }
 
+    if (widget.type === "link") {
+      setSoundDraft({
+        press: resolveDraftSoundValue(
+          widget.interactionSounds?.press,
+          config.uiSounds?.widgetTypeDefaults?.link?.press
+        ),
+        open: resolveDraftSoundValue(
+          widget.interactionSounds?.open,
+          config.uiSounds?.widgetTypeDefaults?.link?.open
+        ),
+        close: resolveDraftSoundValue(
+          widget.interactionSounds?.close,
+          config.uiSounds?.widgetTypeDefaults?.link?.close
+        ),
+      });
+      setDraft({
+        title: widget.title,
+        showTitle: widget.showTitle === false ? "false" : "true",
+        url: widget.url || "",
+        ...appearanceDraft,
+      });
+      return;
+    }
+
     if (widget.type === "weather") {
       setSoundDraft({});
       setDraft({
@@ -377,6 +401,18 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ),
         appearance,
       });
+    } else if (widget.type === "link") {
+      onSave(widget.id, {
+        title: draft.title,
+        showTitle: draft.showTitle !== "false",
+        url: draft.url || undefined,
+        interactionSounds: buildStoredInteractionSounds(
+          widget.type,
+          soundDraft,
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]
+        ),
+        appearance,
+      });
     } else if (widget.type === "weather") {
       onSave(widget.id, {
         title: draft.title,
@@ -421,7 +457,13 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
   };
 
   const saveSoundsAsTypeDefault = () => {
-    if (widget.type !== "state" && widget.type !== "camera" && widget.type !== "grafana" && widget.type !== "numpad") {
+    if (
+      widget.type !== "state" &&
+      widget.type !== "camera" &&
+      widget.type !== "grafana" &&
+      widget.type !== "numpad" &&
+      widget.type !== "link"
+    ) {
       return;
     }
 
@@ -867,6 +909,43 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   <Text style={styles.inlineActionLabel}>Als Default fuer alle Numpad-Widgets verwenden</Text>
                 </EditorButtonPressable>
               </Field>
+            ) : null}
+            {widget.type === "link" ? (
+              <>
+                <Field label="URL">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) => setDraft((current) => ({ ...current, url: value }))}
+                    placeholder="https://example.com"
+                    placeholderTextColor={palette.textMuted}
+                    style={styles.input}
+                    value={draft.url || ""}
+                  />
+                </Field>
+                <Field label="Sounds bei Interaktion">
+                  <Field label="Beim Druecken">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, press: value }))}
+                      value={soundDraft.press}
+                    />
+                  </Field>
+                  <Field label="Beim Oeffnen">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, open: value }))}
+                      value={soundDraft.open}
+                    />
+                  </Field>
+                  <Field label="Beim Schliessen">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, close: value }))}
+                      value={soundDraft.close}
+                    />
+                  </Field>
+                  <EditorButtonPressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
+                    <Text style={styles.inlineActionLabel}>Als Default fuer alle Link-Widgets verwenden</Text>
+                  </EditorButtonPressable>
+                </Field>
+              </>
             ) : null}
             {widget.type === "energy" ? (
               <>
@@ -1572,6 +1651,17 @@ function getWidgetAppearanceDefaults(
     };
   }
 
+  if (widget.type === "link") {
+    return {
+      widgetColor: "rgba(18, 42, 78, 0.95)",
+      widgetColor2: "rgba(10, 24, 46, 0.98)",
+      textColor: palette.text,
+      mutedTextColor: palette.textMuted,
+      cardColor: "rgba(8, 18, 36, 0.72)",
+      cardColor2: "rgba(24, 48, 86, 0.8)",
+    };
+  }
+
   return {
     widgetColor: theme.widgetTones.solarStart,
     widgetColor2: theme.widgetTones.solarEnd,
@@ -1763,7 +1853,13 @@ function buildStoredInteractionSounds(
   draft: Record<string, string[]>,
   defaults?: WidgetInteractionSounds
 ) {
-  if (widgetType !== "state" && widgetType !== "camera" && widgetType !== "grafana" && widgetType !== "numpad") {
+  if (
+    widgetType !== "state" &&
+    widgetType !== "camera" &&
+    widgetType !== "grafana" &&
+    widgetType !== "numpad" &&
+    widgetType !== "link"
+  ) {
     return undefined;
   }
 

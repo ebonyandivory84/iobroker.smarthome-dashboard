@@ -11,6 +11,7 @@ import { WidgetFrame } from "./WidgetFrame";
 import { CameraWidget } from "./widgets/CameraWidget";
 import { EnergyWidget } from "./widgets/EnergyWidget";
 import { GrafanaWidget } from "./widgets/GrafanaWidget";
+import { LinkWidget } from "./widgets/LinkWidget";
 import { NumpadWidget } from "./widgets/NumpadWidget";
 import { SolarWidget } from "./widgets/SolarWidget";
 import { resolveStateNextValue, StateWidget } from "./widgets/StateWidget";
@@ -349,6 +350,8 @@ function getAutoLayoutSpec(
         return { w: 1, h: roundGridUnit(2) };
       case "numpad":
         return { w: 1, h: roundGridUnit(3) };
+      case "link":
+        return { w: 1, h: roundGridUnit(1.8) };
     }
 
     return { w: 1, h: Math.max(1.5, roundGridUnit(fallbackHeight)) };
@@ -374,6 +377,8 @@ function getAutoLayoutSpec(
       return { w: mainColumnWidth, h: roundGridUnit(2.4) };
     case "numpad":
       return { w: mainColumnWidth, h: roundGridUnit(3.2) };
+    case "link":
+      return { w: mainColumnWidth, h: roundGridUnit(2) };
   }
 
   return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
@@ -792,6 +797,10 @@ function renderWidget(
     return <NumpadWidget config={effectiveWidget} />;
   }
 
+  if (effectiveWidget.type === "link") {
+    return <LinkWidget config={effectiveWidget} />;
+  }
+
   return null;
 }
 
@@ -1032,6 +1041,13 @@ function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThe
       background: "linear-gradient(135deg, rgba(214, 188, 166, 0.94), rgba(173, 122, 82, 0.92))",
       border: "1px solid rgba(255, 220, 184, 0.24)",
       boxShadow: "0 16px 26px rgba(54, 28, 10, 0.28)",
+    };
+  }
+  if (type === "link") {
+    return {
+      background: "linear-gradient(135deg, rgba(16, 34, 66, 0.94), rgba(10, 20, 40, 0.96))",
+      border: "1px solid rgba(126, 168, 255, 0.24)",
+      boxShadow: "0 14px 24px rgba(6, 16, 32, 0.32)",
     };
   }
   return {};

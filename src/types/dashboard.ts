@@ -1,4 +1,4 @@
-export type WidgetType = "state" | "camera" | "energy" | "solar" | "grafana" | "weather" | "numpad";
+export type WidgetType = "state" | "camera" | "energy" | "solar" | "grafana" | "weather" | "numpad" | "link";
 
 export type IconPair = {
   active: string;
@@ -104,6 +104,11 @@ export type NumpadWidgetConfig = WidgetBase & {
   type: "numpad";
 };
 
+export type LinkWidgetConfig = WidgetBase & {
+  type: "link";
+  url?: string;
+};
+
 export type SolarNodeLayout = {
   x: number;
   y: number;
@@ -167,7 +172,8 @@ export type WidgetConfig =
   | SolarWidgetConfig
   | GrafanaWidgetConfig
   | WeatherWidgetConfig
-  | NumpadWidgetConfig;
+  | NumpadWidgetConfig
+  | LinkWidgetConfig;
 
 export type BackgroundMode = "gradient" | "mesh" | "solid";
 
