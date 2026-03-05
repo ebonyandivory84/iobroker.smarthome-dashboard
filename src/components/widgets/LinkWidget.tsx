@@ -55,7 +55,6 @@ export function LinkWidget({ config }: LinkWidgetProps) {
             <>
               <View style={styles.iconFallback} />
               <Text numberOfLines={1} style={[styles.openButtonLabel, { color: textColor }]}>{config.title || "Link"}</Text>
-              <Text numberOfLines={1} style={[styles.urlLabel, { color: mutedTextColor }]}>{resolvedUrl}</Text>
             </>
           )}
         </Pressable>
@@ -162,12 +161,6 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 13,
     fontWeight: "800",
-    textAlign: "center",
-  },
-  urlLabel: {
-    color: palette.textMuted,
-    fontSize: 9,
-    fontWeight: "600",
     textAlign: "center",
   },
   empty: {
