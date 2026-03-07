@@ -804,12 +804,34 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv") {
 }
 
 function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv") {
-  // For MJPEG, direct URL is often the most compatible source for <img>.
-  const sources =
-    streamType === "mjpeg"
-      ? [targetUrl, ...getWebStreamProxyUrls(targetUrl, streamType)]
-      : [...getWebStreamProxyUrls(targetUrl, streamType), targetUrl];
+  const includeDirect = shouldUseDirectWebStream(targetUrl, streamType);
+  const sources = [
+    ...getWebStreamProxyUrls(targetUrl, streamType),
+    ...(includeDirect ? [targetUrl] : []),
+  ];
   return Array.from(new Set(sources.filter(Boolean)));
+}
+
+function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv") {
+  if (Platform.OS !== "web" || typeof window === "undefined") {
+    return true;
+  }
+
+  try {
+    const parsed = new URL(targetUrl);
+    const hasEmbeddedCredentials = Boolean(parsed.username || parsed.password);
+    const mixedContentBlocked = window.location.protocol === "https:" && parsed.protocol === "http:";
+
+    // Browser subresource requests are unreliable with embedded credentials and mixed-content URLs.
+    // Prefer same-origin adapter proxy in these cases.
+    if (hasEmbeddedCredentials || mixedContentBlocked) {
+      return false;
+    }
+  } catch {
+    // Keep fallback path when URL parsing fails.
+  }
+
+  return true;
 }
 
 function WebFlvPlayer({
