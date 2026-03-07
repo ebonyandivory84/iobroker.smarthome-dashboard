@@ -35,6 +35,8 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const [layoutToggleSounds, setLayoutToggleSounds] = useState<string[]>([]);
   const [addWidgetSounds, setAddWidgetSounds] = useState<string[]>([]);
   const [openSettingsSounds, setOpenSettingsSounds] = useState<string[]>([]);
+  const [widgetEditSounds, setWidgetEditSounds] = useState<string[]>([]);
+  const [editorButtonSounds, setEditorButtonSounds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,6 +57,8 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     setLayoutToggleSounds(config.uiSounds?.pageSounds?.layoutToggle || []);
     setAddWidgetSounds(config.uiSounds?.pageSounds?.addWidget || []);
     setOpenSettingsSounds(config.uiSounds?.pageSounds?.openSettings || []);
+    setWidgetEditSounds(config.uiSounds?.pageSounds?.widgetEdit || []);
+    setEditorButtonSounds(config.uiSounds?.pageSounds?.editorButton || []);
     setError(null);
     refreshSavedDashboards();
   }, [config.homeLabel, config.title, rawJson, visible]);
@@ -75,6 +79,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
         enabled: soundEnabled,
         volume: Math.max(0, Math.min(100, normalizedVolume)),
         soundSet,
+        widgetTypeDefaults: config.uiSounds?.widgetTypeDefaults,
         pageSounds: {
           tabPress: pageTabSounds,
           swipe: pageSwipeSounds,
@@ -83,6 +88,8 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
           layoutToggle: layoutToggleSounds,
           addWidget: addWidgetSounds,
           openSettings: openSettingsSounds,
+          widgetEdit: widgetEditSounds,
+          editorButton: editorButtonSounds,
         },
       };
       nextDraft = JSON.stringify(parsed, null, 2);
@@ -239,6 +246,14 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
             <View style={styles.soundSetBlock}>
               <Text style={styles.fieldLabel}>Zahnrad / Einstellungen</Text>
               <SoundPickerField onChange={setOpenSettingsSounds} value={openSettingsSounds} />
+            </View>
+            <View style={styles.soundSetBlock}>
+              <Text style={styles.fieldLabel}>3 Punkte / Widget bearbeiten</Text>
+              <SoundPickerField onChange={setWidgetEditSounds} value={widgetEditSounds} />
+            </View>
+            <View style={styles.soundSetBlock}>
+              <Text style={styles.fieldLabel}>Bearbeiten-Menue Buttons</Text>
+              <SoundPickerField onChange={setEditorButtonSounds} value={editorButtonSounds} />
             </View>
           </View>
             <View style={styles.libraryCard}>
