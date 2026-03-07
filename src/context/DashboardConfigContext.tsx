@@ -591,8 +591,24 @@ function normalizeWidgetConfigList(input: DashboardSettings["widgets"] | undefin
     return [];
   }
 
-  return input.map((widget) => ({
-    ...widget,
-    interactionSounds: normalizeWidgetInteractionSounds(widget.interactionSounds),
-  }));
+  const usedIds = new Set<string>();
+
+  return input.map((widget, index) => {
+    const baseId = (widget.id || `${widget.type}-${index + 1}`).trim();
+    let nextId = baseId || `${widget.type}-${index + 1}`;
+    let suffix = 2;
+
+    while (usedIds.has(nextId)) {
+      nextId = `${baseId}-${suffix}`;
+      suffix += 1;
+    }
+
+    usedIds.add(nextId);
+
+    return {
+      ...widget,
+      id: nextId,
+      interactionSounds: normalizeWidgetInteractionSounds(widget.interactionSounds),
+    };
+  });
 }
