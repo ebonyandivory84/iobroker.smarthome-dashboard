@@ -41,6 +41,8 @@ export function CameraWidget({
   const [previewStreamDebug, setPreviewStreamDebug] = useState<string | null>(null);
   const [previewMjpegSourceIndex, setPreviewMjpegSourceIndex] = useState(0);
   const [fullscreenMjpegSourceIndex, setFullscreenMjpegSourceIndex] = useState(0);
+  const [previewMjpegLoaded, setPreviewMjpegLoaded] = useState(false);
+  const [fullscreenMjpegLoaded, setFullscreenMjpegLoaded] = useState(false);
   const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
   const lastTriggerMatchRef = useRef(false);
   const activeLayerRef = useRef<0 | 1>(0);
@@ -85,22 +87,37 @@ export function CameraWidget({
   });
   const activeFeed = fullscreenOpen ? fullscreenFeed : previewFeed;
   const activeSnapshotBaseUrl = activeFeed?.kind === "snapshot" ? activeFeed.url : null;
-  const previewMjpegRenderUrl =
-    previewFeed?.kind === "mjpeg" ? getWebStreamProxyUrl(previewFeed.url, "mjpeg") || previewFeed.url : null;
-  const fullscreenMjpegRenderUrl =
-    fullscreenFeed?.kind === "mjpeg" ? getWebStreamProxyUrl(fullscreenFeed.url, "mjpeg") || fullscreenFeed.url : null;
-  const previewFlvRenderUrl =
-    previewFeed?.kind === "flv" ? getWebStreamProxyUrl(previewFeed.url, "flv") || previewFeed.url : null;
-  const fullscreenFlvRenderUrl =
-    fullscreenFeed?.kind === "flv" ? getWebStreamProxyUrl(fullscreenFeed.url, "flv") || fullscreenFeed.url : null;
   const previewMjpegSources = useMemo(
-    () => [previewMjpegRenderUrl, previewFeed?.kind === "mjpeg" ? previewFeed.url : null].filter(Boolean) as string[],
-    [previewFeed, previewMjpegRenderUrl]
+    () =>
+      previewFeed?.kind === "mjpeg"
+        ? buildWebStreamSources(previewFeed.url, "mjpeg")
+        : [],
+    [previewFeed]
   );
   const fullscreenMjpegSources = useMemo(
-    () => [fullscreenMjpegRenderUrl, fullscreenFeed?.kind === "mjpeg" ? fullscreenFeed.url : null].filter(Boolean) as string[],
-    [fullscreenFeed, fullscreenMjpegRenderUrl]
+    () =>
+      fullscreenFeed?.kind === "mjpeg"
+        ? buildWebStreamSources(fullscreenFeed.url, "mjpeg")
+        : [],
+    [fullscreenFeed]
   );
+  const previewFlvSources = useMemo(
+    () =>
+      previewFeed?.kind === "flv"
+        ? buildWebStreamSources(previewFeed.url, "flv")
+        : [],
+    [previewFeed]
+  );
+  const fullscreenFlvSources = useMemo(
+    () =>
+      fullscreenFeed?.kind === "flv"
+        ? buildWebStreamSources(fullscreenFeed.url, "flv")
+        : [],
+    [fullscreenFeed]
+  );
+  const previewFlvRenderUrl = previewFlvSources[0] || (previewFeed?.kind === "flv" ? previewFeed.url : null);
+  const fullscreenFlvRenderUrl =
+    fullscreenFlvSources[0] || (fullscreenFeed?.kind === "flv" ? fullscreenFeed.url : null);
   const currentPreviewMjpegSrc = previewMjpegSources[Math.min(previewMjpegSourceIndex, Math.max(0, previewMjpegSources.length - 1))] || null;
   const currentFullscreenMjpegSrc =
     fullscreenMjpegSources[Math.min(fullscreenMjpegSourceIndex, Math.max(0, fullscreenMjpegSources.length - 1))] || null;
@@ -147,16 +164,67 @@ export function CameraWidget({
   useEffect(() => {
     if (fullscreenOpen || previewFeed?.kind !== "mjpeg") {
       setPreviewStreamDebug(null);
+      setPreviewMjpegLoaded(false);
     }
   }, [fullscreenOpen, previewFeed?.kind]);
 
   useEffect(() => {
     setPreviewMjpegSourceIndex(0);
-  }, [previewMjpegRenderUrl, previewFeed?.kind, previewFeed?.url]);
+    setPreviewMjpegLoaded(false);
+  }, [previewMjpegSources, previewFeed?.kind, previewFeed?.url]);
 
   useEffect(() => {
     setFullscreenMjpegSourceIndex(0);
-  }, [fullscreenMjpegRenderUrl, fullscreenFeed?.kind, fullscreenFeed?.url]);
+    setFullscreenMjpegLoaded(false);
+  }, [fullscreenMjpegSources, fullscreenFeed?.kind, fullscreenFeed?.url]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || fullscreenOpen || previewFeed?.kind !== "mjpeg" || !currentPreviewMjpegSrc) {
+      return;
+    }
+
+    if (previewMjpegLoaded) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setPreviewMjpegSourceIndex((current) =>
+        current + 1 < previewMjpegSources.length ? current + 1 : current
+      );
+    }, 3500);
+
+    return () => clearTimeout(timer);
+  }, [
+    currentPreviewMjpegSrc,
+    fullscreenOpen,
+    previewFeed?.kind,
+    previewMjpegLoaded,
+    previewMjpegSources.length,
+  ]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || !fullscreenOpen || fullscreenFeed?.kind !== "mjpeg" || !currentFullscreenMjpegSrc) {
+      return;
+    }
+
+    if (fullscreenMjpegLoaded) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setFullscreenMjpegSourceIndex((current) =>
+        current + 1 < fullscreenMjpegSources.length ? current + 1 : current
+      );
+    }, 3500);
+
+    return () => clearTimeout(timer);
+  }, [
+    currentFullscreenMjpegSrc,
+    fullscreenFeed?.kind,
+    fullscreenMjpegLoaded,
+    fullscreenMjpegSources.length,
+    fullscreenOpen,
+  ]);
 
   useEffect(() => {
     fullscreenVisibilityCallbackRef.current = onFullscreenVisibilityChange;
@@ -410,6 +478,7 @@ export function CameraWidget({
                     draggable: false,
                     loading: "eager",
                     onError: () => {
+                      setPreviewMjpegLoaded(false);
                       if (previewMjpegSourceIndex + 1 < previewMjpegSources.length) {
                         setPreviewMjpegSourceIndex((current) => current + 1);
                         setPreviewStreamDebug("MJPEG Preview: Proxy fehlgeschlagen, versuche Direkt-URL...");
@@ -418,6 +487,7 @@ export function CameraWidget({
                       setPreviewStreamDebug((current) => current || "MJPEG Preview: Bild konnte nicht geladen werden.");
                     },
                     onLoad: () => {
+                      setPreviewMjpegLoaded(true);
                       setPreviewStreamDebug(null);
                     },
                     src: currentPreviewMjpegSrc || previewFeed.url,
@@ -556,9 +626,13 @@ export function CameraWidget({
                     draggable: false,
                     loading: "eager",
                     onError: () => {
+                      setFullscreenMjpegLoaded(false);
                       if (fullscreenMjpegSourceIndex + 1 < fullscreenMjpegSources.length) {
                         setFullscreenMjpegSourceIndex((current) => current + 1);
                       }
+                    },
+                    onLoad: () => {
+                      setFullscreenMjpegLoaded(true);
                     },
                     src: currentFullscreenMjpegSrc || fullscreenFeed.url,
                     style: fullscreenWebMjpegStyle,
@@ -717,15 +791,25 @@ function resolveSourceMode(
   return fallback;
 }
 
-function getWebStreamProxyUrl(targetUrl: string, streamType: "mjpeg" | "flv") {
+function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv") {
   if (Platform.OS !== "web" || typeof window === "undefined") {
-    return null;
+    return [];
   }
-  if (!window.location.pathname.includes("/smarthome-dashboard")) {
-    return null;
-  }
-  const proxyBase = `${window.location.origin}/smarthome-dashboard/api/camera-stream`;
-  return `${proxyBase}?streamType=${streamType}&url=${encodeURIComponent(targetUrl)}`;
+
+  const encodedUrl = encodeURIComponent(targetUrl);
+  return [
+    `${window.location.origin}/smarthome-dashboard/api/camera-stream?streamType=${streamType}&url=${encodedUrl}`,
+    `${window.location.origin}/smarthome-dashboard/api/camera-mjpeg?streamType=${streamType}&url=${encodedUrl}`,
+  ];
+}
+
+function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv") {
+  // For MJPEG, direct URL is often the most compatible source for <img>.
+  const sources =
+    streamType === "mjpeg"
+      ? [targetUrl, ...getWebStreamProxyUrls(targetUrl, streamType)]
+      : [...getWebStreamProxyUrls(targetUrl, streamType), targetUrl];
+  return Array.from(new Set(sources.filter(Boolean)));
 }
 
 function WebFlvPlayer({
