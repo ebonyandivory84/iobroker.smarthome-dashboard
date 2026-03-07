@@ -152,12 +152,6 @@ export function GridCanvas({
                   client,
                   onUpdateWidget,
                   onWriteState,
-                  {
-                    cellWidth,
-                    rowHeight: renderRowHeight,
-                    gap: displayConfig.grid.gap,
-                    mainColumnExtraGap,
-                  },
                   displayConfig.theme,
                   stateWrites,
                   displayConfig.uiSounds?.widgetTypeDefaults,
@@ -476,28 +470,6 @@ function displaySpan(x: number, w: number, cellWidth: number, gap: number, mainC
   return Math.max(cellWidth, baseWidth + extraInside);
 }
 
-function computeCameraHeightUnits(
-  widget: WidgetConfig,
-  ratio: number,
-  layoutMetrics: {
-    cellWidth: number;
-    rowHeight: number;
-    gap: number;
-    mainColumnExtraGap: number;
-  }
-) {
-  const widthPx = displaySpan(
-    widget.position.x,
-    widget.position.w,
-    layoutMetrics.cellWidth,
-    layoutMetrics.gap,
-    layoutMetrics.mainColumnExtraGap
-  );
-  const targetHeightPx = widthPx / Math.max(0.0001, ratio);
-  const heightUnits = (targetHeightPx + layoutMetrics.gap) / (layoutMetrics.rowHeight + layoutMetrics.gap);
-  return Math.max(0.5, roundCameraGridUnit(heightUnits));
-}
-
 function WebGridCanvas({
   config,
   mainColumnExtraGap,
@@ -790,12 +762,6 @@ function WebWidgetShell({
           client,
           onUpdateWidget,
           onWriteState,
-          {
-            cellWidth,
-            rowHeight,
-            gap: config.grid.gap,
-            mainColumnExtraGap,
-          },
           config.theme,
           stateWrites,
           config.uiSounds?.widgetTypeDefaults
@@ -816,12 +782,6 @@ function renderWidget(
   client: IoBrokerClient,
   onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void,
   onWriteState: (stateId: string, value: unknown) => void | Promise<void>,
-  layoutMetrics: {
-    cellWidth: number;
-    rowHeight: number;
-    gap: number;
-    mainColumnExtraGap: number;
-  },
   theme?: DashboardSettings["theme"],
   stateWrites?: Record<string, StateWriteFeedback>,
   widgetTypeDefaults?: Partial<Record<WidgetType, WidgetInteractionSounds>>,
@@ -860,20 +820,11 @@ function renderWidget(
           }
 
           const currentRatio = normalizeAspectRatio(effectiveWidget.snapshotAspectRatio);
-          const nextHeight = computeCameraHeightUnits(effectiveWidget, ratio, layoutMetrics);
-          const ratioChanged = Math.abs(currentRatio - ratio) >= 0.02;
-          const heightChanged = Math.abs((effectiveWidget.position.h || 0) - nextHeight) >= 0.05;
-          if (!ratioChanged && !heightChanged) {
+          if (Math.abs(currentRatio - ratio) < 0.02) {
             return;
           }
 
-          onUpdateWidget(effectiveWidget.id, {
-            snapshotAspectRatio: ratio,
-            position: {
-              ...effectiveWidget.position,
-              h: nextHeight,
-            },
-          });
+          onUpdateWidget(effectiveWidget.id, { snapshotAspectRatio: ratio });
         }}
       />
     );
