@@ -41,6 +41,8 @@ export function CameraWidget({
   const [previewStreamDebug, setPreviewStreamDebug] = useState<string | null>(null);
   const [previewMjpegSourceIndex, setPreviewMjpegSourceIndex] = useState(0);
   const [fullscreenMjpegSourceIndex, setFullscreenMjpegSourceIndex] = useState(0);
+  const [previewFlvSourceIndex, setPreviewFlvSourceIndex] = useState(0);
+  const [fullscreenFlvSourceIndex, setFullscreenFlvSourceIndex] = useState(0);
   const [previewMjpegLoaded, setPreviewMjpegLoaded] = useState(false);
   const [fullscreenMjpegLoaded, setFullscreenMjpegLoaded] = useState(false);
   const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
@@ -115,14 +117,14 @@ export function CameraWidget({
         : [],
     [fullscreenFeed]
   );
-  const previewFlvRenderUrl = previewFlvSources[0] || (previewFeed?.kind === "flv" ? previewFeed.url : null);
-  const fullscreenFlvRenderUrl =
-    fullscreenFlvSources[0] || (fullscreenFeed?.kind === "flv" ? fullscreenFeed.url : null);
   const previewFeedKey = `${previewFeed?.kind || "none"}:${previewFeed?.url || ""}`;
   const fullscreenFeedKey = `${fullscreenFeed?.kind || "none"}:${fullscreenFeed?.url || ""}`;
   const currentPreviewMjpegSrc = previewMjpegSources[Math.min(previewMjpegSourceIndex, Math.max(0, previewMjpegSources.length - 1))] || null;
   const currentFullscreenMjpegSrc =
     fullscreenMjpegSources[Math.min(fullscreenMjpegSourceIndex, Math.max(0, fullscreenMjpegSources.length - 1))] || null;
+  const currentPreviewFlvSrc = previewFlvSources[Math.min(previewFlvSourceIndex, Math.max(0, previewFlvSources.length - 1))] || null;
+  const currentFullscreenFlvSrc =
+    fullscreenFlvSources[Math.min(fullscreenFlvSourceIndex, Math.max(0, fullscreenFlvSources.length - 1))] || null;
   const activeRefreshMs = fullscreenOpen
     ? Math.max(180, config.fullscreenRefreshMs || config.refreshMs || 2000)
     : Math.max(100, config.refreshMs || 2000);
@@ -189,6 +191,14 @@ export function CameraWidget({
     setFullscreenMjpegSourceIndex(0);
     setFullscreenMjpegLoaded(false);
   }, [fullscreenMjpegSources, fullscreenFeed?.kind, fullscreenFeed?.url]);
+
+  useEffect(() => {
+    setPreviewFlvSourceIndex(0);
+  }, [previewFlvSources, previewFeed?.kind, previewFeed?.url]);
+
+  useEffect(() => {
+    setFullscreenFlvSourceIndex(0);
+  }, [fullscreenFlvSources, fullscreenFeed?.kind, fullscreenFeed?.url]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || fullscreenOpen || previewFeed?.kind !== "mjpeg" || !currentPreviewMjpegSrc) {
@@ -545,10 +555,12 @@ export function CameraWidget({
               ? Platform.OS === "web"
                 ? (
                     <WebFlvPlayer
-                      key={`preview-flv-${previewFeedKey}`}
+                      key={`preview-flv-${previewFeedKey}:${currentPreviewFlvSrc || previewFeed.url}`}
                       onAspectRatioDetected={reportAspectRatioValue}
+                      onSourceIndexChange={setPreviewFlvSourceIndex}
+                      preferredSourceIndex={previewFlvSourceIndex}
+                      sources={previewFlvSources.length ? previewFlvSources : [previewFeed.url]}
                       title={config.title || "Camera FLV"}
-                      url={previewFlvRenderUrl || previewFeed.url}
                     />
                   )
                 : (
@@ -704,11 +716,13 @@ export function CameraWidget({
               ? Platform.OS === "web"
                 ? (
                     <WebFlvPlayer
-                      key={`fullscreen-flv-${fullscreenFeedKey}`}
+                      key={`fullscreen-flv-${fullscreenFeedKey}:${currentFullscreenFlvSrc || fullscreenFeed.url}`}
                       fullScreen
                       onAspectRatioDetected={reportAspectRatioValue}
+                      onSourceIndexChange={setFullscreenFlvSourceIndex}
+                      preferredSourceIndex={fullscreenFlvSourceIndex}
+                      sources={fullscreenFlvSources.length ? fullscreenFlvSources : [fullscreenFeed.url]}
                       title={config.title || "Camera FLV fullscreen"}
-                      url={fullscreenFlvRenderUrl || fullscreenFeed.url}
                     />
                   )
                 : (
@@ -897,20 +911,31 @@ function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv"
 }
 
 function WebFlvPlayer({
-  url,
+  sources,
   title,
   fullScreen = false,
   onAspectRatioDetected,
+  preferredSourceIndex = 0,
+  onSourceIndexChange,
 }: {
-  url: string;
+  sources: string[];
   title: string;
   fullScreen?: boolean;
   onAspectRatioDetected?: (ratio: number) => void;
+  preferredSourceIndex?: number;
+  onSourceIndexChange?: (index: number) => void;
 }) {
   const videoRef = useRef<any>(null);
   const playerRef = useRef<any>(null);
   const ratioReportedRef = useRef(false);
   const aspectRatioCallbackRef = useRef(onAspectRatioDetected);
+  const normalizedSources = useMemo(
+    () => Array.from(new Set((sources || []).map((entry) => (entry || "").trim()).filter(Boolean))),
+    [sources]
+  );
+  const maxSourceIndex = Math.max(0, normalizedSources.length - 1);
+  const [sourceIndex, setSourceIndex] = useState(Math.min(preferredSourceIndex, maxSourceIndex));
+  const currentSource = normalizedSources[Math.min(sourceIndex, maxSourceIndex)] || "";
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -918,15 +943,42 @@ function WebFlvPlayer({
   }, [onAspectRatioDetected]);
 
   useEffect(() => {
+    const next = Math.min(preferredSourceIndex, maxSourceIndex);
+    setSourceIndex(next);
+  }, [maxSourceIndex, preferredSourceIndex]);
+
+  useEffect(() => {
+    onSourceIndexChange?.(sourceIndex);
+  }, [onSourceIndexChange, sourceIndex]);
+
+  useEffect(() => {
+    setErrorMessage(null);
+  }, [currentSource]);
+
+  useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") {
       return;
     }
 
-    setErrorMessage(null);
     let disposed = false;
     let player: any = null;
     let retryTimer: ReturnType<typeof setInterval> | null = null;
     const videoElement = videoRef.current;
+
+    const safeSetError = (message: string) => {
+      if (!disposed) {
+        setErrorMessage(message);
+      }
+    };
+
+    const moveToNextSource = (message: string) => {
+      if (sourceIndex + 1 < normalizedSources.length) {
+        setSourceIndex((current) => Math.min(normalizedSources.length - 1, current + 1));
+        safeSetError(message);
+        return true;
+      }
+      return false;
+    };
 
     const tryPlay = () => {
       if (!videoElement || disposed) {
@@ -945,27 +997,31 @@ function WebFlvPlayer({
     };
 
     const attach = async () => {
-      if (!videoElement || !url) {
+      if (!videoElement || !currentSource) {
+        safeSetError("FLV Stream URL fehlt.");
         return;
       }
 
       ratioReportedRef.current = false;
       const loaded = await ensureFlvJsLoaded();
       if (disposed || !loaded) {
-        setErrorMessage("FLV Player konnte nicht geladen werden.");
+        if (!moveToNextSource("FLV Quelle fehlgeschlagen, versuche alternative Quelle...")) {
+          safeSetError("FLV Player konnte nicht geladen werden.");
+        }
         return;
       }
 
       if (!window.flvjs?.isSupported?.()) {
-        setErrorMessage("FLV wird von diesem Browser nicht unterstuetzt.");
+        safeSetError("FLV wird von diesem Browser nicht unterstuetzt.");
         return;
       }
 
+      let switchedSource = false;
       player = window.flvjs.createPlayer(
         {
           type: "flv",
           isLive: true,
-          url,
+          url: currentSource,
         },
         {
           enableStashBuffer: false,
@@ -976,12 +1032,15 @@ function WebFlvPlayer({
 
       if (window.flvjs?.Events?.ERROR) {
         player.on(window.flvjs.Events.ERROR, (errorType: string, errorDetail: string) => {
+          if (switchedSource || disposed) {
+            return;
+          }
+          switchedSource = true;
           const detail = [errorType, errorDetail].filter(Boolean).join(" / ");
-          setErrorMessage(
-            detail
-              ? `FLV Stream konnte nicht gestartet werden (${detail}).`
-              : "FLV Stream konnte nicht gestartet werden."
-          );
+          if (moveToNextSource("FLV Quelle fehlgeschlagen, versuche alternative Quelle...")) {
+            return;
+          }
+          safeSetError(detail ? `FLV Stream konnte nicht gestartet werden (${detail}).` : "FLV Stream konnte nicht gestartet werden.");
         });
       }
 
@@ -1017,7 +1076,9 @@ function WebFlvPlayer({
     };
 
     attach().catch(() => {
-      setErrorMessage("FLV Stream konnte nicht initialisiert werden.");
+      if (!moveToNextSource("FLV Quelle fehlgeschlagen, versuche alternative Quelle...")) {
+        safeSetError("FLV Stream konnte nicht initialisiert werden.");
+      }
     });
 
     return () => {
@@ -1042,7 +1103,7 @@ function WebFlvPlayer({
       }
       playerRef.current = null;
     };
-  }, [url]);
+  }, [currentSource, normalizedSources.length, sourceIndex]);
 
   return (
     <>
@@ -1090,6 +1151,11 @@ async function ensureFlvJsLoaded() {
     flvLoaderPromise = new Promise<boolean>((resolve) => {
       const existing = document.querySelector(`script[data-flvjs-src="${FLV_SCRIPT_SRC}"]`) as HTMLScriptElement | null;
       if (existing) {
+        const readyState = (existing as HTMLScriptElement & { readyState?: string }).readyState;
+        if (readyState === "loaded" || readyState === "complete") {
+          resolve(Boolean(window.flvjs));
+          return;
+        }
         existing.addEventListener("load", () => resolve(Boolean(window.flvjs)), { once: true });
         existing.addEventListener("error", () => resolve(false), { once: true });
         return;
@@ -1105,7 +1171,12 @@ async function ensureFlvJsLoaded() {
     });
   }
 
-  return flvLoaderPromise;
+  const loaded = await flvLoaderPromise;
+  if (!loaded) {
+    // Allow retries for later widgets if network/CDN was temporarily unavailable.
+    flvLoaderPromise = null;
+  }
+  return loaded;
 }
 
 const styles = StyleSheet.create({
