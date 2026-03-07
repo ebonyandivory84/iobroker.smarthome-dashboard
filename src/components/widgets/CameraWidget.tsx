@@ -46,7 +46,7 @@ export function CameraWidget({
   const [fullscreenFlvSourceIndex, setFullscreenFlvSourceIndex] = useState(0);
   const [previewMjpegLoaded, setPreviewMjpegLoaded] = useState(false);
   const [fullscreenMjpegLoaded, setFullscreenMjpegLoaded] = useState(false);
-  const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
+  const lastReportedAspectRatioRef = useRef<number | null>(null);
   const lastTriggerMatchRef = useRef(false);
   const activeLayerRef = useRef<0 | 1>(0);
   const latestRequestedUrlRef = useRef<string | null>(null);
@@ -165,6 +165,10 @@ export function CameraWidget({
     const timer = setInterval(() => setTick((current) => current + 1), activeRefreshMs);
     return () => clearInterval(timer);
   }, [activeRefreshMs, activeSnapshotBaseUrl]);
+
+  useEffect(() => {
+    lastReportedAspectRatioRef.current = null;
+  }, [previewFeedKey, fullscreenFeedKey]);
 
   useEffect(() => {
     if (fullscreenOpen || previewFeed?.kind !== "mjpeg") {
@@ -305,7 +309,7 @@ export function CameraWidget({
   }, [config, fullscreenOpen, maximizeStateValue]);
 
   const reportAspectRatio = useCallback((width: number, height: number) => {
-    if (!onAspectRatioDetected || hasReportedAspectRatio.current || !width || !height) {
+    if (!onAspectRatioDetected || !width || !height) {
       return;
     }
 
@@ -314,14 +318,14 @@ export function CameraWidget({
       return;
     }
 
-    if (config.snapshotAspectRatio) {
-      hasReportedAspectRatio.current = true;
+    const previous = lastReportedAspectRatioRef.current;
+    if (previous !== null && Math.abs(previous - ratio) < 0.02) {
       return;
     }
 
-    hasReportedAspectRatio.current = true;
+    lastReportedAspectRatioRef.current = ratio;
     onAspectRatioDetected(ratio);
-  }, [config.snapshotAspectRatio, onAspectRatioDetected]);
+  }, [onAspectRatioDetected]);
 
   const reportAspectRatioValue = useCallback((ratio: number) => {
     if (!Number.isFinite(ratio) || ratio <= 0) {
@@ -1276,14 +1280,14 @@ const styles = StyleSheet.create({
     height: "100%",
     alignItems: "center",
     justifyContent: "center",
-    padding: 18,
+    padding: 0,
   },
   fullscreenImageLayer: {
     position: "absolute",
-    left: 18,
-    top: 18,
-    right: 18,
-    bottom: 18,
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
     width: undefined,
     height: undefined,
   },
