@@ -168,10 +168,7 @@ export function playConfiguredUiSound(soundIds: string[] | undefined, fallback: 
 }
 
 export function playSoundPreview(soundId: string) {
-  if (!uiSoundSettings.enabled) {
-    return;
-  }
-
+  // Preview should always be audible in settings, even when global sounds are disabled.
   playDecodedAudio(soundId, "tap");
 }
 
@@ -186,6 +183,10 @@ export function primeConfiguredSounds(soundIds: string[]) {
 }
 
 function playSynthSound(sound: UiSound) {
+  void playSynthSoundAsync(sound);
+}
+
+async function playSynthSoundAsync(sound: UiSound) {
   const context = getAudioContext();
   const masterGain = masterGainNode;
   if (!context || !masterGain) {
@@ -193,9 +194,7 @@ function playSynthSound(sound: UiSound) {
   }
 
   try {
-    if (context.state === "suspended") {
-      void context.resume();
-    }
+    await ensureAudioContextRunning(context);
 
     const now = context.currentTime + 0.002;
     const activeLibrary = SOUND_LIBRARY_BY_SET[uiSoundSettings.soundSet] || SOUND_LIBRARY_BY_SET.voyager;
@@ -291,9 +290,7 @@ async function playSingleDecodedAudio(soundId: string, fallback?: UiSound) {
     return false;
   }
 
-  if (context.state === "suspended") {
-    void context.resume();
-  }
+  await ensureAudioContextRunning(context);
 
   try {
     const buffer = await loadDecodedAudio(soundId);
@@ -373,4 +370,16 @@ function normalizeUiSoundSettings(settings?: UiSoundSettings): UiSoundSettings {
 function toMasterGain(volume: number) {
   const normalizedVolume = Math.max(0, Math.min(100, volume));
   return (normalizedVolume / 100) * 0.32;
+}
+
+async function ensureAudioContextRunning(context: AudioContext) {
+  if (context.state !== "suspended") {
+    return;
+  }
+
+  try {
+    await context.resume();
+  } catch {
+    // Keep silent if browser still blocks audio.
+  }
 }
