@@ -912,7 +912,7 @@ function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv") {
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
   const sources =
     streamType === "mjpeg"
-      ? [...proxySources, ...(includeDirect ? [targetUrl] : [])]
+      ? [...(includeDirect ? [targetUrl] : []), ...proxySources]
       : [...proxySources, ...(includeDirect ? [targetUrl] : [])];
   return Array.from(new Set(sources.filter(Boolean)));
 }
