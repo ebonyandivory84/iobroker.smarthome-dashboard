@@ -46,7 +46,7 @@ export function CameraWidget({
   const [fullscreenFlvSourceIndex, setFullscreenFlvSourceIndex] = useState(0);
   const [previewMjpegLoaded, setPreviewMjpegLoaded] = useState(false);
   const [fullscreenMjpegLoaded, setFullscreenMjpegLoaded] = useState(false);
-  const lastReportedAspectRatioRef = useRef<number | null>(null);
+  const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
   const lastTriggerMatchRef = useRef(false);
   const activeLayerRef = useRef<0 | 1>(0);
   const latestRequestedUrlRef = useRef<string | null>(null);
@@ -165,10 +165,6 @@ export function CameraWidget({
     const timer = setInterval(() => setTick((current) => current + 1), activeRefreshMs);
     return () => clearInterval(timer);
   }, [activeRefreshMs, activeSnapshotBaseUrl]);
-
-  useEffect(() => {
-    lastReportedAspectRatioRef.current = null;
-  }, [previewFeedKey, fullscreenFeedKey]);
 
   useEffect(() => {
     if (fullscreenOpen || previewFeed?.kind !== "mjpeg") {
@@ -309,7 +305,7 @@ export function CameraWidget({
   }, [config, fullscreenOpen, maximizeStateValue]);
 
   const reportAspectRatio = useCallback((width: number, height: number) => {
-    if (!onAspectRatioDetected || !width || !height) {
+    if (!onAspectRatioDetected || hasReportedAspectRatio.current || !width || !height) {
       return;
     }
 
@@ -318,14 +314,14 @@ export function CameraWidget({
       return;
     }
 
-    const previous = lastReportedAspectRatioRef.current;
-    if (previous !== null && Math.abs(previous - ratio) < 0.02) {
+    if (config.snapshotAspectRatio) {
+      hasReportedAspectRatio.current = true;
       return;
     }
 
-    lastReportedAspectRatioRef.current = ratio;
+    hasReportedAspectRatio.current = true;
     onAspectRatioDetected(ratio);
-  }, [onAspectRatioDetected]);
+  }, [config.snapshotAspectRatio, onAspectRatioDetected]);
 
   const reportAspectRatioValue = useCallback((ratio: number) => {
     if (!Number.isFinite(ratio) || ratio <= 0) {
