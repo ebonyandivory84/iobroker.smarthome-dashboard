@@ -77,7 +77,10 @@ export function WidgetFrame({
       const dx = event.clientX - current.startX;
       const dy = event.clientY - current.startY;
       const xSteps = snap(dx / (cellWidth + gap));
-      const ySteps = snap(dy / (rowHeight + gap));
+      const ySteps = snapWithStep(
+        dy / (rowHeight + gap),
+        current.mode === "resize" && widget.type === "camera" ? 0.1 : GRID_SNAP
+      );
 
       if (current.mode === "drag") {
         onCommitPosition(widget.id, constrainToPrimarySections({
@@ -203,6 +206,7 @@ export function WidgetFrame({
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 const snap = (value: number) => Math.round(value / GRID_SNAP) * GRID_SNAP;
+const snapWithStep = (value: number, step: number) => Math.round(value / step) * step;
 
 const styles = StyleSheet.create({
   shell: {

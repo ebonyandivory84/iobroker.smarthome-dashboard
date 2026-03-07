@@ -604,7 +604,10 @@ function WebWidgetShell({
       }
 
       const dx = snapUnits((event.clientX - active.startX) / stepX);
-      const dy = snapUnits((event.clientY - active.startY) / stepY);
+      const dy = snapUnits(
+        (event.clientY - active.startY) / stepY,
+        active.mode === "resize" && widget.type === "camera" ? CAMERA_GRID_SNAP : GRID_SNAP
+      );
 
       if (!allowManualLayout) {
         return;
@@ -677,7 +680,7 @@ function WebWidgetShell({
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleUp);
     };
-  }, [config.grid.columns, isLayoutMode, onDragAcrossPageEdge, onUpdateWidget, preview, sourceColumns, stepX, stepY, widget.id]);
+  }, [allowManualLayout, config.grid.columns, isLayoutMode, onDragAcrossPageEdge, onUpdateWidget, preview, sourceColumns, stepX, stepY, widget.id, widget.type]);
 
   const begin =
     (mode: "drag" | "resize") =>
@@ -935,8 +938,8 @@ function mergeWidgetInteractionSounds(
   } as WidgetConfig;
 }
 
-function snapUnits(value: number) {
-  return Math.round(value / GRID_SNAP) * GRID_SNAP;
+function snapUnits(value: number, step: number = GRID_SNAP) {
+  return Math.round(value / step) * step;
 }
 
 const webCanvasStyle: CSSProperties = {
