@@ -357,8 +357,18 @@ function buildCameraRequestConfig(rawUrl) {
   const headers = {};
 
   const authFromUserInfo = parsed.username || parsed.password;
-  const queryUser = parsed.searchParams.get("user") || parsed.searchParams.get("username") || "";
-  const queryPassword = parsed.searchParams.get("password") || parsed.searchParams.get("pass") || "";
+  const queryUser =
+    parsed.searchParams.get("user") ||
+    parsed.searchParams.get("username") ||
+    parsed.searchParams.get("User") ||
+    parsed.searchParams.get("Username") ||
+    "";
+  const queryPassword =
+    parsed.searchParams.get("password") ||
+    parsed.searchParams.get("pass") ||
+    parsed.searchParams.get("Password") ||
+    parsed.searchParams.get("Pass") ||
+    "";
 
   if (authFromUserInfo || queryUser || queryPassword) {
     const username = decodeURIComponent(parsed.username || queryUser || "");
@@ -441,6 +451,9 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects) {
         upstreamResponse.resume();
         const redirectedUrl = new URL(location, requestConfig.url).toString();
         const redirectedConfig = buildCameraRequestConfig(redirectedUrl);
+        if (!redirectedConfig.headers.Authorization && requestConfig.headers.Authorization) {
+          redirectedConfig.headers.Authorization = requestConfig.headers.Authorization;
+        }
         proxyCameraStream(redirectedConfig, req, res, streamType, redirects + 1);
         return;
       }

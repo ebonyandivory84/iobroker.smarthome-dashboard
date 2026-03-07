@@ -898,11 +898,16 @@ function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv"
   try {
     const parsed = new URL(targetUrl);
     const hasEmbeddedCredentials = Boolean(parsed.username || parsed.password);
+    const hasQueryCredentials =
+      Boolean(parsed.searchParams.get("user")) ||
+      Boolean(parsed.searchParams.get("username")) ||
+      Boolean(parsed.searchParams.get("password")) ||
+      Boolean(parsed.searchParams.get("pass"));
     const mixedContentBlocked = window.location.protocol === "https:" && parsed.protocol === "http:";
 
-    // Browser subresource requests are unreliable with embedded credentials and mixed-content URLs.
+    // Browser subresource requests are unreliable with URL credentials and mixed-content URLs.
     // Prefer same-origin adapter proxy in these cases.
-    if (hasEmbeddedCredentials || mixedContentBlocked) {
+    if (hasEmbeddedCredentials || hasQueryCredentials || mixedContentBlocked) {
       return false;
     }
   } catch {
