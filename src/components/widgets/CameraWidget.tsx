@@ -43,7 +43,7 @@ export function CameraWidget({
   const [fullscreenMjpegSourceIndex, setFullscreenMjpegSourceIndex] = useState(0);
   const [previewMjpegLoaded, setPreviewMjpegLoaded] = useState(false);
   const [fullscreenMjpegLoaded, setFullscreenMjpegLoaded] = useState(false);
-  const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
+  const hasReportedAspectRatio = useRef(false);
   const lastTriggerMatchRef = useRef(false);
   const activeLayerRef = useRef<0 | 1>(0);
   const latestRequestedUrlRef = useRef<string | null>(null);
@@ -174,6 +174,10 @@ export function CameraWidget({
   }, [previewMjpegSources, previewFeed?.kind, previewFeed?.url]);
 
   useEffect(() => {
+    hasReportedAspectRatio.current = false;
+  }, [previewFeed?.kind, previewFeed?.url]);
+
+  useEffect(() => {
     setFullscreenMjpegSourceIndex(0);
     setFullscreenMjpegLoaded(false);
   }, [fullscreenMjpegSources, fullscreenFeed?.kind, fullscreenFeed?.url]);
@@ -291,9 +295,14 @@ export function CameraWidget({
       return;
     }
 
+    if (config.snapshotAspectRatio && Math.abs(config.snapshotAspectRatio - ratio) < 0.02) {
+      hasReportedAspectRatio.current = true;
+      return;
+    }
+
     hasReportedAspectRatio.current = true;
     onAspectRatioDetected(ratio);
-  }, [onAspectRatioDetected]);
+  }, [config.snapshotAspectRatio, onAspectRatioDetected]);
 
   const snapshotUrl = useMemo(() => {
     if (!activeSnapshotBaseUrl) {
@@ -486,15 +495,29 @@ export function CameraWidget({
                       }
                       setPreviewStreamDebug((current) => current || "MJPEG Preview: Bild konnte nicht geladen werden.");
                     },
-                    onLoad: () => {
+                    onLoad: (event: Event) => {
                       setPreviewMjpegLoaded(true);
                       setPreviewStreamDebug(null);
+                      reportAspectRatio(
+                        (event.currentTarget as HTMLImageElement | null)?.naturalWidth || 0,
+                        (event.currentTarget as HTMLImageElement | null)?.naturalHeight || 0
+                      );
                     },
                     src: currentPreviewMjpegSrc || previewFeed.url,
                     style: webMjpegStyle,
                   })
                 : (
-                    <Image resizeMode="contain" source={{ uri: previewFeed.url }} style={styles.mjpegImage} />
+                    <Image
+                      onLoad={(event) => {
+                        const source = event.nativeEvent.source;
+                        if (source?.width && source?.height) {
+                          reportAspectRatio(source.width, source.height);
+                        }
+                      }}
+                      resizeMode="contain"
+                      source={{ uri: previewFeed.url }}
+                      style={styles.mjpegImage}
+                    />
                   )
               : null}
             {!fullscreenOpen && previewFeed.kind === "mjpeg" && previewStreamDebug ? (
@@ -631,14 +654,28 @@ export function CameraWidget({
                         setFullscreenMjpegSourceIndex((current) => current + 1);
                       }
                     },
-                    onLoad: () => {
+                    onLoad: (event: Event) => {
                       setFullscreenMjpegLoaded(true);
+                      reportAspectRatio(
+                        (event.currentTarget as HTMLImageElement | null)?.naturalWidth || 0,
+                        (event.currentTarget as HTMLImageElement | null)?.naturalHeight || 0
+                      );
                     },
                     src: currentFullscreenMjpegSrc || fullscreenFeed.url,
                     style: fullscreenWebMjpegStyle,
                   })
                 : (
-                    <Image resizeMode="contain" source={{ uri: fullscreenFeed.url }} style={styles.fullscreenMjpegImage} />
+                    <Image
+                      onLoad={(event) => {
+                        const source = event.nativeEvent.source;
+                        if (source?.width && source?.height) {
+                          reportAspectRatio(source.width, source.height);
+                        }
+                      }}
+                      resizeMode="contain"
+                      source={{ uri: fullscreenFeed.url }}
+                      style={styles.fullscreenMjpegImage}
+                    />
                   )
               : null}
             {fullscreenFeed?.kind === "flv" && fullscreenFeed.url
