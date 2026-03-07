@@ -341,6 +341,9 @@ function getAutoLayoutSpec(
       case "state":
         return { w: 1, h: 1 };
       case "camera": {
+        if (widget.manualHeightOverride) {
+          return { w: 1, h: Math.max(0.5, roundCameraGridUnit(fallbackHeight)) };
+        }
         const ratio = normalizeAspectRatio(widget.snapshotAspectRatio);
         return { w: 1, h: Math.max(0.5, roundCameraGridUnit(1 / ratio)) };
       }
@@ -368,6 +371,9 @@ function getAutoLayoutSpec(
     case "state":
       return { w: 1, h: 1 };
     case "camera": {
+      if (widget.manualHeightOverride) {
+        return { w: mainColumnWidth, h: Math.max(0.5, roundCameraGridUnit(fallbackHeight)) };
+      }
       const ratio = normalizeAspectRatio(widget.snapshotAspectRatio);
       return { w: mainColumnWidth, h: Math.max(0.5, roundCameraGridUnit(mainColumnWidth / ratio)) };
     }
