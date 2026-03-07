@@ -365,6 +365,15 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       const fullscreenMjpegUrl = normalizeOptionalInput(draft.fullscreenMjpegUrl);
       const flvUrl = normalizeOptionalInput(draft.flvUrl);
       const fullscreenFlvUrl = normalizeOptionalInput(draft.fullscreenFlvUrl);
+      const cameraSourceChanged =
+        normalizeCameraSourceMode(widget.previewSourceMode) !== previewSourceMode ||
+        normalizeCameraSourceMode(widget.fullscreenSourceMode) !== fullscreenSourceMode ||
+        normalizeOptionalInput(widget.snapshotUrl) !== snapshotUrl ||
+        normalizeOptionalInput(widget.fullscreenSnapshotUrl) !== fullscreenSnapshotUrl ||
+        normalizeOptionalInput(widget.mjpegUrl) !== mjpegUrl ||
+        normalizeOptionalInput(widget.fullscreenMjpegUrl) !== fullscreenMjpegUrl ||
+        normalizeOptionalInput(widget.flvUrl) !== flvUrl ||
+        normalizeOptionalInput(widget.fullscreenFlvUrl) !== fullscreenFlvUrl;
       onSave(widget.id, {
         title: draft.title,
         showTitle: draft.showTitle !== "false",
@@ -382,6 +391,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           widget.fullscreenRefreshMs || widget.refreshMs || 1000,
           100
         ),
+        snapshotAspectRatio: cameraSourceChanged ? undefined : widget.snapshotAspectRatio,
         maximizeStateId: draft.maximizeStateId || undefined,
         maximizeTriggerFormat: normalizeStateFormat(draft.maximizeTriggerFormat),
         maximizeTriggerValue: draft.maximizeTriggerValue || undefined,

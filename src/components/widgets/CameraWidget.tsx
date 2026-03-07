@@ -43,7 +43,7 @@ export function CameraWidget({
   const [fullscreenMjpegSourceIndex, setFullscreenMjpegSourceIndex] = useState(0);
   const [previewMjpegLoaded, setPreviewMjpegLoaded] = useState(false);
   const [fullscreenMjpegLoaded, setFullscreenMjpegLoaded] = useState(false);
-  const hasReportedAspectRatio = useRef(false);
+  const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
   const lastTriggerMatchRef = useRef(false);
   const activeLayerRef = useRef<0 | 1>(0);
   const latestRequestedUrlRef = useRef<string | null>(null);
@@ -176,10 +176,6 @@ export function CameraWidget({
   }, [previewMjpegSources, previewFeed?.kind, previewFeed?.url]);
 
   useEffect(() => {
-    hasReportedAspectRatio.current = false;
-  }, [previewFeed?.kind, previewFeed?.url]);
-
-  useEffect(() => {
     // Force a clean preview re-init when source mode/url changes so updates apply instantly.
     loadingJobRef.current = null;
     latestRequestedUrlRef.current = null;
@@ -307,7 +303,7 @@ export function CameraWidget({
       return;
     }
 
-    if (config.snapshotAspectRatio && Math.abs(config.snapshotAspectRatio - ratio) < 0.02) {
+    if (config.snapshotAspectRatio) {
       hasReportedAspectRatio.current = true;
       return;
     }

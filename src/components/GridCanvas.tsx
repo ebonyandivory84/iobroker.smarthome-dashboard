@@ -796,12 +796,11 @@ function renderWidget(
         onFullscreenSwipeClose={onCameraFullscreenSwipeClose}
         onFullscreenVisibilityChange={(open) => onCameraFullscreenVisibilityChange?.(effectiveWidget.id, open)}
         onAspectRatioDetected={(ratio) => {
-          if (!Number.isFinite(ratio) || ratio <= 0) {
+          if (effectiveWidget.snapshotAspectRatio) {
             return;
           }
 
-          const currentRatio = effectiveWidget.snapshotAspectRatio;
-          if (currentRatio && Math.abs(currentRatio - ratio) < 0.02) {
+          if (!Number.isFinite(ratio) || ratio <= 0) {
             return;
           }
 
