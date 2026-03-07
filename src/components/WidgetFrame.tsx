@@ -39,7 +39,7 @@ export function WidgetFrame({
   children,
 }: WidgetFrameProps) {
   const { config } = useDashboardConfig();
-  const showHeaderTitle = widget.type !== "camera" && widget.showTitle !== false && Boolean(widget.title.trim());
+  const showHeaderTitle = widget.showTitle !== false && Boolean(widget.title.trim());
   const interaction = useRef<{
     mode: "drag" | "resize";
     startX: number;
@@ -129,7 +129,7 @@ export function WidgetFrame({
     <View
       style={[
         styles.shell,
-        widget.type === "state" || widget.type === "camera" ? styles.shellTransparent : null,
+        widget.type === "state" ? styles.shellTransparent : null,
         interactionMode === "drag"
           ? {
               transform: [{ translateX: dragOffset.x }, { translateY: dragOffset.y }],
@@ -170,7 +170,6 @@ export function WidgetFrame({
       <View
         style={[
           styles.content,
-          widget.type !== "camera" &&
           widget.type !== "solar" &&
           widget.type !== "state" &&
           widget.type !== "grafana"

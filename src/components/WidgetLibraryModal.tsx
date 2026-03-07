@@ -23,12 +23,6 @@ const OPTIONS: Array<{
     icon: "toggle-switch-outline",
   },
   {
-    type: "camera",
-    title: "Kamera",
-    description: "Snapshot-URL pollen und optional RTSP-Link einbinden.",
-    icon: "cctv",
-  },
-  {
     type: "energy",
     title: "Energiefluss",
     description: "Kompakter Energiefluss fuer PV, Haus, Batterie und Netz.",
