@@ -18,6 +18,7 @@ let objectEntriesCache = [];
 let objectEntriesCacheTimestamp = 0;
 let objectEntriesPromise = null;
 let insecureHttpsDispatcher = null;
+let runningAdapter = null;
 const OBJECT_CACHE_TTL_MS = 5 * 60 * 1000;
 const CONFIG_STATE_ID = "dashboardConfig";
 const SAVED_DASHBOARDS_STATE_ID = "savedDashboards";
@@ -35,6 +36,7 @@ function startAdapter(options) {
 }
 
 async function main(adapter) {
+  runningAdapter = adapter;
   const app = express();
   app.use(express.json());
   const webRoot = resolveWebRoot(adapter);
@@ -431,6 +433,7 @@ function buildCameraFetchOptions(targetUrl) {
 
 function proxyCameraStream(requestConfig, req, res, streamType, redirects) {
   const sanitizedUrl = sanitizeCameraUrlForLog(requestConfig.url);
+  const log = runningAdapter?.log;
   let parsed;
   try {
     parsed = new URL(requestConfig.url);
@@ -470,7 +473,7 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects) {
         [301, 302, 303, 307, 308].includes(statusCode) &&
         redirects < 5
       ) {
-        adapter.log.debug(
+        log?.debug(
           `[camera-proxy] redirect streamType=${streamType || "unknown"} status=${statusCode} from=${sanitizedUrl} to=${sanitizeCameraUrlForLog(
             new URL(location, requestConfig.url).toString()
           )}`
@@ -486,7 +489,7 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects) {
       }
 
       if (statusCode >= 400) {
-        adapter.log.warn(
+        log?.warn(
           `[camera-proxy] upstream error streamType=${streamType || "unknown"} status=${statusCode} contentType=${String(
             upstreamContentType
           )} url=${sanitizedUrl}`
@@ -503,7 +506,7 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects) {
         return;
       }
 
-      adapter.log.debug(
+      log?.debug(
         `[camera-proxy] stream ok streamType=${streamType || "unknown"} status=${statusCode} contentType=${String(
           upstreamContentType
         )} url=${sanitizedUrl}`
@@ -543,7 +546,7 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects) {
   res.on("close", closeUpstream);
 
   upstreamRequest.on("error", (error) => {
-    adapter.log.warn(
+    log?.warn(
       `[camera-proxy] request failed streamType=${streamType || "unknown"} url=${sanitizedUrl}: ${
         error instanceof Error ? error.message : String(error)
       }`
