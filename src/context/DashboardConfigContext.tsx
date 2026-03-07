@@ -1,4 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   PropsWithChildren,
   createContext,
@@ -33,7 +32,6 @@ type DashboardConfigContextValue = {
   deleteNamedDashboard: (name: string) => Promise<{ ok: boolean; error?: string }>;
 };
 
-const STORAGE_KEY = "smarthome-dashboard-config";
 const LEGACY_DEMO_BASE_URL = "http://127.0.0.1:8087";
 const REMOTE_CONFIG_ENDPOINT = "/smarthome-dashboard/api/config";
 const SAVED_DASHBOARDS_ENDPOINT = "/smarthome-dashboard/api/dashboards";
@@ -175,7 +173,6 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
           }
           setConfig(parsed);
           setRawJson(JSON.stringify(parsed, null, 2));
-          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(parsed, null, 2));
           return;
         } catch (error) {
           console.warn("Remote config parse failed", error);
@@ -183,16 +180,13 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
       }
 
       try {
-        const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        const fallbackJson = stored || JSON.stringify(defaultConfig, null, 2);
-        const parsed = migrateConfig(JSON.parse(fallbackJson) as DashboardSettings);
+        const parsed = migrateConfig(defaultConfig);
         const nextJson = JSON.stringify(parsed, null, 2);
         if (!active) {
           return;
         }
         setConfig(parsed);
         setRawJson(nextJson);
-        await AsyncStorage.setItem(STORAGE_KEY, nextJson);
         await writeRemoteConfig(nextJson);
       } catch (error) {
         console.warn("Config load failed", error);
@@ -211,11 +205,6 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
     setConfig(normalizedConfig);
     const json = JSON.stringify(normalizedConfig, null, 2);
     setRawJson(json);
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, json);
-    } catch (error) {
-      console.warn("Config save failed", error);
-    }
     try {
       await writeRemoteConfig(json);
     } catch (error) {
