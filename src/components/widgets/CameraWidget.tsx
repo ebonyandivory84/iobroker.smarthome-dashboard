@@ -39,6 +39,8 @@ export function CameraWidget({
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [previewStreamDebug, setPreviewStreamDebug] = useState<string | null>(null);
+  const [previewMjpegSourceIndex, setPreviewMjpegSourceIndex] = useState(0);
+  const [fullscreenMjpegSourceIndex, setFullscreenMjpegSourceIndex] = useState(0);
   const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
   const lastTriggerMatchRef = useRef(false);
   const activeLayerRef = useRef<0 | 1>(0);
@@ -91,6 +93,17 @@ export function CameraWidget({
     previewFeed?.kind === "flv" ? getWebStreamProxyUrl(previewFeed.url, "flv") || previewFeed.url : null;
   const fullscreenFlvRenderUrl =
     fullscreenFeed?.kind === "flv" ? getWebStreamProxyUrl(fullscreenFeed.url, "flv") || fullscreenFeed.url : null;
+  const previewMjpegSources = useMemo(
+    () => [previewMjpegRenderUrl, previewFeed?.kind === "mjpeg" ? previewFeed.url : null].filter(Boolean) as string[],
+    [previewFeed, previewMjpegRenderUrl]
+  );
+  const fullscreenMjpegSources = useMemo(
+    () => [fullscreenMjpegRenderUrl, fullscreenFeed?.kind === "mjpeg" ? fullscreenFeed.url : null].filter(Boolean) as string[],
+    [fullscreenFeed, fullscreenMjpegRenderUrl]
+  );
+  const currentPreviewMjpegSrc = previewMjpegSources[Math.min(previewMjpegSourceIndex, Math.max(0, previewMjpegSources.length - 1))] || null;
+  const currentFullscreenMjpegSrc =
+    fullscreenMjpegSources[Math.min(fullscreenMjpegSourceIndex, Math.max(0, fullscreenMjpegSources.length - 1))] || null;
   const activeRefreshMs = fullscreenOpen
     ? Math.max(180, config.fullscreenRefreshMs || config.refreshMs || 2000)
     : Math.max(100, config.refreshMs || 2000);
@@ -136,6 +149,14 @@ export function CameraWidget({
       setPreviewStreamDebug(null);
     }
   }, [fullscreenOpen, previewFeed?.kind]);
+
+  useEffect(() => {
+    setPreviewMjpegSourceIndex(0);
+  }, [previewMjpegRenderUrl, previewFeed?.kind, previewFeed?.url]);
+
+  useEffect(() => {
+    setFullscreenMjpegSourceIndex(0);
+  }, [fullscreenMjpegRenderUrl, fullscreenFeed?.kind, fullscreenFeed?.url]);
 
   useEffect(() => {
     fullscreenVisibilityCallbackRef.current = onFullscreenVisibilityChange;
@@ -389,12 +410,17 @@ export function CameraWidget({
                     draggable: false,
                     loading: "eager",
                     onError: () => {
+                      if (previewMjpegSourceIndex + 1 < previewMjpegSources.length) {
+                        setPreviewMjpegSourceIndex((current) => current + 1);
+                        setPreviewStreamDebug("MJPEG Preview: Proxy fehlgeschlagen, versuche Direkt-URL...");
+                        return;
+                      }
                       setPreviewStreamDebug((current) => current || "MJPEG Preview: Bild konnte nicht geladen werden.");
                     },
                     onLoad: () => {
                       setPreviewStreamDebug(null);
                     },
-                    src: previewMjpegRenderUrl || previewFeed.url,
+                    src: currentPreviewMjpegSrc || previewFeed.url,
                     style: webMjpegStyle,
                   })
                 : (
@@ -529,7 +555,12 @@ export function CameraWidget({
                     decoding: "sync",
                     draggable: false,
                     loading: "eager",
-                    src: fullscreenMjpegRenderUrl || fullscreenFeed.url,
+                    onError: () => {
+                      if (fullscreenMjpegSourceIndex + 1 < fullscreenMjpegSources.length) {
+                        setFullscreenMjpegSourceIndex((current) => current + 1);
+                      }
+                    },
+                    src: currentFullscreenMjpegSrc || fullscreenFeed.url,
                     style: fullscreenWebMjpegStyle,
                   })
                 : (
