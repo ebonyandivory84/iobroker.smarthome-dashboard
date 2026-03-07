@@ -316,6 +316,13 @@ export function CameraWidget({
     onAspectRatioDetected(ratio);
   }, [config.snapshotAspectRatio, onAspectRatioDetected]);
 
+  const reportAspectRatioValue = useCallback((ratio: number) => {
+    if (!Number.isFinite(ratio) || ratio <= 0) {
+      return;
+    }
+    reportAspectRatio(ratio, 1);
+  }, [reportAspectRatio]);
+
   const snapshotUrl = useMemo(() => {
     if (!activeSnapshotBaseUrl) {
       return null;
@@ -543,6 +550,7 @@ export function CameraWidget({
                 ? (
                     <WebFlvPlayer
                       key={`preview-flv-${previewFeedKey}`}
+                      onAspectRatioDetected={reportAspectRatioValue}
                       title={config.title || "Camera FLV"}
                       url={previewFlvRenderUrl || previewFeed.url}
                     />
@@ -702,6 +710,7 @@ export function CameraWidget({
                     <WebFlvPlayer
                       key={`fullscreen-flv-${fullscreenFeedKey}`}
                       fullScreen
+                      onAspectRatioDetected={reportAspectRatioValue}
                       title={config.title || "Camera FLV fullscreen"}
                       url={fullscreenFlvRenderUrl || fullscreenFeed.url}
                     />
@@ -894,13 +903,16 @@ function WebFlvPlayer({
   url,
   title,
   fullScreen = false,
+  onAspectRatioDetected,
 }: {
   url: string;
   title: string;
   fullScreen?: boolean;
+  onAspectRatioDetected?: (ratio: number) => void;
 }) {
   const videoRef = useRef<any>(null);
   const playerRef = useRef<any>(null);
+  const ratioReportedRef = useRef(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [interactionRequired, setInteractionRequired] = useState(false);
 
@@ -920,6 +932,7 @@ function WebFlvPlayer({
         return;
       }
 
+      ratioReportedRef.current = false;
       const loaded = await ensureFlvJsLoaded();
       if (disposed || !loaded) {
         setErrorMessage("FLV Player konnte nicht geladen werden.");
@@ -956,6 +969,22 @@ function WebFlvPlayer({
       }
 
       player.attachMediaElement(videoElement);
+      videoElement.onloadedmetadata = () => {
+        if (ratioReportedRef.current || !onAspectRatioDetected) {
+          return;
+        }
+        const width = Number(videoElement.videoWidth || 0);
+        const height = Number(videoElement.videoHeight || 0);
+        if (!width || !height) {
+          return;
+        }
+        const ratio = width / height;
+        if (!Number.isFinite(ratio) || ratio <= 0) {
+          return;
+        }
+        ratioReportedRef.current = true;
+        onAspectRatioDetected(ratio);
+      };
       player.load();
       void videoElement.play().catch(() => {
         setInteractionRequired(true);
@@ -978,12 +1007,13 @@ function WebFlvPlayer({
         }
       }
       if (videoElement) {
+        videoElement.onloadedmetadata = null;
         videoElement.removeAttribute("src");
         videoElement.load();
       }
       playerRef.current = null;
     };
-  }, [url]);
+  }, [onAspectRatioDetected, url]);
 
   const resumePlayback = useCallback(() => {
     const videoElement = videoRef.current;
