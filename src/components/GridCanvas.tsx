@@ -826,6 +826,9 @@ function renderWidget(
         onFullscreenSwipeClose={onCameraFullscreenSwipeClose}
         onFullscreenVisibilityChange={(open) => onCameraFullscreenVisibilityChange?.(effectiveWidget.id, open)}
         onAspectRatioDetected={(ratio) => {
+          if (effectiveWidget.manualHeightOverride) {
+            return;
+          }
           if (!Number.isFinite(ratio) || ratio <= 0) {
             return;
           }

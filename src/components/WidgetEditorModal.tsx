@@ -394,6 +394,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           widget.fullscreenRefreshMs || widget.refreshMs || 1000,
           100
         ),
+        manualHeightOverride: cameraSourceChanged ? false : widget.manualHeightOverride,
         snapshotAspectRatio: cameraSourceChanged ? undefined : widget.snapshotAspectRatio,
         maximizeStateId: draft.maximizeStateId || undefined,
         maximizeTriggerFormat: normalizeStateFormat(draft.maximizeTriggerFormat),

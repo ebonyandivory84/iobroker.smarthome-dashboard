@@ -175,6 +175,7 @@ export function DashboardScreen() {
       updateWidget(widgetId, {
         ...partial,
         position: constrainToPrimarySections(partial.position, config.grid.columns, cameraConstraint),
+        ...(currentWidget.type === "camera" ? { manualHeightOverride: true } : null),
       });
       return;
     }

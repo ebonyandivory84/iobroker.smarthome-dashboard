@@ -74,6 +74,7 @@ export type StateWidgetConfig = WidgetBase & {
 export type CameraWidgetConfig = WidgetBase & {
   type: "camera";
   titleFontSize?: number;
+  manualHeightOverride?: boolean;
   previewSourceMode?: "snapshot" | "mjpeg" | "flv";
   fullscreenSourceMode?: "snapshot" | "mjpeg" | "flv";
   snapshotUrl?: string;
