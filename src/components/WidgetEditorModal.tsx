@@ -109,6 +109,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       setDraft({
         title: widget.title,
         showTitle: widget.showTitle === false ? "false" : "true",
+        titleFontSize: String(widget.titleFontSize || 14),
         previewSourceMode: widget.previewSourceMode || "snapshot",
         fullscreenSourceMode: widget.fullscreenSourceMode || "snapshot",
         snapshotUrl: widget.snapshotUrl || "",
@@ -378,6 +379,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       onSave(widget.id, {
         title: draft.title,
         showTitle: draft.showTitle !== "false",
+        titleFontSize: clampInt(draft.titleFontSize, widget.titleFontSize || 14, 11),
         previewSourceMode,
         fullscreenSourceMode,
         snapshotUrl,
@@ -845,6 +847,19 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
             ) : null}
             {widget.type === "camera" ? (
               <>
+                <Field label="Titelgroesse (px)">
+                  <TextInput
+                    keyboardType="numeric"
+                    onChangeText={(value) => setDraft((current) => ({ ...current, titleFontSize: value }))}
+                    style={styles.input}
+                    value={draft.titleFontSize || "14"}
+                  />
+                </Field>
+                <ColorField
+                  label="Titelfarbe Overlay"
+                  value={draft.textColor || ""}
+                  onChange={(value) => setDraft((current) => ({ ...current, textColor: value }))}
+                />
                 <Field label="Quelle Miniaturansicht">
                   <ChoiceRow
                     options={["snapshot", "mjpeg", "flv"]}

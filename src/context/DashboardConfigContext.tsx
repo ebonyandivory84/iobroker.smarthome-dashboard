@@ -6,7 +6,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { DashboardPage, DashboardSettings, UiSoundSettings, WidgetConfig } from "../types/dashboard";
+import { CameraWidgetConfig, DashboardPage, DashboardSettings, UiSoundSettings, WidgetConfig } from "../types/dashboard";
 import { defaultConfig } from "../utils/defaultConfig";
 import { normalizeSoundSelection } from "../utils/lcarsSounds";
 
@@ -46,13 +46,97 @@ function migrateConfig(input: DashboardSettings): DashboardSettings {
       ...input.iobroker,
       baseUrl: input.iobroker.baseUrl === LEGACY_DEMO_BASE_URL ? "" : input.iobroker.baseUrl,
     },
-    widgets: input.widgets.map((widget) => ({
-      ...widget,
-      interactionSounds: normalizeWidgetInteractionSounds(widget.interactionSounds),
-    })),
+    widgets: input.widgets.map((widget) => {
+      const normalizedInteractionSounds = normalizeWidgetInteractionSounds(widget.interactionSounds);
+
+      if (widget.type !== "camera") {
+        return {
+          ...widget,
+          interactionSounds: normalizedInteractionSounds,
+        };
+      }
+
+      const legacySnapshot =
+        widget.snapshotUrl &&
+        (widget.snapshotUrl === `${LEGACY_DEMO_BASE_URL}/cam/einfahrt.jpg` ||
+          widget.snapshotUrl === `${LEGACY_DEMO_BASE_URL}/cam/snapshot.jpg`);
+      const legacyCamera = widget as CameraWidgetConfig & {
+        useSnapshotInPreview?: boolean;
+        useSnapshotInFullscreen?: boolean;
+        useMjpegInPreview?: boolean;
+        useMjpegInFullscreen?: boolean;
+        rtspUrl?: string;
+      };
+
+      const snapshotUrl = legacySnapshot ? "" : widget.snapshotUrl;
+      const previewSnapshotUrl = (snapshotUrl || "").trim() || null;
+      const previewMjpegUrl = (widget.mjpegUrl || "").trim() || null;
+      const previewFlvUrl = (widget.flvUrl || "").trim() || null;
+      const fullscreenSnapshotUrl = (widget.fullscreenSnapshotUrl || snapshotUrl || "").trim() || null;
+      const fullscreenMjpegUrl = (widget.fullscreenMjpegUrl || widget.mjpegUrl || "").trim() || null;
+      const fullscreenFlvUrl = (widget.fullscreenFlvUrl || widget.flvUrl || "").trim() || null;
+
+      const previewSourceMode =
+        widget.previewSourceMode ||
+        inferCameraSourceMode(
+          previewSnapshotUrl,
+          previewMjpegUrl,
+          previewFlvUrl,
+          legacyCamera.useMjpegInPreview === true,
+          "snapshot"
+        );
+      const fullscreenSourceMode =
+        widget.fullscreenSourceMode ||
+        inferCameraSourceMode(
+          fullscreenSnapshotUrl,
+          fullscreenMjpegUrl,
+          fullscreenFlvUrl,
+          legacyCamera.useMjpegInFullscreen === true,
+          previewSourceMode
+        );
+
+      return {
+        ...widget,
+        snapshotUrl,
+        previewSourceMode,
+        fullscreenSourceMode,
+        interactionSounds: normalizedInteractionSounds,
+      };
+    }),
   };
 
   return normalizeDashboardPages(nextConfig);
+}
+
+function inferCameraSourceMode(
+  snapshotUrl: string | null,
+  mjpegUrl: string | null,
+  flvUrl: string | null,
+  legacyPreferMjpeg: boolean,
+  fallback: "snapshot" | "mjpeg" | "flv"
+) {
+  if (legacyPreferMjpeg && mjpegUrl) {
+    return "mjpeg";
+  }
+  if (flvUrl && !snapshotUrl && !mjpegUrl) {
+    return "flv";
+  }
+  if (snapshotUrl && !mjpegUrl) {
+    return "snapshot";
+  }
+  if (mjpegUrl && !snapshotUrl && !flvUrl) {
+    return "mjpeg";
+  }
+  if (snapshotUrl) {
+    return "snapshot";
+  }
+  if (mjpegUrl) {
+    return "mjpeg";
+  }
+  if (flvUrl) {
+    return "flv";
+  }
+  return fallback;
 }
 
 export function DashboardConfigProvider({ children }: PropsWithChildren) {
@@ -87,12 +171,8 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
           if (!active) {
             return;
           }
-          const nextJson = JSON.stringify(parsed, null, 2);
           setConfig(parsed);
-          setRawJson(nextJson);
-          if (nextJson !== remoteJson) {
-            await writeRemoteConfig(nextJson);
-          }
+          setRawJson(JSON.stringify(parsed, null, 2));
           return;
         } catch (error) {
           console.warn("Remote config parse failed", error);
@@ -513,7 +593,7 @@ function normalizeWidgetConfigList(input: DashboardSettings["widgets"] | undefin
 
   const usedIds = new Set<string>();
 
-  return input.filter((widget) => widget.type !== "camera").map((widget, index) => {
+  return input.map((widget, index) => {
     const baseId = (widget.id || `${widget.type}-${index + 1}`).trim();
     let nextId = baseId || `${widget.type}-${index + 1}`;
     let suffix = 2;

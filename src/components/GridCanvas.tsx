@@ -9,6 +9,7 @@ import { playConfiguredUiSound } from "../utils/uiSounds";
 import { resolveThemeSettings } from "../utils/themeConfig";
 import { palette } from "../utils/theme";
 import { WidgetFrame } from "./WidgetFrame";
+import { CameraWidget } from "./widgets/CameraWidget";
 import { EnergyWidget } from "./widgets/EnergyWidget";
 import { GrafanaWidget } from "./widgets/GrafanaWidget";
 import { LinkWidget } from "./widgets/LinkWidget";
@@ -118,7 +119,7 @@ export function GridCanvas({
       />
     ) : (
       <View style={[styles.canvas, { height: canvasHeight }]}>
-        {displayConfig.widgets.filter((widget) => widget.type !== "camera").map((widget) => {
+        {displayConfig.widgets.map((widget) => {
           const style = {
             left: displayOffset(widget.position.x, cellWidth, displayConfig.grid.gap, mainColumnExtraGap),
             top: widget.position.y * (renderRowHeight + displayConfig.grid.gap),
@@ -339,6 +340,10 @@ function getAutoLayoutSpec(
     switch (widget.type) {
       case "state":
         return { w: 1, h: 1 };
+      case "camera": {
+        const ratio = normalizeAspectRatio(widget.snapshotAspectRatio);
+        return { w: 1, h: Math.max(0.6, roundGridUnit(1 / ratio)) };
+      }
       case "solar":
         return { w: 1, h: roundGridUnit(3.8) };
       case "grafana":
@@ -362,6 +367,10 @@ function getAutoLayoutSpec(
   switch (widget.type) {
     case "state":
       return { w: 1, h: 1 };
+    case "camera": {
+      const ratio = normalizeAspectRatio(widget.snapshotAspectRatio);
+      return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(mainColumnWidth / ratio)) };
+    }
     case "solar":
       return { w: mainColumnWidth, h: roundGridUnit(options?.isTabletLikeWeb ? 5.5 : 3.2) };
     case "grafana":
@@ -377,6 +386,13 @@ function getAutoLayoutSpec(
   }
 
   return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
+}
+
+function normalizeAspectRatio(value?: number) {
+  if (!value || !Number.isFinite(value) || value <= 0) {
+    return 16 / 9;
+  }
+  return value;
 }
 
 function roundGridUnit(value: number) {
@@ -483,7 +499,7 @@ function WebGridCanvas({
 
   return (
     <div style={{ ...webCanvasStyle, height: canvasHeight }}>
-      {config.widgets.filter((widget) => widget.type !== "camera").map((widget) => (
+      {config.widgets.map((widget) => (
         <WebWidgetShell
           key={widget.id}
           cellWidth={cellWidth}
@@ -556,7 +572,7 @@ function WebWidgetShell({
   sourceColumns: number;
 }) {
   const [preview, setPreview] = useState(widget.position);
-  const showHeaderTitle = widget.showTitle !== false && Boolean(widget.title.trim());
+  const showHeaderTitle = widget.type !== "camera" && widget.showTitle !== false && Boolean(widget.title.trim());
   const interaction = useRef<{
     mode: "drag" | "resize";
     startX: number;
@@ -662,6 +678,16 @@ function WebWidgetShell({
   const shellStyle: CSSProperties = {
     ...webWidgetStyle,
     ...getWidgetTone(widget, theme),
+    ...(widget.type === "camera"
+      ? {
+          border: "none",
+          background: "#000000",
+          backdropFilter: "none",
+          WebkitBackdropFilter: "none",
+          contain: "layout paint style",
+          isolation: "isolate",
+        }
+      : null),
     ...(widget.type === "grafana"
       ? {
           border: "none",
@@ -682,7 +708,8 @@ function WebWidgetShell({
 
   const contentStyle = [
     styles.webContent,
-    widget.type === "grafana" ? styles.webContentBleed : null,
+    widget.type === "camera" || widget.type === "grafana" ? styles.webContentBleed : null,
+    widget.type !== "camera" &&
     widget.type !== "solar" &&
     widget.type !== "state" &&
     widget.type !== "numpad" &&
@@ -765,6 +792,28 @@ function renderWidget(
             resolveStateNextValue(effectiveWidget, states[effectiveWidget.stateId])
           )
         }
+      />
+    );
+  }
+
+  if (effectiveWidget.type === "camera") {
+    return (
+      <CameraWidget
+        config={effectiveWidget}
+        maximizeStateValue={effectiveWidget.maximizeStateId ? states[effectiveWidget.maximizeStateId] : undefined}
+        onFullscreenSwipeClose={onCameraFullscreenSwipeClose}
+        onFullscreenVisibilityChange={(open) => onCameraFullscreenVisibilityChange?.(effectiveWidget.id, open)}
+        onAspectRatioDetected={(ratio) => {
+          if (effectiveWidget.snapshotAspectRatio) {
+            return;
+          }
+
+          if (!Number.isFinite(ratio) || ratio <= 0) {
+            return;
+          }
+
+          onUpdateWidget(effectiveWidget.id, { snapshotAspectRatio: ratio });
+        }}
       />
     );
   }
@@ -1001,6 +1050,12 @@ function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThe
     return {
       background: `linear-gradient(180deg, ${theme.widgetTones.energyStart}, ${theme.widgetTones.energyEnd})`,
       border: "1px solid rgba(90, 150, 255, 0.16)",
+    };
+  }
+  if (type === "camera") {
+    return {
+      background: `linear-gradient(180deg, ${theme.widgetTones.cameraStart}, ${theme.widgetTones.cameraEnd})`,
+      border: "1px solid rgba(255,255,255,0.06)",
     };
   }
   if (type === "solar") {

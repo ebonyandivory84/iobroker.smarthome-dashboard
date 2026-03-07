@@ -76,14 +76,7 @@ async function main(adapter) {
     try {
       const state = await adapter.getStateAsync(CONFIG_STATE_ID);
       const configJson = typeof state?.val === "string" ? state.val : "";
-      const sanitizedConfigJson = sanitizeDashboardConfigJson(configJson);
-      if (sanitizedConfigJson !== configJson) {
-        await adapter.setStateAsync(CONFIG_STATE_ID, {
-          val: sanitizedConfigJson,
-          ack: true,
-        });
-      }
-      res.json({ configJson: sanitizedConfigJson });
+      res.json({ configJson });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Config read failed" });
     }
@@ -104,9 +97,8 @@ async function main(adapter) {
     }
 
     try {
-      const sanitizedConfigJson = sanitizeDashboardConfigJson(configJson);
       await adapter.setStateAsync(CONFIG_STATE_ID, {
-        val: sanitizedConfigJson,
+        val: configJson,
         ack: true,
       });
       res.json({ ok: true });
@@ -139,12 +131,7 @@ async function main(adapter) {
         return;
       }
 
-      const sanitizedConfigJson = sanitizeDashboardConfigJson(configJson);
-      if (sanitizedConfigJson !== configJson) {
-        dashboards[name] = sanitizedConfigJson;
-        await writeSavedDashboards(adapter, dashboards);
-      }
-      res.json({ configJson: sanitizedConfigJson });
+      res.json({ configJson });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Saved dashboard read failed" });
     }
@@ -173,7 +160,7 @@ async function main(adapter) {
 
     try {
       const dashboards = await readSavedDashboards(adapter);
-      dashboards[name] = sanitizeDashboardConfigJson(configJson);
+      dashboards[name] = configJson;
       await writeSavedDashboards(adapter, dashboards);
       res.json({ ok: true });
     } catch (error) {
@@ -363,46 +350,6 @@ async function main(adapter) {
 
 function normalizeDashboardName(value) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function sanitizeDashboardConfigJson(configJson) {
-  if (typeof configJson !== "string" || !configJson.trim()) {
-    return configJson || "";
-  }
-
-  try {
-    const parsed = JSON.parse(configJson);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return configJson;
-    }
-
-    const sanitized = stripCameraWidgetsFromConfig(parsed);
-    return JSON.stringify(sanitized, null, 2);
-  } catch {
-    return configJson;
-  }
-}
-
-function stripCameraWidgetsFromConfig(config) {
-  const sanitizeList = (widgets) =>
-    Array.isArray(widgets) ? widgets.filter((widget) => widget && widget.type !== "camera") : [];
-
-  const nextPages = Array.isArray(config.pages)
-    ? config.pages.map((page) => ({
-        ...page,
-        widgets: sanitizeList(page?.widgets),
-      }))
-    : [];
-
-  const activePageId = typeof config.activePageId === "string" ? config.activePageId : "";
-  const activePage = nextPages.find((page) => page && page.id === activePageId) || nextPages[0] || null;
-
-  return {
-    ...config,
-    pages: nextPages,
-    widgets: activePage ? sanitizeList(activePage.widgets) : sanitizeList(config.widgets),
-    ...(activePage ? { activePageId: activePage.id, title: activePage.title || config.title } : null),
-  };
 }
 
 function buildCameraRequestConfig(rawUrl) {

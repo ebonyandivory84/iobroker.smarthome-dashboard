@@ -110,6 +110,10 @@ export function DashboardScreen() {
     const configuredSoundIds = [
       ...(config.uiSounds?.widgetTypeDefaults?.state?.press || []),
       ...(config.uiSounds?.widgetTypeDefaults?.state?.confirm || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.camera?.press || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.camera?.open || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.camera?.close || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.camera?.scroll || []),
       ...(config.uiSounds?.widgetTypeDefaults?.grafana?.press || []),
       ...(config.uiSounds?.widgetTypeDefaults?.numpad?.press || []),
       ...(config.uiSounds?.widgetTypeDefaults?.numpad?.confirm || []),

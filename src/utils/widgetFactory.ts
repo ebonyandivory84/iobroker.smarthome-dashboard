@@ -9,16 +9,14 @@ export function buildWidgetTemplate(
   count: number,
   grid: GridSettings
 ): WidgetConfig {
-  if (type === "camera") {
-    throw new Error("Camera widgets are disabled.");
-  }
-
   const suffix = count + 1;
   const basePosition = {
     x: 0,
     y: count + 2,
     w:
-      type === "solar"
+      type === "camera"
+        ? 6
+        : type === "solar"
           ? 8
           : type === "grafana"
             ? 6
@@ -28,7 +26,9 @@ export function buildWidgetTemplate(
                   ? 6
                 : 3,
     h:
-      type === "solar"
+      type === "camera"
+        ? 4
+        : type === "solar"
           ? 4
           : type === "energy"
             ? 3
@@ -57,6 +57,28 @@ export function buildWidgetTemplate(
         inactive: "toggle-switch-off-outline",
       },
       position: basePosition,
+    };
+  }
+
+  if (type === "camera") {
+    return {
+      id: `camera-${suffix}`,
+      type: "camera",
+      title: `Kamera ${suffix}`,
+      titleFontSize: 14,
+      previewSourceMode: "snapshot",
+      fullscreenSourceMode: "snapshot",
+      snapshotUrl: "",
+      fullscreenSnapshotUrl: "",
+      mjpegUrl: "",
+      fullscreenMjpegUrl: "",
+      flvUrl: "",
+      fullscreenFlvUrl: "",
+      refreshMs: 2000,
+      position: {
+        ...basePosition,
+        w: Math.min(6, grid.columns),
+      },
     };
   }
 
