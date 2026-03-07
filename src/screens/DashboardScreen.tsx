@@ -145,6 +145,15 @@ export function DashboardScreen() {
 
   const addWidgetByType = (type: WidgetType) => {
     const widget = buildWidgetTemplate(type, config.widgets.length, { columns: config.grid.columns });
+    const existingIds = new Set(config.widgets.map((entry) => entry.id));
+    if (existingIds.has(widget.id)) {
+      const base = widget.id;
+      let counter = 2;
+      while (existingIds.has(`${base}-${counter}`)) {
+        counter += 1;
+      }
+      widget.id = `${base}-${counter}`;
+    }
     const constrainedPosition = constrainToPrimarySections(widget.position, config.grid.columns);
     const nextWidgets = normalizeWidgetLayout([
       ...config.widgets,
