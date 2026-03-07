@@ -3,6 +3,7 @@ const express = require("express");
 const { createProxyMiddleware } = require("http-proxy-middleware");
 const fs = require("fs");
 const path = require("path");
+const { Readable } = require("stream");
 const { resolveWebRoot } = require("./lib/static");
 
 let objectEntriesCache = [];
@@ -259,6 +260,49 @@ async function main(adapter) {
       res.send(buffer);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Snapshot proxy failed" });
+    }
+  });
+
+  app.get("/smarthome-dashboard/api/camera-mjpeg", async (req, res) => {
+    const targetUrl = typeof req.query?.url === "string" ? req.query.url : "";
+    if (!targetUrl) {
+      res.status(400).json({ error: "url missing" });
+      return;
+    }
+
+    const controller = new AbortController();
+    req.on("close", () => controller.abort());
+
+    try {
+      const response = await fetch(targetUrl, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+
+      if (!response.ok || !response.body) {
+        res.status(response.status || 502).json({ error: `MJPEG fetch failed (${response.status || 502})` });
+        return;
+      }
+
+      const contentType = response.headers.get("content-type") || "multipart/x-mixed-replace";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Connection", "keep-alive");
+
+      const stream = Readable.fromWeb(response.body);
+      stream.on("error", () => {
+        if (!res.headersSent) {
+          res.status(500).end();
+          return;
+        }
+        res.end();
+      });
+      stream.pipe(res);
+    } catch (error) {
+      if (controller.signal.aborted) {
+        return;
+      }
+      res.status(500).json({ error: error instanceof Error ? error.message : "MJPEG proxy failed" });
     }
   });
 

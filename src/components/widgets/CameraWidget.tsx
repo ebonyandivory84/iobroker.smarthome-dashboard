@@ -64,6 +64,10 @@ export function CameraWidget({
   });
   const activeFeed = fullscreenOpen ? fullscreenFeed : previewFeed;
   const activeSnapshotBaseUrl = activeFeed?.kind === "snapshot" ? activeFeed.url : null;
+  const previewMjpegRenderUrl =
+    previewFeed?.kind === "mjpeg" ? getWebMjpegProxyUrl(previewFeed.url) || previewFeed.url : null;
+  const fullscreenMjpegRenderUrl =
+    fullscreenFeed?.kind === "mjpeg" ? getWebMjpegProxyUrl(fullscreenFeed.url) || fullscreenFeed.url : null;
   const activeRefreshMs = fullscreenOpen
     ? Math.max(180, config.fullscreenRefreshMs || config.refreshMs || 2000)
     : Math.max(100, config.refreshMs || 2000);
@@ -355,7 +359,7 @@ export function CameraWidget({
                     decoding: "sync",
                     draggable: false,
                     loading: "eager",
-                    src: previewFeed.url,
+                    src: previewMjpegRenderUrl || previewFeed.url,
                     style: webMjpegStyle,
                   })
                 : (
@@ -474,7 +478,7 @@ export function CameraWidget({
                     decoding: "sync",
                     draggable: false,
                     loading: "eager",
-                    src: fullscreenFeed.url,
+                    src: fullscreenMjpegRenderUrl || fullscreenFeed.url,
                     style: fullscreenWebMjpegStyle,
                   })
                 : (
@@ -596,6 +600,17 @@ function resolveSourceMode(
   }
 
   return fallback;
+}
+
+function getWebMjpegProxyUrl(targetUrl: string) {
+  if (Platform.OS !== "web" || typeof window === "undefined") {
+    return null;
+  }
+  if (!window.location.pathname.includes("/smarthome-dashboard")) {
+    return null;
+  }
+  const proxyBase = `${window.location.origin}/smarthome-dashboard/api/camera-mjpeg`;
+  return `${proxyBase}?url=${encodeURIComponent(targetUrl)}`;
 }
 
 const styles = StyleSheet.create({
