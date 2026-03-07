@@ -97,28 +97,28 @@ export function CameraWidget({
       previewFeed?.kind === "mjpeg"
         ? buildWebStreamSources(previewFeed.url, "mjpeg")
         : [],
-    [previewFeed]
+    [previewFeed?.kind, previewFeed?.url]
   );
   const fullscreenMjpegSources = useMemo(
     () =>
       fullscreenFeed?.kind === "mjpeg"
         ? buildWebStreamSources(fullscreenFeed.url, "mjpeg")
         : [],
-    [fullscreenFeed]
+    [fullscreenFeed?.kind, fullscreenFeed?.url]
   );
   const previewFlvSources = useMemo(
     () =>
       previewFeed?.kind === "flv"
         ? buildWebStreamSources(previewFeed.url, "flv")
         : [],
-    [previewFeed]
+    [previewFeed?.kind, previewFeed?.url]
   );
   const fullscreenFlvSources = useMemo(
     () =>
       fullscreenFeed?.kind === "flv"
         ? buildWebStreamSources(fullscreenFeed.url, "flv")
         : [],
-    [fullscreenFeed]
+    [fullscreenFeed?.kind, fullscreenFeed?.url]
   );
   const previewFeedKey = `${previewFeed?.kind || "none"}:${previewFeed?.url || ""}`;
   const fullscreenFeedKey = `${fullscreenFeed?.kind || "none"}:${fullscreenFeed?.url || ""}`;
