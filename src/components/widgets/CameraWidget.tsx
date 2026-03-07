@@ -581,7 +581,7 @@ export function CameraWidget({
               ? Platform.OS === "web"
                 ? (
                     <WebFlvPlayer
-                      key={`preview-flv-${previewFeedKey}:${currentPreviewFlvSrc || previewFeed.url}`}
+                      key={`preview-flv-${previewFeedKey}`}
                       onAspectRatioDetected={reportAspectRatioValue}
                       onSourceIndexChange={setPreviewFlvSourceIndex}
                       preferredSourceIndex={previewFlvSourceIndex}
@@ -749,7 +749,7 @@ export function CameraWidget({
               ? Platform.OS === "web"
                 ? (
                     <WebFlvPlayer
-                      key={`fullscreen-flv-${fullscreenFeedKey}:${currentFullscreenFlvSrc || fullscreenFeed.url}`}
+                      key={`fullscreen-flv-${fullscreenFeedKey}`}
                       fullScreen
                       onAspectRatioDetected={reportAspectRatioValue}
                       onSourceIndexChange={setFullscreenFlvSourceIndex}
@@ -982,6 +982,9 @@ function WebFlvPlayer({
   onSourceIndexChange?: (index: number) => void;
 }) {
   const videoRef = useRef<any>(null);
+  const setVideoRef = useCallback((element: any) => {
+    videoRef.current = element;
+  }, []);
   const playerRef = useRef<any>(null);
   const ratioReportedRef = useRef(false);
   const aspectRatioCallbackRef = useRef(onAspectRatioDetected);
@@ -1168,9 +1171,7 @@ function WebFlvPlayer({
         controls: false,
         muted: true,
         playsInline: true,
-        ref: (element: any) => {
-          videoRef.current = element;
-        },
+        ref: setVideoRef,
         style: fullScreen ? fullscreenWebFlvStyle : webFlvStyle,
         title,
       })}
@@ -1284,10 +1285,19 @@ const styles = StyleSheet.create({
     left: 14,
     top: 14,
     maxWidth: "72%",
+    zIndex: 12,
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 7,
     backgroundColor: "rgba(4, 8, 14, 0.44)",
+    pointerEvents: "none",
+    ...(Platform.OS === "web"
+      ? {
+          transform: "translateZ(0)" as const,
+          willChange: "transform" as const,
+          backfaceVisibility: "hidden" as const,
+        }
+      : null),
   },
   titleBadgeLabel: {
     color: palette.text,
