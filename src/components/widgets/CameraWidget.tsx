@@ -1724,7 +1724,7 @@ const webMjpegStyle = {
   top: 0,
   width: "100%",
   height: "100%",
-  objectFit: "contain",
+  objectFit: "scale-down",
   objectPosition: "center center",
   display: "block",
   backgroundColor: "#000000",
