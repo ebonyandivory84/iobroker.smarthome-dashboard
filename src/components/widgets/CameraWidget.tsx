@@ -600,7 +600,7 @@ export function CameraWidget({
                           reportAspectRatio(source.width, source.height);
                         }
                       }}
-                      resizeMode="cover"
+                      resizeMode="contain"
                       source={{ uri: previewFeed.url }}
                       style={styles.mjpegImage}
                     />
@@ -1721,7 +1721,7 @@ const baseFullscreenWebLayerStyle = {
 const webMjpegStyle = {
   width: "100%",
   height: "100%",
-  objectFit: "cover",
+  objectFit: "contain",
   display: "block",
   backgroundColor: "#000000",
 } as const;
