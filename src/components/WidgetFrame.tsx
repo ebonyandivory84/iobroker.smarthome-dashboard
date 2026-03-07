@@ -3,8 +3,10 @@ import type { CSSProperties } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { WidgetConfig } from "../types/dashboard";
 import { constrainToPrimarySections, GRID_SNAP } from "../utils/gridLayout";
+import { playConfiguredUiSound } from "../utils/uiSounds";
 import { palette } from "../utils/theme";
 
 type WidgetFrameProps = {
@@ -36,6 +38,7 @@ export function WidgetFrame({
   onRemove,
   children,
 }: WidgetFrameProps) {
+  const { config } = useDashboardConfig();
   const showHeaderTitle = widget.type !== "camera" && widget.showTitle !== false && Boolean(widget.title.trim());
   const interaction = useRef<{
     mode: "drag" | "resize";
@@ -126,7 +129,7 @@ export function WidgetFrame({
     <View
       style={[
         styles.shell,
-        widget.type === "state" ? styles.shellTransparent : null,
+        widget.type === "state" || widget.type === "camera" ? styles.shellTransparent : null,
         interactionMode === "drag"
           ? {
               transform: [{ translateX: dragOffset.x }, { translateY: dragOffset.y }],
@@ -142,7 +145,13 @@ export function WidgetFrame({
       ) : null}
       {isLayoutMode ? (
         <View style={styles.headerActions}>
-          <Pressable onPress={() => onEdit(widget.id)} style={styles.iconButton}>
+          <Pressable
+            onPress={() => {
+              playConfiguredUiSound(config.uiSounds?.pageSounds?.widgetEdit, "panel", `widget-edit:${widget.id}`);
+              onEdit(widget.id);
+            }}
+            style={styles.iconButton}
+          >
             <MaterialCommunityIcons color={palette.text} name="dots-horizontal" size={18} />
           </Pressable>
           <Pressable onPress={() => onRemove(widget.id)} style={styles.iconButton}>
