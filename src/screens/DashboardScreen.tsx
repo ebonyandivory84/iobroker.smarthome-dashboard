@@ -171,9 +171,10 @@ export function DashboardScreen() {
       return;
     }
     if (partial.position) {
+      const cameraConstraint = currentWidget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : undefined;
       updateWidget(widgetId, {
         ...partial,
-        position: constrainToPrimarySections(partial.position, config.grid.columns),
+        position: constrainToPrimarySections(partial.position, config.grid.columns, cameraConstraint),
       });
       return;
     }

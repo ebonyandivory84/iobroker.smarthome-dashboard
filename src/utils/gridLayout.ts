@@ -3,6 +3,11 @@ import { GridPosition, WidgetConfig } from "../types/dashboard";
 export const GRID_SNAP = 0.5;
 export const PRIMARY_SECTION_COUNT = 3;
 
+type SectionConstraintOptions = {
+  minHeight?: number;
+  heightSnap?: number;
+};
+
 export function resolveWidgetPosition(
   widgets: WidgetConfig[],
   widgetId: string,
@@ -32,14 +37,20 @@ export function normalizeWidgetLayout(widgets: WidgetConfig[], columns: number):
   return placed;
 }
 
-export function constrainToPrimarySections(position: GridPosition, columns: number): GridPosition {
+export function constrainToPrimarySections(
+  position: GridPosition,
+  columns: number,
+  options?: SectionConstraintOptions
+): GridPosition {
   const sectionWidth = getPrimarySectionWidth(columns);
   const subColumnWidth = sectionWidth / PRIMARY_SECTION_COUNT;
   const maxWidth = sectionWidth;
   const minWidth = Math.min(maxWidth, subColumnWidth);
   const snappedWidth = snapToSubColumns(position.w, subColumnWidth, 1);
   const w = clamp(snappedWidth, minWidth, maxWidth);
-  const h = Math.max(1, snap(position.h));
+  const minHeight = options?.minHeight ?? 1;
+  const heightSnap = options?.heightSnap ?? GRID_SNAP;
+  const h = Math.max(minHeight, snapWithStep(position.h, heightSnap));
   const y = Math.max(0, snap(position.y));
   const tentativeX = Math.max(0, position.x);
   const center = tentativeX + w / 2;
@@ -105,6 +116,11 @@ function clamp(value: number, min: number, max: number) {
 
 function snap(value: number) {
   return Math.round(value / GRID_SNAP) * GRID_SNAP;
+}
+
+function snapWithStep(value: number, step: number) {
+  const safeStep = Number.isFinite(step) && step > 0 ? step : GRID_SNAP;
+  return Math.round(value / safeStep) * safeStep;
 }
 
 function snapToSubColumns(value: number, subColumnWidth: number, minSteps: number) {

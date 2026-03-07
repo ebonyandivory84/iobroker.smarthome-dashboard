@@ -84,13 +84,13 @@ export function WidgetFrame({
           ...widget.position,
           x: clamp(current.startPosition.x + xSteps, 0, columns - current.startPosition.w),
           y: Math.max(0, current.startPosition.y + ySteps),
-        }, columns));
+        }, columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : undefined));
       } else {
         onCommitPosition(widget.id, constrainToPrimarySections({
           ...widget.position,
           w: clamp(current.startPosition.w + xSteps, 1, columns),
-          h: Math.max(1, current.startPosition.h + ySteps),
-        }, columns));
+          h: Math.max(widget.type === "camera" ? 0.5 : 1, current.startPosition.h + ySteps),
+        }, columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : undefined));
       }
 
       interaction.current = null;

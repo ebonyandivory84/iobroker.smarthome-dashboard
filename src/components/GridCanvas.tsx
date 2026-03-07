@@ -615,7 +615,7 @@ function WebWidgetShell({
           ...active.startPosition,
           x: clamp(active.startPosition.x + dx, 0, config.grid.columns - active.startPosition.w),
           y: Math.max(0, active.startPosition.y + dy),
-        }, config.grid.columns);
+        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : undefined);
         setPreview(nextPreview);
 
         if (isLayoutMode && onDragAcrossPageEdge) {
@@ -643,8 +643,8 @@ function WebWidgetShell({
           setPreview(constrainToPrimarySections({
             ...active.startPosition,
             w: active.startPosition.w,
-            h: Math.max(1, active.startPosition.h + dy),
-          }, config.grid.columns));
+            h: Math.max(0.5, active.startPosition.h + dy),
+          }, config.grid.columns, { minHeight: 0.5, heightSnap: 0.1 }));
         } else {
           setPreview(constrainToPrimarySections({
             ...active.startPosition,
