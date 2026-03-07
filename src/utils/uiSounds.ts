@@ -26,6 +26,8 @@ const DEFAULT_UI_SOUND_SETTINGS: UiSoundSettings = {
     layoutToggle: [],
     addWidget: [],
     openSettings: [],
+    widgetEdit: [],
+    editorButton: [],
   },
 };
 
@@ -362,6 +364,8 @@ function normalizeUiSoundSettings(settings?: UiSoundSettings): UiSoundSettings {
       layoutToggle: normalizeSoundSelection(settings?.pageSounds?.layoutToggle),
       addWidget: normalizeSoundSelection(settings?.pageSounds?.addWidget),
       openSettings: normalizeSoundSelection(settings?.pageSounds?.openSettings),
+      widgetEdit: normalizeSoundSelection(settings?.pageSounds?.widgetEdit),
+      editorButton: normalizeSoundSelection(settings?.pageSounds?.editorButton),
     },
   };
 }
