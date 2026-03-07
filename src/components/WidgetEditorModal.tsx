@@ -40,9 +40,10 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     const inactive = (draft.iconInactive || widget?.iconPair?.inactive || "toggle-switch-off-outline") as keyof typeof MaterialCommunityIcons.glyphMap;
     return { active, inactive };
   }, [draft.iconActive, draft.iconInactive, widget?.iconPair?.active, widget?.iconPair?.inactive]);
+  const editorTargetKey = visible && widget ? `${widget.type}:${widget.id}` : null;
 
   useEffect(() => {
-    if (!widget || !visible) {
+    if (!widget || !editorTargetKey) {
       return;
     }
 
@@ -246,7 +247,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       stat3StateId: widget.stats?.third?.stateId || "",
       ...appearanceDraft,
     });
-  }, [config.uiSounds?.widgetTypeDefaults, visible, widget]);
+  }, [editorTargetKey]);
 
   useEffect(() => {
     if (!visible || widget?.type !== "weather") {

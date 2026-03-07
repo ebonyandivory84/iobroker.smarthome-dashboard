@@ -23,6 +23,7 @@ const MAX_FULLSCREEN_DURATION_MS = 30_000;
 const LAYER_FADE_MS = 0;
 const pinnedColor = "#f3c84a";
 const FLV_SCRIPT_SRC = "https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js";
+const FLV_SCRIPT_LOAD_TIMEOUT_MS = 8000;
 let flvLoaderPromise: Promise<boolean> | null = null;
 
 export function CameraWidget({
@@ -1149,15 +1150,31 @@ async function ensureFlvJsLoaded() {
 
   if (!flvLoaderPromise) {
     flvLoaderPromise = new Promise<boolean>((resolve) => {
+      let settled = false;
+      const settle = (value: boolean) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        resolve(value);
+      };
+      const timeout = setTimeout(() => settle(Boolean(window.flvjs)), FLV_SCRIPT_LOAD_TIMEOUT_MS);
       const existing = document.querySelector(`script[data-flvjs-src="${FLV_SCRIPT_SRC}"]`) as HTMLScriptElement | null;
       if (existing) {
         const readyState = (existing as HTMLScriptElement & { readyState?: string }).readyState;
         if (readyState === "loaded" || readyState === "complete") {
-          resolve(Boolean(window.flvjs));
+          clearTimeout(timeout);
+          settle(Boolean(window.flvjs));
           return;
         }
-        existing.addEventListener("load", () => resolve(Boolean(window.flvjs)), { once: true });
-        existing.addEventListener("error", () => resolve(false), { once: true });
+        existing.addEventListener("load", () => {
+          clearTimeout(timeout);
+          settle(Boolean(window.flvjs));
+        }, { once: true });
+        existing.addEventListener("error", () => {
+          clearTimeout(timeout);
+          settle(false);
+        }, { once: true });
         return;
       }
 
@@ -1165,8 +1182,14 @@ async function ensureFlvJsLoaded() {
       script.src = FLV_SCRIPT_SRC;
       script.async = true;
       script.dataset.flvjsSrc = FLV_SCRIPT_SRC;
-      script.onload = () => resolve(Boolean(window.flvjs));
-      script.onerror = () => resolve(false);
+      script.onload = () => {
+        clearTimeout(timeout);
+        settle(Boolean(window.flvjs));
+      };
+      script.onerror = () => {
+        clearTimeout(timeout);
+        settle(false);
+      };
       document.head.appendChild(script);
     });
   }
