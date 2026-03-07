@@ -20,13 +20,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@iobroker/adapter-core": "^3.2.3",
     "@expo/metro-runtime": "~5.0.5",
     "@expo/vector-icons": "~14.1.0",
+    "@iobroker/adapter-core": "^3.2.3",
     "@react-native-async-storage/async-storage": "1.23.1",
-    "express": "^4.21.2",
     "expo": "~53.0.0",
     "expo-status-bar": "~2.2.3",
+    "express": "^4.21.2",
+    "flv.js": "^1.6.2",
     "http-proxy-middleware": "^3.0.3",
     "react": "19.0.0",
     "react-dom": "19.0.0",

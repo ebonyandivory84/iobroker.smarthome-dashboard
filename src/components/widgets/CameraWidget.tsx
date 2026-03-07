@@ -688,12 +688,14 @@ function WebFlvPlayer({
   fullScreen?: boolean;
 }) {
   const videoRef = useRef<any>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") {
       return;
     }
 
+    setErrorMessage(null);
     let disposed = false;
     let player: any = null;
     const videoElement = videoRef.current;
@@ -704,7 +706,13 @@ function WebFlvPlayer({
       }
 
       const loaded = await ensureFlvJsLoaded();
-      if (disposed || !loaded || !window.flvjs?.isSupported?.()) {
+      if (disposed || !loaded) {
+        setErrorMessage("FLV Player konnte nicht geladen werden.");
+        return;
+      }
+
+      if (!window.flvjs?.isSupported?.()) {
+        setErrorMessage("FLV wird von diesem Browser nicht unterstuetzt.");
         return;
       }
 
@@ -720,12 +728,22 @@ function WebFlvPlayer({
         }
       );
 
+      if (window.flvjs?.Events?.ERROR) {
+        player.on(window.flvjs.Events.ERROR, () => {
+          setErrorMessage("FLV Stream konnte nicht gestartet werden.");
+        });
+      }
+
       player.attachMediaElement(videoElement);
       player.load();
-      void videoElement.play().catch(() => undefined);
+      void videoElement.play().catch(() => {
+        setErrorMessage("Autoplay fuer FLV blockiert.");
+      });
     };
 
-    attach().catch(() => undefined);
+    attach().catch(() => {
+      setErrorMessage("FLV Stream konnte nicht initialisiert werden.");
+    });
 
     return () => {
       disposed = true;
@@ -745,17 +763,26 @@ function WebFlvPlayer({
     };
   }, [url]);
 
-  return createElement("video", {
-    autoPlay: true,
-    controls: false,
-    muted: true,
-    playsInline: true,
-    ref: (element: any) => {
-      videoRef.current = element;
-    },
-    style: fullScreen ? fullscreenWebFlvStyle : webFlvStyle,
-    title,
-  });
+  return (
+    <>
+      {createElement("video", {
+        autoPlay: true,
+        controls: false,
+        muted: true,
+        playsInline: true,
+        ref: (element: any) => {
+          videoRef.current = element;
+        },
+        style: fullScreen ? fullscreenWebFlvStyle : webFlvStyle,
+        title,
+      })}
+      {errorMessage ? (
+        <View style={styles.flvErrorOverlay}>
+          <Text style={styles.flvErrorText}>{errorMessage}</Text>
+        </View>
+      ) : null}
+    </>
+  );
 }
 
 async function ensureFlvJsLoaded() {
@@ -765,6 +792,17 @@ async function ensureFlvJsLoaded() {
 
   if (window.flvjs) {
     return true;
+  }
+
+  try {
+    const imported = await import("flv.js");
+    const maybeFlv = (imported as { default?: any }).default || imported;
+    if (maybeFlv) {
+      window.flvjs = maybeFlv;
+      return true;
+    }
+  } catch {
+    // fallback to CDN loader below
   }
 
   if (!flvLoaderPromise) {
@@ -912,6 +950,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
     backgroundColor: "rgba(4, 8, 14, 0.44)",
+  },
+  flvErrorOverlay: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 12,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: "rgba(160, 22, 40, 0.75)",
+  },
+  flvErrorText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "700",
   },
 });
 

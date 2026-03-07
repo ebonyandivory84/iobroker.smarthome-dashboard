@@ -281,7 +281,7 @@ async function main(adapter) {
     }
 
     const controller = new AbortController();
-    req.on("close", () => controller.abort());
+    res.on("close", () => controller.abort());
 
     try {
       const requestConfig = buildCameraRequestConfig(targetUrl);
