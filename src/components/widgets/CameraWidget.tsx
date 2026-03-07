@@ -914,7 +914,6 @@ function WebFlvPlayer({
   const playerRef = useRef<any>(null);
   const ratioReportedRef = useRef(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [interactionRequired, setInteractionRequired] = useState(false);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") {
@@ -922,7 +921,6 @@ function WebFlvPlayer({
     }
 
     setErrorMessage(null);
-    setInteractionRequired(false);
     let disposed = false;
     let player: any = null;
     const videoElement = videoRef.current;
@@ -987,7 +985,7 @@ function WebFlvPlayer({
       };
       player.load();
       void videoElement.play().catch(() => {
-        setInteractionRequired(true);
+        // Ignore autoplay rejections to avoid overlay flicker.
       });
     };
 
@@ -1015,28 +1013,6 @@ function WebFlvPlayer({
     };
   }, [onAspectRatioDetected, url]);
 
-  const resumePlayback = useCallback(() => {
-    const videoElement = videoRef.current;
-    if (!videoElement) {
-      return;
-    }
-
-    try {
-      if (playerRef.current?.play) {
-        playerRef.current.play();
-      }
-    } catch {
-      // ignore and fallback to HTMLVideoElement play
-    }
-
-    void videoElement.play().then(() => {
-      setInteractionRequired(false);
-      setErrorMessage(null);
-    }).catch(() => {
-      setErrorMessage("Wiedergabe konnte nicht gestartet werden.");
-    });
-  }, []);
-
   return (
     <>
       {createElement("video", {
@@ -1054,11 +1030,6 @@ function WebFlvPlayer({
         <View style={styles.flvErrorOverlay}>
           <Text style={styles.flvErrorText}>{errorMessage}</Text>
         </View>
-      ) : null}
-      {interactionRequired ? (
-        <Pressable onPress={resumePlayback} style={styles.flvTapOverlay}>
-          <Text style={styles.flvTapText}>Tippen zum Starten</Text>
-        </Pressable>
       ) : null}
     </>
   );
