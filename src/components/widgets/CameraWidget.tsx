@@ -1500,7 +1500,7 @@ const webFlvStyle = {
 const fullscreenWebFlvStyle = {
   width: "100%",
   height: "100%",
-  objectFit: "cover",
+  objectFit: "contain",
   display: "block",
   backgroundColor: "#000000",
 } as const;
