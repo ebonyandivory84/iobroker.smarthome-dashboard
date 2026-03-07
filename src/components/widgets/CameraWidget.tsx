@@ -44,8 +44,13 @@ export function CameraWidget({
   const fullscreenSnapshotBaseUrl = (config.fullscreenSnapshotUrl || config.snapshotUrl || "").trim() || null;
   const previewMjpegUrl = (config.mjpegUrl || "").trim() || null;
   const fullscreenMjpegUrl = (config.fullscreenMjpegUrl || config.mjpegUrl || "").trim() || null;
-  const previewSourceMode = config.previewSourceMode || "snapshot";
-  const fullscreenSourceMode = config.fullscreenSourceMode || "snapshot";
+  const previewSourceMode = resolveSourceMode(config.previewSourceMode, previewSnapshotBaseUrl, previewMjpegUrl);
+  const fullscreenSourceMode = resolveSourceMode(
+    config.fullscreenSourceMode,
+    fullscreenSnapshotBaseUrl,
+    fullscreenMjpegUrl,
+    previewSourceMode
+  );
 
   const previewFeed = resolveCameraFeed({
     sourceMode: previewSourceMode,
@@ -570,6 +575,27 @@ function resolveCameraFeed(input: {
   }
 
   return null;
+}
+
+function resolveSourceMode(
+  sourceMode: CameraWidgetConfig["previewSourceMode"],
+  snapshotUrl: string | null,
+  mjpegUrl: string | null,
+  fallback: "snapshot" | "mjpeg" = "snapshot"
+) {
+  if (sourceMode === "snapshot" || sourceMode === "mjpeg") {
+    return sourceMode;
+  }
+
+  if (snapshotUrl && !mjpegUrl) {
+    return "snapshot";
+  }
+
+  if (mjpegUrl && !snapshotUrl) {
+    return "mjpeg";
+  }
+
+  return fallback;
 }
 
 const styles = StyleSheet.create({

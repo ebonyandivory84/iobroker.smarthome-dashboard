@@ -70,21 +70,53 @@ function migrateConfig(input: DashboardSettings): DashboardSettings {
         rtspUrl?: string;
       };
 
-      const previewSourceMode = legacyCamera.useMjpegInPreview === true ? "mjpeg" : "snapshot";
-      const fullscreenSourceMode = legacyCamera.useMjpegInFullscreen === true ? "mjpeg" : "snapshot";
       const snapshotUrl = legacySnapshot ? "" : widget.snapshotUrl;
+      const previewSnapshotUrl = (snapshotUrl || "").trim() || null;
+      const previewMjpegUrl = (widget.mjpegUrl || "").trim() || null;
+      const fullscreenSnapshotUrl = (widget.fullscreenSnapshotUrl || snapshotUrl || "").trim() || null;
+      const fullscreenMjpegUrl = (widget.fullscreenMjpegUrl || widget.mjpegUrl || "").trim() || null;
+
+      const previewSourceMode =
+        widget.previewSourceMode ||
+        inferCameraSourceMode(previewSnapshotUrl, previewMjpegUrl, legacyCamera.useMjpegInPreview === true, "snapshot");
+      const fullscreenSourceMode =
+        widget.fullscreenSourceMode ||
+        inferCameraSourceMode(
+          fullscreenSnapshotUrl,
+          fullscreenMjpegUrl,
+          legacyCamera.useMjpegInFullscreen === true,
+          previewSourceMode
+        );
 
       return {
         ...widget,
         snapshotUrl,
-        previewSourceMode: widget.previewSourceMode || previewSourceMode,
-        fullscreenSourceMode: widget.fullscreenSourceMode || fullscreenSourceMode,
+        previewSourceMode,
+        fullscreenSourceMode,
         interactionSounds: normalizedInteractionSounds,
       };
     }),
   };
 
   return normalizeDashboardPages(nextConfig);
+}
+
+function inferCameraSourceMode(
+  snapshotUrl: string | null,
+  mjpegUrl: string | null,
+  legacyPreferMjpeg: boolean,
+  fallback: "snapshot" | "mjpeg"
+) {
+  if (legacyPreferMjpeg && mjpegUrl) {
+    return "mjpeg";
+  }
+  if (snapshotUrl && !mjpegUrl) {
+    return "snapshot";
+  }
+  if (mjpegUrl && !snapshotUrl) {
+    return "mjpeg";
+  }
+  return fallback;
 }
 
 export function DashboardConfigProvider({ children }: PropsWithChildren) {

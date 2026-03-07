@@ -865,19 +865,33 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 </Field>
                 <Field label="Refresh (ms)">
                   <TextInput
+                    editable={(draft.previewSourceMode || "snapshot") === "snapshot"}
                     keyboardType="numeric"
                     onChangeText={(value) => setDraft((current) => ({ ...current, refreshMs: value }))}
-                    style={styles.input}
+                    style={[
+                      styles.input,
+                      (draft.previewSourceMode || "snapshot") === "mjpeg" ? styles.disabledInput : null,
+                    ]}
                     value={draft.refreshMs || ""}
                   />
+                  {(draft.previewSourceMode || "snapshot") === "mjpeg" ? (
+                    <Text style={styles.mappingHint}>Bei MJPEG ist kein Snapshot-Refresh aktiv.</Text>
+                  ) : null}
                 </Field>
                 <Field label="Refresh Vollbild (ms)">
                   <TextInput
+                    editable={(draft.fullscreenSourceMode || "snapshot") === "snapshot"}
                     keyboardType="numeric"
                     onChangeText={(value) => setDraft((current) => ({ ...current, fullscreenRefreshMs: value }))}
-                    style={styles.input}
+                    style={[
+                      styles.input,
+                      (draft.fullscreenSourceMode || "snapshot") === "mjpeg" ? styles.disabledInput : null,
+                    ]}
                     value={draft.fullscreenRefreshMs || ""}
                   />
+                  {(draft.fullscreenSourceMode || "snapshot") === "mjpeg" ? (
+                    <Text style={styles.mappingHint}>Bei MJPEG ist im Vollbild kein Snapshot-Refresh aktiv.</Text>
+                  ) : null}
                 </Field>
                 <Field label="Maximieren per Datenpunkt">
                   <StateFieldInput
@@ -910,7 +924,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   />
                 </Field>
                 <Field label="Sounds bei Interaktion">
-                  <Field label="RTSP Taste">
+                  <Field label="Beim Tippen">
                     <SoundPickerField
                       onChange={(value) => setSoundDraft((current) => ({ ...current, press: value }))}
                       value={soundDraft.press}
@@ -2206,6 +2220,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(6, 12, 20, 0.9)",
     borderWidth: 1,
     borderColor: palette.border,
+  },
+  disabledInput: {
+    opacity: 0.55,
   },
   colorFieldWrap: {
     flexDirection: "row",
