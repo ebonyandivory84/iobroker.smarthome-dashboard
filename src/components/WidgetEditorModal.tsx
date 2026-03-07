@@ -108,15 +108,12 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       setDraft({
         title: widget.title,
         showTitle: widget.showTitle === false ? "false" : "true",
+        previewSourceMode: widget.previewSourceMode || "snapshot",
+        fullscreenSourceMode: widget.fullscreenSourceMode || "snapshot",
         snapshotUrl: widget.snapshotUrl || "",
         fullscreenSnapshotUrl: widget.fullscreenSnapshotUrl || "",
-        useSnapshotInPreview: widget.useSnapshotInPreview === false ? "false" : "true",
-        useSnapshotInFullscreen: widget.useSnapshotInFullscreen === false ? "false" : "true",
         mjpegUrl: widget.mjpegUrl || "",
         fullscreenMjpegUrl: widget.fullscreenMjpegUrl || "",
-        useMjpegInPreview: widget.useMjpegInPreview ? "true" : "false",
-        useMjpegInFullscreen: widget.useMjpegInFullscreen ? "true" : "false",
-        rtspUrl: widget.rtspUrl || "",
         refreshMs: String(widget.refreshMs || 2000),
         fullscreenRefreshMs: String(widget.fullscreenRefreshMs || widget.refreshMs || 1000),
         maximizeStateId: widget.maximizeStateId || "",
@@ -356,15 +353,12 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       onSave(widget.id, {
         title: draft.title,
         showTitle: draft.showTitle !== "false",
+        previewSourceMode: draft.previewSourceMode === "mjpeg" ? "mjpeg" : "snapshot",
+        fullscreenSourceMode: draft.fullscreenSourceMode === "mjpeg" ? "mjpeg" : "snapshot",
         snapshotUrl: draft.snapshotUrl || undefined,
         fullscreenSnapshotUrl: draft.fullscreenSnapshotUrl || undefined,
-        useSnapshotInPreview: draft.useSnapshotInPreview !== "false",
-        useSnapshotInFullscreen: draft.useSnapshotInFullscreen !== "false",
         mjpegUrl: draft.mjpegUrl || undefined,
         fullscreenMjpegUrl: draft.fullscreenMjpegUrl || undefined,
-        useMjpegInPreview: draft.useMjpegInPreview === "true",
-        useMjpegInFullscreen: draft.useMjpegInFullscreen === "true",
-        rtspUrl: draft.rtspUrl || undefined,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 250),
         fullscreenRefreshMs: clampInt(
           draft.fullscreenRefreshMs,
@@ -823,19 +817,26 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
             ) : null}
             {widget.type === "camera" ? (
               <>
+                <Field label="Quelle Miniaturansicht">
+                  <ChoiceRow
+                    options={["snapshot", "mjpeg"]}
+                    value={draft.previewSourceMode || "snapshot"}
+                    onSelect={(value) => setDraft((current) => ({ ...current, previewSourceMode: value }))}
+                  />
+                </Field>
+                <Field label="Quelle Vollbildansicht">
+                  <ChoiceRow
+                    options={["snapshot", "mjpeg"]}
+                    value={draft.fullscreenSourceMode || "snapshot"}
+                    onSelect={(value) => setDraft((current) => ({ ...current, fullscreenSourceMode: value }))}
+                  />
+                </Field>
                 <Field label="Snapshot URL (Miniatur)">
                   <TextInput
                     autoCapitalize="none"
                     onChangeText={(value) => setDraft((current) => ({ ...current, snapshotUrl: value }))}
                     style={styles.input}
                     value={draft.snapshotUrl || ""}
-                  />
-                </Field>
-                <Field label="Fuer Miniaturansicht verwenden">
-                  <ChoiceRow
-                    options={["true", "false"]}
-                    value={draft.useSnapshotInPreview || "true"}
-                    onSelect={(value) => setDraft((current) => ({ ...current, useSnapshotInPreview: value }))}
                   />
                 </Field>
                 <Field label="Snapshot URL (Vollbild, optional)">
@@ -846,13 +847,6 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={draft.fullscreenSnapshotUrl || ""}
                   />
                 </Field>
-                <Field label="Fuer Vollbildansicht verwenden">
-                  <ChoiceRow
-                    options={["true", "false"]}
-                    value={draft.useSnapshotInFullscreen || "true"}
-                    onSelect={(value) => setDraft((current) => ({ ...current, useSnapshotInFullscreen: value }))}
-                  />
-                </Field>
                 <Field label="MJPEG URL (Miniatur)">
                   <TextInput
                     autoCapitalize="none"
@@ -861,34 +855,12 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={draft.mjpegUrl || ""}
                   />
                 </Field>
-                <Field label="Fuer Miniaturansicht verwenden">
-                  <ChoiceRow
-                    options={["false", "true"]}
-                    value={draft.useMjpegInPreview || "false"}
-                    onSelect={(value) => setDraft((current) => ({ ...current, useMjpegInPreview: value }))}
-                  />
-                </Field>
                 <Field label="MJPEG URL (Vollbild, optional)">
                   <TextInput
                     autoCapitalize="none"
                     onChangeText={(value) => setDraft((current) => ({ ...current, fullscreenMjpegUrl: value }))}
                     style={styles.input}
                     value={draft.fullscreenMjpegUrl || ""}
-                  />
-                </Field>
-                <Field label="Fuer Vollbildansicht verwenden">
-                  <ChoiceRow
-                    options={["false", "true"]}
-                    value={draft.useMjpegInFullscreen || "false"}
-                    onSelect={(value) => setDraft((current) => ({ ...current, useMjpegInFullscreen: value }))}
-                  />
-                </Field>
-                <Field label="RTSP URL">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) => setDraft((current) => ({ ...current, rtspUrl: value }))}
-                    style={styles.input}
-                    value={draft.rtspUrl || ""}
                   />
                 </Field>
                 <Field label="Refresh (ms)">

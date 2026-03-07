@@ -7,7 +7,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { DashboardPage, DashboardSettings, UiSoundSettings, WidgetConfig } from "../types/dashboard";
+import { CameraWidgetConfig, DashboardPage, DashboardSettings, UiSoundSettings, WidgetConfig } from "../types/dashboard";
 import { defaultConfig } from "../utils/defaultConfig";
 import { normalizeSoundSelection } from "../utils/lcarsSounds";
 
@@ -62,10 +62,25 @@ function migrateConfig(input: DashboardSettings): DashboardSettings {
         widget.snapshotUrl &&
         (widget.snapshotUrl === `${LEGACY_DEMO_BASE_URL}/cam/einfahrt.jpg` ||
           widget.snapshotUrl === `${LEGACY_DEMO_BASE_URL}/cam/snapshot.jpg`);
+      const legacyCamera = widget as CameraWidgetConfig & {
+        useSnapshotInPreview?: boolean;
+        useSnapshotInFullscreen?: boolean;
+        useMjpegInPreview?: boolean;
+        useMjpegInFullscreen?: boolean;
+        rtspUrl?: string;
+      };
 
-      return legacySnapshot
-        ? { ...widget, snapshotUrl: "", interactionSounds: normalizedInteractionSounds }
-        : { ...widget, interactionSounds: normalizedInteractionSounds };
+      const previewSourceMode = legacyCamera.useMjpegInPreview === true ? "mjpeg" : "snapshot";
+      const fullscreenSourceMode = legacyCamera.useMjpegInFullscreen === true ? "mjpeg" : "snapshot";
+      const snapshotUrl = legacySnapshot ? "" : widget.snapshotUrl;
+
+      return {
+        ...widget,
+        snapshotUrl,
+        previewSourceMode: widget.previewSourceMode || previewSourceMode,
+        fullscreenSourceMode: widget.fullscreenSourceMode || fullscreenSourceMode,
+        interactionSounds: normalizedInteractionSounds,
+      };
     }),
   };
 

@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Image, Linking, Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { CameraWidgetConfig } from "../../types/dashboard";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
 import { palette } from "../../utils/theme";
@@ -44,23 +44,18 @@ export function CameraWidget({
   const fullscreenSnapshotBaseUrl = (config.fullscreenSnapshotUrl || config.snapshotUrl || "").trim() || null;
   const previewMjpegUrl = (config.mjpegUrl || "").trim() || null;
   const fullscreenMjpegUrl = (config.fullscreenMjpegUrl || config.mjpegUrl || "").trim() || null;
-
-  const useSnapshotInPreview = config.useSnapshotInPreview !== false;
-  const useSnapshotInFullscreen = config.useSnapshotInFullscreen !== false;
-  const useMjpegInPreview = config.useMjpegInPreview === true;
-  const useMjpegInFullscreen = config.useMjpegInFullscreen === true;
+  const previewSourceMode = config.previewSourceMode || "snapshot";
+  const fullscreenSourceMode = config.fullscreenSourceMode || "snapshot";
 
   const previewFeed = resolveCameraFeed({
+    sourceMode: previewSourceMode,
     snapshotUrl: previewSnapshotBaseUrl,
-    snapshotEnabled: useSnapshotInPreview,
     mjpegUrl: previewMjpegUrl,
-    mjpegEnabled: useMjpegInPreview,
   });
   const fullscreenFeed = resolveCameraFeed({
+    sourceMode: fullscreenSourceMode,
     snapshotUrl: fullscreenSnapshotBaseUrl,
-    snapshotEnabled: useSnapshotInFullscreen,
     mjpegUrl: fullscreenMjpegUrl,
-    mjpegEnabled: useMjpegInFullscreen,
   });
   const activeFeed = fullscreenOpen ? fullscreenFeed : previewFeed;
   const activeSnapshotBaseUrl = activeFeed?.kind === "snapshot" ? activeFeed.url : null;
@@ -378,19 +373,8 @@ export function CameraWidget({
           </View>
         )}
         </Pressable>
-        {!previewFeed && !previewSnapshotBaseUrl && !previewMjpegUrl && !config.rtspUrl ? (
+        {!previewFeed && !previewSnapshotBaseUrl && !previewMjpegUrl ? (
           <Text style={[styles.hint, { color: mutedTextColor }]}>Widget ist noch nicht konfiguriert.</Text>
-        ) : null}
-        {config.rtspUrl && !previewFeed ? (
-          <Pressable
-            onPress={() => {
-              playConfiguredUiSound(config.interactionSounds?.press, "tap", `${config.id}:press`);
-              Linking.openURL(config.rtspUrl!);
-            }}
-            style={styles.button}
-          >
-            <Text style={[styles.buttonLabel, { color: textColor }]}>RTSP Stream oeffnen</Text>
-          </Pressable>
         ) : null}
       </View>
       <Modal animationType={Platform.OS === "web" ? "fade" : "none"} transparent visible={fullscreenOpen}>
@@ -565,25 +549,24 @@ function normalizeBoolean(value: unknown) {
 }
 
 function resolveCameraFeed(input: {
+  sourceMode: "snapshot" | "mjpeg";
   snapshotUrl: string | null;
-  snapshotEnabled: boolean;
   mjpegUrl: string | null;
-  mjpegEnabled: boolean;
 }) {
-  if (input.mjpegEnabled && input.mjpegUrl) {
-    return { kind: "mjpeg" as const, url: input.mjpegUrl };
-  }
-
-  if (input.snapshotEnabled && input.snapshotUrl) {
+  if (input.sourceMode === "snapshot" && input.snapshotUrl) {
     return { kind: "snapshot" as const, url: input.snapshotUrl };
   }
 
-  if (input.snapshotUrl) {
-    return { kind: "snapshot" as const, url: input.snapshotUrl };
+  if (input.sourceMode === "mjpeg" && input.mjpegUrl) {
+    return { kind: "mjpeg" as const, url: input.mjpegUrl };
   }
 
-  if (input.mjpegUrl) {
+  if (input.sourceMode === "snapshot" && input.mjpegUrl) {
     return { kind: "mjpeg" as const, url: input.mjpegUrl };
+  }
+
+  if (input.sourceMode === "mjpeg" && input.snapshotUrl) {
+    return { kind: "snapshot" as const, url: input.snapshotUrl };
   }
 
   return null;
@@ -651,17 +634,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: palette.danger,
     fontSize: 12,
-  },
-  button: {
-    marginTop: 12,
-    borderRadius: 14,
-    alignItems: "center",
-    paddingVertical: 10,
-    backgroundColor: "rgba(77, 226, 177, 0.16)",
-  },
-  buttonLabel: {
-    color: palette.text,
-    fontWeight: "700",
   },
   fullscreenBackdrop: {
     flex: 1,
