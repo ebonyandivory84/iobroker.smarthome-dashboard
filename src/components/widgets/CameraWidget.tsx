@@ -867,9 +867,10 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv") {
 function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv") {
   const includeDirect = shouldUseDirectWebStream(targetUrl, streamType);
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
-  const sources = includeDirect
-    ? [targetUrl, ...proxySources]
-    : proxySources;
+  const sources =
+    streamType === "mjpeg"
+      ? (includeDirect ? [targetUrl, ...proxySources] : proxySources)
+      : [...proxySources, ...(includeDirect ? [targetUrl] : [])];
   return Array.from(new Set(sources.filter(Boolean)));
 }
 
