@@ -386,6 +386,11 @@ function buildCameraRequestConfig(rawUrl) {
   return {
     url: parsed.toString(),
     headers,
+    auth: {
+      username: decodeURIComponent(parsed.username || queryUser || ""),
+      password: decodeURIComponent(parsed.password || queryPassword || ""),
+      hasQueryCredentials: Boolean(queryUser || queryPassword),
+    },
   };
 }
 
@@ -431,7 +436,7 @@ function buildCameraFetchOptions(targetUrl) {
   }
 }
 
-function proxyCameraStream(requestConfig, req, res, streamType, redirects) {
+function proxyCameraStream(requestConfig, req, res, streamType, redirects, authRetries = 0) {
   const sanitizedUrl = sanitizeCameraUrlForLog(requestConfig.url);
   const log = runningAdapter?.log;
   let parsed;
@@ -484,11 +489,39 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects) {
         if (!redirectedConfig.headers.Authorization && requestConfig.headers.Authorization) {
           redirectedConfig.headers.Authorization = requestConfig.headers.Authorization;
         }
-        proxyCameraStream(redirectedConfig, req, res, streamType, redirects + 1);
+        proxyCameraStream(redirectedConfig, req, res, streamType, redirects + 1, authRetries);
         return;
       }
 
       if (statusCode >= 400) {
+        if (
+          statusCode === 401 &&
+          streamType === "mjpeg" &&
+          authRetries < 1 &&
+          requestConfig.auth?.username &&
+          !requestConfig.auth?.hasQueryCredentials
+        ) {
+          try {
+            const retryUrl = new URL(requestConfig.url);
+            retryUrl.searchParams.set("user", requestConfig.auth.username);
+            retryUrl.searchParams.set("pwd", requestConfig.auth.password || "");
+            const retryConfig = buildCameraRequestConfig(retryUrl.toString());
+            if (!retryConfig.headers.Authorization && requestConfig.headers.Authorization) {
+              retryConfig.headers.Authorization = requestConfig.headers.Authorization;
+            }
+            log?.warn(
+              `[camera-proxy] upstream 401 streamType=mjpeg, retry with query credentials url=${sanitizeCameraUrlForLog(
+                retryConfig.url
+              )}`
+            );
+            upstreamResponse.resume();
+            proxyCameraStream(retryConfig, req, res, streamType, redirects, authRetries + 1);
+            return;
+          } catch {
+            // fall through to normal error handling
+          }
+        }
+
         log?.warn(
           `[camera-proxy] upstream error streamType=${streamType || "unknown"} status=${statusCode} contentType=${String(
             upstreamContentType
