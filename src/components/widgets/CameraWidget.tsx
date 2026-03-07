@@ -904,10 +904,7 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv") {
   }
 
   const encodedUrl = encodeURIComponent(targetUrl);
-  return [
-    `${window.location.origin}/smarthome-dashboard/api/camera-stream?streamType=${streamType}&url=${encodedUrl}`,
-    `${window.location.origin}/smarthome-dashboard/api/camera-mjpeg?streamType=${streamType}&url=${encodedUrl}`,
-  ];
+  return [`${window.location.origin}/smarthome-dashboard/api/camera-stream?streamType=${streamType}&url=${encodedUrl}`];
 }
 
 function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv") {
