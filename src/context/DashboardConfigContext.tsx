@@ -87,8 +87,12 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
           if (!active) {
             return;
           }
+          const nextJson = JSON.stringify(parsed, null, 2);
           setConfig(parsed);
-          setRawJson(JSON.stringify(parsed, null, 2));
+          setRawJson(nextJson);
+          if (nextJson !== remoteJson) {
+            await writeRemoteConfig(nextJson);
+          }
           return;
         } catch (error) {
           console.warn("Remote config parse failed", error);

@@ -118,7 +118,7 @@ export function GridCanvas({
       />
     ) : (
       <View style={[styles.canvas, { height: canvasHeight }]}>
-        {displayConfig.widgets.map((widget) => {
+        {displayConfig.widgets.filter((widget) => widget.type !== "camera").map((widget) => {
           const style = {
             left: displayOffset(widget.position.x, cellWidth, displayConfig.grid.gap, mainColumnExtraGap),
             top: widget.position.y * (renderRowHeight + displayConfig.grid.gap),
@@ -483,7 +483,7 @@ function WebGridCanvas({
 
   return (
     <div style={{ ...webCanvasStyle, height: canvasHeight }}>
-      {config.widgets.map((widget) => (
+      {config.widgets.filter((widget) => widget.type !== "camera").map((widget) => (
         <WebWidgetShell
           key={widget.id}
           cellWidth={cellWidth}
