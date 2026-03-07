@@ -545,7 +545,7 @@ export function CameraWidget({
                           reportAspectRatio(source.width, source.height);
                         }
                       }}
-                      resizeMode="contain"
+                      resizeMode="cover"
                       source={{ uri: previewFeed.url }}
                       style={styles.mjpegImage}
                     />
@@ -672,7 +672,7 @@ export function CameraWidget({
                           commitLayerLoad(layer, url);
                         }
                       }}
-                      resizeMode="contain"
+                      resizeMode="cover"
                       source={{ uri: url }}
                       style={[styles.fullscreenImageLayer, isVisible ? styles.layerVisible : styles.layerHidden]}
                     />
@@ -711,7 +711,7 @@ export function CameraWidget({
                           reportAspectRatio(source.width, source.height);
                         }
                       }}
-                      resizeMode="contain"
+                      resizeMode="cover"
                       source={{ uri: fullscreenFeed.url }}
                       style={styles.fullscreenMjpegImage}
                     />
@@ -1415,7 +1415,7 @@ const baseFullscreenWebLayerStyle = {
   top: 0,
   width: "100%",
   height: "100%",
-  objectFit: "contain",
+  objectFit: "cover",
   display: "block",
   backgroundColor: "#000000",
   transition: LAYER_FADE_MS > 0 ? `opacity ${LAYER_FADE_MS}ms linear` : "none",
@@ -1425,7 +1425,7 @@ const baseFullscreenWebLayerStyle = {
 const webMjpegStyle = {
   width: "100%",
   height: "100%",
-  objectFit: "contain",
+  objectFit: "cover",
   display: "block",
   backgroundColor: "#000000",
 } as const;
@@ -1433,7 +1433,7 @@ const webMjpegStyle = {
 const fullscreenWebMjpegStyle = {
   width: "100%",
   height: "100%",
-  objectFit: "contain",
+  objectFit: "cover",
   display: "block",
   backgroundColor: "#000000",
 } as const;
@@ -1441,7 +1441,7 @@ const fullscreenWebMjpegStyle = {
 const webFlvStyle = {
   width: "100%",
   height: "100%",
-  objectFit: "contain",
+  objectFit: "cover",
   display: "block",
   backgroundColor: "transparent",
 } as const;
@@ -1449,7 +1449,7 @@ const webFlvStyle = {
 const fullscreenWebFlvStyle = {
   width: "100%",
   height: "100%",
-  objectFit: "contain",
+  objectFit: "cover",
   display: "block",
   backgroundColor: "#000000",
 } as const;
