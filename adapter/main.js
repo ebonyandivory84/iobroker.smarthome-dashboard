@@ -244,8 +244,10 @@ async function main(adapter) {
     }
 
     try {
-      const response = await fetch(targetUrl, {
+      const requestConfig = buildCameraRequestConfig(targetUrl);
+      const response = await fetch(requestConfig.url, {
         cache: "no-store",
+        headers: requestConfig.headers,
       });
 
       if (!response.ok) {
@@ -274,9 +276,11 @@ async function main(adapter) {
     req.on("close", () => controller.abort());
 
     try {
-      const response = await fetch(targetUrl, {
+      const requestConfig = buildCameraRequestConfig(targetUrl);
+      const response = await fetch(requestConfig.url, {
         cache: "no-store",
         signal: controller.signal,
+        headers: requestConfig.headers,
       });
 
       if (!response.ok || !response.body) {
@@ -362,6 +366,25 @@ async function main(adapter) {
 
 function normalizeDashboardName(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function buildCameraRequestConfig(rawUrl) {
+  const parsed = new URL(rawUrl);
+  const headers = {};
+
+  if (parsed.username || parsed.password) {
+    const username = decodeURIComponent(parsed.username || "");
+    const password = decodeURIComponent(parsed.password || "");
+    const auth = Buffer.from(`${username}:${password}`).toString("base64");
+    headers.Authorization = `Basic ${auth}`;
+    parsed.username = "";
+    parsed.password = "";
+  }
+
+  return {
+    url: parsed.toString(),
+    headers,
+  };
 }
 
 async function readSavedDashboards(adapter) {
