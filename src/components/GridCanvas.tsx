@@ -211,7 +211,7 @@ function buildResponsiveAutoLayoutConfig(
     const desiredY = Math.max(0, widget.position.y);
     const bestStart = desiredStart;
     const bestY = Math.max(desiredY, ...columnHeights.slice(bestStart, bestStart + spec.w));
-    const snappedBottom = ceilGridUnit(bestY + spec.h);
+    const snappedBottom = ceilGridUnitForWidget(bestY + spec.h, widget.type);
 
     for (let index = bestStart; index < bestStart + spec.w; index += 1) {
       columnHeights[index] = snappedBottom;
@@ -271,7 +271,7 @@ function buildDesktopAutoLayoutConfig(
       );
       const bestLocal = localHint;
       const bestY = Math.max(desiredY, subColumnHeights[sectionStart + bestLocal]);
-      const snappedBottom = ceilGridUnit(bestY + spec.h);
+      const snappedBottom = ceilGridUnitForWidget(bestY + spec.h, widget.type);
 
       const targetIndex = sectionStart + bestLocal;
       subColumnHeights[targetIndex] = snappedBottom;
@@ -295,7 +295,7 @@ function buildDesktopAutoLayoutConfig(
     const startIndex = bestStartSection * mainColumnWidth;
     const endIndex = startIndex + sectionSpan * mainColumnWidth;
     const bestY = Math.max(desiredY, ...subColumnHeights.slice(startIndex, endIndex));
-    const snappedBottom = ceilGridUnit(bestY + spec.h);
+    const snappedBottom = ceilGridUnitForWidget(bestY + spec.h, widget.type);
     for (let index = startIndex; index < endIndex; index += 1) {
       subColumnHeights[index] = snappedBottom;
     }
@@ -342,7 +342,7 @@ function getAutoLayoutSpec(
         return { w: 1, h: 1 };
       case "camera": {
         const ratio = normalizeAspectRatio(widget.snapshotAspectRatio);
-        return { w: 1, h: Math.max(0.6, roundGridUnit(1 / ratio)) };
+        return { w: 1, h: Math.max(0.5, roundCameraGridUnit(1 / ratio)) };
       }
       case "solar":
         return { w: 1, h: roundGridUnit(3.8) };
@@ -369,7 +369,7 @@ function getAutoLayoutSpec(
       return { w: 1, h: 1 };
     case "camera": {
       const ratio = normalizeAspectRatio(widget.snapshotAspectRatio);
-      return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(mainColumnWidth / ratio)) };
+      return { w: mainColumnWidth, h: Math.max(0.5, roundCameraGridUnit(mainColumnWidth / ratio)) };
     }
     case "solar":
       return { w: mainColumnWidth, h: roundGridUnit(options?.isTabletLikeWeb ? 5.5 : 3.2) };
@@ -399,8 +399,19 @@ function roundGridUnit(value: number) {
   return Math.round(value / GRID_SNAP) * GRID_SNAP;
 }
 
+function roundCameraGridUnit(value: number) {
+  return Math.round(value / CAMERA_GRID_SNAP) * CAMERA_GRID_SNAP;
+}
+
 function ceilGridUnit(value: number) {
   return Math.ceil(value / GRID_SNAP) * GRID_SNAP;
+}
+
+function ceilGridUnitForWidget(value: number, widgetType: WidgetType) {
+  if (widgetType === "camera") {
+    return Math.ceil(value / CAMERA_GRID_SNAP) * CAMERA_GRID_SNAP;
+  }
+  return ceilGridUnit(value);
 }
 
 function mapDisplayPositionToSourceHint(position: WidgetConfig["position"], displayColumns: number, sourceColumns: number) {
@@ -1101,3 +1112,4 @@ function buildGradientBackground(start: string, end?: string) {
   }
   return start;
 }
+const CAMERA_GRID_SNAP = 0.1;
