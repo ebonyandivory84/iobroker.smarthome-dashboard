@@ -1,24 +1,24 @@
-# ioBroker Adapter
+# SmartHome Dashboard Adapter
 
-Der Adapter bringt jetzt eine typische Grundstruktur mit:
+This folder contains the adapter runtime and static web hosting target.
 
-- `io-package.json` fuer Manifest und Default-Konfiguration
-- `admin/jsonConfig.json` fuer die Adapter-Einstellungen in Admin
-- API-Endpunkte fuer State Read/Write
-- statische Auslieferung eines Web-Bundles unter `/smarthome-dashboard`
+For full project documentation (features, install, development workflow, screenshots),
+see the repository root README:
 
-## Endpunkte
+- [README.md](../README.md)
 
-- `POST /smarthome-dashboard/api/states`
-- `PUT /smarthome-dashboard/api/state`
+## Adapter Responsibilities
 
-## Web-Bundle
+- hosts the exported web app under `/smarthome-dashboard`
+- provides API endpoints for config, state reads/writes, object browse, camera proxy, and dashboard storage
+- supports optional dev-server proxy mode for rapid frontend iteration
 
-Standardmaessig wird aus `adapter/www` ausgeliefert. Alternativ kann in der Adapter-Konfiguration `webDir` auf einen anderen Build-Ordner zeigen.
+## Important
 
-## Noch offen fuer produktiv
+Before pushing production updates, export the current web bundle:
 
-- echtes Packaging/Publish als ioBroker-Adapter
-- Authentifizierung und Rechtepruefung
-- optional Push/Subscriptions statt Polling
-- automatisierter Export des Expo-Web-Bundles in den Adapter
+```bash
+npm run export:web
+```
+
+Then commit `adapter/www` together with code changes.

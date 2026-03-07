@@ -1,90 +1,125 @@
-# SmartHome Dashboard
+# SmartHome Dashboard for ioBroker
 
-Expo-basierte React-Native-WebUI fuer ein modulares SmartHome-Dashboard mit:
+[![ioBroker](https://img.shields.io/badge/ioBroker-Ready-3399CC)](https://www.iobroker.net/)
+[![Expo](https://img.shields.io/badge/Expo-Web%20UI-000020)](https://expo.dev/)
+[![Node](https://img.shields.io/badge/Node-%3E%3D18-43853D)](https://nodejs.org/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-- konfigurierbaren Widgets per JSON
-- Grid-Layout mit Drag/Resize-Snapping
-- ioBroker State Read/Write ueber Adapter-API-Endpunkte
-- Kamera-Snapshots (mit Auto-Refresh) und RTSP-Links
-- Energiefluss-Widget als Basis fuer PV-Daten
+Modular SmartHome dashboard adapter for ioBroker with a hosted React Native Web UI.
+It combines state control, camera widgets, energy/solar widgets, dashboard pages, drag-and-drop layout editing, and configurable UI sounds.
 
-## Start
+## Highlights
+
+- Widget-based dashboard with multi-page support
+- Drag, resize, and cross-page widget move in layout mode
+- Camera widget with per-view source selection:
+  `snapshot`, `mjpeg`, `flv` (web)
+- Dedicated energy and solar widgets
+- Link widget with fullscreen in-dashboard overlay
+- Configurable interaction sound system (per widget and page actions)
+- Hosted web UI directly from the adapter (`/smarthome-dashboard`)
+- Optional development proxy mode for live frontend iteration
+
+## Screenshot Gallery
+
+Replace these placeholder images with real UI screenshots from your setup.
+
+| Dashboard | Widget Editor | Camera Fullscreen |
+|---|---|---|
+| ![Dashboard](/docs/images/dashboard-overview-placeholder.svg) | ![Widget Editor](/docs/images/widget-editor-placeholder.svg) | ![Camera Fullscreen](/docs/images/camera-fullscreen-placeholder.svg) |
+
+## Repository Structure
+
+- `main.js` / `io-package.json` / `admin/jsonConfig.json`: adapter package root
+- `adapter/main.js`: express server + API endpoints + web hosting/proxy
+- `src/`: React Native Web dashboard application
+- `adapter/www/`: exported production web bundle (must be committed for GitHub install)
+- `assets/`: local widget assets and sound files
+
+## Quick Start (Local Development)
 
 ```bash
 npm install
 npm run web
 ```
 
-Fuer den statischen Export in den ioBroker-Adapter:
+Run type checks:
+
+```bash
+npm run typecheck
+```
+
+## Build Web Bundle for Adapter
 
 ```bash
 npm run export:web
 ```
 
-## Als ioBroker-Adapter von GitHub installieren
+This exports the static web app to `adapter/www`.
 
-Dieses Repository ist jetzt am Root als ioBroker-Adapter vorbereitet:
+## Install Adapter from GitHub in ioBroker
 
-- `package.json` am Root ist das Adapter-Paket
-- `io-package.json` am Root enthaelt das Adapter-Manifest
-- `main.js` am Root startet den Adapter
-- das Web-Bundle wird aus `adapter/www` ausgeliefert
-
-Wichtig vor dem Push:
+After pushing your repository:
 
 ```bash
-npm run export:web
+iobroker url "git+https://github.com/<user>/<repo>.git#main"
+iobroker restart smarthome-dashboard.0
 ```
 
-Danach `adapter/www` mit committen. Erst dann enthaelt das GitHub-Repo das auslieferbare Webinterface.
+Important: always export and commit `adapter/www` before pushing a release commit.
 
-Installation in ioBroker:
+## Live Development with Installed Adapter
 
-1. Repository auf GitHub pushen
-2. In ioBroker unter "Adapter" den GitHub-/Custom-URL-Install nutzen
-3. Die GitHub-Repo-URL des Root-Repositories angeben
+You can keep the adapter installed and still iterate quickly on UI code.
 
-Wenn du das Repo spaeter in `iobroker.smarthome-dashboard` umbenennst, passt es auch namlich direkt zum Adapter-Paket.
+1. Set adapter config `Dev server URL` (example: `http://192.168.1.50:8083`)
+2. Start local web dev server:
 
-## Live-Entwicklung mit installiertem Adapter
-
-Du kannst den Adapter einmal in ioBroker installieren und danach die UI lokal weiterentwickeln, ohne jedes Mal `adapter/www` neu zu exportieren.
-
-Vorgehen:
-
-1. Adapter aus GitHub installieren
-2. In der Adapter-Konfiguration `Dev server URL` setzen, z. B. `http://192.168.1.50:8083`
-3. Lokal im Projekt `npm run web` starten
-4. Im Browser oder auf dem ioBroker-Host `http://<iobroker-host>:8099/smarthome-dashboard` aufrufen
-
-Dann passiert Folgendes:
-
-- `/smarthome-dashboard/api/*` bleibt im Adapter und liest/schreibt echte ioBroker-States
-- das UI selbst wird live an deinen Expo-Webserver weitergeleitet
-- dadurch siehst du Design- und Logikänderungen direkt
-
-Wichtig:
-
-- Verwende bei `Dev server URL` eine Adresse, die vom ioBroker-Host erreichbar ist
-- `localhost` funktioniert nur, wenn ioBroker und dein Dev-Server auf demselben Rechner laufen
-- Wenn `Dev server URL` leer ist, liefert der Adapter wieder das statische Bundle aus `adapter/www`
-
-## Erwartete ioBroker-Endpunkte
-
-Die Frontend-App erwartet einen ioBroker-Adapter oder Reverse-Proxy mit diesen Endpunkten:
-
-- `POST /smarthome-dashboard/api/states` mit `{ "stateIds": ["id1", "id2"] }`
-- `PUT /smarthome-dashboard/api/state` mit `{ "stateId": "id1", "value": true }`
-
-Antwort fuer `POST /states`:
-
-```json
-{
-  "0_userdata.0.doors.front": false,
-  "0_userdata.0.energy.pv": 4200
-}
+```bash
+npm run web
 ```
 
-## Nächster Ausbau
+3. Open:
+   `http://<iobroker-host>:8099/smarthome-dashboard`
 
-Dein bestehendes PV-Dashboard kann spaeter als weiteres Widget oder als dedizierter Screen eingebunden werden. Die Grundstruktur dafuer ist vorhanden.
+In this mode:
+
+- `/smarthome-dashboard/api/*` stays on adapter side
+- UI requests are proxied to your local Expo dev server
+
+## API Endpoints (Adapter)
+
+- `GET /smarthome-dashboard/api/config`
+- `PUT /smarthome-dashboard/api/config`
+- `GET /smarthome-dashboard/api/dashboards`
+- `GET /smarthome-dashboard/api/dashboards/:name`
+- `PUT /smarthome-dashboard/api/dashboards/:name`
+- `DELETE /smarthome-dashboard/api/dashboards/:name`
+- `POST /smarthome-dashboard/api/states`
+- `PUT /smarthome-dashboard/api/state`
+- `POST /smarthome-dashboard/api/objects`
+- `GET /smarthome-dashboard/api/images`
+- `GET /smarthome-dashboard/api/camera-snapshot`
+- `GET /smarthome-dashboard/api/camera-stream`
+
+## Camera Notes
+
+- `snapshot`: polling image URL with configurable refresh
+- `mjpeg`: continuous stream via image tag / proxy
+- `flv`: web-only playback via `flv.js`
+
+If FLV shows `CodecUnsupported`, camera stream codec is usually not browser-compatible.
+Use H.264-compatible stream variants (often sub/ext stream).
+
+## Troubleshooting
+
+- Black camera preview in web:
+  verify URL reachability from ioBroker host, auth format, and camera session limits
+- No sound:
+  check `UI-Sounds` enabled, volume > 0, browser tab/device audio not muted
+- No assets in image picker:
+  make sure files are in `assets/` and re-export + redeploy adapter
+
+## License
+
+MIT

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" fill="none">
+  <rect width="1280" height="720" fill="#0C1018"/>
+  <rect x="210" y="40" width="860" height="640" rx="22" fill="#151B27"/>
+  <rect x="250" y="90" width="780" height="56" rx="12" fill="#212B3C"/>
+  <rect x="250" y="170" width="780" height="420" rx="14" fill="#0F1521"/>
+  <rect x="280" y="200" width="340" height="42" rx="10" fill="#243247"/>
+  <rect x="650" y="200" width="340" height="42" rx="10" fill="#243247"/>
+  <rect x="280" y="258" width="710" height="42" rx="10" fill="#243247"/>
+  <rect x="280" y="316" width="710" height="42" rx="10" fill="#243247"/>
+  <rect x="280" y="374" width="710" height="42" rx="10" fill="#243247"/>
+  <rect x="280" y="432" width="710" height="42" rx="10" fill="#243247"/>
+  <rect x="250" y="610" width="180" height="48" rx="12" fill="#1E3A5F"/>
+  <rect x="850" y="610" width="180" height="48" rx="12" fill="#2F8E63"/>
+  <text x="640" y="128" fill="#9DB4D5" font-family="Arial, sans-serif" font-size="28" text-anchor="middle">Widget Editor Placeholder</text>
+  <text x="640" y="568" fill="#8EA6C8" font-family="Arial, sans-serif" font-size="24" text-anchor="middle">Replace with a real screenshot</text>
+</svg>
