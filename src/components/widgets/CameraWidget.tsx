@@ -132,48 +132,10 @@ export function CameraWidget({
   }, [activeRefreshMs, activeSnapshotBaseUrl]);
 
   useEffect(() => {
-    if (
-      Platform.OS !== "web" ||
-      typeof window === "undefined" ||
-      fullscreenOpen ||
-      previewFeed?.kind !== "mjpeg" ||
-      !previewMjpegRenderUrl
-    ) {
+    if (fullscreenOpen || previewFeed?.kind !== "mjpeg") {
       setPreviewStreamDebug(null);
-      return;
     }
-
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 4000);
-
-    fetch(previewMjpegRenderUrl, {
-      method: "GET",
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then((response) => {
-        if (!response.ok) {
-          setPreviewStreamDebug(`MJPEG Preview Fehler: HTTP ${response.status}`);
-          return;
-        }
-        setPreviewStreamDebug(null);
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        const message = error instanceof Error ? error.message : "Unbekannter Fehler";
-        setPreviewStreamDebug(`MJPEG Preview Fehler: ${message}`);
-      })
-      .finally(() => {
-        window.clearTimeout(timer);
-      });
-
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [fullscreenOpen, previewFeed?.kind, previewMjpegRenderUrl]);
+  }, [fullscreenOpen, previewFeed?.kind]);
 
   useEffect(() => {
     fullscreenVisibilityCallbackRef.current = onFullscreenVisibilityChange;

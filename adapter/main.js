@@ -356,13 +356,19 @@ function buildCameraRequestConfig(rawUrl) {
   const parsed = new URL(rawUrl);
   const headers = {};
 
-  if (parsed.username || parsed.password) {
-    const username = decodeURIComponent(parsed.username || "");
-    const password = decodeURIComponent(parsed.password || "");
+  const authFromUserInfo = parsed.username || parsed.password;
+  const queryUser = parsed.searchParams.get("user") || parsed.searchParams.get("username") || "";
+  const queryPassword = parsed.searchParams.get("password") || parsed.searchParams.get("pass") || "";
+
+  if (authFromUserInfo || queryUser || queryPassword) {
+    const username = decodeURIComponent(parsed.username || queryUser || "");
+    const password = decodeURIComponent(parsed.password || queryPassword || "");
     const auth = Buffer.from(`${username}:${password}`).toString("base64");
     headers.Authorization = `Basic ${auth}`;
-    parsed.username = "";
-    parsed.password = "";
+    if (authFromUserInfo) {
+      parsed.username = "";
+      parsed.password = "";
+    }
   }
 
   return {
