@@ -171,6 +171,10 @@ export function DashboardScreen() {
       return;
     }
     if (partial.position) {
+      if (currentWidget.type === "camera") {
+        updateWidget(widgetId, partial);
+        return;
+      }
       updateWidget(widgetId, {
         ...partial,
         position: constrainToPrimarySections(partial.position, config.grid.columns),
