@@ -5,6 +5,7 @@ import { StateWriteFeedback } from "../hooks/useIoBrokerStates";
 import { IoBrokerClient } from "../services/iobroker";
 import { DashboardSettings, StateSnapshot, WidgetConfig, WidgetInteractionSounds, WidgetType } from "../types/dashboard";
 import { constrainToPrimarySections, GRID_SNAP } from "../utils/gridLayout";
+import { playConfiguredUiSound } from "../utils/uiSounds";
 import { resolveThemeSettings } from "../utils/themeConfig";
 import { palette } from "../utils/theme";
 import { WidgetFrame } from "./WidgetFrame";
@@ -728,7 +729,14 @@ function WebWidgetShell({
       ) : null}
       {isLayoutMode ? (
         <div style={webControlsStyle}>
-          <button onClick={() => onEditWidget(widget.id)} style={webIconButtonStyle} type="button">
+          <button
+            onClick={() => {
+              playConfiguredUiSound(config.uiSounds?.pageSounds?.widgetEdit, "panel", `widget-edit:${widget.id}`);
+              onEditWidget(widget.id);
+            }}
+            style={webIconButtonStyle}
+            type="button"
+          >
             ⋯
           </button>
           <button onClick={() => onRemoveWidget(widget.id)} style={webIconButtonStyle} type="button">

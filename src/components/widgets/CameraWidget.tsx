@@ -925,7 +925,24 @@ function WebFlvPlayer({
     setErrorMessage(null);
     let disposed = false;
     let player: any = null;
+    let retryTimer: ReturnType<typeof setInterval> | null = null;
     const videoElement = videoRef.current;
+
+    const tryPlay = () => {
+      if (!videoElement || disposed) {
+        return;
+      }
+      try {
+        if (playerRef.current?.play) {
+          playerRef.current.play();
+        }
+      } catch {
+        // ignore
+      }
+      void videoElement.play().catch(() => {
+        // Ignore autoplay rejections; retry loop handles late-ready starts.
+      });
+    };
 
     const attach = async () => {
       if (!videoElement || !url) {
@@ -986,10 +1003,17 @@ function WebFlvPlayer({
         ratioReportedRef.current = true;
         callback(ratio);
       };
+      videoElement.oncanplay = () => {
+        tryPlay();
+      };
       player.load();
-      void videoElement.play().catch(() => {
-        // Ignore autoplay rejections to avoid overlay flicker.
-      });
+      tryPlay();
+      retryTimer = setInterval(() => {
+        if (!videoElement || disposed || !videoElement.paused) {
+          return;
+        }
+        tryPlay();
+      }, 1200);
     };
 
     attach().catch(() => {
@@ -1009,8 +1033,12 @@ function WebFlvPlayer({
       }
       if (videoElement) {
         videoElement.onloadedmetadata = null;
+        videoElement.oncanplay = null;
         videoElement.removeAttribute("src");
         videoElement.load();
+      }
+      if (retryTimer) {
+        clearInterval(retryTimer);
       }
       playerRef.current = null;
     };
