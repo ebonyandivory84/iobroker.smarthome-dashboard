@@ -889,6 +889,10 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={draft.fullscreenFlvUrl || ""}
                   />
                 </Field>
+                <Text style={styles.mappingHint}>
+                  FLV-Hinweis: Bei `CodecUnsupported` liefert der Stream meist kein browser-kompatibles H.264. Falls
+                  vorhanden, statt `main` den `ext`/Substream verwenden (z. B. `channel0_ext.bcs`).
+                </Text>
                 <Field label="Refresh (ms)">
                   <TextInput
                     editable={(draft.previewSourceMode || "snapshot") === "snapshot"}
