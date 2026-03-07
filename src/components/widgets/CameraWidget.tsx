@@ -47,7 +47,7 @@ export function CameraWidget({
   const [fullscreenFlvSourceIndex, setFullscreenFlvSourceIndex] = useState(0);
   const [previewMjpegLoaded, setPreviewMjpegLoaded] = useState(false);
   const [fullscreenMjpegLoaded, setFullscreenMjpegLoaded] = useState(false);
-  const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
+  const hasReportedAspectRatio = useRef(false);
   const lastTriggerMatchRef = useRef(false);
   const activeLayerRef = useRef<0 | 1>(0);
   const latestRequestedUrlRef = useRef<string | null>(null);
@@ -184,6 +184,7 @@ export function CameraWidget({
     // Force a clean preview re-init when source mode/url changes so updates apply instantly.
     loadingJobRef.current = null;
     latestRequestedUrlRef.current = null;
+    hasReportedAspectRatio.current = false;
     setLoadingLayer(null);
     setLayerUrls([null, null]);
     setActiveLayer(0);
@@ -1263,7 +1264,7 @@ const styles = StyleSheet.create({
   },
   preview: {
     flex: 1,
-    minHeight: 120,
+    minHeight: 0,
     borderRadius: 0,
     overflow: "hidden",
     backgroundColor: "transparent",
@@ -1491,7 +1492,7 @@ const fullscreenWebMjpegStyle = {
 const webFlvStyle = {
   width: "100%",
   height: "100%",
-  objectFit: "cover",
+  objectFit: "contain",
   display: "block",
   backgroundColor: "transparent",
 } as const;
