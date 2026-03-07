@@ -265,7 +265,7 @@ async function main(adapter) {
     }
   });
 
-  app.get("/smarthome-dashboard/api/camera-mjpeg", async (req, res) => {
+  const handleCameraStreamProxy = async (req, res) => {
     const targetUrl = typeof req.query?.url === "string" ? req.query.url : "";
     if (!targetUrl) {
       res.status(400).json({ error: "url missing" });
@@ -284,7 +284,7 @@ async function main(adapter) {
       });
 
       if (!response.ok || !response.body) {
-        res.status(response.status || 502).json({ error: `MJPEG fetch failed (${response.status || 502})` });
+        res.status(response.status || 502).json({ error: `Stream fetch failed (${response.status || 502})` });
         return;
       }
 
@@ -306,9 +306,12 @@ async function main(adapter) {
       if (controller.signal.aborted) {
         return;
       }
-      res.status(500).json({ error: error instanceof Error ? error.message : "MJPEG proxy failed" });
+      res.status(500).json({ error: error instanceof Error ? error.message : "Stream proxy failed" });
     }
-  });
+  };
+
+  app.get("/smarthome-dashboard/api/camera-stream", handleCameraStreamProxy);
+  app.get("/smarthome-dashboard/api/camera-mjpeg", handleCameraStreamProxy);
 
   app.use("/smarthome-dashboard/widget-assets", express.static(widgetAssetsRoot));
 

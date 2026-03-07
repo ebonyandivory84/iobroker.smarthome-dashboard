@@ -71,6 +71,8 @@ export function buildWidgetTemplate(
       fullscreenSnapshotUrl: "",
       mjpegUrl: "",
       fullscreenMjpegUrl: "",
+      flvUrl: "",
+      fullscreenFlvUrl: "",
       refreshMs: 2000,
       position: {
         ...basePosition,

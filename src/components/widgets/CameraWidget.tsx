@@ -5,6 +5,12 @@ import { CameraWidgetConfig } from "../../types/dashboard";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
 import { palette } from "../../utils/theme";
 
+declare global {
+  interface Window {
+    flvjs?: any;
+  }
+}
+
 type CameraWidgetProps = {
   config: CameraWidgetConfig;
   maximizeStateValue?: unknown;
@@ -16,6 +22,8 @@ type CameraWidgetProps = {
 const MAX_FULLSCREEN_DURATION_MS = 30_000;
 const LAYER_FADE_MS = 0;
 const pinnedColor = "#f3c84a";
+const FLV_SCRIPT_SRC = "https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js";
+let flvLoaderPromise: Promise<boolean> | null = null;
 
 export function CameraWidget({
   config,
@@ -44,11 +52,19 @@ export function CameraWidget({
   const fullscreenSnapshotBaseUrl = (config.fullscreenSnapshotUrl || config.snapshotUrl || "").trim() || null;
   const previewMjpegUrl = (config.mjpegUrl || "").trim() || null;
   const fullscreenMjpegUrl = (config.fullscreenMjpegUrl || config.mjpegUrl || "").trim() || null;
-  const previewSourceMode = resolveSourceMode(config.previewSourceMode, previewSnapshotBaseUrl, previewMjpegUrl);
+  const previewFlvUrl = (config.flvUrl || "").trim() || null;
+  const fullscreenFlvUrl = (config.fullscreenFlvUrl || config.flvUrl || "").trim() || null;
+  const previewSourceMode = resolveSourceMode(
+    config.previewSourceMode,
+    previewSnapshotBaseUrl,
+    previewMjpegUrl,
+    previewFlvUrl
+  );
   const fullscreenSourceMode = resolveSourceMode(
     config.fullscreenSourceMode,
     fullscreenSnapshotBaseUrl,
     fullscreenMjpegUrl,
+    fullscreenFlvUrl,
     previewSourceMode
   );
 
@@ -56,18 +72,23 @@ export function CameraWidget({
     sourceMode: previewSourceMode,
     snapshotUrl: previewSnapshotBaseUrl,
     mjpegUrl: previewMjpegUrl,
+    flvUrl: previewFlvUrl,
   });
   const fullscreenFeed = resolveCameraFeed({
     sourceMode: fullscreenSourceMode,
     snapshotUrl: fullscreenSnapshotBaseUrl,
     mjpegUrl: fullscreenMjpegUrl,
+    flvUrl: fullscreenFlvUrl,
   });
   const activeFeed = fullscreenOpen ? fullscreenFeed : previewFeed;
   const activeSnapshotBaseUrl = activeFeed?.kind === "snapshot" ? activeFeed.url : null;
   const previewMjpegRenderUrl =
-    previewFeed?.kind === "mjpeg" ? getWebMjpegProxyUrl(previewFeed.url) || previewFeed.url : null;
+    previewFeed?.kind === "mjpeg" ? getWebStreamProxyUrl(previewFeed.url) || previewFeed.url : null;
   const fullscreenMjpegRenderUrl =
-    fullscreenFeed?.kind === "mjpeg" ? getWebMjpegProxyUrl(fullscreenFeed.url) || fullscreenFeed.url : null;
+    fullscreenFeed?.kind === "mjpeg" ? getWebStreamProxyUrl(fullscreenFeed.url) || fullscreenFeed.url : null;
+  const previewFlvRenderUrl = previewFeed?.kind === "flv" ? getWebStreamProxyUrl(previewFeed.url) || previewFeed.url : null;
+  const fullscreenFlvRenderUrl =
+    fullscreenFeed?.kind === "flv" ? getWebStreamProxyUrl(fullscreenFeed.url) || fullscreenFeed.url : null;
   const activeRefreshMs = fullscreenOpen
     ? Math.max(180, config.fullscreenRefreshMs || config.refreshMs || 2000)
     : Math.max(100, config.refreshMs || 2000);
@@ -366,6 +387,17 @@ export function CameraWidget({
                     <Image resizeMode="contain" source={{ uri: previewFeed.url }} style={styles.mjpegImage} />
                   )
               : null}
+            {!fullscreenOpen && previewFeed.kind === "flv" && previewFeed.url
+              ? Platform.OS === "web"
+                ? (
+                    <WebFlvPlayer title={config.title || "Camera FLV"} url={previewFlvRenderUrl || previewFeed.url} />
+                  )
+                : (
+                    <View style={styles.empty}>
+                      <Text style={[styles.emptyText, { color: mutedTextColor }]}>FLV wird nur im Web unterstuetzt.</Text>
+                    </View>
+                  )
+              : null}
             {config.showTitle !== false && config.title ? (
               <View style={styles.titleBadge}>
                 <Text numberOfLines={1} style={[styles.titleBadgeLabel, { color: textColor }]}>
@@ -377,12 +409,12 @@ export function CameraWidget({
         ) : (
           <View style={styles.empty}>
             <Text style={[styles.emptyText, { color: mutedTextColor }]}>
-              {previewSnapshotBaseUrl || previewMjpegUrl ? "Stream wird geladen..." : "Kein Stream konfiguriert"}
+              {previewSnapshotBaseUrl || previewMjpegUrl || previewFlvUrl ? "Stream wird geladen..." : "Kein Stream konfiguriert"}
             </Text>
           </View>
         )}
         </Pressable>
-        {!previewFeed && !previewSnapshotBaseUrl && !previewMjpegUrl ? (
+        {!previewFeed && !previewSnapshotBaseUrl && !previewMjpegUrl && !previewFlvUrl ? (
           <Text style={[styles.hint, { color: mutedTextColor }]}>Widget ist noch nicht konfiguriert.</Text>
         ) : null}
       </View>
@@ -485,6 +517,21 @@ export function CameraWidget({
                     <Image resizeMode="contain" source={{ uri: fullscreenFeed.url }} style={styles.fullscreenMjpegImage} />
                   )
               : null}
+            {fullscreenFeed?.kind === "flv" && fullscreenFeed.url
+              ? Platform.OS === "web"
+                ? (
+                    <WebFlvPlayer
+                      fullScreen
+                      title={config.title || "Camera FLV fullscreen"}
+                      url={fullscreenFlvRenderUrl || fullscreenFeed.url}
+                    />
+                  )
+                : (
+                    <View style={styles.empty}>
+                      <Text style={[styles.emptyText, { color: mutedTextColor }]}>FLV wird nur im Web unterstuetzt.</Text>
+                    </View>
+                  )
+              : null}
           </View>
           {config.showTitle !== false && config.title ? (
             <View style={styles.fullscreenTitle}>
@@ -558,24 +605,37 @@ function normalizeBoolean(value: unknown) {
 }
 
 function resolveCameraFeed(input: {
-  sourceMode: "snapshot" | "mjpeg";
+  sourceMode: "snapshot" | "mjpeg" | "flv";
   snapshotUrl: string | null;
   mjpegUrl: string | null;
+  flvUrl: string | null;
 }) {
-  if (input.sourceMode === "snapshot" && input.snapshotUrl) {
-    return { kind: "snapshot" as const, url: input.snapshotUrl };
-  }
+  const sourcePriority =
+    input.sourceMode === "snapshot"
+      ? [
+          { kind: "snapshot" as const, url: input.snapshotUrl },
+          { kind: "mjpeg" as const, url: input.mjpegUrl },
+          { kind: "flv" as const, url: input.flvUrl },
+        ]
+      : input.sourceMode === "mjpeg"
+        ? [
+            { kind: "mjpeg" as const, url: input.mjpegUrl },
+            { kind: "snapshot" as const, url: input.snapshotUrl },
+            { kind: "flv" as const, url: input.flvUrl },
+          ]
+        : [
+            { kind: "flv" as const, url: input.flvUrl },
+            { kind: "mjpeg" as const, url: input.mjpegUrl },
+            { kind: "snapshot" as const, url: input.snapshotUrl },
+          ];
 
-  if (input.sourceMode === "mjpeg" && input.mjpegUrl) {
-    return { kind: "mjpeg" as const, url: input.mjpegUrl };
-  }
-
-  if (input.sourceMode === "snapshot" && input.mjpegUrl) {
-    return { kind: "mjpeg" as const, url: input.mjpegUrl };
-  }
-
-  if (input.sourceMode === "mjpeg" && input.snapshotUrl) {
-    return { kind: "snapshot" as const, url: input.snapshotUrl };
+  for (const source of sourcePriority) {
+    if (source.url) {
+      return {
+        kind: source.kind,
+        url: source.url,
+      };
+    }
   }
 
   return null;
@@ -585,32 +645,148 @@ function resolveSourceMode(
   sourceMode: CameraWidgetConfig["previewSourceMode"],
   snapshotUrl: string | null,
   mjpegUrl: string | null,
-  fallback: "snapshot" | "mjpeg" = "snapshot"
+  flvUrl: string | null,
+  fallback: "snapshot" | "mjpeg" | "flv" = "snapshot"
 ) {
-  if (sourceMode === "snapshot" || sourceMode === "mjpeg") {
+  if (sourceMode === "snapshot" || sourceMode === "mjpeg" || sourceMode === "flv") {
     return sourceMode;
   }
 
-  if (snapshotUrl && !mjpegUrl) {
+  if (snapshotUrl && !mjpegUrl && !flvUrl) {
     return "snapshot";
   }
 
-  if (mjpegUrl && !snapshotUrl) {
+  if (mjpegUrl && !snapshotUrl && !flvUrl) {
     return "mjpeg";
+  }
+
+  if (flvUrl && !snapshotUrl && !mjpegUrl) {
+    return "flv";
   }
 
   return fallback;
 }
 
-function getWebMjpegProxyUrl(targetUrl: string) {
+function getWebStreamProxyUrl(targetUrl: string) {
   if (Platform.OS !== "web" || typeof window === "undefined") {
     return null;
   }
   if (!window.location.pathname.includes("/smarthome-dashboard")) {
     return null;
   }
-  const proxyBase = `${window.location.origin}/smarthome-dashboard/api/camera-mjpeg`;
+  const proxyBase = `${window.location.origin}/smarthome-dashboard/api/camera-stream`;
   return `${proxyBase}?url=${encodeURIComponent(targetUrl)}`;
+}
+
+function WebFlvPlayer({
+  url,
+  title,
+  fullScreen = false,
+}: {
+  url: string;
+  title: string;
+  fullScreen?: boolean;
+}) {
+  const videoRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") {
+      return;
+    }
+
+    let disposed = false;
+    let player: any = null;
+    const videoElement = videoRef.current;
+
+    const attach = async () => {
+      if (!videoElement || !url) {
+        return;
+      }
+
+      const loaded = await ensureFlvJsLoaded();
+      if (disposed || !loaded || !window.flvjs?.isSupported?.()) {
+        return;
+      }
+
+      player = window.flvjs.createPlayer(
+        {
+          type: "flv",
+          isLive: true,
+          url,
+        },
+        {
+          enableStashBuffer: false,
+          lazyLoad: false,
+        }
+      );
+
+      player.attachMediaElement(videoElement);
+      player.load();
+      void videoElement.play().catch(() => undefined);
+    };
+
+    attach().catch(() => undefined);
+
+    return () => {
+      disposed = true;
+      if (player) {
+        try {
+          player.unload();
+          player.detachMediaElement();
+          player.destroy();
+        } catch {
+          // ignore cleanup errors
+        }
+      }
+      if (videoElement) {
+        videoElement.removeAttribute("src");
+        videoElement.load();
+      }
+    };
+  }, [url]);
+
+  return createElement("video", {
+    autoPlay: true,
+    controls: false,
+    muted: true,
+    playsInline: true,
+    ref: (element: any) => {
+      videoRef.current = element;
+    },
+    style: fullScreen ? fullscreenWebFlvStyle : webFlvStyle,
+    title,
+  });
+}
+
+async function ensureFlvJsLoaded() {
+  if (Platform.OS !== "web" || typeof window === "undefined" || typeof document === "undefined") {
+    return false;
+  }
+
+  if (window.flvjs) {
+    return true;
+  }
+
+  if (!flvLoaderPromise) {
+    flvLoaderPromise = new Promise<boolean>((resolve) => {
+      const existing = document.querySelector(`script[data-flvjs-src="${FLV_SCRIPT_SRC}"]`) as HTMLScriptElement | null;
+      if (existing) {
+        existing.addEventListener("load", () => resolve(Boolean(window.flvjs)), { once: true });
+        existing.addEventListener("error", () => resolve(false), { once: true });
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = FLV_SCRIPT_SRC;
+      script.async = true;
+      script.dataset.flvjsSrc = FLV_SCRIPT_SRC;
+      script.onload = () => resolve(Boolean(window.flvjs));
+      script.onerror = () => resolve(false);
+      document.head.appendChild(script);
+    });
+  }
+
+  return flvLoaderPromise;
 }
 
 const styles = StyleSheet.create({
@@ -792,6 +968,22 @@ const webMjpegStyle = {
 } as const;
 
 const fullscreenWebMjpegStyle = {
+  width: "100%",
+  height: "100%",
+  objectFit: "contain",
+  display: "block",
+  backgroundColor: "#000000",
+} as const;
+
+const webFlvStyle = {
+  width: "100%",
+  height: "100%",
+  objectFit: "contain",
+  display: "block",
+  backgroundColor: "#000000",
+} as const;
+
+const fullscreenWebFlvStyle = {
   width: "100%",
   height: "100%",
   objectFit: "contain",

@@ -73,17 +73,26 @@ function migrateConfig(input: DashboardSettings): DashboardSettings {
       const snapshotUrl = legacySnapshot ? "" : widget.snapshotUrl;
       const previewSnapshotUrl = (snapshotUrl || "").trim() || null;
       const previewMjpegUrl = (widget.mjpegUrl || "").trim() || null;
+      const previewFlvUrl = (widget.flvUrl || "").trim() || null;
       const fullscreenSnapshotUrl = (widget.fullscreenSnapshotUrl || snapshotUrl || "").trim() || null;
       const fullscreenMjpegUrl = (widget.fullscreenMjpegUrl || widget.mjpegUrl || "").trim() || null;
+      const fullscreenFlvUrl = (widget.fullscreenFlvUrl || widget.flvUrl || "").trim() || null;
 
       const previewSourceMode =
         widget.previewSourceMode ||
-        inferCameraSourceMode(previewSnapshotUrl, previewMjpegUrl, legacyCamera.useMjpegInPreview === true, "snapshot");
+        inferCameraSourceMode(
+          previewSnapshotUrl,
+          previewMjpegUrl,
+          previewFlvUrl,
+          legacyCamera.useMjpegInPreview === true,
+          "snapshot"
+        );
       const fullscreenSourceMode =
         widget.fullscreenSourceMode ||
         inferCameraSourceMode(
           fullscreenSnapshotUrl,
           fullscreenMjpegUrl,
+          fullscreenFlvUrl,
           legacyCamera.useMjpegInFullscreen === true,
           previewSourceMode
         );
@@ -104,17 +113,30 @@ function migrateConfig(input: DashboardSettings): DashboardSettings {
 function inferCameraSourceMode(
   snapshotUrl: string | null,
   mjpegUrl: string | null,
+  flvUrl: string | null,
   legacyPreferMjpeg: boolean,
-  fallback: "snapshot" | "mjpeg"
+  fallback: "snapshot" | "mjpeg" | "flv"
 ) {
   if (legacyPreferMjpeg && mjpegUrl) {
     return "mjpeg";
   }
+  if (flvUrl && !snapshotUrl && !mjpegUrl) {
+    return "flv";
+  }
   if (snapshotUrl && !mjpegUrl) {
     return "snapshot";
   }
-  if (mjpegUrl && !snapshotUrl) {
+  if (mjpegUrl && !snapshotUrl && !flvUrl) {
     return "mjpeg";
+  }
+  if (snapshotUrl) {
+    return "snapshot";
+  }
+  if (mjpegUrl) {
+    return "mjpeg";
+  }
+  if (flvUrl) {
+    return "flv";
   }
   return fallback;
 }

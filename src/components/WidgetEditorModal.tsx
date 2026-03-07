@@ -114,6 +114,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         fullscreenSnapshotUrl: widget.fullscreenSnapshotUrl || "",
         mjpegUrl: widget.mjpegUrl || "",
         fullscreenMjpegUrl: widget.fullscreenMjpegUrl || "",
+        flvUrl: widget.flvUrl || "",
+        fullscreenFlvUrl: widget.fullscreenFlvUrl || "",
         refreshMs: String(widget.refreshMs || 2000),
         fullscreenRefreshMs: String(widget.fullscreenRefreshMs || widget.refreshMs || 1000),
         maximizeStateId: widget.maximizeStateId || "",
@@ -350,15 +352,23 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         appearance,
       });
     } else if (widget.type === "camera") {
+      const previewSourceMode =
+        draft.previewSourceMode === "mjpeg" || draft.previewSourceMode === "flv" ? draft.previewSourceMode : "snapshot";
+      const fullscreenSourceMode =
+        draft.fullscreenSourceMode === "mjpeg" || draft.fullscreenSourceMode === "flv"
+          ? draft.fullscreenSourceMode
+          : "snapshot";
       onSave(widget.id, {
         title: draft.title,
         showTitle: draft.showTitle !== "false",
-        previewSourceMode: draft.previewSourceMode === "mjpeg" ? "mjpeg" : "snapshot",
-        fullscreenSourceMode: draft.fullscreenSourceMode === "mjpeg" ? "mjpeg" : "snapshot",
+        previewSourceMode,
+        fullscreenSourceMode,
         snapshotUrl: draft.snapshotUrl || undefined,
         fullscreenSnapshotUrl: draft.fullscreenSnapshotUrl || undefined,
         mjpegUrl: draft.mjpegUrl || undefined,
         fullscreenMjpegUrl: draft.fullscreenMjpegUrl || undefined,
+        flvUrl: draft.flvUrl || undefined,
+        fullscreenFlvUrl: draft.fullscreenFlvUrl || undefined,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 250),
         fullscreenRefreshMs: clampInt(
           draft.fullscreenRefreshMs,
@@ -819,14 +829,14 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
               <>
                 <Field label="Quelle Miniaturansicht">
                   <ChoiceRow
-                    options={["snapshot", "mjpeg"]}
+                    options={["snapshot", "mjpeg", "flv"]}
                     value={draft.previewSourceMode || "snapshot"}
                     onSelect={(value) => setDraft((current) => ({ ...current, previewSourceMode: value }))}
                   />
                 </Field>
                 <Field label="Quelle Vollbildansicht">
                   <ChoiceRow
-                    options={["snapshot", "mjpeg"]}
+                    options={["snapshot", "mjpeg", "flv"]}
                     value={draft.fullscreenSourceMode || "snapshot"}
                     onSelect={(value) => setDraft((current) => ({ ...current, fullscreenSourceMode: value }))}
                   />
@@ -863,6 +873,22 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={draft.fullscreenMjpegUrl || ""}
                   />
                 </Field>
+                <Field label="FLV URL (Miniatur)">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) => setDraft((current) => ({ ...current, flvUrl: value }))}
+                    style={styles.input}
+                    value={draft.flvUrl || ""}
+                  />
+                </Field>
+                <Field label="FLV URL (Vollbild, optional)">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) => setDraft((current) => ({ ...current, fullscreenFlvUrl: value }))}
+                    style={styles.input}
+                    value={draft.fullscreenFlvUrl || ""}
+                  />
+                </Field>
                 <Field label="Refresh (ms)">
                   <TextInput
                     editable={(draft.previewSourceMode || "snapshot") === "snapshot"}
@@ -870,12 +896,12 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     onChangeText={(value) => setDraft((current) => ({ ...current, refreshMs: value }))}
                     style={[
                       styles.input,
-                      (draft.previewSourceMode || "snapshot") === "mjpeg" ? styles.disabledInput : null,
+                      (draft.previewSourceMode || "snapshot") !== "snapshot" ? styles.disabledInput : null,
                     ]}
                     value={draft.refreshMs || ""}
                   />
-                  {(draft.previewSourceMode || "snapshot") === "mjpeg" ? (
-                    <Text style={styles.mappingHint}>Bei MJPEG ist kein Snapshot-Refresh aktiv.</Text>
+                  {(draft.previewSourceMode || "snapshot") !== "snapshot" ? (
+                    <Text style={styles.mappingHint}>Refresh gilt nur fuer Snapshot.</Text>
                   ) : null}
                 </Field>
                 <Field label="Refresh Vollbild (ms)">
@@ -885,12 +911,12 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     onChangeText={(value) => setDraft((current) => ({ ...current, fullscreenRefreshMs: value }))}
                     style={[
                       styles.input,
-                      (draft.fullscreenSourceMode || "snapshot") === "mjpeg" ? styles.disabledInput : null,
+                      (draft.fullscreenSourceMode || "snapshot") !== "snapshot" ? styles.disabledInput : null,
                     ]}
                     value={draft.fullscreenRefreshMs || ""}
                   />
-                  {(draft.fullscreenSourceMode || "snapshot") === "mjpeg" ? (
-                    <Text style={styles.mappingHint}>Bei MJPEG ist im Vollbild kein Snapshot-Refresh aktiv.</Text>
+                  {(draft.fullscreenSourceMode || "snapshot") !== "snapshot" ? (
+                    <Text style={styles.mappingHint}>Refresh gilt im Vollbild nur fuer Snapshot.</Text>
                   ) : null}
                 </Field>
                 <Field label="Maximieren per Datenpunkt">

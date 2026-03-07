@@ -44,6 +44,8 @@ const defaultWidgets: DashboardSettings["widgets"] = [
       fullscreenSnapshotUrl: "",
       mjpegUrl: "",
       fullscreenMjpegUrl: "",
+      flvUrl: "",
+      fullscreenFlvUrl: "",
       refreshMs: 2000,
       position: { x: 6, y: 0, w: 6, h: 4 },
     },
