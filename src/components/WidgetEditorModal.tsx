@@ -319,6 +319,11 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     return null;
   }
 
+  const previewCameraMode = normalizeCameraSourceMode(draft.previewSourceMode);
+  const fullscreenCameraMode = normalizeCameraSourceMode(draft.fullscreenSourceMode);
+  const previewCameraUrl = getCameraUrlByMode(draft, previewCameraMode, false);
+  const fullscreenCameraUrl = getCameraUrlByMode(draft, fullscreenCameraMode, true);
+
   const save = () => {
     const appearance = buildAppearance(draft);
 
@@ -352,23 +357,25 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         appearance,
       });
     } else if (widget.type === "camera") {
-      const previewSourceMode =
-        draft.previewSourceMode === "mjpeg" || draft.previewSourceMode === "flv" ? draft.previewSourceMode : "snapshot";
-      const fullscreenSourceMode =
-        draft.fullscreenSourceMode === "mjpeg" || draft.fullscreenSourceMode === "flv"
-          ? draft.fullscreenSourceMode
-          : "snapshot";
+      const previewSourceMode = previewCameraMode;
+      const fullscreenSourceMode = fullscreenCameraMode;
+      const snapshotUrl = normalizeOptionalInput(draft.snapshotUrl);
+      const fullscreenSnapshotUrl = normalizeOptionalInput(draft.fullscreenSnapshotUrl);
+      const mjpegUrl = normalizeOptionalInput(draft.mjpegUrl);
+      const fullscreenMjpegUrl = normalizeOptionalInput(draft.fullscreenMjpegUrl);
+      const flvUrl = normalizeOptionalInput(draft.flvUrl);
+      const fullscreenFlvUrl = normalizeOptionalInput(draft.fullscreenFlvUrl);
       onSave(widget.id, {
         title: draft.title,
         showTitle: draft.showTitle !== "false",
         previewSourceMode,
         fullscreenSourceMode,
-        snapshotUrl: draft.snapshotUrl || undefined,
-        fullscreenSnapshotUrl: draft.fullscreenSnapshotUrl || undefined,
-        mjpegUrl: draft.mjpegUrl || undefined,
-        fullscreenMjpegUrl: draft.fullscreenMjpegUrl || undefined,
-        flvUrl: draft.flvUrl || undefined,
-        fullscreenFlvUrl: draft.fullscreenFlvUrl || undefined,
+        snapshotUrl,
+        fullscreenSnapshotUrl,
+        mjpegUrl,
+        fullscreenMjpegUrl,
+        flvUrl,
+        fullscreenFlvUrl,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 250),
         fullscreenRefreshMs: clampInt(
           draft.fullscreenRefreshMs,
@@ -830,96 +837,71 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 <Field label="Quelle Miniaturansicht">
                   <ChoiceRow
                     options={["snapshot", "mjpeg", "flv"]}
-                    value={draft.previewSourceMode || "snapshot"}
+                    value={previewCameraMode}
                     onSelect={(value) => setDraft((current) => ({ ...current, previewSourceMode: value }))}
                   />
                 </Field>
                 <Field label="Quelle Vollbildansicht">
                   <ChoiceRow
                     options={["snapshot", "mjpeg", "flv"]}
-                    value={draft.fullscreenSourceMode || "snapshot"}
+                    value={fullscreenCameraMode}
                     onSelect={(value) => setDraft((current) => ({ ...current, fullscreenSourceMode: value }))}
                   />
                 </Field>
-                <Field label="Snapshot URL (Miniatur)">
+                <Field label="URL Miniaturansicht">
                   <TextInput
                     autoCapitalize="none"
-                    onChangeText={(value) => setDraft((current) => ({ ...current, snapshotUrl: value }))}
+                    onChangeText={(value) =>
+                      setDraft((current) => setCameraUrlByMode(current, previewCameraMode, false, value))
+                    }
                     style={styles.input}
-                    value={draft.snapshotUrl || ""}
+                    value={previewCameraUrl}
                   />
                 </Field>
-                <Field label="Snapshot URL (Vollbild, optional)">
+                <Field label="URL Vollbildansicht (optional)">
                   <TextInput
                     autoCapitalize="none"
-                    onChangeText={(value) => setDraft((current) => ({ ...current, fullscreenSnapshotUrl: value }))}
+                    onChangeText={(value) =>
+                      setDraft((current) => setCameraUrlByMode(current, fullscreenCameraMode, true, value))
+                    }
                     style={styles.input}
-                    value={draft.fullscreenSnapshotUrl || ""}
+                    value={fullscreenCameraUrl}
                   />
                 </Field>
-                <Field label="MJPEG URL (Miniatur)">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) => setDraft((current) => ({ ...current, mjpegUrl: value }))}
-                    style={styles.input}
-                    value={draft.mjpegUrl || ""}
-                  />
-                </Field>
-                <Field label="MJPEG URL (Vollbild, optional)">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) => setDraft((current) => ({ ...current, fullscreenMjpegUrl: value }))}
-                    style={styles.input}
-                    value={draft.fullscreenMjpegUrl || ""}
-                  />
-                </Field>
-                <Field label="FLV URL (Miniatur)">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) => setDraft((current) => ({ ...current, flvUrl: value }))}
-                    style={styles.input}
-                    value={draft.flvUrl || ""}
-                  />
-                </Field>
-                <Field label="FLV URL (Vollbild, optional)">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) => setDraft((current) => ({ ...current, fullscreenFlvUrl: value }))}
-                    style={styles.input}
-                    value={draft.fullscreenFlvUrl || ""}
-                  />
-                </Field>
+                <Text style={styles.mappingHint}>
+                  Die URL-Felder gelten jeweils fuer das oben gewaehlte Format (Snapshot, MJPEG oder FLV).
+                </Text>
                 <Text style={styles.mappingHint}>
                   FLV-Hinweis: Bei `CodecUnsupported` liefert der Stream meist kein browser-kompatibles H.264. Falls
                   vorhanden, statt `main` den `ext`/Substream verwenden (z. B. `channel0_ext.bcs`).
                 </Text>
                 <Field label="Refresh (ms)">
                   <TextInput
-                    editable={(draft.previewSourceMode || "snapshot") === "snapshot"}
+                    editable={previewCameraMode === "snapshot"}
                     keyboardType="numeric"
                     onChangeText={(value) => setDraft((current) => ({ ...current, refreshMs: value }))}
                     style={[
                       styles.input,
-                      (draft.previewSourceMode || "snapshot") !== "snapshot" ? styles.disabledInput : null,
+                      previewCameraMode !== "snapshot" ? styles.disabledInput : null,
                     ]}
                     value={draft.refreshMs || ""}
                   />
-                  {(draft.previewSourceMode || "snapshot") !== "snapshot" ? (
+                  {previewCameraMode !== "snapshot" ? (
                     <Text style={styles.mappingHint}>Refresh gilt nur fuer Snapshot.</Text>
                   ) : null}
                 </Field>
                 <Field label="Refresh Vollbild (ms)">
                   <TextInput
-                    editable={(draft.fullscreenSourceMode || "snapshot") === "snapshot"}
+                    editable={fullscreenCameraMode === "snapshot"}
                     keyboardType="numeric"
                     onChangeText={(value) => setDraft((current) => ({ ...current, fullscreenRefreshMs: value }))}
                     style={[
                       styles.input,
-                      (draft.fullscreenSourceMode || "snapshot") !== "snapshot" ? styles.disabledInput : null,
+                      fullscreenCameraMode !== "snapshot" ? styles.disabledInput : null,
                     ]}
                     value={draft.fullscreenRefreshMs || ""}
                   />
-                  {(draft.fullscreenSourceMode || "snapshot") !== "snapshot" ? (
+                  {fullscreenCameraMode !== "snapshot" ? (
                     <Text style={styles.mappingHint}>Refresh gilt im Vollbild nur fuer Snapshot.</Text>
                   ) : null}
                 </Field>
@@ -1925,6 +1907,47 @@ function normalizeStateFormat(raw: string | undefined) {
     return raw;
   }
   return "boolean";
+}
+
+function normalizeCameraSourceMode(raw: string | undefined) {
+  if (raw === "mjpeg" || raw === "flv") {
+    return raw;
+  }
+  return "snapshot";
+}
+
+function getCameraUrlByMode(
+  draft: Record<string, string>,
+  mode: "snapshot" | "mjpeg" | "flv",
+  fullscreen: boolean
+) {
+  if (mode === "snapshot") {
+    return fullscreen ? draft.fullscreenSnapshotUrl || "" : draft.snapshotUrl || "";
+  }
+  if (mode === "mjpeg") {
+    return fullscreen ? draft.fullscreenMjpegUrl || "" : draft.mjpegUrl || "";
+  }
+  return fullscreen ? draft.fullscreenFlvUrl || "" : draft.flvUrl || "";
+}
+
+function setCameraUrlByMode(
+  draft: Record<string, string>,
+  mode: "snapshot" | "mjpeg" | "flv",
+  fullscreen: boolean,
+  value: string
+) {
+  if (mode === "snapshot") {
+    return fullscreen ? { ...draft, fullscreenSnapshotUrl: value } : { ...draft, snapshotUrl: value };
+  }
+  if (mode === "mjpeg") {
+    return fullscreen ? { ...draft, fullscreenMjpegUrl: value } : { ...draft, mjpegUrl: value };
+  }
+  return fullscreen ? { ...draft, fullscreenFlvUrl: value } : { ...draft, flvUrl: value };
+}
+
+function normalizeOptionalInput(value: string | undefined) {
+  const normalized = (value || "").trim();
+  return normalized || undefined;
 }
 
 function normalizeAddonMode(raw: string | undefined) {
