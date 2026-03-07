@@ -910,7 +910,12 @@ function WebFlvPlayer({
   const videoRef = useRef<any>(null);
   const playerRef = useRef<any>(null);
   const ratioReportedRef = useRef(false);
+  const aspectRatioCallbackRef = useRef(onAspectRatioDetected);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    aspectRatioCallbackRef.current = onAspectRatioDetected;
+  }, [onAspectRatioDetected]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") {
@@ -965,7 +970,8 @@ function WebFlvPlayer({
 
       player.attachMediaElement(videoElement);
       videoElement.onloadedmetadata = () => {
-        if (ratioReportedRef.current || !onAspectRatioDetected) {
+        const callback = aspectRatioCallbackRef.current;
+        if (ratioReportedRef.current || !callback) {
           return;
         }
         const width = Number(videoElement.videoWidth || 0);
@@ -978,7 +984,7 @@ function WebFlvPlayer({
           return;
         }
         ratioReportedRef.current = true;
-        onAspectRatioDetected(ratio);
+        callback(ratio);
       };
       player.load();
       void videoElement.play().catch(() => {
@@ -1008,7 +1014,7 @@ function WebFlvPlayer({
       }
       playerRef.current = null;
     };
-  }, [onAspectRatioDetected, url]);
+  }, [url]);
 
   return (
     <>
