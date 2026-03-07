@@ -38,6 +38,7 @@ export function CameraWidget({
   const [loadingLayer, setLoadingLayer] = useState<0 | 1 | null>(null);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [pinned, setPinned] = useState(false);
+  const [previewStreamDebug, setPreviewStreamDebug] = useState<string | null>(null);
   const hasReportedAspectRatio = useRef(Boolean(config.snapshotAspectRatio));
   const lastTriggerMatchRef = useRef(false);
   const activeLayerRef = useRef<0 | 1>(0);
@@ -129,6 +130,50 @@ export function CameraWidget({
     const timer = setInterval(() => setTick((current) => current + 1), activeRefreshMs);
     return () => clearInterval(timer);
   }, [activeRefreshMs, activeSnapshotBaseUrl]);
+
+  useEffect(() => {
+    if (
+      Platform.OS !== "web" ||
+      typeof window === "undefined" ||
+      fullscreenOpen ||
+      previewFeed?.kind !== "mjpeg" ||
+      !previewMjpegRenderUrl
+    ) {
+      setPreviewStreamDebug(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 4000);
+
+    fetch(previewMjpegRenderUrl, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (!response.ok) {
+          setPreviewStreamDebug(`MJPEG Preview Fehler: HTTP ${response.status}`);
+          return;
+        }
+        setPreviewStreamDebug(null);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        const message = error instanceof Error ? error.message : "Unbekannter Fehler";
+        setPreviewStreamDebug(`MJPEG Preview Fehler: ${message}`);
+      })
+      .finally(() => {
+        window.clearTimeout(timer);
+      });
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [fullscreenOpen, previewFeed?.kind, previewMjpegRenderUrl]);
 
   useEffect(() => {
     fullscreenVisibilityCallbackRef.current = onFullscreenVisibilityChange;
@@ -381,6 +426,12 @@ export function CameraWidget({
                     decoding: "sync",
                     draggable: false,
                     loading: "eager",
+                    onError: () => {
+                      setPreviewStreamDebug((current) => current || "MJPEG Preview: Bild konnte nicht geladen werden.");
+                    },
+                    onLoad: () => {
+                      setPreviewStreamDebug(null);
+                    },
                     src: previewMjpegRenderUrl || previewFeed.url,
                     style: webMjpegStyle,
                   })
@@ -388,6 +439,11 @@ export function CameraWidget({
                     <Image resizeMode="contain" source={{ uri: previewFeed.url }} style={styles.mjpegImage} />
                   )
               : null}
+            {!fullscreenOpen && previewFeed.kind === "mjpeg" && previewStreamDebug ? (
+              <View style={styles.streamDebugOverlay}>
+                <Text style={styles.streamDebugText}>{previewStreamDebug}</Text>
+              </View>
+            ) : null}
             {!fullscreenOpen && previewFeed.kind === "flv" && previewFeed.url
               ? Platform.OS === "web"
                 ? (
@@ -1018,6 +1074,21 @@ const styles = StyleSheet.create({
   flvTapText: {
     color: "#ffffff",
     fontSize: 13,
+    fontWeight: "700",
+  },
+  streamDebugOverlay: {
+    position: "absolute",
+    left: 10,
+    right: 10,
+    bottom: 10,
+    borderRadius: 10,
+    backgroundColor: "rgba(0, 0, 0, 0.72)",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  streamDebugText: {
+    color: "#ffe7e7",
+    fontSize: 12,
     fontWeight: "700",
   },
 });
