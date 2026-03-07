@@ -24,6 +24,7 @@ const LAYER_FADE_MS = 0;
 const pinnedColor = "#f3c84a";
 const FLV_SCRIPT_SRC = "https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js";
 const FLV_SCRIPT_LOAD_TIMEOUT_MS = 8000;
+const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 12_000;
 let flvLoaderPromise: Promise<boolean> | null = null;
 
 export function CameraWidget({
@@ -211,6 +212,10 @@ export function CameraWidget({
       return;
     }
 
+    if (previewMjpegSources.length < 2) {
+      return;
+    }
+
     const timer = setTimeout(() => {
       setPreviewMjpegSourceIndex((current) => {
         const next = current + 1 < previewMjpegSources.length ? current + 1 : current;
@@ -219,7 +224,7 @@ export function CameraWidget({
         }
         return next;
       });
-    }, 3500);
+    }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
 
     return () => clearTimeout(timer);
   }, [
@@ -239,11 +244,15 @@ export function CameraWidget({
       return;
     }
 
+    if (fullscreenMjpegSources.length < 2) {
+      return;
+    }
+
     const timer = setTimeout(() => {
       setFullscreenMjpegSourceIndex((current) =>
         current + 1 < fullscreenMjpegSources.length ? current + 1 : current
       );
-    }, 3500);
+    }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
 
     return () => clearTimeout(timer);
   }, [
@@ -522,7 +531,7 @@ export function CameraWidget({
                       setPreviewMjpegLoaded(false);
                       if (previewMjpegSourceIndex + 1 < previewMjpegSources.length) {
                         setPreviewMjpegSourceIndex((current) => current + 1);
-                        setPreviewStreamDebug("MJPEG Preview: Proxy fehlgeschlagen, versuche Direkt-URL...");
+                        setPreviewStreamDebug("MJPEG Preview: Quelle fehlgeschlagen, versuche naechste URL...");
                         return;
                       }
                       setPreviewStreamDebug((current) => current || "MJPEG Preview: Bild konnte nicht geladen werden.");
