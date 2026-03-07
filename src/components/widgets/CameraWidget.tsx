@@ -1719,19 +1719,29 @@ const baseFullscreenWebLayerStyle = {
 } as const;
 
 const webMjpegStyle = {
+  position: "absolute",
+  left: 0,
+  top: 0,
   width: "100%",
   height: "100%",
   objectFit: "contain",
+  objectPosition: "center center",
   display: "block",
   backgroundColor: "#000000",
+  pointerEvents: "none",
 } as const;
 
 const fullscreenWebMjpegStyle = {
+  position: "absolute",
+  left: 0,
+  top: 0,
   width: "100%",
   height: "100%",
   objectFit: "contain",
+  objectPosition: "center center",
   display: "block",
   backgroundColor: "#000000",
+  pointerEvents: "none",
 } as const;
 
 const webFlvStyle = {
