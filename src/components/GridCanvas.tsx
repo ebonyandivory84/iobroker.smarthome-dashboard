@@ -135,7 +135,7 @@ export function GridCanvas({
                 gap={displayConfig.grid.gap}
                 isLayoutMode={effectiveLayoutMode}
                 allowManualLayout={!isCompactWeb}
-                allowResize={false}
+                allowResize={widget.type === "camera"}
                 onCommitPosition={(widgetId, position) =>
                   onUpdateWidget(widgetId, {
                     position: mapDisplayPositionToSourceHint(position, displayConfig.grid.columns, config.grid.columns),
@@ -526,7 +526,7 @@ function WebGridCanvas({
           onDragAcrossPageEdge={onDragAcrossPageEdge}
           stateWrites={stateWrites}
           allowManualLayout={true}
-          allowResize={false}
+          allowResize={widget.type === "camera"}
           mainColumnExtraGap={mainColumnExtraGap}
           sourceColumns={sourceColumns}
           states={states}
@@ -639,11 +639,19 @@ function WebWidgetShell({
           }
         }
       } else {
-        setPreview(constrainToPrimarySections({
-          ...active.startPosition,
-          w: clamp(active.startPosition.w + dx, 1, config.grid.columns),
-          h: Math.max(1, active.startPosition.h + dy),
-        }, config.grid.columns));
+        if (widget.type === "camera") {
+          setPreview(constrainToPrimarySections({
+            ...active.startPosition,
+            w: active.startPosition.w,
+            h: Math.max(1, active.startPosition.h + dy),
+          }, config.grid.columns));
+        } else {
+          setPreview(constrainToPrimarySections({
+            ...active.startPosition,
+            w: clamp(active.startPosition.w + dx, 1, config.grid.columns),
+            h: Math.max(1, active.startPosition.h + dy),
+          }, config.grid.columns));
+        }
       }
     };
 
