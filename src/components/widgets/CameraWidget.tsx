@@ -83,12 +83,13 @@ export function CameraWidget({
   const activeFeed = fullscreenOpen ? fullscreenFeed : previewFeed;
   const activeSnapshotBaseUrl = activeFeed?.kind === "snapshot" ? activeFeed.url : null;
   const previewMjpegRenderUrl =
-    previewFeed?.kind === "mjpeg" ? getWebStreamProxyUrl(previewFeed.url) || previewFeed.url : null;
+    previewFeed?.kind === "mjpeg" ? getWebStreamProxyUrl(previewFeed.url, "mjpeg") || previewFeed.url : null;
   const fullscreenMjpegRenderUrl =
-    fullscreenFeed?.kind === "mjpeg" ? getWebStreamProxyUrl(fullscreenFeed.url) || fullscreenFeed.url : null;
-  const previewFlvRenderUrl = previewFeed?.kind === "flv" ? getWebStreamProxyUrl(previewFeed.url) || previewFeed.url : null;
+    fullscreenFeed?.kind === "mjpeg" ? getWebStreamProxyUrl(fullscreenFeed.url, "mjpeg") || fullscreenFeed.url : null;
+  const previewFlvRenderUrl =
+    previewFeed?.kind === "flv" ? getWebStreamProxyUrl(previewFeed.url, "flv") || previewFeed.url : null;
   const fullscreenFlvRenderUrl =
-    fullscreenFeed?.kind === "flv" ? getWebStreamProxyUrl(fullscreenFeed.url) || fullscreenFeed.url : null;
+    fullscreenFeed?.kind === "flv" ? getWebStreamProxyUrl(fullscreenFeed.url, "flv") || fullscreenFeed.url : null;
   const activeRefreshMs = fullscreenOpen
     ? Math.max(180, config.fullscreenRefreshMs || config.refreshMs || 2000)
     : Math.max(100, config.refreshMs || 2000);
@@ -667,7 +668,7 @@ function resolveSourceMode(
   return fallback;
 }
 
-function getWebStreamProxyUrl(targetUrl: string) {
+function getWebStreamProxyUrl(targetUrl: string, streamType: "mjpeg" | "flv") {
   if (Platform.OS !== "web" || typeof window === "undefined") {
     return null;
   }
@@ -675,7 +676,7 @@ function getWebStreamProxyUrl(targetUrl: string) {
     return null;
   }
   const proxyBase = `${window.location.origin}/smarthome-dashboard/api/camera-stream`;
-  return `${proxyBase}?url=${encodeURIComponent(targetUrl)}`;
+  return `${proxyBase}?streamType=${streamType}&url=${encodeURIComponent(targetUrl)}`;
 }
 
 function WebFlvPlayer({
@@ -729,8 +730,13 @@ function WebFlvPlayer({
       );
 
       if (window.flvjs?.Events?.ERROR) {
-        player.on(window.flvjs.Events.ERROR, () => {
-          setErrorMessage("FLV Stream konnte nicht gestartet werden.");
+        player.on(window.flvjs.Events.ERROR, (errorType: string, errorDetail: string) => {
+          const detail = [errorType, errorDetail].filter(Boolean).join(" / ");
+          setErrorMessage(
+            detail
+              ? `FLV Stream konnte nicht gestartet werden (${detail}).`
+              : "FLV Stream konnte nicht gestartet werden."
+          );
         });
       }
 

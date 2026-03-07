@@ -275,6 +275,7 @@ async function main(adapter) {
 
   const handleCameraStreamProxy = async (req, res) => {
     const targetUrl = typeof req.query?.url === "string" ? req.query.url : "";
+    const streamType = typeof req.query?.streamType === "string" ? req.query.streamType.toLowerCase() : "";
     if (!targetUrl) {
       res.status(400).json({ error: "url missing" });
       return;
@@ -297,7 +298,10 @@ async function main(adapter) {
         return;
       }
 
-      const contentType = response.headers.get("content-type") || "multipart/x-mixed-replace";
+      const sourceContentType = response.headers.get("content-type");
+      const contentType =
+        sourceContentType ||
+        (streamType === "flv" || looksLikeFlvUrl(targetUrl) ? "video/x-flv" : "multipart/x-mixed-replace");
       res.setHeader("Content-Type", contentType);
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
       res.setHeader("Connection", "keep-alive");
@@ -470,6 +474,23 @@ function isLikelyLocalHost(hostname) {
     return true;
   }
 
+  return false;
+}
+
+function looksLikeFlvUrl(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    const pathname = parsed.pathname.toLowerCase();
+    if (pathname.endsWith(".flv") || pathname.includes("/flv")) {
+      return true;
+    }
+    const streamParam = parsed.searchParams.get("stream");
+    if (streamParam && streamParam.toLowerCase().includes(".bcs")) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
   return false;
 }
 
