@@ -530,7 +530,7 @@ export function CameraWidget({
                           reportAspectRatio(source.width, source.height);
                         }
                       }}
-                      resizeMode="cover"
+                      resizeMode="contain"
                       source={{ uri: previewFeed.url }}
                       style={styles.mjpegImage}
                     />
@@ -866,10 +866,10 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv") {
 
 function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv") {
   const includeDirect = shouldUseDirectWebStream(targetUrl, streamType);
-  const sources = [
-    ...getWebStreamProxyUrls(targetUrl, streamType),
-    ...(includeDirect ? [targetUrl] : []),
-  ];
+  const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
+  const sources = includeDirect
+    ? [targetUrl, ...proxySources]
+    : proxySources;
   return Array.from(new Set(sources.filter(Boolean)));
 }
 
@@ -1292,7 +1292,7 @@ const baseFullscreenWebLayerStyle = {
 const webMjpegStyle = {
   width: "100%",
   height: "100%",
-  objectFit: "cover",
+  objectFit: "contain",
   display: "block",
   backgroundColor: "#000000",
 } as const;
