@@ -39,6 +39,31 @@ export function CameraWidget({
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const displayUrl = layerUrls[activeLayer];
+
+  const previewSnapshotBaseUrl = (config.snapshotUrl || "").trim() || null;
+  const fullscreenSnapshotBaseUrl = (config.fullscreenSnapshotUrl || config.snapshotUrl || "").trim() || null;
+  const previewMjpegUrl = (config.mjpegUrl || "").trim() || null;
+  const fullscreenMjpegUrl = (config.fullscreenMjpegUrl || config.mjpegUrl || "").trim() || null;
+
+  const useSnapshotInPreview = config.useSnapshotInPreview !== false;
+  const useSnapshotInFullscreen = config.useSnapshotInFullscreen !== false;
+  const useMjpegInPreview = config.useMjpegInPreview === true;
+  const useMjpegInFullscreen = config.useMjpegInFullscreen === true;
+
+  const previewFeed = resolveCameraFeed({
+    snapshotUrl: previewSnapshotBaseUrl,
+    snapshotEnabled: useSnapshotInPreview,
+    mjpegUrl: previewMjpegUrl,
+    mjpegEnabled: useMjpegInPreview,
+  });
+  const fullscreenFeed = resolveCameraFeed({
+    snapshotUrl: fullscreenSnapshotBaseUrl,
+    snapshotEnabled: useSnapshotInFullscreen,
+    mjpegUrl: fullscreenMjpegUrl,
+    mjpegEnabled: useMjpegInFullscreen,
+  });
+  const activeFeed = fullscreenOpen ? fullscreenFeed : previewFeed;
+  const activeSnapshotBaseUrl = activeFeed?.kind === "snapshot" ? activeFeed.url : null;
   const activeRefreshMs = fullscreenOpen
     ? Math.max(180, config.fullscreenRefreshMs || config.refreshMs || 2000)
     : Math.max(100, config.refreshMs || 2000);
@@ -72,9 +97,12 @@ export function CameraWidget({
   );
 
   useEffect(() => {
+    if (!activeSnapshotBaseUrl) {
+      return;
+    }
     const timer = setInterval(() => setTick((current) => current + 1), activeRefreshMs);
     return () => clearInterval(timer);
-  }, [activeRefreshMs]);
+  }, [activeRefreshMs, activeSnapshotBaseUrl]);
 
   useEffect(() => {
     fullscreenVisibilityCallbackRef.current = onFullscreenVisibilityChange;
@@ -146,16 +174,16 @@ export function CameraWidget({
   }, [onAspectRatioDetected]);
 
   const snapshotUrl = useMemo(() => {
-    if (!config.snapshotUrl) {
+    if (!activeSnapshotBaseUrl) {
       return null;
     }
     if (Platform.OS === "web" && typeof window !== "undefined" && window.location.pathname.includes("/smarthome-dashboard")) {
       const proxyBase = `${window.location.origin}/smarthome-dashboard/api/camera-snapshot`;
-      return `${proxyBase}?url=${encodeURIComponent(config.snapshotUrl)}&t=${tick}`;
+      return `${proxyBase}?url=${encodeURIComponent(activeSnapshotBaseUrl)}&t=${tick}`;
     }
-    const separator = config.snapshotUrl.includes("?") ? "&" : "?";
-    return `${config.snapshotUrl}${separator}t=${tick}`;
-  }, [config.snapshotUrl, tick]);
+    const separator = activeSnapshotBaseUrl.includes("?") ? "&" : "?";
+    return `${activeSnapshotBaseUrl}${separator}t=${tick}`;
+  }, [activeSnapshotBaseUrl, tick]);
 
   useEffect(() => {
     activeLayerRef.current = activeLayer;
@@ -237,16 +265,16 @@ export function CameraWidget({
     <>
       <View style={styles.container}>
         <Pressable
-          disabled={!displayUrl}
+          disabled={!previewFeed}
           onPress={() => {
             playConfiguredUiSound(config.interactionSounds?.open, "open", `${config.id}:open`);
             openFullscreen();
           }}
           style={styles.preview}
         >
-        {displayUrl ? (
+        {previewFeed ? (
           <View style={styles.snapshotWrap}>
-            {!fullscreenOpen
+            {!fullscreenOpen && previewFeed.kind === "snapshot"
               ? ([0, 1] as const).map((layer) => {
                   const url = layerUrls[layer];
                   if (!url) {
@@ -320,6 +348,20 @@ export function CameraWidget({
                       );
                 })
               : null}
+            {!fullscreenOpen && previewFeed.kind === "mjpeg" && previewFeed.url
+              ? Platform.OS === "web"
+                ? createElement("img", {
+                    alt: config.title || "Camera MJPEG",
+                    decoding: "sync",
+                    draggable: false,
+                    loading: "eager",
+                    src: previewFeed.url,
+                    style: webMjpegStyle,
+                  })
+                : (
+                    <Image resizeMode="contain" source={{ uri: previewFeed.url }} style={styles.mjpegImage} />
+                  )
+              : null}
             {config.showTitle !== false && config.title ? (
               <View style={styles.titleBadge}>
                 <Text numberOfLines={1} style={[styles.titleBadgeLabel, { color: textColor }]}>
@@ -331,15 +373,15 @@ export function CameraWidget({
         ) : (
           <View style={styles.empty}>
             <Text style={[styles.emptyText, { color: mutedTextColor }]}>
-              {config.snapshotUrl ? "Snapshot wird geladen..." : "Kein Snapshot konfiguriert"}
+              {previewSnapshotBaseUrl || previewMjpegUrl ? "Stream wird geladen..." : "Kein Stream konfiguriert"}
             </Text>
           </View>
         )}
         </Pressable>
-        {!displayUrl && !config.snapshotUrl && !config.rtspUrl ? (
+        {!previewFeed && !previewSnapshotBaseUrl && !previewMjpegUrl && !config.rtspUrl ? (
           <Text style={[styles.hint, { color: mutedTextColor }]}>Widget ist noch nicht konfiguriert.</Text>
         ) : null}
-        {config.rtspUrl && !displayUrl ? (
+        {config.rtspUrl && !previewFeed ? (
           <Pressable
             onPress={() => {
               playConfiguredUiSound(config.interactionSounds?.press, "tap", `${config.id}:press`);
@@ -375,7 +417,8 @@ export function CameraWidget({
             </Pressable>
           </View>
           <View {...fullscreenPanResponder.panHandlers} style={styles.fullscreenStage}>
-            {([0, 1] as const).map((layer) => {
+            {fullscreenFeed?.kind === "snapshot"
+              ? ([0, 1] as const).map((layer) => {
               const url = layerUrls[layer];
               if (!url) {
                 return null;
@@ -433,7 +476,22 @@ export function CameraWidget({
                       style={[styles.fullscreenImageLayer, isVisible ? styles.layerVisible : styles.layerHidden]}
                     />
                   );
-            })}
+            })
+              : null}
+            {fullscreenFeed?.kind === "mjpeg" && fullscreenFeed.url
+              ? Platform.OS === "web"
+                ? createElement("img", {
+                    alt: config.title || "Camera MJPEG fullscreen",
+                    decoding: "sync",
+                    draggable: false,
+                    loading: "eager",
+                    src: fullscreenFeed.url,
+                    style: fullscreenWebMjpegStyle,
+                  })
+                : (
+                    <Image resizeMode="contain" source={{ uri: fullscreenFeed.url }} style={styles.fullscreenMjpegImage} />
+                  )
+              : null}
           </View>
           {config.showTitle !== false && config.title ? (
             <View style={styles.fullscreenTitle}>
@@ -501,6 +559,31 @@ function normalizeBoolean(value: unknown) {
 
   if (["false", "0", "off", "no"].includes(normalized)) {
     return false;
+  }
+
+  return null;
+}
+
+function resolveCameraFeed(input: {
+  snapshotUrl: string | null;
+  snapshotEnabled: boolean;
+  mjpegUrl: string | null;
+  mjpegEnabled: boolean;
+}) {
+  if (input.mjpegEnabled && input.mjpegUrl) {
+    return { kind: "mjpeg" as const, url: input.mjpegUrl };
+  }
+
+  if (input.snapshotEnabled && input.snapshotUrl) {
+    return { kind: "snapshot" as const, url: input.snapshotUrl };
+  }
+
+  if (input.snapshotUrl) {
+    return { kind: "snapshot" as const, url: input.snapshotUrl };
+  }
+
+  if (input.mjpegUrl) {
+    return { kind: "mjpeg" as const, url: input.mjpegUrl };
   }
 
   return null;
@@ -602,6 +685,14 @@ const styles = StyleSheet.create({
     width: undefined,
     height: undefined,
   },
+  mjpegImage: {
+    width: "100%",
+    height: "100%",
+  },
+  fullscreenMjpegImage: {
+    width: "100%",
+    height: "100%",
+  },
   fullscreenActions: {
     position: "absolute",
     top: 24,
@@ -677,4 +768,20 @@ const baseFullscreenWebLayerStyle = {
   backgroundColor: "#000000",
   transition: LAYER_FADE_MS > 0 ? `opacity ${LAYER_FADE_MS}ms linear` : "none",
   pointerEvents: "none",
+} as const;
+
+const webMjpegStyle = {
+  width: "100%",
+  height: "100%",
+  objectFit: "contain",
+  display: "block",
+  backgroundColor: "#000000",
+} as const;
+
+const fullscreenWebMjpegStyle = {
+  width: "100%",
+  height: "100%",
+  objectFit: "contain",
+  display: "block",
+  backgroundColor: "#000000",
 } as const;

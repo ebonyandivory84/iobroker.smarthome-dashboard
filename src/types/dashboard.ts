@@ -74,6 +74,13 @@ export type StateWidgetConfig = WidgetBase & {
 export type CameraWidgetConfig = WidgetBase & {
   type: "camera";
   snapshotUrl?: string;
+  fullscreenSnapshotUrl?: string;
+  useSnapshotInPreview?: boolean;
+  useSnapshotInFullscreen?: boolean;
+  mjpegUrl?: string;
+  fullscreenMjpegUrl?: string;
+  useMjpegInPreview?: boolean;
+  useMjpegInFullscreen?: boolean;
   rtspUrl?: string;
   refreshMs?: number;
   fullscreenRefreshMs?: number;

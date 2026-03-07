@@ -66,6 +66,13 @@ export function buildWidgetTemplate(
       type: "camera",
       title: `Kamera ${suffix}`,
       snapshotUrl: "",
+      fullscreenSnapshotUrl: "",
+      useSnapshotInPreview: true,
+      useSnapshotInFullscreen: true,
+      mjpegUrl: "",
+      fullscreenMjpegUrl: "",
+      useMjpegInPreview: false,
+      useMjpegInFullscreen: false,
       rtspUrl: "rtsp://camera.local:554/stream1",
       refreshMs: 2000,
       position: {
