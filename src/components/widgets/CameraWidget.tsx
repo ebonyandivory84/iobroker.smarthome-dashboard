@@ -118,6 +118,8 @@ export function CameraWidget({
   const previewFlvRenderUrl = previewFlvSources[0] || (previewFeed?.kind === "flv" ? previewFeed.url : null);
   const fullscreenFlvRenderUrl =
     fullscreenFlvSources[0] || (fullscreenFeed?.kind === "flv" ? fullscreenFeed.url : null);
+  const previewFeedKey = `${previewFeed?.kind || "none"}:${previewFeed?.url || ""}`;
+  const fullscreenFeedKey = `${fullscreenFeed?.kind || "none"}:${fullscreenFeed?.url || ""}`;
   const currentPreviewMjpegSrc = previewMjpegSources[Math.min(previewMjpegSourceIndex, Math.max(0, previewMjpegSources.length - 1))] || null;
   const currentFullscreenMjpegSrc =
     fullscreenMjpegSources[Math.min(fullscreenMjpegSourceIndex, Math.max(0, fullscreenMjpegSources.length - 1))] || null;
@@ -176,6 +178,16 @@ export function CameraWidget({
   useEffect(() => {
     hasReportedAspectRatio.current = false;
   }, [previewFeed?.kind, previewFeed?.url]);
+
+  useEffect(() => {
+    // Force a clean preview re-init when source mode/url changes so updates apply instantly.
+    loadingJobRef.current = null;
+    latestRequestedUrlRef.current = null;
+    setLoadingLayer(null);
+    setLayerUrls([null, null]);
+    setActiveLayer(0);
+    activeLayerRef.current = 0;
+  }, [previewFeedKey]);
 
   useEffect(() => {
     setFullscreenMjpegSourceIndex(0);
@@ -485,6 +497,7 @@ export function CameraWidget({
                     alt: config.title || "Camera MJPEG",
                     decoding: "sync",
                     draggable: false,
+                    key: `preview-mjpeg-${currentPreviewMjpegSrc || previewFeed.url}`,
                     loading: "eager",
                     onError: () => {
                       setPreviewMjpegLoaded(false);
@@ -528,7 +541,11 @@ export function CameraWidget({
             {!fullscreenOpen && previewFeed.kind === "flv" && previewFeed.url
               ? Platform.OS === "web"
                 ? (
-                    <WebFlvPlayer title={config.title || "Camera FLV"} url={previewFlvRenderUrl || previewFeed.url} />
+                    <WebFlvPlayer
+                      key={`preview-flv-${previewFeedKey}`}
+                      title={config.title || "Camera FLV"}
+                      url={previewFlvRenderUrl || previewFeed.url}
+                    />
                   )
                 : (
                     <View style={styles.empty}>
@@ -647,6 +664,7 @@ export function CameraWidget({
                     alt: config.title || "Camera MJPEG fullscreen",
                     decoding: "sync",
                     draggable: false,
+                    key: `fullscreen-mjpeg-${currentFullscreenMjpegSrc || fullscreenFeed.url}`,
                     loading: "eager",
                     onError: () => {
                       setFullscreenMjpegLoaded(false);
@@ -682,6 +700,7 @@ export function CameraWidget({
               ? Platform.OS === "web"
                 ? (
                     <WebFlvPlayer
+                      key={`fullscreen-flv-${fullscreenFeedKey}`}
                       fullScreen
                       title={config.title || "Camera FLV fullscreen"}
                       url={fullscreenFlvRenderUrl || fullscreenFeed.url}
@@ -1067,7 +1086,7 @@ const styles = StyleSheet.create({
     minHeight: 120,
     borderRadius: 0,
     overflow: "hidden",
-    backgroundColor: "#000000",
+    backgroundColor: "transparent",
   },
   snapshotWrap: {
     flex: 1,
@@ -1292,9 +1311,9 @@ const fullscreenWebMjpegStyle = {
 const webFlvStyle = {
   width: "100%",
   height: "100%",
-  objectFit: "cover",
+  objectFit: "contain",
   display: "block",
-  backgroundColor: "#000000",
+  backgroundColor: "transparent",
 } as const;
 
 const fullscreenWebFlvStyle = {
