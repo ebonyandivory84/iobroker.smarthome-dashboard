@@ -118,6 +118,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         fullscreenMjpegUrl: widget.fullscreenMjpegUrl || "",
         flvUrl: widget.flvUrl || "",
         fullscreenFlvUrl: widget.fullscreenFlvUrl || "",
+        fmp4Url: widget.fmp4Url || "",
+        fullscreenFmp4Url: widget.fullscreenFmp4Url || "",
         refreshMs: String(widget.refreshMs || 2000),
         fullscreenRefreshMs: String(widget.fullscreenRefreshMs || widget.refreshMs || 1000),
         maximizeStateId: widget.maximizeStateId || "",
@@ -367,6 +369,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       const fullscreenMjpegUrl = normalizeOptionalInput(draft.fullscreenMjpegUrl);
       const flvUrl = normalizeOptionalInput(draft.flvUrl);
       const fullscreenFlvUrl = normalizeOptionalInput(draft.fullscreenFlvUrl);
+      const fmp4Url = normalizeOptionalInput(draft.fmp4Url);
+      const fullscreenFmp4Url = normalizeOptionalInput(draft.fullscreenFmp4Url);
       const cameraSourceChanged =
         normalizeCameraSourceMode(widget.previewSourceMode) !== previewSourceMode ||
         normalizeCameraSourceMode(widget.fullscreenSourceMode) !== fullscreenSourceMode ||
@@ -375,7 +379,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         normalizeOptionalInput(widget.mjpegUrl) !== mjpegUrl ||
         normalizeOptionalInput(widget.fullscreenMjpegUrl) !== fullscreenMjpegUrl ||
         normalizeOptionalInput(widget.flvUrl) !== flvUrl ||
-        normalizeOptionalInput(widget.fullscreenFlvUrl) !== fullscreenFlvUrl;
+        normalizeOptionalInput(widget.fullscreenFlvUrl) !== fullscreenFlvUrl ||
+        normalizeOptionalInput(widget.fmp4Url) !== fmp4Url ||
+        normalizeOptionalInput(widget.fullscreenFmp4Url) !== fullscreenFmp4Url;
       onSave(widget.id, {
         title: draft.title,
         showTitle: draft.showTitle !== "false",
@@ -388,6 +394,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         fullscreenMjpegUrl,
         flvUrl,
         fullscreenFlvUrl,
+        fmp4Url,
+        fullscreenFmp4Url,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 250),
         fullscreenRefreshMs: clampInt(
           draft.fullscreenRefreshMs,
@@ -863,14 +871,14 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 />
                 <Field label="Quelle Miniaturansicht">
                   <ChoiceRow
-                    options={["snapshot", "mjpeg", "flv"]}
+                    options={["snapshot", "mjpeg", "flv", "fmp4"]}
                     value={previewCameraMode}
                     onSelect={(value) => setDraft((current) => ({ ...current, previewSourceMode: value }))}
                   />
                 </Field>
                 <Field label="Quelle Vollbildansicht">
                   <ChoiceRow
-                    options={["snapshot", "mjpeg", "flv"]}
+                    options={["snapshot", "mjpeg", "flv", "fmp4"]}
                     value={fullscreenCameraMode}
                     onSelect={(value) => setDraft((current) => ({ ...current, fullscreenSourceMode: value }))}
                   />
@@ -896,7 +904,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   />
                 </Field>
                 <Text style={styles.mappingHint}>
-                  Die URL-Felder gelten jeweils fuer das oben gewaehlte Format (Snapshot, MJPEG oder FLV).
+                  Die URL-Felder gelten jeweils fuer das oben gewaehlte Format (Snapshot, MJPEG, FLV oder fMP4).
                 </Text>
                 <Text style={styles.mappingHint}>
                   FLV-Hinweis: Bei `CodecUnsupported` liefert der Stream meist kein browser-kompatibles H.264. Falls
@@ -1937,7 +1945,7 @@ function normalizeStateFormat(raw: string | undefined) {
 }
 
 function normalizeCameraSourceMode(raw: string | undefined) {
-  if (raw === "mjpeg" || raw === "flv") {
+  if (raw === "mjpeg" || raw === "flv" || raw === "fmp4") {
     return raw;
   }
   return "snapshot";
@@ -1945,7 +1953,7 @@ function normalizeCameraSourceMode(raw: string | undefined) {
 
 function getCameraUrlByMode(
   draft: Record<string, string>,
-  mode: "snapshot" | "mjpeg" | "flv",
+  mode: "snapshot" | "mjpeg" | "flv" | "fmp4",
   fullscreen: boolean
 ) {
   if (mode === "snapshot") {
@@ -1954,12 +1962,15 @@ function getCameraUrlByMode(
   if (mode === "mjpeg") {
     return fullscreen ? draft.fullscreenMjpegUrl || "" : draft.mjpegUrl || "";
   }
-  return fullscreen ? draft.fullscreenFlvUrl || "" : draft.flvUrl || "";
+  if (mode === "flv") {
+    return fullscreen ? draft.fullscreenFlvUrl || "" : draft.flvUrl || "";
+  }
+  return fullscreen ? draft.fullscreenFmp4Url || "" : draft.fmp4Url || "";
 }
 
 function setCameraUrlByMode(
   draft: Record<string, string>,
-  mode: "snapshot" | "mjpeg" | "flv",
+  mode: "snapshot" | "mjpeg" | "flv" | "fmp4",
   fullscreen: boolean,
   value: string
 ) {
@@ -1969,7 +1980,10 @@ function setCameraUrlByMode(
   if (mode === "mjpeg") {
     return fullscreen ? { ...draft, fullscreenMjpegUrl: value } : { ...draft, mjpegUrl: value };
   }
-  return fullscreen ? { ...draft, fullscreenFlvUrl: value } : { ...draft, flvUrl: value };
+  if (mode === "flv") {
+    return fullscreen ? { ...draft, fullscreenFlvUrl: value } : { ...draft, flvUrl: value };
+  }
+  return fullscreen ? { ...draft, fullscreenFmp4Url: value } : { ...draft, fmp4Url: value };
 }
 
 function normalizeOptionalInput(value: string | undefined) {

@@ -72,9 +72,11 @@ function migrateConfig(input: DashboardSettings): DashboardSettings {
       const previewSnapshotUrl = (snapshotUrl || "").trim() || null;
       const previewMjpegUrl = (widget.mjpegUrl || "").trim() || null;
       const previewFlvUrl = (widget.flvUrl || "").trim() || null;
+      const previewFmp4Url = (widget.fmp4Url || "").trim() || null;
       const fullscreenSnapshotUrl = (widget.fullscreenSnapshotUrl || snapshotUrl || "").trim() || null;
       const fullscreenMjpegUrl = (widget.fullscreenMjpegUrl || widget.mjpegUrl || "").trim() || null;
       const fullscreenFlvUrl = (widget.fullscreenFlvUrl || widget.flvUrl || "").trim() || null;
+      const fullscreenFmp4Url = (widget.fullscreenFmp4Url || widget.fmp4Url || "").trim() || null;
 
       const previewSourceMode =
         widget.previewSourceMode ||
@@ -82,6 +84,7 @@ function migrateConfig(input: DashboardSettings): DashboardSettings {
           previewSnapshotUrl,
           previewMjpegUrl,
           previewFlvUrl,
+          previewFmp4Url,
           legacyCamera.useMjpegInPreview === true,
           "snapshot"
         );
@@ -91,6 +94,7 @@ function migrateConfig(input: DashboardSettings): DashboardSettings {
           fullscreenSnapshotUrl,
           fullscreenMjpegUrl,
           fullscreenFlvUrl,
+          fullscreenFmp4Url,
           legacyCamera.useMjpegInFullscreen === true,
           previewSourceMode
         );
@@ -112,19 +116,23 @@ function inferCameraSourceMode(
   snapshotUrl: string | null,
   mjpegUrl: string | null,
   flvUrl: string | null,
+  fmp4Url: string | null,
   legacyPreferMjpeg: boolean,
-  fallback: "snapshot" | "mjpeg" | "flv"
+  fallback: "snapshot" | "mjpeg" | "flv" | "fmp4"
 ) {
   if (legacyPreferMjpeg && mjpegUrl) {
     return "mjpeg";
   }
-  if (flvUrl && !snapshotUrl && !mjpegUrl) {
+  if (flvUrl && !snapshotUrl && !mjpegUrl && !fmp4Url) {
     return "flv";
   }
-  if (snapshotUrl && !mjpegUrl) {
+  if (fmp4Url && !snapshotUrl && !mjpegUrl && !flvUrl) {
+    return "fmp4";
+  }
+  if (snapshotUrl && !mjpegUrl && !flvUrl && !fmp4Url) {
     return "snapshot";
   }
-  if (mjpegUrl && !snapshotUrl && !flvUrl) {
+  if (mjpegUrl && !snapshotUrl && !flvUrl && !fmp4Url) {
     return "mjpeg";
   }
   if (snapshotUrl) {
@@ -135,6 +143,9 @@ function inferCameraSourceMode(
   }
   if (flvUrl) {
     return "flv";
+  }
+  if (fmp4Url) {
+    return "fmp4";
   }
   return fallback;
 }

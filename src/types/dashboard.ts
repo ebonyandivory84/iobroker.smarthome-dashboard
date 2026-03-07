@@ -75,14 +75,16 @@ export type CameraWidgetConfig = WidgetBase & {
   type: "camera";
   titleFontSize?: number;
   manualHeightOverride?: boolean;
-  previewSourceMode?: "snapshot" | "mjpeg" | "flv";
-  fullscreenSourceMode?: "snapshot" | "mjpeg" | "flv";
+  previewSourceMode?: "snapshot" | "mjpeg" | "flv" | "fmp4";
+  fullscreenSourceMode?: "snapshot" | "mjpeg" | "flv" | "fmp4";
   snapshotUrl?: string;
   fullscreenSnapshotUrl?: string;
   mjpegUrl?: string;
   fullscreenMjpegUrl?: string;
   flvUrl?: string;
   fullscreenFlvUrl?: string;
+  fmp4Url?: string;
+  fullscreenFmp4Url?: string;
   refreshMs?: number;
   fullscreenRefreshMs?: number;
   snapshotAspectRatio?: number;

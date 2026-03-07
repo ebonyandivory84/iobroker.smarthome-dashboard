@@ -568,7 +568,11 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
       const sourceContentType = upstreamResponse.headers["content-type"];
       const contentType =
         sourceContentType ||
-        (streamType === "flv" || looksLikeFlvUrl(requestConfig.url) ? "video/x-flv" : "multipart/x-mixed-replace");
+        (streamType === "flv" || looksLikeFlvUrl(requestConfig.url)
+          ? "video/x-flv"
+          : streamType === "fmp4"
+            ? "video/mp4"
+            : "multipart/x-mixed-replace");
 
       res.status(statusCode);
       res.setHeader("Content-Type", contentType);

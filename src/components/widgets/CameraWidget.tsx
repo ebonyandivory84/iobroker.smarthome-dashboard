@@ -45,6 +45,8 @@ export function CameraWidget({
   const [fullscreenMjpegSourceIndex, setFullscreenMjpegSourceIndex] = useState(0);
   const [previewFlvSourceIndex, setPreviewFlvSourceIndex] = useState(0);
   const [fullscreenFlvSourceIndex, setFullscreenFlvSourceIndex] = useState(0);
+  const [previewFmp4SourceIndex, setPreviewFmp4SourceIndex] = useState(0);
+  const [fullscreenFmp4SourceIndex, setFullscreenFmp4SourceIndex] = useState(0);
   const [previewMjpegLoaded, setPreviewMjpegLoaded] = useState(false);
   const [fullscreenMjpegLoaded, setFullscreenMjpegLoaded] = useState(false);
   const hasReportedAspectRatio = useRef(false);
@@ -64,17 +66,21 @@ export function CameraWidget({
   const fullscreenMjpegUrl = (config.fullscreenMjpegUrl || config.mjpegUrl || "").trim() || null;
   const previewFlvUrl = (config.flvUrl || config.fullscreenFlvUrl || "").trim() || null;
   const fullscreenFlvUrl = (config.fullscreenFlvUrl || config.flvUrl || "").trim() || null;
+  const previewFmp4Url = (config.fmp4Url || config.fullscreenFmp4Url || "").trim() || null;
+  const fullscreenFmp4Url = (config.fullscreenFmp4Url || config.fmp4Url || "").trim() || null;
   const previewSourceMode = resolveSourceMode(
     config.previewSourceMode,
     previewSnapshotBaseUrl,
     previewMjpegUrl,
-    previewFlvUrl
+    previewFlvUrl,
+    previewFmp4Url
   );
   const fullscreenSourceMode = resolveSourceMode(
     config.fullscreenSourceMode,
     fullscreenSnapshotBaseUrl,
     fullscreenMjpegUrl,
     fullscreenFlvUrl,
+    fullscreenFmp4Url,
     previewSourceMode
   );
 
@@ -83,12 +89,14 @@ export function CameraWidget({
     snapshotUrl: previewSnapshotBaseUrl,
     mjpegUrl: previewMjpegUrl,
     flvUrl: previewFlvUrl,
+    fmp4Url: previewFmp4Url,
   });
   const fullscreenFeed = resolveCameraFeed({
     sourceMode: fullscreenSourceMode,
     snapshotUrl: fullscreenSnapshotBaseUrl,
     mjpegUrl: fullscreenMjpegUrl,
     flvUrl: fullscreenFlvUrl,
+    fmp4Url: fullscreenFmp4Url,
   });
   const activeFeed = fullscreenOpen ? fullscreenFeed : previewFeed;
   const activeSnapshotBaseUrl = activeFeed?.kind === "snapshot" ? activeFeed.url : null;
@@ -120,6 +128,20 @@ export function CameraWidget({
         : [],
     [fullscreenFeed?.kind, fullscreenFeed?.url]
   );
+  const previewFmp4Sources = useMemo(
+    () =>
+      previewFeed?.kind === "fmp4"
+        ? buildWebStreamSources(previewFeed.url, "fmp4")
+        : [],
+    [previewFeed?.kind, previewFeed?.url]
+  );
+  const fullscreenFmp4Sources = useMemo(
+    () =>
+      fullscreenFeed?.kind === "fmp4"
+        ? buildWebStreamSources(fullscreenFeed.url, "fmp4")
+        : [],
+    [fullscreenFeed?.kind, fullscreenFeed?.url]
+  );
   const previewFeedKey = `${previewFeed?.kind || "none"}:${previewFeed?.url || ""}`;
   const fullscreenFeedKey = `${fullscreenFeed?.kind || "none"}:${fullscreenFeed?.url || ""}`;
   const currentPreviewMjpegSrc = previewMjpegSources[Math.min(previewMjpegSourceIndex, Math.max(0, previewMjpegSources.length - 1))] || null;
@@ -128,6 +150,10 @@ export function CameraWidget({
   const currentPreviewFlvSrc = previewFlvSources[Math.min(previewFlvSourceIndex, Math.max(0, previewFlvSources.length - 1))] || null;
   const currentFullscreenFlvSrc =
     fullscreenFlvSources[Math.min(fullscreenFlvSourceIndex, Math.max(0, fullscreenFlvSources.length - 1))] || null;
+  const currentPreviewFmp4Src =
+    previewFmp4Sources[Math.min(previewFmp4SourceIndex, Math.max(0, previewFmp4Sources.length - 1))] || null;
+  const currentFullscreenFmp4Src =
+    fullscreenFmp4Sources[Math.min(fullscreenFmp4SourceIndex, Math.max(0, fullscreenFmp4Sources.length - 1))] || null;
   const activeRefreshMs = fullscreenOpen
     ? Math.max(180, config.fullscreenRefreshMs || config.refreshMs || 2000)
     : Math.max(100, config.refreshMs || 2000);
@@ -203,6 +229,14 @@ export function CameraWidget({
   useEffect(() => {
     setFullscreenFlvSourceIndex(0);
   }, [fullscreenFlvSources, fullscreenFeed?.kind, fullscreenFeed?.url]);
+
+  useEffect(() => {
+    setPreviewFmp4SourceIndex(0);
+  }, [previewFmp4Sources, previewFeed?.kind, previewFeed?.url]);
+
+  useEffect(() => {
+    setFullscreenFmp4SourceIndex(0);
+  }, [fullscreenFmp4Sources, fullscreenFeed?.kind, fullscreenFeed?.url]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || fullscreenOpen || previewFeed?.kind !== "mjpeg" || !currentPreviewMjpegSrc) {
@@ -595,6 +629,24 @@ export function CameraWidget({
                     </View>
                   )
               : null}
+            {!fullscreenOpen && previewFeed.kind === "fmp4" && previewFeed.url
+              ? Platform.OS === "web"
+                ? (
+                    <WebFmp4Player
+                      key={`preview-fmp4-${previewFeedKey}:${currentPreviewFmp4Src || "none"}`}
+                      onAspectRatioDetected={reportAspectRatioValue}
+                      onSourceIndexChange={setPreviewFmp4SourceIndex}
+                      preferredSourceIndex={previewFmp4SourceIndex}
+                      sources={previewFmp4Sources.length ? previewFmp4Sources : [previewFeed.url]}
+                      title={config.title || "Camera fMP4"}
+                    />
+                  )
+                : (
+                    <View style={styles.empty}>
+                      <Text style={[styles.emptyText, { color: mutedTextColor }]}>fMP4 wird nur im Web unterstuetzt.</Text>
+                    </View>
+                  )
+              : null}
             {config.showTitle !== false && config.title ? (
               <View style={styles.titleBadge}>
                 <Text numberOfLines={1} style={[styles.titleBadgeLabel, { color: textColor, fontSize: titleFontSize }]}>
@@ -606,12 +658,12 @@ export function CameraWidget({
         ) : (
           <View style={styles.empty}>
             <Text style={[styles.emptyText, { color: mutedTextColor }]}>
-              {previewSnapshotBaseUrl || previewMjpegUrl || previewFlvUrl ? "Stream wird geladen..." : "Kein Stream konfiguriert"}
+              {previewSnapshotBaseUrl || previewMjpegUrl || previewFlvUrl || previewFmp4Url ? "Stream wird geladen..." : "Kein Stream konfiguriert"}
             </Text>
           </View>
         )}
         </Pressable>
-        {!previewFeed && !previewSnapshotBaseUrl && !previewMjpegUrl && !previewFlvUrl ? (
+        {!previewFeed && !previewSnapshotBaseUrl && !previewMjpegUrl && !previewFlvUrl && !previewFmp4Url ? (
           <Text style={[styles.hint, { color: mutedTextColor }]}>Widget ist noch nicht konfiguriert.</Text>
         ) : null}
       </View>
@@ -764,6 +816,25 @@ export function CameraWidget({
                     </View>
                   )
               : null}
+            {fullscreenFeed?.kind === "fmp4" && fullscreenFeed.url
+              ? Platform.OS === "web"
+                ? (
+                    <WebFmp4Player
+                      key={`fullscreen-fmp4-${fullscreenFeedKey}:${currentFullscreenFmp4Src || "none"}`}
+                      fullScreen
+                      onAspectRatioDetected={reportAspectRatioValue}
+                      onSourceIndexChange={setFullscreenFmp4SourceIndex}
+                      preferredSourceIndex={fullscreenFmp4SourceIndex}
+                      sources={fullscreenFmp4Sources.length ? fullscreenFmp4Sources : [fullscreenFeed.url]}
+                      title={config.title || "Camera fMP4 fullscreen"}
+                    />
+                  )
+                : (
+                    <View style={styles.empty}>
+                      <Text style={[styles.emptyText, { color: mutedTextColor }]}>fMP4 wird nur im Web unterstuetzt.</Text>
+                    </View>
+                  )
+              : null}
           </View>
           {config.showTitle !== false && config.title ? (
             <View style={styles.fullscreenTitle}>
@@ -837,10 +908,11 @@ function normalizeBoolean(value: unknown) {
 }
 
 function resolveCameraFeed(input: {
-  sourceMode: "snapshot" | "mjpeg" | "flv";
+  sourceMode: "snapshot" | "mjpeg" | "flv" | "fmp4";
   snapshotUrl: string | null;
   mjpegUrl: string | null;
   flvUrl: string | null;
+  fmp4Url: string | null;
 }) {
   const sourcePriority =
     input.sourceMode === "snapshot"
@@ -848,18 +920,28 @@ function resolveCameraFeed(input: {
           { kind: "snapshot" as const, url: input.snapshotUrl },
           { kind: "mjpeg" as const, url: input.mjpegUrl },
           { kind: "flv" as const, url: input.flvUrl },
+          { kind: "fmp4" as const, url: input.fmp4Url },
         ]
       : input.sourceMode === "mjpeg"
         ? [
             { kind: "mjpeg" as const, url: input.mjpegUrl },
             { kind: "snapshot" as const, url: input.snapshotUrl },
             { kind: "flv" as const, url: input.flvUrl },
+            { kind: "fmp4" as const, url: input.fmp4Url },
           ]
-        : [
-            { kind: "flv" as const, url: input.flvUrl },
-            { kind: "mjpeg" as const, url: input.mjpegUrl },
-            { kind: "snapshot" as const, url: input.snapshotUrl },
-          ];
+        : input.sourceMode === "flv"
+          ? [
+              { kind: "flv" as const, url: input.flvUrl },
+              { kind: "mjpeg" as const, url: input.mjpegUrl },
+              { kind: "snapshot" as const, url: input.snapshotUrl },
+              { kind: "fmp4" as const, url: input.fmp4Url },
+            ]
+          : [
+              { kind: "fmp4" as const, url: input.fmp4Url },
+              { kind: "flv" as const, url: input.flvUrl },
+              { kind: "mjpeg" as const, url: input.mjpegUrl },
+              { kind: "snapshot" as const, url: input.snapshotUrl },
+            ];
 
   for (const source of sourcePriority) {
     if (source.url) {
@@ -878,28 +960,33 @@ function resolveSourceMode(
   snapshotUrl: string | null,
   mjpegUrl: string | null,
   flvUrl: string | null,
-  fallback: "snapshot" | "mjpeg" | "flv" = "snapshot"
+  fmp4Url: string | null,
+  fallback: "snapshot" | "mjpeg" | "flv" | "fmp4" = "snapshot"
 ) {
-  if (sourceMode === "snapshot" || sourceMode === "mjpeg" || sourceMode === "flv") {
+  if (sourceMode === "snapshot" || sourceMode === "mjpeg" || sourceMode === "flv" || sourceMode === "fmp4") {
     return sourceMode;
   }
 
-  if (snapshotUrl && !mjpegUrl && !flvUrl) {
+  if (snapshotUrl && !mjpegUrl && !flvUrl && !fmp4Url) {
     return "snapshot";
   }
 
-  if (mjpegUrl && !snapshotUrl && !flvUrl) {
+  if (mjpegUrl && !snapshotUrl && !flvUrl && !fmp4Url) {
     return "mjpeg";
   }
 
-  if (flvUrl && !snapshotUrl && !mjpegUrl) {
+  if (flvUrl && !snapshotUrl && !mjpegUrl && !fmp4Url) {
     return "flv";
+  }
+
+  if (fmp4Url && !snapshotUrl && !mjpegUrl && !flvUrl) {
+    return "fmp4";
   }
 
   return fallback;
 }
 
-function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv") {
+function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
   if (Platform.OS !== "web" || typeof window === "undefined") {
     return [];
   }
@@ -908,7 +995,7 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv") {
   return [`${window.location.origin}/smarthome-dashboard/api/camera-stream?streamType=${streamType}&url=${encodedUrl}`];
 }
 
-function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv") {
+function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
   const includeDirect = shouldUseDirectWebStream(targetUrl, streamType);
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
   const sources =
@@ -918,7 +1005,7 @@ function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv") {
   return Array.from(new Set(sources.filter(Boolean)));
 }
 
-function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv") {
+function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
   if (Platform.OS !== "web" || typeof window === "undefined") {
     return true;
   }
@@ -939,7 +1026,7 @@ function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv"
     }
 
     // For MJPEG we still allow a direct fallback after proxy (many cameras work only directly).
-    if (streamType === "mjpeg" && (hasEmbeddedCredentials || hasQueryCredentials)) {
+    if ((streamType === "mjpeg" || streamType === "fmp4") && (hasEmbeddedCredentials || hasQueryCredentials)) {
       return true;
     }
 
@@ -1173,6 +1260,154 @@ function WebFlvPlayer({
         playsInline: true,
         ref: setVideoRef,
         style: fullScreen ? fullscreenWebFlvStyle : webFlvStyle,
+        title,
+      })}
+      {errorMessage ? (
+        <View style={styles.flvErrorOverlay}>
+          <Text style={styles.flvErrorText}>{errorMessage}</Text>
+        </View>
+      ) : null}
+    </>
+  );
+}
+
+function WebFmp4Player({
+  sources,
+  title,
+  fullScreen = false,
+  onAspectRatioDetected,
+  preferredSourceIndex = 0,
+  onSourceIndexChange,
+}: {
+  sources: string[];
+  title: string;
+  fullScreen?: boolean;
+  onAspectRatioDetected?: (ratio: number) => void;
+  preferredSourceIndex?: number;
+  onSourceIndexChange?: (index: number) => void;
+}) {
+  const videoRef = useRef<any>(null);
+  const setVideoRef = useCallback((element: any) => {
+    videoRef.current = element;
+  }, []);
+  const ratioReportedRef = useRef(false);
+  const aspectRatioCallbackRef = useRef(onAspectRatioDetected);
+  const normalizedSources = useMemo(
+    () => Array.from(new Set((sources || []).map((entry) => (entry || "").trim()).filter(Boolean))),
+    [sources]
+  );
+  const maxSourceIndex = Math.max(0, normalizedSources.length - 1);
+  const [sourceIndex, setSourceIndex] = useState(Math.min(preferredSourceIndex, maxSourceIndex));
+  const currentSource = normalizedSources[Math.min(sourceIndex, maxSourceIndex)] || "";
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    aspectRatioCallbackRef.current = onAspectRatioDetected;
+  }, [onAspectRatioDetected]);
+
+  useEffect(() => {
+    const next = Math.min(preferredSourceIndex, maxSourceIndex);
+    setSourceIndex(next);
+  }, [maxSourceIndex, preferredSourceIndex]);
+
+  useEffect(() => {
+    onSourceIndexChange?.(sourceIndex);
+  }, [onSourceIndexChange, sourceIndex]);
+
+  useEffect(() => {
+    setErrorMessage(null);
+    ratioReportedRef.current = false;
+  }, [currentSource]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || !currentSource) {
+      return;
+    }
+
+    let disposed = false;
+    const videoElement = videoRef.current as HTMLVideoElement | null;
+    if (!videoElement) {
+      return;
+    }
+
+    const moveToNextSource = (message: string) => {
+      if (sourceIndex + 1 < normalizedSources.length) {
+        setSourceIndex((current) => Math.min(normalizedSources.length - 1, current + 1));
+        if (!disposed) {
+          setErrorMessage(message);
+        }
+        return true;
+      }
+      return false;
+    };
+
+    const tryPlay = () => {
+      void videoElement.play().catch(() => {
+        // ignore autoplay issues
+      });
+    };
+
+    const handleMetadata = () => {
+      const callback = aspectRatioCallbackRef.current;
+      if (ratioReportedRef.current || !callback) {
+        return;
+      }
+      const width = Number(videoElement.videoWidth || 0);
+      const height = Number(videoElement.videoHeight || 0);
+      if (!width || !height) {
+        return;
+      }
+      const ratio = width / height;
+      if (!Number.isFinite(ratio) || ratio <= 0) {
+        return;
+      }
+      ratioReportedRef.current = true;
+      callback(ratio);
+    };
+
+    const handleError = () => {
+      if (disposed) {
+        return;
+      }
+      if (!moveToNextSource("fMP4 Quelle fehlgeschlagen, versuche alternative Quelle...")) {
+        setErrorMessage("fMP4 Stream konnte nicht gestartet werden.");
+      }
+    };
+
+    videoElement.addEventListener("loadedmetadata", handleMetadata);
+    videoElement.addEventListener("canplay", tryPlay);
+    videoElement.addEventListener("error", handleError);
+    tryPlay();
+
+    const watchdog = setTimeout(() => {
+      if (disposed) {
+        return;
+      }
+      const hasData = videoElement.readyState >= 2;
+      if (!hasData) {
+        handleError();
+      }
+    }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
+
+    return () => {
+      disposed = true;
+      clearTimeout(watchdog);
+      videoElement.removeEventListener("loadedmetadata", handleMetadata);
+      videoElement.removeEventListener("canplay", tryPlay);
+      videoElement.removeEventListener("error", handleError);
+    };
+  }, [currentSource, normalizedSources.length, sourceIndex]);
+
+  return (
+    <>
+      {createElement("video", {
+        autoPlay: true,
+        controls: false,
+        muted: true,
+        playsInline: true,
+        ref: setVideoRef,
+        src: currentSource || undefined,
+        style: fullScreen ? fullscreenWebFmp4Style : webFmp4Style,
         title,
       })}
       {errorMessage ? (
@@ -1508,6 +1743,22 @@ const webFlvStyle = {
 } as const;
 
 const fullscreenWebFlvStyle = {
+  width: "100%",
+  height: "100%",
+  objectFit: "contain",
+  display: "block",
+  backgroundColor: "#000000",
+} as const;
+
+const webFmp4Style = {
+  width: "100%",
+  height: "100%",
+  objectFit: "contain",
+  display: "block",
+  backgroundColor: "#000000",
+} as const;
+
+const fullscreenWebFmp4Style = {
   width: "100%",
   height: "100%",
   objectFit: "contain",
