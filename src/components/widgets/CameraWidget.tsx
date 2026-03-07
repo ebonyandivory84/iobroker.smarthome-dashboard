@@ -52,7 +52,7 @@ export function CameraWidget({
   const fullscreenSnapshotBaseUrl = (config.fullscreenSnapshotUrl || config.snapshotUrl || "").trim() || null;
   const previewMjpegUrl = (config.mjpegUrl || "").trim() || null;
   const fullscreenMjpegUrl = (config.fullscreenMjpegUrl || config.mjpegUrl || "").trim() || null;
-  const previewFlvUrl = (config.flvUrl || "").trim() || null;
+  const previewFlvUrl = (config.flvUrl || config.fullscreenFlvUrl || "").trim() || null;
   const fullscreenFlvUrl = (config.fullscreenFlvUrl || config.flvUrl || "").trim() || null;
   const previewSourceMode = resolveSourceMode(
     config.previewSourceMode,
@@ -689,7 +689,9 @@ function WebFlvPlayer({
   fullScreen?: boolean;
 }) {
   const videoRef = useRef<any>(null);
+  const playerRef = useRef<any>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [interactionRequired, setInteractionRequired] = useState(false);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") {
@@ -697,6 +699,7 @@ function WebFlvPlayer({
     }
 
     setErrorMessage(null);
+    setInteractionRequired(false);
     let disposed = false;
     let player: any = null;
     const videoElement = videoRef.current;
@@ -728,6 +731,7 @@ function WebFlvPlayer({
           lazyLoad: false,
         }
       );
+      playerRef.current = player;
 
       if (window.flvjs?.Events?.ERROR) {
         player.on(window.flvjs.Events.ERROR, (errorType: string, errorDetail: string) => {
@@ -743,7 +747,7 @@ function WebFlvPlayer({
       player.attachMediaElement(videoElement);
       player.load();
       void videoElement.play().catch(() => {
-        setErrorMessage("Autoplay fuer FLV blockiert.");
+        setInteractionRequired(true);
       });
     };
 
@@ -766,8 +770,31 @@ function WebFlvPlayer({
         videoElement.removeAttribute("src");
         videoElement.load();
       }
+      playerRef.current = null;
     };
   }, [url]);
+
+  const resumePlayback = useCallback(() => {
+    const videoElement = videoRef.current;
+    if (!videoElement) {
+      return;
+    }
+
+    try {
+      if (playerRef.current?.play) {
+        playerRef.current.play();
+      }
+    } catch {
+      // ignore and fallback to HTMLVideoElement play
+    }
+
+    void videoElement.play().then(() => {
+      setInteractionRequired(false);
+      setErrorMessage(null);
+    }).catch(() => {
+      setErrorMessage("Wiedergabe konnte nicht gestartet werden.");
+    });
+  }, []);
 
   return (
     <>
@@ -786,6 +813,11 @@ function WebFlvPlayer({
         <View style={styles.flvErrorOverlay}>
           <Text style={styles.flvErrorText}>{errorMessage}</Text>
         </View>
+      ) : null}
+      {interactionRequired ? (
+        <Pressable onPress={resumePlayback} style={styles.flvTapOverlay}>
+          <Text style={styles.flvTapText}>Tippen zum Starten</Text>
+        </Pressable>
       ) : null}
     </>
   );
@@ -970,6 +1002,22 @@ const styles = StyleSheet.create({
   flvErrorText: {
     color: "#ffffff",
     fontSize: 12,
+    fontWeight: "700",
+  },
+  flvTapOverlay: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    top: 12,
+    bottom: 12,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.42)",
+  },
+  flvTapText: {
+    color: "#ffffff",
+    fontSize: 13,
     fontWeight: "700",
   },
 });
