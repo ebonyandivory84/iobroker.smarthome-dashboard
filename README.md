@@ -22,11 +22,9 @@ It combines state control, camera widgets, energy/solar widgets, dashboard pages
 
 ## Screenshot Gallery
 
-Replace these placeholder images with real UI screenshots from your setup.
-
 | Dashboard | Widget Editor | Camera Fullscreen |
 |---|---|---|
-| ![Dashboard](/docs/images/dashboard-overview-placeholder.svg) | ![Widget Editor](/docs/images/widget-editor-placeholder.svg) | ![Camera Fullscreen](/docs/images/camera-fullscreen-placeholder.svg) |
+| ![Dashboard](/docs/images/dashboard-overview.png) | ![Widget Editor](/docs/images/widget-editor.png) | ![Camera Fullscreen](/docs/images/camera-fullscreen.png) |
 
 ## Repository Structure
 
