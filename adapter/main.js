@@ -5,10 +5,17 @@ const fs = require("fs");
 const path = require("path");
 const { Readable } = require("stream");
 const { resolveWebRoot } = require("./lib/static");
+let UndiciAgent = null;
+try {
+  ({ Agent: UndiciAgent } = require("undici"));
+} catch {
+  UndiciAgent = null;
+}
 
 let objectEntriesCache = [];
 let objectEntriesCacheTimestamp = 0;
 let objectEntriesPromise = null;
+let insecureHttpsDispatcher = null;
 const OBJECT_CACHE_TTL_MS = 5 * 60 * 1000;
 const CONFIG_STATE_ID = "dashboardConfig";
 const SAVED_DASHBOARDS_STATE_ID = "savedDashboards";
@@ -248,6 +255,7 @@ async function main(adapter) {
       const response = await fetch(requestConfig.url, {
         cache: "no-store",
         headers: requestConfig.headers,
+        ...buildCameraFetchOptions(requestConfig.url),
       });
 
       if (!response.ok) {
@@ -281,6 +289,7 @@ async function main(adapter) {
         cache: "no-store",
         signal: controller.signal,
         headers: requestConfig.headers,
+        ...buildCameraFetchOptions(requestConfig.url),
       });
 
       if (!response.ok || !response.body) {
@@ -388,6 +397,80 @@ function buildCameraRequestConfig(rawUrl) {
     url: parsed.toString(),
     headers,
   };
+}
+
+function buildCameraFetchOptions(targetUrl) {
+  try {
+    const parsed = new URL(targetUrl);
+    const options = {
+      redirect: "follow",
+    };
+
+    if (parsed.protocol === "https:" && isLikelyLocalHost(parsed.hostname)) {
+      const dispatcher = getInsecureHttpsDispatcher();
+      if (dispatcher) {
+        options.dispatcher = dispatcher;
+      }
+    }
+
+    return options;
+  } catch {
+    return {
+      redirect: "follow",
+    };
+  }
+}
+
+function getInsecureHttpsDispatcher() {
+  if (!UndiciAgent) {
+    return null;
+  }
+  if (insecureHttpsDispatcher) {
+    return insecureHttpsDispatcher;
+  }
+  insecureHttpsDispatcher = new UndiciAgent({
+    connect: {
+      rejectUnauthorized: false,
+    },
+  });
+  return insecureHttpsDispatcher;
+}
+
+function isLikelyLocalHost(hostname) {
+  if (!hostname) {
+    return false;
+  }
+
+  const host = String(hostname).toLowerCase();
+  if (host === "localhost" || host === "::1" || host.endsWith(".local")) {
+    return true;
+  }
+
+  const ipv4Match = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!ipv4Match) {
+    return false;
+  }
+
+  const octets = ipv4Match.slice(1).map((value) => Number(value));
+  if (octets.some((value) => Number.isNaN(value) || value < 0 || value > 255)) {
+    return false;
+  }
+
+  const [a, b] = octets;
+  if (a === 10) {
+    return true;
+  }
+  if (a === 172 && b >= 16 && b <= 31) {
+    return true;
+  }
+  if (a === 192 && b === 168) {
+    return true;
+  }
+  if (a === 127) {
+    return true;
+  }
+
+  return false;
 }
 
 async function readSavedDashboards(adapter) {
