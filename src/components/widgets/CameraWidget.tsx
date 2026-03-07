@@ -882,10 +882,14 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv") {
 
 function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv") {
   const includeDirect = shouldUseDirectWebStream(targetUrl, streamType);
+  const preferProxyFirstForMjpeg =
+    streamType === "mjpeg" && hasEmbeddedCredentialsInUrl(targetUrl) && !isMixedContentBlocked(targetUrl);
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
   const sources =
     streamType === "mjpeg"
-      ? (includeDirect ? [targetUrl, ...proxySources] : proxySources)
+      ? preferProxyFirstForMjpeg
+        ? [...proxySources, ...(includeDirect ? [targetUrl] : [])]
+        : (includeDirect ? [targetUrl, ...proxySources] : proxySources)
       : [...proxySources, ...(includeDirect ? [targetUrl] : [])];
   return Array.from(new Set(sources.filter(Boolean)));
 }
@@ -905,9 +909,18 @@ function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv"
       Boolean(parsed.searchParams.get("pass"));
     const mixedContentBlocked = window.location.protocol === "https:" && parsed.protocol === "http:";
 
-    // Browser subresource requests are unreliable with URL credentials and mixed-content URLs.
-    // Prefer same-origin adapter proxy in these cases.
-    if (hasEmbeddedCredentials || hasQueryCredentials || mixedContentBlocked) {
+    // Mixed-content is blocked on HTTPS pages.
+    if (mixedContentBlocked) {
+      return false;
+    }
+
+    // For MJPEG we still allow a direct fallback after proxy (many cameras work only directly).
+    if (streamType === "mjpeg" && (hasEmbeddedCredentials || hasQueryCredentials)) {
+      return true;
+    }
+
+    // For FLV with URL credentials we keep proxy-only by default.
+    if (hasEmbeddedCredentials || hasQueryCredentials) {
       return false;
     }
   } catch {
@@ -915,6 +928,27 @@ function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv"
   }
 
   return true;
+}
+
+function hasEmbeddedCredentialsInUrl(targetUrl: string) {
+  try {
+    const parsed = new URL(targetUrl);
+    return Boolean(parsed.username || parsed.password);
+  } catch {
+    return false;
+  }
+}
+
+function isMixedContentBlocked(targetUrl: string) {
+  if (Platform.OS !== "web" || typeof window === "undefined") {
+    return false;
+  }
+  try {
+    const parsed = new URL(targetUrl);
+    return window.location.protocol === "https:" && parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
 }
 
 function WebFlvPlayer({
