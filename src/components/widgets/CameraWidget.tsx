@@ -212,9 +212,13 @@ export function CameraWidget({
     }
 
     const timer = setTimeout(() => {
-      setPreviewMjpegSourceIndex((current) =>
-        current + 1 < previewMjpegSources.length ? current + 1 : current
-      );
+      setPreviewMjpegSourceIndex((current) => {
+        const next = current + 1 < previewMjpegSources.length ? current + 1 : current;
+        if (next !== current) {
+          setPreviewStreamDebug("MJPEG Preview: Quelle reagiert nicht, wechsle zur naechsten URL...");
+        }
+        return next;
+      });
     }, 3500);
 
     return () => clearTimeout(timer);
@@ -524,12 +528,22 @@ export function CameraWidget({
                       setPreviewStreamDebug((current) => current || "MJPEG Preview: Bild konnte nicht geladen werden.");
                     },
                     onLoad: (event: Event) => {
+                      const target = event.currentTarget as HTMLImageElement | null;
+                      const width = target?.naturalWidth || 0;
+                      const height = target?.naturalHeight || 0;
+                      if (!width || !height) {
+                        setPreviewMjpegLoaded(false);
+                        if (previewMjpegSourceIndex + 1 < previewMjpegSources.length) {
+                          setPreviewMjpegSourceIndex((current) => current + 1);
+                          setPreviewStreamDebug("MJPEG Preview: Ungueltige Bilddaten, wechsle zur naechsten URL...");
+                          return;
+                        }
+                        setPreviewStreamDebug("MJPEG Preview: Stream liefert keine gueltigen Bilddaten.");
+                        return;
+                      }
                       setPreviewMjpegLoaded(true);
                       setPreviewStreamDebug(null);
-                      reportAspectRatio(
-                        (event.currentTarget as HTMLImageElement | null)?.naturalWidth || 0,
-                        (event.currentTarget as HTMLImageElement | null)?.naturalHeight || 0
-                      );
+                      reportAspectRatio(width, height);
                     },
                     src: currentPreviewMjpegSrc || previewFeed.url,
                     style: webMjpegStyle,
@@ -691,11 +705,18 @@ export function CameraWidget({
                       }
                     },
                     onLoad: (event: Event) => {
+                      const target = event.currentTarget as HTMLImageElement | null;
+                      const width = target?.naturalWidth || 0;
+                      const height = target?.naturalHeight || 0;
+                      if (!width || !height) {
+                        setFullscreenMjpegLoaded(false);
+                        if (fullscreenMjpegSourceIndex + 1 < fullscreenMjpegSources.length) {
+                          setFullscreenMjpegSourceIndex((current) => current + 1);
+                        }
+                        return;
+                      }
                       setFullscreenMjpegLoaded(true);
-                      reportAspectRatio(
-                        (event.currentTarget as HTMLImageElement | null)?.naturalWidth || 0,
-                        (event.currentTarget as HTMLImageElement | null)?.naturalHeight || 0
-                      );
+                      reportAspectRatio(width, height);
                     },
                     src: currentFullscreenMjpegSrc || fullscreenFeed.url,
                     style: fullscreenWebMjpegStyle,
@@ -882,14 +903,10 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv") {
 
 function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv") {
   const includeDirect = shouldUseDirectWebStream(targetUrl, streamType);
-  const preferProxyFirstForMjpeg =
-    streamType === "mjpeg" && hasEmbeddedCredentialsInUrl(targetUrl) && !isMixedContentBlocked(targetUrl);
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
   const sources =
     streamType === "mjpeg"
-      ? preferProxyFirstForMjpeg
-        ? [...proxySources, ...(includeDirect ? [targetUrl] : [])]
-        : (includeDirect ? [targetUrl, ...proxySources] : proxySources)
+      ? [...proxySources, ...(includeDirect ? [targetUrl] : [])]
       : [...proxySources, ...(includeDirect ? [targetUrl] : [])];
   return Array.from(new Set(sources.filter(Boolean)));
 }
@@ -928,15 +945,6 @@ function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv"
   }
 
   return true;
-}
-
-function hasEmbeddedCredentialsInUrl(targetUrl: string) {
-  try {
-    const parsed = new URL(targetUrl);
-    return Boolean(parsed.username || parsed.password);
-  } catch {
-    return false;
-  }
 }
 
 function isMixedContentBlocked(targetUrl: string) {
