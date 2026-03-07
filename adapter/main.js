@@ -387,6 +387,26 @@ function buildCameraRequestConfig(rawUrl) {
   };
 }
 
+function sanitizeCameraUrlForLog(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    parsed.username = "";
+    parsed.password = "";
+    ["password", "pass", "pwd", "token", "auth"].forEach((key) => {
+      if (parsed.searchParams.has(key)) {
+        parsed.searchParams.set(key, "***");
+      }
+      const upper = key.charAt(0).toUpperCase() + key.slice(1);
+      if (parsed.searchParams.has(upper)) {
+        parsed.searchParams.set(upper, "***");
+      }
+    });
+    return parsed.toString();
+  } catch {
+    return "<invalid-url>";
+  }
+}
+
 function buildCameraFetchOptions(targetUrl) {
   try {
     const parsed = new URL(targetUrl);
@@ -410,6 +430,7 @@ function buildCameraFetchOptions(targetUrl) {
 }
 
 function proxyCameraStream(requestConfig, req, res, streamType, redirects) {
+  const sanitizedUrl = sanitizeCameraUrlForLog(requestConfig.url);
   let parsed;
   try {
     parsed = new URL(requestConfig.url);
@@ -442,12 +463,18 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects) {
     (upstreamResponse) => {
       const statusCode = upstreamResponse.statusCode || 502;
       const location = upstreamResponse.headers.location;
+      const upstreamContentType = upstreamResponse.headers["content-type"] || "";
 
       if (
         location &&
         [301, 302, 303, 307, 308].includes(statusCode) &&
         redirects < 5
       ) {
+        adapter.log.debug(
+          `[camera-proxy] redirect streamType=${streamType || "unknown"} status=${statusCode} from=${sanitizedUrl} to=${sanitizeCameraUrlForLog(
+            new URL(location, requestConfig.url).toString()
+          )}`
+        );
         upstreamResponse.resume();
         const redirectedUrl = new URL(location, requestConfig.url).toString();
         const redirectedConfig = buildCameraRequestConfig(redirectedUrl);
@@ -459,6 +486,11 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects) {
       }
 
       if (statusCode >= 400) {
+        adapter.log.warn(
+          `[camera-proxy] upstream error streamType=${streamType || "unknown"} status=${statusCode} contentType=${String(
+            upstreamContentType
+          )} url=${sanitizedUrl}`
+        );
         const chunks = [];
         upstreamResponse.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
         upstreamResponse.on("end", () => {
@@ -470,6 +502,12 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects) {
         });
         return;
       }
+
+      adapter.log.debug(
+        `[camera-proxy] stream ok streamType=${streamType || "unknown"} status=${statusCode} contentType=${String(
+          upstreamContentType
+        )} url=${sanitizedUrl}`
+      );
 
       const sourceContentType = upstreamResponse.headers["content-type"];
       const contentType =
@@ -505,6 +543,11 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects) {
   res.on("close", closeUpstream);
 
   upstreamRequest.on("error", (error) => {
+    adapter.log.warn(
+      `[camera-proxy] request failed streamType=${streamType || "unknown"} url=${sanitizedUrl}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
     if (!res.headersSent) {
       res.status(502).json({ error: error instanceof Error ? error.message : "Stream proxy request failed" });
       return;
