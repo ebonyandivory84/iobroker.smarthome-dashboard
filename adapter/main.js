@@ -4,6 +4,8 @@ const { createProxyMiddleware } = require("http-proxy-middleware");
 const fs = require("fs");
 const path = require("path");
 const { Readable } = require("stream");
+const http = require("http");
+const https = require("https");
 const { resolveWebRoot } = require("./lib/static");
 let UndiciAgent = null;
 try {
@@ -281,44 +283,10 @@ async function main(adapter) {
       return;
     }
 
-    const controller = new AbortController();
-    res.on("close", () => controller.abort());
-
     try {
       const requestConfig = buildCameraRequestConfig(targetUrl);
-      const response = await fetch(requestConfig.url, {
-        cache: "no-store",
-        signal: controller.signal,
-        headers: requestConfig.headers,
-        ...buildCameraFetchOptions(requestConfig.url),
-      });
-
-      if (!response.ok || !response.body) {
-        res.status(response.status || 502).json({ error: `Stream fetch failed (${response.status || 502})` });
-        return;
-      }
-
-      const sourceContentType = response.headers.get("content-type");
-      const contentType =
-        sourceContentType ||
-        (streamType === "flv" || looksLikeFlvUrl(targetUrl) ? "video/x-flv" : "multipart/x-mixed-replace");
-      res.setHeader("Content-Type", contentType);
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-      res.setHeader("Connection", "keep-alive");
-
-      const stream = Readable.fromWeb(response.body);
-      stream.on("error", () => {
-        if (!res.headersSent) {
-          res.status(500).end();
-          return;
-        }
-        res.end();
-      });
-      stream.pipe(res);
+      proxyCameraStream(requestConfig, req, res, streamType, 0);
     } catch (error) {
-      if (controller.signal.aborted) {
-        return;
-      }
       res.status(500).json({ error: error instanceof Error ? error.message : "Stream proxy failed" });
     }
   };
@@ -423,6 +391,109 @@ function buildCameraFetchOptions(targetUrl) {
       redirect: "follow",
     };
   }
+}
+
+function proxyCameraStream(requestConfig, req, res, streamType, redirects) {
+  let parsed;
+  try {
+    parsed = new URL(requestConfig.url);
+  } catch {
+    if (!res.headersSent) {
+      res.status(400).json({ error: "Invalid camera stream URL" });
+    } else {
+      res.end();
+    }
+    return;
+  }
+
+  const useHttps = parsed.protocol === "https:";
+  const transport = useHttps ? https : http;
+  const upstreamRequest = transport.request(
+    {
+      protocol: parsed.protocol,
+      hostname: parsed.hostname,
+      port: parsed.port || (useHttps ? 443 : 80),
+      method: "GET",
+      path: `${parsed.pathname}${parsed.search}`,
+      headers: {
+        Accept: "*/*",
+        Connection: "keep-alive",
+        "User-Agent": "ioBroker-smart-dashboard-camera-proxy/1.0",
+        ...requestConfig.headers,
+      },
+      rejectUnauthorized: !(useHttps && isLikelyLocalHost(parsed.hostname)),
+    },
+    (upstreamResponse) => {
+      const statusCode = upstreamResponse.statusCode || 502;
+      const location = upstreamResponse.headers.location;
+
+      if (
+        location &&
+        [301, 302, 303, 307, 308].includes(statusCode) &&
+        redirects < 5
+      ) {
+        upstreamResponse.resume();
+        const redirectedUrl = new URL(location, requestConfig.url).toString();
+        const redirectedConfig = buildCameraRequestConfig(redirectedUrl);
+        proxyCameraStream(redirectedConfig, req, res, streamType, redirects + 1);
+        return;
+      }
+
+      if (statusCode >= 400) {
+        const chunks = [];
+        upstreamResponse.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+        upstreamResponse.on("end", () => {
+          if (res.headersSent) {
+            return;
+          }
+          const body = Buffer.concat(chunks).toString("utf8");
+          res.status(statusCode).json({ error: body || `Stream fetch failed (${statusCode})` });
+        });
+        return;
+      }
+
+      const sourceContentType = upstreamResponse.headers["content-type"];
+      const contentType =
+        sourceContentType ||
+        (streamType === "flv" || looksLikeFlvUrl(requestConfig.url) ? "video/x-flv" : "multipart/x-mixed-replace");
+
+      res.status(statusCode);
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+
+      upstreamResponse.on("error", () => {
+        if (!res.headersSent) {
+          res.status(502).end();
+          return;
+        }
+        res.end();
+      });
+      upstreamResponse.pipe(res);
+    }
+  );
+
+  const closeUpstream = () => {
+    try {
+      upstreamRequest.destroy();
+    } catch {
+      // ignore
+    }
+  };
+
+  req.on("aborted", closeUpstream);
+  res.on("close", closeUpstream);
+
+  upstreamRequest.on("error", (error) => {
+    if (!res.headersSent) {
+      res.status(502).json({ error: error instanceof Error ? error.message : "Stream proxy request failed" });
+      return;
+    }
+    res.end();
+  });
+
+  upstreamRequest.end();
 }
 
 function getInsecureHttpsDispatcher() {
