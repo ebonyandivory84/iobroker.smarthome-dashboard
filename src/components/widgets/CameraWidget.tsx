@@ -472,7 +472,7 @@ export function CameraWidget({
                               reportAspectRatio(source.width, source.height);
                             }
                           }}
-                          resizeMode="contain"
+                          resizeMode="cover"
                           source={{ uri: url }}
                           style={[styles.imageLayer, isVisible ? styles.layerVisible : styles.layerHidden]}
                         />
@@ -514,7 +514,7 @@ export function CameraWidget({
                           reportAspectRatio(source.width, source.height);
                         }
                       }}
-                      resizeMode="contain"
+                      resizeMode="cover"
                       source={{ uri: previewFeed.url }}
                       style={styles.mjpegImage}
                     />
@@ -1253,7 +1253,7 @@ const baseWebLayerStyle = {
   top: 0,
   width: "100%",
   height: "100%",
-  objectFit: "contain",
+  objectFit: "cover",
   display: "block",
   backgroundColor: "#000000",
   transition: LAYER_FADE_MS > 0 ? `opacity ${LAYER_FADE_MS}ms linear` : "none",
@@ -1276,7 +1276,7 @@ const baseFullscreenWebLayerStyle = {
 const webMjpegStyle = {
   width: "100%",
   height: "100%",
-  objectFit: "contain",
+  objectFit: "cover",
   display: "block",
   backgroundColor: "#000000",
 } as const;
@@ -1292,7 +1292,7 @@ const fullscreenWebMjpegStyle = {
 const webFlvStyle = {
   width: "100%",
   height: "100%",
-  objectFit: "contain",
+  objectFit: "cover",
   display: "block",
   backgroundColor: "#000000",
 } as const;
