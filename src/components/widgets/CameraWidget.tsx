@@ -28,6 +28,7 @@ const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 12_000;
 const MJPEG_RECONNECT_DELAY_MS = 1800;
 const FLV_RECONNECT_DELAY_MS = 1800;
 const MJPEG_HANDOFF_RETRY_MS = 900;
+const MJPEG_PREVIEW_RESUME_DELAY_MS = 900;
 let flvLoaderPromise: Promise<boolean> | null = null;
 
 export function CameraWidget({
@@ -55,6 +56,7 @@ export function CameraWidget({
   const [fullscreenFmp4SourceIndex, setFullscreenFmp4SourceIndex] = useState(0);
   const [previewMjpegLoaded, setPreviewMjpegLoaded] = useState(false);
   const [fullscreenMjpegLoaded, setFullscreenMjpegLoaded] = useState(false);
+  const [previewMjpegPaused, setPreviewMjpegPaused] = useState(false);
   const hasReportedAspectRatio = useRef(false);
   const lastTriggerMatchRef = useRef(false);
   const activeLayerRef = useRef<0 | 1>(0);
@@ -62,6 +64,7 @@ export function CameraWidget({
   const loadingJobRef = useRef<{ layer: 0 | 1; url: string } | null>(null);
   const fullscreenVisibilityCallbackRef = useRef(onFullscreenVisibilityChange);
   const previewMjpegRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewMjpegResumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const titleFontSize = Math.max(11, Math.min(28, Math.round(config.titleFontSize || 14)));
@@ -172,15 +175,23 @@ export function CameraWidget({
       clearTimeout(previewMjpegRetryTimerRef.current);
       previewMjpegRetryTimerRef.current = null;
     }
+    if (previewMjpegResumeTimerRef.current) {
+      clearTimeout(previewMjpegResumeTimerRef.current);
+      previewMjpegResumeTimerRef.current = null;
+    }
     if (previewFeed?.kind === "mjpeg") {
       setPreviewMjpegLoaded(false);
-      setPreviewMjpegSourceIndex(0);
-      setPreviewStreamDebug("MJPEG Preview: Neuverbinden...");
-      setPreviewMjpegSession((current) => current + 1);
+      setPreviewMjpegPaused(true);
+      setPreviewStreamDebug("MJPEG Preview: Warte auf Stream-Freigabe...");
+      previewMjpegResumeTimerRef.current = setTimeout(() => {
+        setPreviewMjpegPaused(false);
+        restartPreviewMjpeg();
+        previewMjpegResumeTimerRef.current = null;
+      }, MJPEG_PREVIEW_RESUME_DELAY_MS);
       previewMjpegRetryTimerRef.current = setTimeout(() => {
-        setPreviewMjpegSession((current) => current + 1);
+        restartPreviewMjpeg();
         previewMjpegRetryTimerRef.current = null;
-      }, MJPEG_HANDOFF_RETRY_MS);
+      }, MJPEG_PREVIEW_RESUME_DELAY_MS + MJPEG_HANDOFF_RETRY_MS);
     }
     if (previewFeed?.kind === "flv") {
       // Restart preview immediately to keep max/min transitions snappy on tablet.
@@ -254,6 +265,9 @@ export function CameraWidget({
     if (fullscreenOpen || previewFeed?.kind !== "mjpeg") {
       setPreviewStreamDebug(null);
       setPreviewMjpegLoaded(false);
+      if (fullscreenOpen) {
+        setPreviewMjpegPaused(true);
+      }
     }
   }, [fullscreenOpen, previewFeed?.kind]);
 
@@ -376,6 +390,9 @@ export function CameraWidget({
     return () => {
       if (previewMjpegRetryTimerRef.current) {
         clearTimeout(previewMjpegRetryTimerRef.current);
+      }
+      if (previewMjpegResumeTimerRef.current) {
+        clearTimeout(previewMjpegResumeTimerRef.current);
       }
     };
   }, []);
@@ -616,7 +633,7 @@ export function CameraWidget({
                       );
                 })
               : null}
-            {!fullscreenOpen && previewFeed.kind === "mjpeg" && previewFeed.url
+            {!fullscreenOpen && !previewMjpegPaused && previewFeed.kind === "mjpeg" && previewFeed.url
               ? Platform.OS === "web"
                 ? createElement("img", {
                     alt: config.title || "Camera MJPEG",
@@ -726,9 +743,7 @@ export function CameraWidget({
       <Modal
         animationType={
           Platform.OS === "web"
-            ? fullscreenFeed?.kind === "flv" || fullscreenFeed?.kind === "fmp4"
-              ? "none"
-              : "fade"
+            ? "none"
             : "none"
         }
         transparent
