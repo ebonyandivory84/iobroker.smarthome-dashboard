@@ -24,9 +24,7 @@ const LAYER_FADE_MS = 0;
 const pinnedColor = "#f3c84a";
 const FLV_SCRIPT_SRC = "https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js";
 const FLV_SCRIPT_LOAD_TIMEOUT_MS = 8000;
-const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 8_000;
-const FLV_SOURCE_SWITCH_TIMEOUT_MS = 8_000;
-const FMP4_SOURCE_SWITCH_TIMEOUT_MS = 8_000;
+const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 12_000;
 let flvLoaderPromise: Promise<boolean> | null = null;
 
 export function CameraWidget({
@@ -41,11 +39,9 @@ export function CameraWidget({
   const [activeLayer, setActiveLayer] = useState<0 | 1>(0);
   const [loadingLayer, setLoadingLayer] = useState<0 | 1 | null>(null);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
-  const [fullscreenSession, setFullscreenSession] = useState(0);
   const [pinned, setPinned] = useState(false);
   const [previewStreamDebug, setPreviewStreamDebug] = useState<string | null>(null);
   const [previewMjpegSourceIndex, setPreviewMjpegSourceIndex] = useState(0);
-  const [previewMjpegSession, setPreviewMjpegSession] = useState(0);
   const [fullscreenMjpegSourceIndex, setFullscreenMjpegSourceIndex] = useState(0);
   const [previewFlvSourceIndex, setPreviewFlvSourceIndex] = useState(0);
   const [fullscreenFlvSourceIndex, setFullscreenFlvSourceIndex] = useState(0);
@@ -79,7 +75,6 @@ export function CameraWidget({
     previewFlvUrl,
     previewFmp4Url
   );
-  const disableFlvOnTouchWeb = isTouchLikeWeb();
   const fullscreenSourceMode = resolveSourceMode(
     config.fullscreenSourceMode,
     fullscreenSnapshotBaseUrl,
@@ -93,14 +88,14 @@ export function CameraWidget({
     sourceMode: previewSourceMode,
     snapshotUrl: previewSnapshotBaseUrl,
     mjpegUrl: previewMjpegUrl,
-    flvUrl: disableFlvOnTouchWeb ? null : previewFlvUrl,
+    flvUrl: previewFlvUrl,
     fmp4Url: previewFmp4Url,
   });
   const fullscreenFeed = resolveCameraFeed({
     sourceMode: fullscreenSourceMode,
     snapshotUrl: fullscreenSnapshotBaseUrl,
     mjpegUrl: fullscreenMjpegUrl,
-    flvUrl: disableFlvOnTouchWeb ? null : fullscreenFlvUrl,
+    flvUrl: fullscreenFlvUrl,
     fmp4Url: fullscreenFmp4Url,
   });
   const activeFeed = fullscreenOpen ? fullscreenFeed : previewFeed;
@@ -159,45 +154,17 @@ export function CameraWidget({
     previewFmp4Sources[Math.min(previewFmp4SourceIndex, Math.max(0, previewFmp4Sources.length - 1))] || null;
   const currentFullscreenFmp4Src =
     fullscreenFmp4Sources[Math.min(fullscreenFmp4SourceIndex, Math.max(0, fullscreenFmp4Sources.length - 1))] || null;
-  const keepPreviewMjpegAliveDuringFullscreen =
-    fullscreenOpen &&
-    previewFeed?.kind === "mjpeg" &&
-    fullscreenFeed?.kind === "mjpeg" &&
-    previewFeed.url !== fullscreenFeed.url;
   const activeRefreshMs = fullscreenOpen
     ? Math.max(180, config.fullscreenRefreshMs || config.refreshMs || 2000)
     : Math.max(100, config.refreshMs || 2000);
-  const touchLikeWeb = isTouchLikeWeb();
 
   const closeFullscreen = () => {
-    if (previewFeed?.kind === "mjpeg") {
-      setPreviewMjpegSourceIndex(0);
-      setPreviewMjpegLoaded(false);
-      setPreviewStreamDebug(null);
-      setPreviewMjpegSession((current) => current + 1);
-    }
-    const isSameFlvFeed = previewFeed?.kind === "flv" && fullscreenFeed?.kind === "flv" && previewFeed.url === fullscreenFeed.url;
-    if (isSameFlvFeed && previewFlvSources.length) {
-      const matchingIndex = previewFlvSources.findIndex((source) => source === currentFullscreenFlvSrc);
-      if (matchingIndex >= 0) {
-        setPreviewFlvSourceIndex(matchingIndex);
-      }
-    }
-    const isSameFmp4Feed =
-      previewFeed?.kind === "fmp4" && fullscreenFeed?.kind === "fmp4" && previewFeed.url === fullscreenFeed.url;
-    if (isSameFmp4Feed && previewFmp4Sources.length) {
-      const matchingIndex = previewFmp4Sources.findIndex((source) => source === currentFullscreenFmp4Src);
-      if (matchingIndex >= 0) {
-        setPreviewFmp4SourceIndex(matchingIndex);
-      }
-    }
     fullscreenVisibilityCallbackRef.current?.(false);
     setFullscreenOpen(false);
     setPinned(false);
   };
 
   const openFullscreen = () => {
-    setFullscreenSession((current) => current + 1);
     fullscreenVisibilityCallbackRef.current?.(true);
     setPinned(false);
     setFullscreenOpen(true);
@@ -228,11 +195,11 @@ export function CameraWidget({
   }, [activeRefreshMs, activeSnapshotBaseUrl]);
 
   useEffect(() => {
-    if (previewFeed?.kind !== "mjpeg") {
+    if (fullscreenOpen || previewFeed?.kind !== "mjpeg") {
       setPreviewStreamDebug(null);
       setPreviewMjpegLoaded(false);
     }
-  }, [previewFeed?.kind]);
+  }, [fullscreenOpen, previewFeed?.kind]);
 
   useEffect(() => {
     setPreviewMjpegSourceIndex(0);
@@ -469,10 +436,11 @@ export function CameraWidget({
     latestRequestedUrlRef.current = snapshotUrl;
 
     if (!snapshotUrl) {
-      // Keep the last successful snapshot layers in memory so a temporary switch
-      // to non-snapshot fullscreen sources does not blank the preview on close.
       loadingJobRef.current = null;
       setLoadingLayer(null);
+      setLayerUrls([null, null]);
+      setActiveLayer(0);
+      activeLayerRef.current = 0;
       return;
     }
 
@@ -498,176 +466,6 @@ export function CameraWidget({
 
     scheduleLoad(snapshotUrl);
   }, [layerUrls, scheduleLoad, snapshotUrl]);
-
-  if (Platform.OS === "web" && touchLikeWeb) {
-    const previewTabletStreamUrl =
-      previewFeed?.kind === "mjpeg" || previewFeed?.kind === "flv" || previewFeed?.kind === "fmp4"
-        ? resolveTabletStreamUrl(previewFeed.url, previewFeed.kind)
-        : null;
-    const fullscreenTabletStreamUrl =
-      fullscreenFeed?.kind === "mjpeg" || fullscreenFeed?.kind === "flv" || fullscreenFeed?.kind === "fmp4"
-        ? resolveTabletStreamUrl(fullscreenFeed.url, fullscreenFeed.kind)
-        : null;
-    const previewTabletMjpegUrl =
-      previewFeed?.kind === "mjpeg" && previewTabletStreamUrl
-        ? withReconnectNonce(previewTabletStreamUrl, previewMjpegSession)
-        : null;
-
-    return (
-      <>
-        <View style={styles.container}>
-          <Pressable
-            disabled={!previewFeed}
-            onPress={() => {
-              playConfiguredUiSound(config.interactionSounds?.open, "open", `${config.id}:open`);
-              openFullscreen();
-            }}
-            style={styles.preview}
-          >
-            {previewFeed ? (
-              <View style={styles.snapshotWrap}>
-                {previewFeed.kind === "snapshot" && snapshotUrl
-                  ? createElement("img", {
-                      alt: config.title || "Camera snapshot",
-                      decoding: "sync",
-                      draggable: false,
-                      loading: "eager",
-                      src: snapshotUrl,
-                      style: webMjpegStyle,
-                    })
-                  : null}
-                {previewFeed.kind === "mjpeg" && previewTabletMjpegUrl
-                  ? createElement("img", {
-                      alt: config.title || "Camera MJPEG",
-                      decoding: "sync",
-                      draggable: false,
-                      key: `tablet-preview-mjpeg-${previewTabletMjpegUrl}`,
-                      loading: "eager",
-                      onError: () => {
-                        setPreviewMjpegLoaded(false);
-                        setPreviewStreamDebug("MJPEG Preview: Stream konnte nicht geladen werden.");
-                      },
-                      onLoad: () => {
-                        setPreviewMjpegLoaded(true);
-                        setPreviewStreamDebug(null);
-                      },
-                      src: previewTabletMjpegUrl,
-                      style: webMjpegStyle,
-                    })
-                  : null}
-                {previewFeed.kind === "flv" && previewTabletStreamUrl
-                  ? (
-                      <WebFlvPlayer
-                        key={`tablet-preview-flv-${previewTabletStreamUrl}`}
-                        onAspectRatioDetected={reportAspectRatioValue}
-                        sources={[previewTabletStreamUrl]}
-                        title={config.title || "Camera FLV"}
-                      />
-                    )
-                  : null}
-                {previewFeed.kind === "fmp4" && previewTabletStreamUrl
-                  ? (
-                      <WebFmp4Player
-                        key={`tablet-preview-fmp4-${previewTabletStreamUrl}`}
-                        onAspectRatioDetected={reportAspectRatioValue}
-                        sources={[previewTabletStreamUrl]}
-                        title={config.title || "Camera fMP4"}
-                      />
-                    )
-                  : null}
-                {previewFeed.kind === "mjpeg" && previewStreamDebug ? (
-                  <View style={styles.streamDebugOverlay}>
-                    <Text style={styles.streamDebugText}>{previewStreamDebug}</Text>
-                  </View>
-                ) : null}
-                {config.showTitle !== false && config.title ? (
-                  <View style={styles.titleBadge}>
-                    <Text numberOfLines={1} style={[styles.titleBadgeLabel, { color: textColor, fontSize: titleFontSize }]}>
-                      {config.title}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-            ) : (
-              <View style={styles.empty}>
-                <Text style={[styles.emptyText, { color: mutedTextColor }]}>Kein Stream konfiguriert</Text>
-              </View>
-            )}
-          </Pressable>
-        </View>
-        <Modal animationType="fade" transparent visible={fullscreenOpen}>
-          <View style={styles.fullscreenBackdrop}>
-            <View style={styles.fullscreenActions}>
-              <Pressable
-                onPress={() => setPinned((current) => !current)}
-                style={[styles.fullscreenActionButton, styles.fullscreenActionSpacing, pinned ? styles.fullscreenPinActive : null]}
-              >
-                <MaterialCommunityIcons
-                  color={pinned ? pinnedColor : palette.text}
-                  name={pinned ? "pin" : "pin-outline"}
-                  size={18}
-                />
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  playConfiguredUiSound(config.interactionSounds?.close, "close", `${config.id}:close`);
-                  closeFullscreen();
-                }}
-                style={styles.fullscreenActionButton}
-              >
-                <MaterialCommunityIcons color={palette.text} name="close" size={20} />
-              </Pressable>
-            </View>
-            <View {...fullscreenPanResponder.panHandlers} style={styles.fullscreenStage}>
-              {fullscreenFeed?.kind === "snapshot" && snapshotUrl
-                ? createElement("img", {
-                    alt: config.title || "Camera snapshot fullscreen",
-                    decoding: "sync",
-                    draggable: false,
-                    loading: "eager",
-                    src: snapshotUrl,
-                    style: fullscreenWebMjpegStyle,
-                  })
-                : null}
-              {fullscreenFeed?.kind === "mjpeg" && fullscreenTabletStreamUrl
-                ? createElement("img", {
-                    alt: config.title || "Camera MJPEG fullscreen",
-                    decoding: "sync",
-                    draggable: false,
-                    key: `tablet-fullscreen-mjpeg-${fullscreenTabletStreamUrl}:${fullscreenSession}`,
-                    loading: "eager",
-                    src: fullscreenTabletStreamUrl,
-                    style: fullscreenWebMjpegStyle,
-                  })
-                : null}
-              {fullscreenFeed?.kind === "flv" && fullscreenTabletStreamUrl
-                ? (
-                    <WebFlvPlayer
-                      key={`tablet-fullscreen-flv-${fullscreenTabletStreamUrl}:${fullscreenSession}`}
-                      fullScreen
-                      onAspectRatioDetected={reportAspectRatioValue}
-                      sources={[fullscreenTabletStreamUrl]}
-                      title={config.title || "Camera FLV fullscreen"}
-                    />
-                  )
-                : null}
-              {fullscreenFeed?.kind === "fmp4" && fullscreenTabletStreamUrl
-                ? (
-                    <WebFmp4Player
-                      key={`tablet-fullscreen-fmp4-${fullscreenTabletStreamUrl}:${fullscreenSession}`}
-                      fullScreen
-                      onAspectRatioDetected={reportAspectRatioValue}
-                      sources={[fullscreenTabletStreamUrl]}
-                      title={config.title || "Camera fMP4 fullscreen"}
-                    />
-                  )
-                : null}
-            </View>
-          </View>
-        </Modal>
-      </>
-    );
-  }
 
   return (
     <>
@@ -756,7 +554,7 @@ export function CameraWidget({
                       );
                 })
               : null}
-            {( !fullscreenOpen || keepPreviewMjpegAliveDuringFullscreen ) && previewFeed.kind === "mjpeg" && previewFeed.url
+            {!fullscreenOpen && previewFeed.kind === "mjpeg" && previewFeed.url
               ? Platform.OS === "web"
                 ? createElement("img", {
                     alt: config.title || "Camera MJPEG",
@@ -791,10 +589,8 @@ export function CameraWidget({
                       setPreviewStreamDebug(null);
                       reportAspectRatio(width, height);
                     },
-                    src: withReconnectNonce(currentPreviewMjpegSrc || previewFeed.url, previewMjpegSession),
-                    style: keepPreviewMjpegAliveDuringFullscreen
-                      ? { ...webMjpegStyle, opacity: 0, visibility: "hidden" as const }
-                      : webMjpegStyle,
+                    src: currentPreviewMjpegSrc || previewFeed.url,
+                    style: webMjpegStyle,
                   })
                 : (
                     <Image
@@ -805,11 +601,8 @@ export function CameraWidget({
                         }
                       }}
                       resizeMode="contain"
-                      source={{ uri: withReconnectNonce(previewFeed.url, previewMjpegSession) }}
-                      style={[
-                        styles.mjpegImage,
-                        keepPreviewMjpegAliveDuringFullscreen ? styles.layerHidden : styles.layerVisible,
-                      ]}
+                      source={{ uri: previewFeed.url }}
+                      style={styles.mjpegImage}
                     />
                   )
               : null}
@@ -820,13 +613,7 @@ export function CameraWidget({
             ) : null}
             {!fullscreenOpen && previewFeed.kind === "flv" && previewFeed.url
               ? Platform.OS === "web"
-                ? touchLikeWeb
-                  ? (
-                      <View style={styles.touchPreviewPlaceholder}>
-                        <Text style={styles.touchPreviewPlaceholderText}>FLV Vorschau auf Tablet deaktiviert</Text>
-                      </View>
-                    )
-                  : (
+                ? (
                     <WebFlvPlayer
                       key={`preview-flv-${previewFeedKey}`}
                       onAspectRatioDetected={reportAspectRatioValue}
@@ -844,13 +631,7 @@ export function CameraWidget({
               : null}
             {!fullscreenOpen && previewFeed.kind === "fmp4" && previewFeed.url
               ? Platform.OS === "web"
-                ? touchLikeWeb
-                  ? (
-                      <View style={styles.touchPreviewPlaceholder}>
-                        <Text style={styles.touchPreviewPlaceholderText}>fMP4 Vorschau auf Tablet deaktiviert</Text>
-                      </View>
-                    )
-                  : (
+                ? (
                     <WebFmp4Player
                       key={`preview-fmp4-${previewFeedKey}:${currentPreviewFmp4Src || "none"}`}
                       onAspectRatioDetected={reportAspectRatioValue}
@@ -1020,7 +801,7 @@ export function CameraWidget({
               ? Platform.OS === "web"
                 ? (
                     <WebFlvPlayer
-                      key={`fullscreen-flv-${fullscreenFeedKey}:${fullscreenSession}`}
+                      key={`fullscreen-flv-${fullscreenFeedKey}`}
                       fullScreen
                       onAspectRatioDetected={reportAspectRatioValue}
                       onSourceIndexChange={setFullscreenFlvSourceIndex}
@@ -1039,7 +820,7 @@ export function CameraWidget({
               ? Platform.OS === "web"
                 ? (
                     <WebFmp4Player
-                      key={`fullscreen-fmp4-${fullscreenFeedKey}:${currentFullscreenFmp4Src || "none"}:${fullscreenSession}`}
+                      key={`fullscreen-fmp4-${fullscreenFeedKey}:${currentFullscreenFmp4Src || "none"}`}
                       fullScreen
                       onAspectRatioDetected={reportAspectRatioValue}
                       onSourceIndexChange={setFullscreenFmp4SourceIndex}
@@ -1220,40 +1001,8 @@ function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv" | 
   const sources =
     streamType === "mjpeg"
       ? [...(includeDirect ? [targetUrl] : []), ...proxySources]
-      : [...(includeDirect ? [targetUrl] : []), ...proxySources];
+      : [...proxySources, ...(includeDirect ? [targetUrl] : [])];
   return Array.from(new Set(sources.filter(Boolean)));
-}
-
-function isTouchLikeWeb() {
-  if (Platform.OS !== "web" || typeof window === "undefined") {
-    return false;
-  }
-  try {
-    const touchPoints = typeof navigator !== "undefined" ? Number(navigator.maxTouchPoints || 0) : 0;
-    const coarsePointer = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
-    return touchPoints > 0 || coarsePointer;
-  } catch {
-    return false;
-  }
-}
-
-function withReconnectNonce(url: string, nonce: number) {
-  if (!url) {
-    return url;
-  }
-  try {
-    const parsed = new URL(url);
-    parsed.searchParams.set("_r", String(nonce));
-    return parsed.toString();
-  } catch {
-    const separator = url.includes("?") ? "&" : "?";
-    return `${url}${separator}_r=${nonce}`;
-  }
-}
-
-function resolveTabletStreamUrl(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
-  const proxyUrl = getWebStreamProxyUrls(targetUrl, streamType)[0];
-  return proxyUrl || targetUrl;
 }
 
 function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
@@ -1334,7 +1083,6 @@ function WebFlvPlayer({
   const [sourceIndex, setSourceIndex] = useState(Math.min(preferredSourceIndex, maxSourceIndex));
   const currentSource = normalizedSources[Math.min(sourceIndex, maxSourceIndex)] || "";
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     aspectRatioCallbackRef.current = onAspectRatioDetected;
@@ -1351,7 +1099,6 @@ function WebFlvPlayer({
 
   useEffect(() => {
     setErrorMessage(null);
-    setIsReady(false);
   }, [currentSource]);
 
   useEffect(() => {
@@ -1362,13 +1109,11 @@ function WebFlvPlayer({
     let disposed = false;
     let player: any = null;
     let retryTimer: ReturnType<typeof setInterval> | null = null;
-    let startupWatchdog: ReturnType<typeof setTimeout> | null = null;
     const videoElement = videoRef.current;
 
     const safeSetError = (message: string) => {
       if (!disposed) {
         setErrorMessage(message);
-        setIsReady(false);
       }
     };
 
@@ -1395,9 +1140,6 @@ function WebFlvPlayer({
       void videoElement.play().catch(() => {
         // Ignore autoplay rejections; retry loop handles late-ready starts.
       });
-      if (videoElement.readyState >= 2 && !disposed) {
-        setIsReady(true);
-      }
     };
 
     const attach = async () => {
@@ -1450,9 +1192,6 @@ function WebFlvPlayer({
 
       player.attachMediaElement(videoElement);
       videoElement.onloadedmetadata = () => {
-        if (!disposed) {
-          setIsReady(true);
-        }
         const callback = aspectRatioCallbackRef.current;
         if (ratioReportedRef.current || !callback) {
           return;
@@ -1470,30 +1209,10 @@ function WebFlvPlayer({
         callback(ratio);
       };
       videoElement.oncanplay = () => {
-        if (startupWatchdog) {
-          clearTimeout(startupWatchdog);
-          startupWatchdog = null;
-        }
-        if (!disposed) {
-          setIsReady(true);
-        }
         tryPlay();
       };
       player.load();
       tryPlay();
-      startupWatchdog = setTimeout(() => {
-        if (disposed || switchedSource || !videoElement) {
-          return;
-        }
-        const hasData = videoElement.readyState >= 2;
-        if (hasData) {
-          return;
-        }
-        switchedSource = true;
-        if (!moveToNextSource("FLV Quelle reagiert nicht, versuche alternative Quelle...")) {
-          safeSetError("FLV Stream reagiert nicht.");
-        }
-      }, FLV_SOURCE_SWITCH_TIMEOUT_MS);
       retryTimer = setInterval(() => {
         if (!videoElement || disposed || !videoElement.paused) {
           return;
@@ -1528,9 +1247,6 @@ function WebFlvPlayer({
       if (retryTimer) {
         clearInterval(retryTimer);
       }
-      if (startupWatchdog) {
-        clearTimeout(startupWatchdog);
-      }
       playerRef.current = null;
     };
   }, [currentSource, normalizedSources.length, sourceIndex]);
@@ -1549,10 +1265,6 @@ function WebFlvPlayer({
       {errorMessage ? (
         <View style={styles.flvErrorOverlay}>
           <Text style={styles.flvErrorText}>{errorMessage}</Text>
-        </View>
-      ) : !isReady ? (
-        <View style={styles.streamLoadingOverlay}>
-          <Text style={styles.streamLoadingText}>Stream wird verbunden...</Text>
         </View>
       ) : null}
     </>
@@ -1588,7 +1300,6 @@ function WebFmp4Player({
   const [sourceIndex, setSourceIndex] = useState(Math.min(preferredSourceIndex, maxSourceIndex));
   const currentSource = normalizedSources[Math.min(sourceIndex, maxSourceIndex)] || "";
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     aspectRatioCallbackRef.current = onAspectRatioDetected;
@@ -1606,7 +1317,6 @@ function WebFmp4Player({
   useEffect(() => {
     setErrorMessage(null);
     ratioReportedRef.current = false;
-    setIsReady(false);
   }, [currentSource]);
 
   useEffect(() => {
@@ -1635,15 +1345,9 @@ function WebFmp4Player({
       void videoElement.play().catch(() => {
         // ignore autoplay issues
       });
-      if (videoElement.readyState >= 2 && !disposed) {
-        setIsReady(true);
-      }
     };
 
     const handleMetadata = () => {
-      if (!disposed) {
-        setIsReady(true);
-      }
       const callback = aspectRatioCallbackRef.current;
       if (ratioReportedRef.current || !callback) {
         return;
@@ -1665,7 +1369,6 @@ function WebFmp4Player({
       if (disposed) {
         return;
       }
-      setIsReady(false);
       if (!moveToNextSource("fMP4 Quelle fehlgeschlagen, versuche alternative Quelle...")) {
         setErrorMessage("fMP4 Stream konnte nicht gestartet werden.");
       }
@@ -1684,7 +1387,7 @@ function WebFmp4Player({
       if (!hasData) {
         handleError();
       }
-    }, FMP4_SOURCE_SWITCH_TIMEOUT_MS);
+    }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
 
     return () => {
       disposed = true;
@@ -1710,10 +1413,6 @@ function WebFmp4Player({
       {errorMessage ? (
         <View style={styles.flvErrorOverlay}>
           <Text style={styles.flvErrorText}>{errorMessage}</Text>
-        </View>
-      ) : !isReady ? (
-        <View style={styles.streamLoadingOverlay}>
-          <Text style={styles.streamLoadingText}>Stream wird verbunden...</Text>
         </View>
       ) : null}
     </>
@@ -1942,21 +1641,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
-  streamLoadingOverlay: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#000000",
-  },
-  streamLoadingText: {
-    color: "#d5deef",
-    fontSize: 12,
-    fontWeight: "700",
-  },
   flvTapOverlay: {
     position: "absolute",
     left: 12,
@@ -1987,19 +1671,6 @@ const styles = StyleSheet.create({
     color: "#ffe7e7",
     fontSize: 12,
     fontWeight: "700",
-  },
-  touchPreviewPlaceholder: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#000000",
-  },
-  touchPreviewPlaceholderText: {
-    color: "#c5d2e6",
-    fontSize: 12,
-    fontWeight: "700",
-    textAlign: "center",
-    paddingHorizontal: 12,
   },
 });
 
@@ -2078,7 +1749,7 @@ const webFlvStyle = {
   height: "100%",
   objectFit: "contain",
   display: "block",
-  backgroundColor: "#000000",
+  backgroundColor: "transparent",
 } as const;
 
 const fullscreenWebFlvStyle = {

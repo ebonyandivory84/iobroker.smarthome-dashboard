@@ -17,7 +17,7 @@ export function DashboardScreen() {
   const { width } = useWindowDimensions();
   const isCompact = width < 700;
   const [isTouchCapableWeb, setIsTouchCapableWeb] = useState(false);
-  const isTouchLayout = Platform.OS !== "web" && (width < 1100 || isTouchCapableWeb);
+  const isTouchLayout = width < 1100 || isTouchCapableWeb;
   const horizontalPagerRef = useRef<ScrollView | null>(null);
   const horizontalOffsetRef = useRef(0);
   const pageOffsetsRef = useRef<Record<string, number>>({});
@@ -62,7 +62,6 @@ export function DashboardScreen() {
   const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
   const [layoutMode, setLayoutMode] = useState(false);
   const [visiblePageId, setVisiblePageId] = useState(activePageId);
-  const [refreshNonce, setRefreshNonce] = useState(0);
   const lastContentScrollAt = useRef(0);
   const activePageIndex = Math.max(0, dashboardPages.findIndex((page) => page.id === activePageId));
 
@@ -411,10 +410,9 @@ export function DashboardScreen() {
         deltaY > 96 &&
         deltaY > Math.abs(deltaX) + 32
       ) {
-        pullRefreshBlockedUntilRef.current = Date.now() + 2200;
         playConfiguredUiSound(config.uiSounds?.pageSounds?.pullToRefresh, "page", "global:pullToRefresh");
         window.setTimeout(() => {
-          setRefreshNonce((current) => current + 1);
+          window.location.reload();
         }, 140);
       }
 
@@ -484,7 +482,6 @@ export function DashboardScreen() {
               onTouchEnd={handlePageTouchEnd(pageConfig.activePageId)}
             >
               <GridCanvas
-                key={`${pageConfig.activePageId}:${refreshNonce}`}
                 client={client}
                 config={pageConfig}
                 isLayoutMode={layoutMode}
