@@ -24,7 +24,7 @@ const LAYER_FADE_MS = 0;
 const pinnedColor = "#f3c84a";
 const FLV_SCRIPT_SRC = "https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js";
 const FLV_SCRIPT_LOAD_TIMEOUT_MS = 8000;
-const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 8_000;
+const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 2_500;
 const FLV_SOURCE_SWITCH_TIMEOUT_MS = 8_000;
 const FMP4_SOURCE_SWITCH_TIMEOUT_MS = 8_000;
 let flvLoaderPromise: Promise<boolean> | null = null;
@@ -44,6 +44,7 @@ export function CameraWidget({
   const [pinned, setPinned] = useState(false);
   const [previewStreamDebug, setPreviewStreamDebug] = useState<string | null>(null);
   const [previewMjpegSourceIndex, setPreviewMjpegSourceIndex] = useState(0);
+  const [previewMjpegSession, setPreviewMjpegSession] = useState(0);
   const [fullscreenMjpegSourceIndex, setFullscreenMjpegSourceIndex] = useState(0);
   const [previewFlvSourceIndex, setPreviewFlvSourceIndex] = useState(0);
   const [fullscreenFlvSourceIndex, setFullscreenFlvSourceIndex] = useState(0);
@@ -173,6 +174,10 @@ export function CameraWidget({
       }
       setPreviewMjpegLoaded(false);
       setPreviewStreamDebug(null);
+    }
+    if (previewFeed?.kind === "mjpeg") {
+      // Force a fresh preview reconnect after fullscreen closes.
+      setPreviewMjpegSession((current) => current + 1);
     }
     const isSameFlvFeed = previewFeed?.kind === "flv" && fullscreenFeed?.kind === "flv" && previewFeed.url === fullscreenFeed.url;
     if (isSameFlvFeed && previewFlvSources.length) {
@@ -583,7 +588,7 @@ export function CameraWidget({
                       );
                 })
               : null}
-            {previewFeed.kind === "mjpeg" && previewFeed.url
+            {!fullscreenOpen && previewFeed.kind === "mjpeg" && previewFeed.url
               ? Platform.OS === "web"
                 ? createElement("img", {
                     alt: config.title || "Camera MJPEG",
@@ -618,8 +623,8 @@ export function CameraWidget({
                       setPreviewStreamDebug(null);
                       reportAspectRatio(width, height);
                     },
-                    src: currentPreviewMjpegSrc || previewFeed.url,
-                    style: fullscreenOpen ? { ...webMjpegStyle, opacity: 0, visibility: "hidden" as const } : webMjpegStyle,
+                    src: withReconnectNonce(currentPreviewMjpegSrc || previewFeed.url, previewMjpegSession),
+                    style: webMjpegStyle,
                   })
                 : (
                     <Image
@@ -630,12 +635,12 @@ export function CameraWidget({
                         }
                       }}
                       resizeMode="contain"
-                      source={{ uri: previewFeed.url }}
-                      style={[styles.mjpegImage, fullscreenOpen ? styles.layerHidden : styles.layerVisible]}
+                      source={{ uri: withReconnectNonce(previewFeed.url, previewMjpegSession) }}
+                      style={styles.mjpegImage}
                     />
                   )
               : null}
-            {previewFeed.kind === "mjpeg" && previewStreamDebug && !fullscreenOpen ? (
+            {!fullscreenOpen && previewFeed.kind === "mjpeg" && previewStreamDebug ? (
               <View style={styles.streamDebugOverlay}>
                 <Text style={styles.streamDebugText}>{previewStreamDebug}</Text>
               </View>
@@ -1027,7 +1032,10 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv" | 
 function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
   const includeDirect = shouldUseDirectWebStream(targetUrl, streamType);
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
-  const sources = [...(includeDirect ? [targetUrl] : []), ...proxySources];
+  const sources =
+    streamType === "mjpeg"
+      ? [...(includeDirect ? [targetUrl] : []), ...proxySources]
+      : [...proxySources, ...(includeDirect ? [targetUrl] : [])];
   return Array.from(new Set(sources.filter(Boolean)));
 }
 
@@ -1078,6 +1086,20 @@ function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv"
   }
 
   return true;
+}
+
+function withReconnectNonce(url: string, nonce: number) {
+  if (!url) {
+    return url;
+  }
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set("_r", String(nonce));
+    return parsed.toString();
+  } catch {
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}_r=${nonce}`;
+  }
 }
 
 function isMixedContentBlocked(targetUrl: string) {
