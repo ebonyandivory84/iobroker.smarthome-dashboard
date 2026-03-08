@@ -582,7 +582,7 @@ export function CameraWidget({
                       );
                 })
               : null}
-            {!fullscreenOpen && previewFeed.kind === "mjpeg" && previewFeed.url
+            {previewFeed.kind === "mjpeg" && previewFeed.url
               ? Platform.OS === "web"
                 ? createElement("img", {
                     alt: config.title || "Camera MJPEG",
@@ -618,7 +618,9 @@ export function CameraWidget({
                       reportAspectRatio(width, height);
                     },
                     src: currentPreviewMjpegSrc || previewFeed.url,
-                    style: webMjpegStyle,
+                    style: fullscreenOpen
+                      ? { ...webMjpegStyle, opacity: 0, visibility: "hidden" as const }
+                      : webMjpegStyle,
                   })
                 : (
                     <Image
@@ -630,7 +632,7 @@ export function CameraWidget({
                       }}
                       resizeMode="contain"
                       source={{ uri: previewFeed.url }}
-                      style={styles.mjpegImage}
+                      style={[styles.mjpegImage, fullscreenOpen ? styles.layerHidden : styles.layerVisible]}
                     />
                   )
               : null}
