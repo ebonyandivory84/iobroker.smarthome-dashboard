@@ -201,6 +201,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         showTitle: widget.showTitle === false ? "false" : "true",
         url: widget.url || "",
         iconImage: widget.iconImage || "",
+        iconImageCrop: widget.iconImageCrop || "none",
         ...appearanceDraft,
       });
       return;
@@ -459,6 +460,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         showTitle: draft.showTitle !== "false",
         url: draft.url || undefined,
         iconImage: draft.iconImage || undefined,
+        iconImageCrop: normalizeIconImageCrop(draft.iconImageCrop),
         interactionSounds: buildStoredInteractionSounds(
           widget.type,
           soundDraft,
@@ -1060,6 +1062,13 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       <Text style={styles.stateBrowseLabel}>Bild waehlen</Text>
                     </EditorButtonPressable>
                   </View>
+                </Field>
+                <Field label="Bildform">
+                  <ChoiceRow
+                    options={["none", "rounded", "circle"]}
+                    value={draft.iconImageCrop || "none"}
+                    onSelect={(value) => setDraft((current) => ({ ...current, iconImageCrop: value }))}
+                  />
                 </Field>
                 <Field label="Sounds bei Interaktion">
                   <Field label="Beim Druecken">

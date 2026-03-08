@@ -120,6 +120,7 @@ export type LinkWidgetConfig = WidgetBase & {
   type: "link";
   url?: string;
   iconImage?: string;
+  iconImageCrop?: "none" | "rounded" | "circle";
 };
 
 export type SolarNodeLayout = {

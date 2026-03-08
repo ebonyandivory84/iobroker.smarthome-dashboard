@@ -16,6 +16,7 @@ export function LinkWidget({ config }: LinkWidgetProps) {
   const iconUri = config.iconImage
     ? `/smarthome-dashboard/widget-assets/${encodeURIComponent(config.iconImage)}`
     : null;
+  const iconImageCrop = normalizeIconImageCrop(config.iconImageCrop);
 
   const close = () => {
     playConfiguredUiSound(config.interactionSounds?.close, "close", `${config.id}:close`);
@@ -50,7 +51,15 @@ export function LinkWidget({ config }: LinkWidgetProps) {
           style={[styles.openButton, iconUri ? styles.openButtonImageMode : null]}
         >
           {iconUri ? (
-            <Image source={{ uri: iconUri }} style={styles.fullImage} />
+            <Image
+              resizeMode={iconImageCrop === "circle" ? "cover" : "contain"}
+              source={{ uri: iconUri }}
+              style={[
+                styles.fullImage,
+                iconImageCrop === "rounded" ? styles.fullImageRounded : null,
+                iconImageCrop === "circle" ? styles.fullImageCircle : null,
+              ]}
+            />
           ) : (
             <>
               <View style={styles.iconFallback} />
@@ -119,6 +128,13 @@ function normalizeUrl(raw?: string) {
   return `https://${value}`;
 }
 
+function normalizeIconImageCrop(value: LinkWidgetConfig["iconImageCrop"]) {
+  if (value === "rounded" || value === "circle") {
+    return value;
+  }
+  return "none";
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -149,6 +165,12 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     borderRadius: 0,
+  },
+  fullImageRounded: {
+    borderRadius: 12,
+  },
+  fullImageCircle: {
+    borderRadius: 999,
   },
   iconFallback: {
     width: 34,
