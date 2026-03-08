@@ -499,6 +499,176 @@ export function CameraWidget({
     scheduleLoad(snapshotUrl);
   }, [layerUrls, scheduleLoad, snapshotUrl]);
 
+  if (Platform.OS === "web" && touchLikeWeb) {
+    const previewTabletStreamUrl =
+      previewFeed?.kind === "mjpeg" || previewFeed?.kind === "flv" || previewFeed?.kind === "fmp4"
+        ? resolveTabletStreamUrl(previewFeed.url, previewFeed.kind)
+        : null;
+    const fullscreenTabletStreamUrl =
+      fullscreenFeed?.kind === "mjpeg" || fullscreenFeed?.kind === "flv" || fullscreenFeed?.kind === "fmp4"
+        ? resolveTabletStreamUrl(fullscreenFeed.url, fullscreenFeed.kind)
+        : null;
+    const previewTabletMjpegUrl =
+      previewFeed?.kind === "mjpeg" && previewTabletStreamUrl
+        ? withReconnectNonce(previewTabletStreamUrl, previewMjpegSession)
+        : null;
+
+    return (
+      <>
+        <View style={styles.container}>
+          <Pressable
+            disabled={!previewFeed}
+            onPress={() => {
+              playConfiguredUiSound(config.interactionSounds?.open, "open", `${config.id}:open`);
+              openFullscreen();
+            }}
+            style={styles.preview}
+          >
+            {previewFeed ? (
+              <View style={styles.snapshotWrap}>
+                {previewFeed.kind === "snapshot" && snapshotUrl
+                  ? createElement("img", {
+                      alt: config.title || "Camera snapshot",
+                      decoding: "sync",
+                      draggable: false,
+                      loading: "eager",
+                      src: snapshotUrl,
+                      style: webMjpegStyle,
+                    })
+                  : null}
+                {previewFeed.kind === "mjpeg" && previewTabletMjpegUrl
+                  ? createElement("img", {
+                      alt: config.title || "Camera MJPEG",
+                      decoding: "sync",
+                      draggable: false,
+                      key: `tablet-preview-mjpeg-${previewTabletMjpegUrl}`,
+                      loading: "eager",
+                      onError: () => {
+                        setPreviewMjpegLoaded(false);
+                        setPreviewStreamDebug("MJPEG Preview: Stream konnte nicht geladen werden.");
+                      },
+                      onLoad: () => {
+                        setPreviewMjpegLoaded(true);
+                        setPreviewStreamDebug(null);
+                      },
+                      src: previewTabletMjpegUrl,
+                      style: webMjpegStyle,
+                    })
+                  : null}
+                {previewFeed.kind === "flv" && previewTabletStreamUrl
+                  ? (
+                      <WebFlvPlayer
+                        key={`tablet-preview-flv-${previewTabletStreamUrl}`}
+                        onAspectRatioDetected={reportAspectRatioValue}
+                        sources={[previewTabletStreamUrl]}
+                        title={config.title || "Camera FLV"}
+                      />
+                    )
+                  : null}
+                {previewFeed.kind === "fmp4" && previewTabletStreamUrl
+                  ? (
+                      <WebFmp4Player
+                        key={`tablet-preview-fmp4-${previewTabletStreamUrl}`}
+                        onAspectRatioDetected={reportAspectRatioValue}
+                        sources={[previewTabletStreamUrl]}
+                        title={config.title || "Camera fMP4"}
+                      />
+                    )
+                  : null}
+                {previewFeed.kind === "mjpeg" && previewStreamDebug ? (
+                  <View style={styles.streamDebugOverlay}>
+                    <Text style={styles.streamDebugText}>{previewStreamDebug}</Text>
+                  </View>
+                ) : null}
+                {config.showTitle !== false && config.title ? (
+                  <View style={styles.titleBadge}>
+                    <Text numberOfLines={1} style={[styles.titleBadgeLabel, { color: textColor, fontSize: titleFontSize }]}>
+                      {config.title}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            ) : (
+              <View style={styles.empty}>
+                <Text style={[styles.emptyText, { color: mutedTextColor }]}>Kein Stream konfiguriert</Text>
+              </View>
+            )}
+          </Pressable>
+        </View>
+        <Modal animationType="fade" transparent visible={fullscreenOpen}>
+          <View style={styles.fullscreenBackdrop}>
+            <View style={styles.fullscreenActions}>
+              <Pressable
+                onPress={() => setPinned((current) => !current)}
+                style={[styles.fullscreenActionButton, styles.fullscreenActionSpacing, pinned ? styles.fullscreenPinActive : null]}
+              >
+                <MaterialCommunityIcons
+                  color={pinned ? pinnedColor : palette.text}
+                  name={pinned ? "pin" : "pin-outline"}
+                  size={18}
+                />
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  playConfiguredUiSound(config.interactionSounds?.close, "close", `${config.id}:close`);
+                  closeFullscreen();
+                }}
+                style={styles.fullscreenActionButton}
+              >
+                <MaterialCommunityIcons color={palette.text} name="close" size={20} />
+              </Pressable>
+            </View>
+            <View {...fullscreenPanResponder.panHandlers} style={styles.fullscreenStage}>
+              {fullscreenFeed?.kind === "snapshot" && snapshotUrl
+                ? createElement("img", {
+                    alt: config.title || "Camera snapshot fullscreen",
+                    decoding: "sync",
+                    draggable: false,
+                    loading: "eager",
+                    src: snapshotUrl,
+                    style: fullscreenWebMjpegStyle,
+                  })
+                : null}
+              {fullscreenFeed?.kind === "mjpeg" && fullscreenTabletStreamUrl
+                ? createElement("img", {
+                    alt: config.title || "Camera MJPEG fullscreen",
+                    decoding: "sync",
+                    draggable: false,
+                    key: `tablet-fullscreen-mjpeg-${fullscreenTabletStreamUrl}:${fullscreenSession}`,
+                    loading: "eager",
+                    src: fullscreenTabletStreamUrl,
+                    style: fullscreenWebMjpegStyle,
+                  })
+                : null}
+              {fullscreenFeed?.kind === "flv" && fullscreenTabletStreamUrl
+                ? (
+                    <WebFlvPlayer
+                      key={`tablet-fullscreen-flv-${fullscreenTabletStreamUrl}:${fullscreenSession}`}
+                      fullScreen
+                      onAspectRatioDetected={reportAspectRatioValue}
+                      sources={[fullscreenTabletStreamUrl]}
+                      title={config.title || "Camera FLV fullscreen"}
+                    />
+                  )
+                : null}
+              {fullscreenFeed?.kind === "fmp4" && fullscreenTabletStreamUrl
+                ? (
+                    <WebFmp4Player
+                      key={`tablet-fullscreen-fmp4-${fullscreenTabletStreamUrl}:${fullscreenSession}`}
+                      fullScreen
+                      onAspectRatioDetected={reportAspectRatioValue}
+                      sources={[fullscreenTabletStreamUrl]}
+                      title={config.title || "Camera fMP4 fullscreen"}
+                    />
+                  )
+                : null}
+            </View>
+          </View>
+        </Modal>
+      </>
+    );
+  }
+
   return (
     <>
       <View style={styles.container}>
@@ -1079,6 +1249,11 @@ function withReconnectNonce(url: string, nonce: number) {
     const separator = url.includes("?") ? "&" : "?";
     return `${url}${separator}_r=${nonce}`;
   }
+}
+
+function resolveTabletStreamUrl(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
+  const proxyUrl = getWebStreamProxyUrls(targetUrl, streamType)[0];
+  return proxyUrl || targetUrl;
 }
 
 function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
