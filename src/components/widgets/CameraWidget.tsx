@@ -28,7 +28,6 @@ const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 8_000;
 const FLV_SOURCE_SWITCH_TIMEOUT_MS = 8_000;
 const FMP4_SOURCE_SWITCH_TIMEOUT_MS = 8_000;
 let flvLoaderPromise: Promise<boolean> | null = null;
-const rememberedMjpegSourceByTargetUrl = new Map<string, string>();
 
 export function CameraWidget({
   config,
@@ -174,6 +173,21 @@ export function CameraWidget({
       }
       setPreviewMjpegLoaded(false);
       setPreviewStreamDebug(null);
+    }
+    const isSameFlvFeed = previewFeed?.kind === "flv" && fullscreenFeed?.kind === "flv" && previewFeed.url === fullscreenFeed.url;
+    if (isSameFlvFeed && previewFlvSources.length) {
+      const matchingIndex = previewFlvSources.findIndex((source) => source === currentFullscreenFlvSrc);
+      if (matchingIndex >= 0) {
+        setPreviewFlvSourceIndex(matchingIndex);
+      }
+    }
+    const isSameFmp4Feed =
+      previewFeed?.kind === "fmp4" && fullscreenFeed?.kind === "fmp4" && previewFeed.url === fullscreenFeed.url;
+    if (isSameFmp4Feed && previewFmp4Sources.length) {
+      const matchingIndex = previewFmp4Sources.findIndex((source) => source === currentFullscreenFmp4Src);
+      if (matchingIndex >= 0) {
+        setPreviewFmp4SourceIndex(matchingIndex);
+      }
     }
     fullscreenVisibilityCallbackRef.current?.(false);
     setFullscreenOpen(false);
@@ -602,7 +616,6 @@ export function CameraWidget({
                       }
                       setPreviewMjpegLoaded(true);
                       setPreviewStreamDebug(null);
-                      rememberMjpegSource(previewFeed.url, currentPreviewMjpegSrc || previewFeed.url);
                       reportAspectRatio(width, height);
                     },
                     src: currentPreviewMjpegSrc || previewFeed.url,
@@ -794,7 +807,6 @@ export function CameraWidget({
                         return;
                       }
                       setFullscreenMjpegLoaded(true);
-                      rememberMjpegSource(fullscreenFeed.url, currentFullscreenMjpegSrc || fullscreenFeed.url);
                       reportAspectRatio(width, height);
                     },
                     src: currentFullscreenMjpegSrc || fullscreenFeed.url,
@@ -1015,10 +1027,7 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv" | 
 function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
   const includeDirect = shouldUseDirectWebStream(targetUrl, streamType);
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
-  const sources =
-    streamType === "mjpeg"
-      ? prioritizeRememberedMjpegSource(targetUrl, [...(includeDirect ? [targetUrl] : []), ...proxySources])
-      : [...proxySources, ...(includeDirect ? [targetUrl] : [])];
+  const sources = [...(includeDirect ? [targetUrl] : []), ...proxySources];
   return Array.from(new Set(sources.filter(Boolean)));
 }
 
@@ -1069,29 +1078,6 @@ function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv"
   }
 
   return true;
-}
-
-function prioritizeRememberedMjpegSource(targetUrl: string, candidates: string[]) {
-  const unique = Array.from(new Set(candidates.filter(Boolean)));
-  if (!unique.length) {
-    return unique;
-  }
-  const remembered = rememberedMjpegSourceByTargetUrl.get(targetUrl);
-  if (!remembered) {
-    return unique;
-  }
-  const rememberedIndex = unique.indexOf(remembered);
-  if (rememberedIndex <= 0) {
-    return unique;
-  }
-  return [unique[rememberedIndex], ...unique.slice(0, rememberedIndex), ...unique.slice(rememberedIndex + 1)];
-}
-
-function rememberMjpegSource(targetUrl: string, workingSourceUrl: string) {
-  if (!targetUrl || !workingSourceUrl) {
-    return;
-  }
-  rememberedMjpegSourceByTargetUrl.set(targetUrl, workingSourceUrl);
 }
 
 function isMixedContentBlocked(targetUrl: string) {
