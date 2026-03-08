@@ -27,6 +27,7 @@ const FLV_SCRIPT_LOAD_TIMEOUT_MS = 8000;
 const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 12_000;
 const MJPEG_RECONNECT_DELAY_MS = 1800;
 const FLV_RECONNECT_DELAY_MS = 1800;
+const STREAM_HANDOFF_DELAY_MS = 450;
 let flvLoaderPromise: Promise<boolean> | null = null;
 
 export function CameraWidget({
@@ -60,6 +61,8 @@ export function CameraWidget({
   const latestRequestedUrlRef = useRef<string | null>(null);
   const loadingJobRef = useRef<{ layer: 0 | 1; url: string } | null>(null);
   const fullscreenVisibilityCallbackRef = useRef(onFullscreenVisibilityChange);
+  const previewMjpegRestartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewFlvRestartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const titleFontSize = Math.max(11, Math.min(28, Math.round(config.titleFontSize || 14)));
@@ -166,12 +169,26 @@ export function CameraWidget({
   const fullscreenMjpegHasFallback = fullscreenMjpegSourceIndex + 1 < fullscreenMjpegSources.length;
 
   const closeFullscreen = () => {
+    if (previewMjpegRestartTimerRef.current) {
+      clearTimeout(previewMjpegRestartTimerRef.current);
+      previewMjpegRestartTimerRef.current = null;
+    }
+    if (previewFlvRestartTimerRef.current) {
+      clearTimeout(previewFlvRestartTimerRef.current);
+      previewFlvRestartTimerRef.current = null;
+    }
     if (previewFeed?.kind === "mjpeg") {
       setPreviewMjpegLoaded(false);
-      setPreviewMjpegSession((current) => current + 1);
+      previewMjpegRestartTimerRef.current = setTimeout(() => {
+        setPreviewMjpegSession((current) => current + 1);
+        previewMjpegRestartTimerRef.current = null;
+      }, STREAM_HANDOFF_DELAY_MS);
     }
     if (previewFeed?.kind === "flv") {
-      setPreviewFlvSession((current) => current + 1);
+      previewFlvRestartTimerRef.current = setTimeout(() => {
+        setPreviewFlvSession((current) => current + 1);
+        previewFlvRestartTimerRef.current = null;
+      }, STREAM_HANDOFF_DELAY_MS);
     }
     fullscreenVisibilityCallbackRef.current?.(false);
     setFullscreenOpen(false);
@@ -350,6 +367,17 @@ export function CameraWidget({
   useEffect(() => {
     fullscreenVisibilityCallbackRef.current?.(fullscreenOpen);
   }, [fullscreenOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (previewMjpegRestartTimerRef.current) {
+        clearTimeout(previewMjpegRestartTimerRef.current);
+      }
+      if (previewFlvRestartTimerRef.current) {
+        clearTimeout(previewFlvRestartTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined" || !fullscreenOpen) {

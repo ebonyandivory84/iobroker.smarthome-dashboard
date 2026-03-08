@@ -22,6 +22,7 @@ export function DashboardScreen() {
   const horizontalOffsetRef = useRef(0);
   const pageOffsetsRef = useRef<Record<string, number>>({});
   const pullRefreshBlockedUntilRef = useRef(0);
+  const pullRefreshInFlightRef = useRef(false);
   const edgeTransferCooldownRef = useRef(0);
   const fullscreenCameraMapRef = useRef<Record<string, boolean>>({});
   const pullGestureRef = useRef<{
@@ -408,12 +409,14 @@ export function DashboardScreen() {
         isFreshGesture &&
         currentOffset <= 0 &&
         deltaY > 96 &&
-        deltaY > Math.abs(deltaX) + 32
+        deltaY > Math.abs(deltaX) + 32 &&
+        !pullRefreshInFlightRef.current
       ) {
+        pullRefreshInFlightRef.current = true;
         playConfiguredUiSound(config.uiSounds?.pageSounds?.pullToRefresh, "page", "global:pullToRefresh");
         window.setTimeout(() => {
           window.location.reload();
-        }, 140);
+        }, 160);
       }
 
       pullGestureRef.current = {
@@ -608,6 +611,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     shadowRadius: 0,
     shadowOffset: { width: 0, height: 0 },
+    ...(Platform.OS === "web"
+      ? {
+          overscrollBehaviorY: "contain" as const,
+        }
+      : null),
   },
   scrollCompact: {
     margin: 0,
@@ -659,5 +667,11 @@ const styles = StyleSheet.create({
   },
   pageScroll: {
     flex: 1,
+    ...(Platform.OS === "web"
+      ? {
+          overscrollBehaviorY: "contain" as const,
+          touchAction: "pan-y" as const,
+        }
+      : null),
   },
 });

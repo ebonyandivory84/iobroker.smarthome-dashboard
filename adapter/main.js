@@ -473,6 +473,8 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
 
   const useHttps = parsed.protocol === "https:";
   const transport = useHttps ? https : http;
+  let upstreamResponseRef = null;
+  let closed = false;
   const upstreamRequest = transport.request(
     {
       protocol: parsed.protocol,
@@ -482,13 +484,14 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
       path: `${parsed.pathname}${parsed.search}`,
       headers: {
         Accept: "*/*",
-        Connection: "keep-alive",
+        Connection: "close",
         "User-Agent": "ioBroker-smart-dashboard-camera-proxy/1.0",
         ...requestConfig.headers,
       },
       rejectUnauthorized: !(useHttps && isLikelyLocalHost(parsed.hostname)),
     },
     (upstreamResponse) => {
+      upstreamResponseRef = upstreamResponse;
       const statusCode = upstreamResponse.statusCode || 502;
       const location = upstreamResponse.headers.location;
       const upstreamContentType = upstreamResponse.headers["content-type"] || "";
@@ -577,7 +580,7 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
       res.status(statusCode);
       res.setHeader("Content-Type", contentType);
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-      res.setHeader("Connection", "keep-alive");
+      res.setHeader("Connection", "close");
       res.setHeader("X-Accel-Buffering", "no");
 
       upstreamResponse.on("error", () => {
@@ -592,6 +595,22 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
   );
 
   const closeUpstream = () => {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    if (upstreamResponseRef) {
+      try {
+        upstreamResponseRef.unpipe(res);
+      } catch {
+        // ignore
+      }
+      try {
+        upstreamResponseRef.destroy();
+      } catch {
+        // ignore
+      }
+    }
     try {
       upstreamRequest.destroy();
     } catch {
@@ -600,6 +619,7 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
   };
 
   req.on("aborted", closeUpstream);
+  req.on("close", closeUpstream);
   res.on("close", closeUpstream);
 
   upstreamRequest.on("error", (error) => {
