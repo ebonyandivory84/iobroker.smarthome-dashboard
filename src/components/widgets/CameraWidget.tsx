@@ -163,6 +163,18 @@ export function CameraWidget({
   const modalAnimationType = Platform.OS === "web" && shouldDisableWebModalFadeOnTouch() ? "none" : "fade";
 
   const closeFullscreen = () => {
+    const isSameMjpegFeed =
+      previewFeed?.kind === "mjpeg" &&
+      fullscreenFeed?.kind === "mjpeg" &&
+      previewFeed.url === fullscreenFeed.url;
+    if (isSameMjpegFeed && currentFullscreenMjpegSrc && previewMjpegSources.length) {
+      const matchingIndex = previewMjpegSources.findIndex((source) => source === currentFullscreenMjpegSrc);
+      if (matchingIndex >= 0) {
+        setPreviewMjpegSourceIndex(matchingIndex);
+      }
+      setPreviewMjpegLoaded(false);
+      setPreviewStreamDebug(null);
+    }
     fullscreenVisibilityCallbackRef.current?.(false);
     setFullscreenOpen(false);
     setPinned(false);
