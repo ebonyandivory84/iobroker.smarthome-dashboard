@@ -589,6 +589,11 @@ function WebWidgetShell({
   sourceColumns: number;
 }) {
   const [preview, setPreview] = useState(widget.position);
+  const linkBorderless =
+    widget.type === "link" &&
+    Boolean(widget.iconImage) &&
+    widget.iconImageSizeMode === "maximized" &&
+    widget.iconImageBorderless === true;
   const showHeaderTitle = widget.type !== "camera" && widget.showTitle !== false && Boolean(widget.title.trim());
   const interaction = useRef<{
     mode: "drag" | "resize";
@@ -727,6 +732,17 @@ function WebWidgetShell({
           isolation: "isolate",
         }
       : null),
+    ...(linkBorderless
+      ? {
+          border: "none",
+          background: "transparent",
+          backdropFilter: "none",
+          WebkitBackdropFilter: "none",
+          boxShadow: "none",
+          contain: "layout paint style",
+          isolation: "isolate",
+        }
+      : null),
     left: displayOffset(preview.x, cellWidth, config.grid.gap, mainColumnExtraGap),
     top: preview.y * stepY,
     width: displaySpan(preview.x, preview.w, cellWidth, config.grid.gap, mainColumnExtraGap),
@@ -736,12 +752,13 @@ function WebWidgetShell({
 
   const contentStyle = [
     styles.webContent,
-    widget.type === "camera" || widget.type === "grafana" ? styles.webContentBleed : null,
+    widget.type === "camera" || widget.type === "grafana" || linkBorderless ? styles.webContentBleed : null,
     widget.type !== "camera" &&
     widget.type !== "solar" &&
     widget.type !== "state" &&
     widget.type !== "numpad" &&
-    widget.type !== "grafana"
+    widget.type !== "grafana" &&
+    !linkBorderless
       ? styles.webContentInset
       : null,
     widget.type === "grafana" ? styles.webContentGrafana : null,

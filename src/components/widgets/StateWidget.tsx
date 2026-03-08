@@ -37,6 +37,7 @@ export function StateWidget({ config, value, addonValue, onToggle, interactionSt
     : null;
   const iconImageCrop = normalizeIconImageCrop(config.iconImageCrop);
   const iconImageSizeMode = normalizeIconImageSizeMode(config.iconImageSizeMode);
+  const iconImageBorderless = config.iconImageBorderless === true;
   const showMaximizedImage = Boolean(iconImageUri && iconImageSizeMode === "maximized");
   const iconImageResizeMode = iconImageCrop === "circle" ? "cover" : "contain";
 
@@ -57,7 +58,7 @@ export function StateWidget({ config, value, addonValue, onToggle, interactionSt
       onLayout={(event: LayoutChangeEvent) => setTileLayout(event.nativeEvent.layout)}
       style={[
         styles.tile,
-        showMaximizedImage ? styles.tileImageMaximized : null,
+        showMaximizedImage && iconImageBorderless ? styles.tileImageMaximized : null,
         compactTile ? styles.tileCompact : null,
         veryCompactTile ? styles.tileVeryCompact : null,
         { backgroundColor: tileBackground },
@@ -69,6 +70,7 @@ export function StateWidget({ config, value, addonValue, onToggle, interactionSt
           source={{ uri: iconImageUri }}
           style={[
             styles.maximizedImage,
+            showMaximizedImage && iconImageBorderless ? styles.maximizedImageBorderless : null,
             iconImageCrop === "rounded" ? styles.maximizedImageRounded : null,
             iconImageCrop === "circle" ? styles.maximizedImageCircle : null,
           ]}
@@ -451,6 +453,9 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     width: undefined,
     height: undefined,
+  },
+  maximizedImageBorderless: {
+    borderRadius: 0,
   },
   maximizedImageRounded: {
     borderRadius: 12,

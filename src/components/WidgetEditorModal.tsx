@@ -67,6 +67,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         iconImage: widget.iconImage || "",
         iconImageCrop: widget.iconImageCrop || "none",
         iconImageSizeMode: widget.iconImageSizeMode || "standard",
+        iconImageBorderless: widget.iconImageBorderless ? "true" : "false",
         onLabel: widget.onLabel || "",
         offLabel: widget.offLabel || "",
         activeValue: widget.activeValue || "",
@@ -204,6 +205,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         iconImage: widget.iconImage || "",
         iconImageCrop: widget.iconImageCrop || "none",
         iconImageSizeMode: widget.iconImageSizeMode || "standard",
+        iconImageBorderless: widget.iconImageBorderless ? "true" : "false",
         ...appearanceDraft,
       });
       return;
@@ -344,6 +346,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         iconImage: draft.iconImage || undefined,
         iconImageCrop: normalizeIconImageCrop(draft.iconImageCrop),
         iconImageSizeMode: normalizeIconImageSizeMode(draft.iconImageSizeMode),
+        iconImageBorderless: draft.iconImageBorderless === "true",
         onLabel: draft.onLabel || undefined,
         offLabel: draft.offLabel || undefined,
         activeValue: draft.activeValue || undefined,
@@ -465,6 +468,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         iconImage: draft.iconImage || undefined,
         iconImageCrop: normalizeIconImageCrop(draft.iconImageCrop),
         iconImageSizeMode: normalizeIconImageSizeMode(draft.iconImageSizeMode),
+        iconImageBorderless: draft.iconImageBorderless === "true",
         interactionSounds: buildStoredInteractionSounds(
           widget.type,
           soundDraft,
@@ -820,6 +824,13 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       onSelect={(value) => setDraft((current) => ({ ...current, iconImageSizeMode: value }))}
                     />
                   </Field>
+                  <Field label="Borderless">
+                    <ChoiceRow
+                      options={["false", "true"]}
+                      value={draft.iconImageBorderless || "false"}
+                      onSelect={(value) => setDraft((current) => ({ ...current, iconImageBorderless: value }))}
+                    />
+                  </Field>
                 </Field>
                 <Field label="Addon">
                   <ChoiceRow
@@ -1086,6 +1097,13 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     options={["standard", "maximized"]}
                     value={draft.iconImageSizeMode || "standard"}
                     onSelect={(value) => setDraft((current) => ({ ...current, iconImageSizeMode: value }))}
+                  />
+                </Field>
+                <Field label="Borderless">
+                  <ChoiceRow
+                    options={["false", "true"]}
+                    value={draft.iconImageBorderless || "false"}
+                    onSelect={(value) => setDraft((current) => ({ ...current, iconImageBorderless: value }))}
                   />
                 </Field>
                 <Field label="Sounds bei Interaktion">

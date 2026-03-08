@@ -18,6 +18,7 @@ export function LinkWidget({ config }: LinkWidgetProps) {
     : null;
   const iconImageCrop = normalizeIconImageCrop(config.iconImageCrop);
   const iconImageSizeMode = normalizeIconImageSizeMode(config.iconImageSizeMode);
+  const iconImageBorderless = config.iconImageBorderless === true;
   const maximizedImage = Boolean(iconUri && iconImageSizeMode === "maximized");
 
   const close = () => {
@@ -50,7 +51,7 @@ export function LinkWidget({ config }: LinkWidgetProps) {
             playConfiguredUiSound(config.interactionSounds?.press, "tap", `${config.id}:press`);
             openOverlay();
           }}
-          style={[styles.openButton, maximizedImage ? styles.openButtonImageMode : null]}
+          style={[styles.openButton, maximizedImage && iconImageBorderless ? styles.openButtonImageMode : null]}
         >
           {iconUri ? (
             <Image

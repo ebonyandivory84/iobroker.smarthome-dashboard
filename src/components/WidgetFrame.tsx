@@ -39,6 +39,11 @@ export function WidgetFrame({
   children,
 }: WidgetFrameProps) {
   const { config } = useDashboardConfig();
+  const linkBorderless =
+    widget.type === "link" &&
+    Boolean(widget.iconImage) &&
+    widget.iconImageSizeMode === "maximized" &&
+    widget.iconImageBorderless === true;
   const showHeaderTitle = widget.type !== "camera" && widget.showTitle !== false && Boolean(widget.title.trim());
   const interaction = useRef<{
     mode: "drag" | "resize";
@@ -132,7 +137,7 @@ export function WidgetFrame({
     <View
       style={[
         styles.shell,
-        widget.type === "state" || widget.type === "camera" ? styles.shellTransparent : null,
+        widget.type === "state" || widget.type === "camera" || linkBorderless ? styles.shellTransparent : null,
         interactionMode === "drag"
           ? {
               transform: [{ translateX: dragOffset.x }, { translateY: dragOffset.y }],
@@ -176,7 +181,8 @@ export function WidgetFrame({
           widget.type !== "camera" &&
           widget.type !== "solar" &&
           widget.type !== "state" &&
-          widget.type !== "grafana"
+          widget.type !== "grafana" &&
+          !linkBorderless
             ? styles.contentInset
             : null,
         ]}
