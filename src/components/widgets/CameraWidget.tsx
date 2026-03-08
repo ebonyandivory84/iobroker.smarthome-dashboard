@@ -275,13 +275,24 @@ export function CameraWidget({
       return;
     }
 
-    // No automatic source switching for MJPEG preview; keep one deterministic source.
+    const watchdog = setTimeout(() => {
+      if (previewMjpegLoaded) {
+        return;
+      }
+      if (movePreviewMjpegToNextSource()) {
+        return;
+      }
+      setPreviewStreamDebug("MJPEG Preview: Stream konnte nicht gestartet werden.");
+    }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
+
+    return () => clearTimeout(watchdog);
   }, [
     currentPreviewMjpegSrc,
     fullscreenOpen,
+    movePreviewMjpegToNextSource,
     previewFeed?.kind,
     previewMjpegLoaded,
-    previewMjpegSources.length,
+    setPreviewStreamDebug,
   ]);
 
   useEffect(() => {
@@ -289,13 +300,20 @@ export function CameraWidget({
       return;
     }
 
-    // No automatic source switching for MJPEG fullscreen; keep one deterministic source.
+    const watchdog = setTimeout(() => {
+      if (fullscreenMjpegLoaded) {
+        return;
+      }
+      moveFullscreenMjpegToNextSource();
+    }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
+
+    return () => clearTimeout(watchdog);
   }, [
     currentFullscreenMjpegSrc,
     fullscreenFeed?.kind,
     fullscreenMjpegLoaded,
-    fullscreenMjpegSources.length,
     fullscreenOpen,
+    moveFullscreenMjpegToNextSource,
   ]);
 
   useEffect(() => {
@@ -1126,6 +1144,7 @@ function WebFlvPlayer({
     let disposed = false;
     let player: any = null;
     let retryTimer: ReturnType<typeof setInterval> | null = null;
+    let watchdogTimer: ReturnType<typeof setTimeout> | null = null;
     const videoElement = videoRef.current;
 
     const safeSetError = (message: string) => {
@@ -1226,10 +1245,28 @@ function WebFlvPlayer({
         callback(ratio);
       };
       videoElement.oncanplay = () => {
+        if (watchdogTimer) {
+          clearTimeout(watchdogTimer);
+          watchdogTimer = null;
+        }
         tryPlay();
       };
       player.load();
       tryPlay();
+      watchdogTimer = setTimeout(() => {
+        if (disposed || switchedSource) {
+          return;
+        }
+        const hasData = Number(videoElement.readyState || 0) >= 2;
+        if (hasData) {
+          return;
+        }
+        switchedSource = true;
+        if (moveToNextSource("FLV Quelle fehlgeschlagen, versuche alternative Quelle...")) {
+          return;
+        }
+        safeSetError("FLV Stream konnte nicht gestartet werden.");
+      }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
       retryTimer = setInterval(() => {
         if (!videoElement || disposed || !videoElement.paused) {
           return;
@@ -1263,6 +1300,9 @@ function WebFlvPlayer({
       }
       if (retryTimer) {
         clearInterval(retryTimer);
+      }
+      if (watchdogTimer) {
+        clearTimeout(watchdogTimer);
       }
       playerRef.current = null;
     };
