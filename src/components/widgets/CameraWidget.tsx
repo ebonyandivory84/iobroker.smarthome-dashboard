@@ -201,6 +201,13 @@ export function CameraWidget({
     return true;
   }, [previewMjpegHasFallback, previewMjpegSources.length]);
 
+  const restartPreviewMjpeg = useCallback((message = "MJPEG Preview: Neuverbindung...") => {
+    setPreviewMjpegLoaded(false);
+    setPreviewMjpegSourceIndex(0);
+    setPreviewStreamDebug(message);
+    setPreviewMjpegSession((current) => current + 1);
+  }, []);
+
   const moveFullscreenMjpegToNextSource = useCallback(() => {
     if (!fullscreenMjpegHasFallback) {
       return false;
@@ -297,8 +304,7 @@ export function CameraWidget({
       if (movePreviewMjpegToNextSource()) {
         return;
       }
-      setPreviewStreamDebug("MJPEG Preview: Stream konnte nicht gestartet werden, Neuverbindung...");
-      setPreviewMjpegSession((current) => current + 1);
+      restartPreviewMjpeg();
     }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
 
     return () => clearTimeout(watchdog);
@@ -308,7 +314,7 @@ export function CameraWidget({
     movePreviewMjpegToNextSource,
     previewFeed?.kind,
     previewMjpegLoaded,
-    setPreviewStreamDebug,
+    restartPreviewMjpeg,
   ]);
 
   useEffect(() => {
@@ -338,11 +344,11 @@ export function CameraWidget({
     }
 
     const retry = setTimeout(() => {
-      setPreviewMjpegSession((current) => current + 1);
+      restartPreviewMjpeg();
     }, MJPEG_RECONNECT_DELAY_MS);
 
     return () => clearTimeout(retry);
-  }, [fullscreenOpen, previewFeed?.kind, previewMjpegLoaded, previewStreamDebug]);
+  }, [fullscreenOpen, previewFeed?.kind, previewMjpegLoaded, previewStreamDebug, restartPreviewMjpeg]);
 
   useEffect(() => {
     fullscreenVisibilityCallbackRef.current = onFullscreenVisibilityChange;
@@ -620,8 +626,7 @@ export function CameraWidget({
                       if (movePreviewMjpegToNextSource()) {
                         return;
                       }
-                      setPreviewMjpegLoaded(false);
-                      setPreviewStreamDebug("MJPEG Preview: Stream konnte nicht geladen werden.");
+                      restartPreviewMjpeg("MJPEG Preview: Quelle nicht erreichbar, Neuverbindung...");
                     },
                     onLoad: (event: Event) => {
                       const target = event.currentTarget as HTMLImageElement | null;
@@ -631,8 +636,7 @@ export function CameraWidget({
                         if (movePreviewMjpegToNextSource()) {
                           return;
                         }
-                        setPreviewMjpegLoaded(false);
-                        setPreviewStreamDebug("MJPEG Preview: Stream liefert keine gueltigen Bilddaten.");
+                        restartPreviewMjpeg("MJPEG Preview: Ungueltige Bilddaten, Neuverbindung...");
                         return;
                       }
                       setPreviewMjpegLoaded(true);
