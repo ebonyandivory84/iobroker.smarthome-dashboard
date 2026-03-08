@@ -158,6 +158,11 @@ export function CameraWidget({
     previewFmp4Sources[Math.min(previewFmp4SourceIndex, Math.max(0, previewFmp4Sources.length - 1))] || null;
   const currentFullscreenFmp4Src =
     fullscreenFmp4Sources[Math.min(fullscreenFmp4SourceIndex, Math.max(0, fullscreenFmp4Sources.length - 1))] || null;
+  const keepPreviewMjpegAliveDuringFullscreen =
+    fullscreenOpen &&
+    previewFeed?.kind === "mjpeg" &&
+    fullscreenFeed?.kind === "mjpeg" &&
+    previewFeed.url !== fullscreenFeed.url;
   const activeRefreshMs = fullscreenOpen
     ? Math.max(180, config.fullscreenRefreshMs || config.refreshMs || 2000)
     : Math.max(100, config.refreshMs || 2000);
@@ -579,7 +584,7 @@ export function CameraWidget({
                       );
                 })
               : null}
-            {previewFeed.kind === "mjpeg" && previewFeed.url
+            {( !fullscreenOpen || keepPreviewMjpegAliveDuringFullscreen ) && previewFeed.kind === "mjpeg" && previewFeed.url
               ? Platform.OS === "web"
                 ? createElement("img", {
                     alt: config.title || "Camera MJPEG",
@@ -615,7 +620,7 @@ export function CameraWidget({
                       reportAspectRatio(width, height);
                     },
                     src: withReconnectNonce(currentPreviewMjpegSrc || previewFeed.url, previewMjpegSession),
-                    style: fullscreenOpen
+                    style: keepPreviewMjpegAliveDuringFullscreen
                       ? { ...webMjpegStyle, opacity: 0, visibility: "hidden" as const }
                       : webMjpegStyle,
                   })
@@ -629,7 +634,10 @@ export function CameraWidget({
                       }}
                       resizeMode="contain"
                       source={{ uri: withReconnectNonce(previewFeed.url, previewMjpegSession) }}
-                      style={[styles.mjpegImage, fullscreenOpen ? styles.layerHidden : styles.layerVisible]}
+                      style={[
+                        styles.mjpegImage,
+                        keepPreviewMjpegAliveDuringFullscreen ? styles.layerHidden : styles.layerVisible,
+                      ]}
                     />
                   )
               : null}
