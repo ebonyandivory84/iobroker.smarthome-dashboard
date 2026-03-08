@@ -23,6 +23,7 @@ export function DashboardScreen() {
   const pageOffsetsRef = useRef<Record<string, number>>({});
   const pullRefreshBlockedUntilRef = useRef(0);
   const edgeTransferCooldownRef = useRef(0);
+  const refreshInProgressRef = useRef(false);
   const fullscreenCameraMapRef = useRef<Record<string, boolean>>({});
   const pullGestureRef = useRef<{
     pageId: string | null;
@@ -410,9 +411,15 @@ export function DashboardScreen() {
         deltaY > 96 &&
         deltaY > Math.abs(deltaX) + 32
       ) {
+        if (refreshInProgressRef.current) {
+          return;
+        }
+        refreshInProgressRef.current = true;
         playConfiguredUiSound(config.uiSounds?.pageSounds?.pullToRefresh, "page", "global:pullToRefresh");
         window.setTimeout(() => {
-          window.location.reload();
+          const url = new URL(window.location.href);
+          url.searchParams.set("_refresh", String(Date.now()));
+          window.location.replace(url.toString());
         }, 140);
       }
 
