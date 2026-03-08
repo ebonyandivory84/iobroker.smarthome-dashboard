@@ -45,6 +45,7 @@ export function CameraWidget({
   const [pinned, setPinned] = useState(false);
   const [previewStreamDebug, setPreviewStreamDebug] = useState<string | null>(null);
   const [previewMjpegSourceIndex, setPreviewMjpegSourceIndex] = useState(0);
+  const [previewMjpegSession, setPreviewMjpegSession] = useState(0);
   const [fullscreenMjpegSourceIndex, setFullscreenMjpegSourceIndex] = useState(0);
   const [previewFlvSourceIndex, setPreviewFlvSourceIndex] = useState(0);
   const [fullscreenFlvSourceIndex, setFullscreenFlvSourceIndex] = useState(0);
@@ -163,6 +164,11 @@ export function CameraWidget({
   const touchLikeWeb = isTouchLikeWeb();
 
   const closeFullscreen = () => {
+    if (previewFeed?.kind === "mjpeg") {
+      setPreviewMjpegLoaded(false);
+      setPreviewStreamDebug(null);
+      setPreviewMjpegSession((current) => current + 1);
+    }
     const isSameFlvFeed = previewFeed?.kind === "flv" && fullscreenFeed?.kind === "flv" && previewFeed.url === fullscreenFeed.url;
     if (isSameFlvFeed && previewFlvSources.length) {
       const matchingIndex = previewFlvSources.findIndex((source) => source === currentFullscreenFlvSrc);
@@ -608,7 +614,7 @@ export function CameraWidget({
                       setPreviewStreamDebug(null);
                       reportAspectRatio(width, height);
                     },
-                    src: currentPreviewMjpegSrc || previewFeed.url,
+                    src: withReconnectNonce(currentPreviewMjpegSrc || previewFeed.url, previewMjpegSession),
                     style: fullscreenOpen
                       ? { ...webMjpegStyle, opacity: 0, visibility: "hidden" as const }
                       : webMjpegStyle,
@@ -622,7 +628,7 @@ export function CameraWidget({
                         }
                       }}
                       resizeMode="contain"
-                      source={{ uri: previewFeed.url }}
+                      source={{ uri: withReconnectNonce(previewFeed.url, previewMjpegSession) }}
                       style={[styles.mjpegImage, fullscreenOpen ? styles.layerHidden : styles.layerVisible]}
                     />
                   )
@@ -1048,6 +1054,20 @@ function isTouchLikeWeb() {
     return touchPoints > 0 || coarsePointer;
   } catch {
     return false;
+  }
+}
+
+function withReconnectNonce(url: string, nonce: number) {
+  if (!url) {
+    return url;
+  }
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set("_r", String(nonce));
+    return parsed.toString();
+  } catch {
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}_r=${nonce}`;
   }
 }
 
