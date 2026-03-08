@@ -19,6 +19,7 @@ export function LinkWidget({ config }: LinkWidgetProps) {
   const iconImageCrop = normalizeIconImageCrop(config.iconImageCrop);
   const iconImageSizeMode = normalizeIconImageSizeMode(config.iconImageSizeMode);
   const iconImageBorderless = config.iconImageBorderless === true;
+  const hasIconImage = Boolean(iconUri);
   const maximizedImage = Boolean(iconUri && iconImageSizeMode === "maximized");
 
   const close = () => {
@@ -51,7 +52,11 @@ export function LinkWidget({ config }: LinkWidgetProps) {
             playConfiguredUiSound(config.interactionSounds?.press, "tap", `${config.id}:press`);
             openOverlay();
           }}
-          style={[styles.openButton, maximizedImage && iconImageBorderless ? styles.openButtonImageMode : null]}
+          style={[
+            styles.openButton,
+            hasIconImage ? styles.openButtonWithImage : null,
+            maximizedImage && iconImageBorderless ? styles.openButtonImageMode : null,
+          ]}
         >
           {iconUri ? (
             <Image
@@ -173,14 +178,21 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     gap: 0,
   },
+  openButtonWithImage: {
+    borderWidth: 0,
+    borderColor: "transparent",
+    backgroundColor: "transparent",
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
   fullImage: {
     width: "100%",
     height: "100%",
     borderRadius: 0,
   },
   standardImage: {
-    width: "72%",
-    height: "72%",
+    width: "82%",
+    height: "82%",
     borderRadius: 0,
   },
   fullImageRounded: {
