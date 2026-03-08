@@ -24,11 +24,10 @@ const LAYER_FADE_MS = 0;
 const pinnedColor = "#f3c84a";
 const FLV_SCRIPT_SRC = "https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js";
 const FLV_SCRIPT_LOAD_TIMEOUT_MS = 8000;
-const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 2_500;
+const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 8_000;
 const FLV_SOURCE_SWITCH_TIMEOUT_MS = 8_000;
 const FMP4_SOURCE_SWITCH_TIMEOUT_MS = 8_000;
 let flvLoaderPromise: Promise<boolean> | null = null;
-const rememberedMjpegSourceByUrl = new Map<string, number>();
 
 export function CameraWidget({
   config,
@@ -163,18 +162,6 @@ export function CameraWidget({
   const modalAnimationType = Platform.OS === "web" && shouldDisableWebModalFadeOnTouch() ? "none" : "fade";
 
   const closeFullscreen = () => {
-    const isSameFeed = previewFeed?.kind === fullscreenFeed?.kind && previewFeed?.url === fullscreenFeed?.url;
-    if (isSameFeed) {
-      if (previewFeed?.kind === "mjpeg") {
-        setPreviewMjpegSourceIndex(fullscreenMjpegSourceIndex);
-        setPreviewMjpegLoaded(false);
-        setPreviewStreamDebug(null);
-      } else if (previewFeed?.kind === "flv") {
-        setPreviewFlvSourceIndex(fullscreenFlvSourceIndex);
-      } else if (previewFeed?.kind === "fmp4") {
-        setPreviewFmp4SourceIndex(fullscreenFmp4SourceIndex);
-      }
-    }
     fullscreenVisibilityCallbackRef.current?.(false);
     setFullscreenOpen(false);
     setPinned(false);
@@ -218,8 +205,7 @@ export function CameraWidget({
   }, [fullscreenOpen, previewFeed?.kind]);
 
   useEffect(() => {
-    const remembered = getRememberedSourceIndex(previewFeed?.url || null, previewMjpegSources);
-    setPreviewMjpegSourceIndex(remembered);
+    setPreviewMjpegSourceIndex(0);
     setPreviewMjpegLoaded(false);
   }, [previewMjpegSources, previewFeed?.kind, previewFeed?.url]);
 
@@ -235,8 +221,7 @@ export function CameraWidget({
   }, [previewFeedKey]);
 
   useEffect(() => {
-    const remembered = getRememberedSourceIndex(fullscreenFeed?.url || null, fullscreenMjpegSources);
-    setFullscreenMjpegSourceIndex(remembered);
+    setFullscreenMjpegSourceIndex(0);
     setFullscreenMjpegLoaded(false);
   }, [fullscreenMjpegSources, fullscreenFeed?.kind, fullscreenFeed?.url]);
 
@@ -604,9 +589,6 @@ export function CameraWidget({
                       }
                       setPreviewMjpegLoaded(true);
                       setPreviewStreamDebug(null);
-                      if (previewFeed?.url) {
-                        rememberSourceIndex(previewFeed.url, previewMjpegSourceIndex);
-                      }
                       reportAspectRatio(width, height);
                     },
                     src: currentPreviewMjpegSrc || previewFeed.url,
@@ -798,9 +780,6 @@ export function CameraWidget({
                         return;
                       }
                       setFullscreenMjpegLoaded(true);
-                      if (fullscreenFeed?.url) {
-                        rememberSourceIndex(fullscreenFeed.url, fullscreenMjpegSourceIndex);
-                      }
                       reportAspectRatio(width, height);
                     },
                     src: currentFullscreenMjpegSrc || fullscreenFeed.url,
@@ -1032,18 +1011,7 @@ function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv" | 
 }
 
 function shouldPreferProxyFirstForMjpeg() {
-  if (Platform.OS !== "web" || typeof window === "undefined") {
-    return false;
-  }
-
-  try {
-    const touchPoints = typeof navigator !== "undefined" ? Number(navigator.maxTouchPoints || 0) : 0;
-    const hasCoarsePointer = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
-    const tabletLikeWidth = window.innerWidth < 1100;
-    return touchPoints > 0 || hasCoarsePointer || tabletLikeWidth;
-  } catch {
-    return false;
-  }
+  return false;
 }
 
 function shouldDisableWebModalFadeOnTouch() {
@@ -1057,24 +1025,6 @@ function shouldDisableWebModalFadeOnTouch() {
   } catch {
     return false;
   }
-}
-
-function getRememberedSourceIndex(targetUrl: string | null, sources: string[]) {
-  if (!targetUrl || !sources.length) {
-    return 0;
-  }
-  const remembered = rememberedMjpegSourceByUrl.get(targetUrl);
-  if (remembered === undefined) {
-    return 0;
-  }
-  return Math.max(0, Math.min(remembered, Math.max(0, sources.length - 1)));
-}
-
-function rememberSourceIndex(targetUrl: string, index: number) {
-  if (!targetUrl || !Number.isFinite(index) || index < 0) {
-    return;
-  }
-  rememberedMjpegSourceByUrl.set(targetUrl, index);
 }
 
 function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {

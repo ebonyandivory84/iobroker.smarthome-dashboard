@@ -23,7 +23,6 @@ export function DashboardScreen() {
   const pageOffsetsRef = useRef<Record<string, number>>({});
   const pullRefreshBlockedUntilRef = useRef(0);
   const edgeTransferCooldownRef = useRef(0);
-  const refreshInProgressRef = useRef(false);
   const fullscreenCameraMapRef = useRef<Record<string, boolean>>({});
   const pullGestureRef = useRef<{
     pageId: string | null;
@@ -63,6 +62,7 @@ export function DashboardScreen() {
   const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
   const [layoutMode, setLayoutMode] = useState(false);
   const [visiblePageId, setVisiblePageId] = useState(activePageId);
+  const [refreshNonce, setRefreshNonce] = useState(0);
   const lastContentScrollAt = useRef(0);
   const activePageIndex = Math.max(0, dashboardPages.findIndex((page) => page.id === activePageId));
 
@@ -411,15 +411,10 @@ export function DashboardScreen() {
         deltaY > 96 &&
         deltaY > Math.abs(deltaX) + 32
       ) {
-        if (refreshInProgressRef.current) {
-          return;
-        }
-        refreshInProgressRef.current = true;
+        pullRefreshBlockedUntilRef.current = Date.now() + 2200;
         playConfiguredUiSound(config.uiSounds?.pageSounds?.pullToRefresh, "page", "global:pullToRefresh");
         window.setTimeout(() => {
-          const url = new URL(window.location.href);
-          url.searchParams.set("_refresh", String(Date.now()));
-          window.location.replace(url.toString());
+          setRefreshNonce((current) => current + 1);
         }, 140);
       }
 
@@ -489,6 +484,7 @@ export function DashboardScreen() {
               onTouchEnd={handlePageTouchEnd(pageConfig.activePageId)}
             >
               <GridCanvas
+                key={`${pageConfig.activePageId}:${refreshNonce}`}
                 client={client}
                 config={pageConfig}
                 isLayoutMode={layoutMode}
