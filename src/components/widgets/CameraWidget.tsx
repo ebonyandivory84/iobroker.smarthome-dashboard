@@ -203,10 +203,12 @@ export function CameraWidget({
 
   const restartPreviewMjpeg = useCallback((message = "MJPEG Preview: Neuverbindung...") => {
     setPreviewMjpegLoaded(false);
-    setPreviewMjpegSourceIndex(0);
+    setPreviewMjpegSourceIndex((current) =>
+      previewMjpegSources.length > 1 ? (current + 1) % previewMjpegSources.length : 0
+    );
     setPreviewStreamDebug(message);
     setPreviewMjpegSession((current) => current + 1);
-  }, []);
+  }, [previewMjpegSources.length]);
 
   const moveFullscreenMjpegToNextSource = useCallback(() => {
     if (!fullscreenMjpegHasFallback) {
@@ -1056,6 +1058,13 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv" | 
   }
 
   const encodedUrl = encodeURIComponent(targetUrl);
+  if (streamType === "mjpeg") {
+    return [
+      `${window.location.origin}/smarthome-dashboard/api/camera-stream?streamType=${streamType}&url=${encodedUrl}`,
+      `${window.location.origin}/smarthome-dashboard/api/camera-mjpeg?streamType=${streamType}&url=${encodedUrl}`,
+    ];
+  }
+
   return [`${window.location.origin}/smarthome-dashboard/api/camera-stream?streamType=${streamType}&url=${encodedUrl}`];
 }
 
