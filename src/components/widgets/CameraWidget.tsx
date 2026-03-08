@@ -44,7 +44,6 @@ export function CameraWidget({
   const [pinned, setPinned] = useState(false);
   const [previewStreamDebug, setPreviewStreamDebug] = useState<string | null>(null);
   const [previewMjpegSourceIndex, setPreviewMjpegSourceIndex] = useState(0);
-  const [previewMjpegSession, setPreviewMjpegSession] = useState(0);
   const [fullscreenMjpegSourceIndex, setFullscreenMjpegSourceIndex] = useState(0);
   const [previewFlvSourceIndex, setPreviewFlvSourceIndex] = useState(0);
   const [fullscreenFlvSourceIndex, setFullscreenFlvSourceIndex] = useState(0);
@@ -173,10 +172,6 @@ export function CameraWidget({
       }
       setPreviewMjpegLoaded(false);
       setPreviewStreamDebug(null);
-      if (isTouchLikeWeb()) {
-        // Force a fresh MJPEG reconnect on touch browsers to avoid stale socket frames.
-        setPreviewMjpegSession((current) => current + 1);
-      }
     }
     const isSameFlvFeed = previewFeed?.kind === "flv" && fullscreenFeed?.kind === "flv" && previewFeed.url === fullscreenFeed.url;
     if (isSameFlvFeed && previewFlvSources.length) {
@@ -622,7 +617,7 @@ export function CameraWidget({
                       setPreviewStreamDebug(null);
                       reportAspectRatio(width, height);
                     },
-                    src: withReconnectNonce(currentPreviewMjpegSrc || previewFeed.url, previewMjpegSession),
+                    src: currentPreviewMjpegSrc || previewFeed.url,
                     style: webMjpegStyle,
                   })
                 : (
@@ -634,7 +629,7 @@ export function CameraWidget({
                         }
                       }}
                       resizeMode="contain"
-                      source={{ uri: withReconnectNonce(previewFeed.url, previewMjpegSession) }}
+                      source={{ uri: previewFeed.url }}
                       style={styles.mjpegImage}
                     />
                   )
@@ -1031,13 +1026,7 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv" | 
 function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
   const includeDirect = shouldUseDirectWebStream(targetUrl, streamType);
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
-  const touchWeb = isTouchLikeWeb();
-  const sources =
-    streamType === "mjpeg" && touchWeb
-      ? [...proxySources, ...(includeDirect ? [targetUrl] : [])]
-      : streamType === "flv" && touchWeb
-        ? [...proxySources]
-        : [...(includeDirect ? [targetUrl] : []), ...proxySources];
+  const sources = [...(includeDirect ? [targetUrl] : []), ...proxySources];
   return Array.from(new Set(sources.filter(Boolean)));
 }
 
@@ -1075,33 +1064,6 @@ function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv"
   }
 
   return true;
-}
-
-function isTouchLikeWeb() {
-  if (Platform.OS !== "web" || typeof window === "undefined") {
-    return false;
-  }
-  try {
-    const touchPoints = typeof navigator !== "undefined" ? Number(navigator.maxTouchPoints || 0) : 0;
-    const coarsePointer = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
-    return touchPoints > 0 || coarsePointer;
-  } catch {
-    return false;
-  }
-}
-
-function withReconnectNonce(url: string, nonce: number) {
-  if (!url) {
-    return url;
-  }
-  try {
-    const parsed = new URL(url);
-    parsed.searchParams.set("_r", String(nonce));
-    return parsed.toString();
-  } catch {
-    const separator = url.includes("?") ? "&" : "?";
-    return `${url}${separator}_r=${nonce}`;
-  }
 }
 
 function isMixedContentBlocked(targetUrl: string) {
