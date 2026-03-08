@@ -116,14 +116,24 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         titleFontSize: String(widget.titleFontSize || 14),
         previewSourceMode: widget.previewSourceMode || "snapshot",
         fullscreenSourceMode: widget.fullscreenSourceMode || "snapshot",
+        tabletPreviewSourceMode: widget.tabletPreviewSourceMode || widget.previewSourceMode || "snapshot",
+        tabletFullscreenSourceMode: widget.tabletFullscreenSourceMode || widget.fullscreenSourceMode || "snapshot",
         snapshotUrl: widget.snapshotUrl || "",
         fullscreenSnapshotUrl: widget.fullscreenSnapshotUrl || "",
+        tabletSnapshotUrl: widget.tabletSnapshotUrl || "",
+        tabletFullscreenSnapshotUrl: widget.tabletFullscreenSnapshotUrl || "",
         mjpegUrl: widget.mjpegUrl || "",
         fullscreenMjpegUrl: widget.fullscreenMjpegUrl || "",
+        tabletMjpegUrl: widget.tabletMjpegUrl || "",
+        tabletFullscreenMjpegUrl: widget.tabletFullscreenMjpegUrl || "",
         flvUrl: widget.flvUrl || "",
         fullscreenFlvUrl: widget.fullscreenFlvUrl || "",
+        tabletFlvUrl: widget.tabletFlvUrl || "",
+        tabletFullscreenFlvUrl: widget.tabletFullscreenFlvUrl || "",
         fmp4Url: widget.fmp4Url || "",
         fullscreenFmp4Url: widget.fullscreenFmp4Url || "",
+        tabletFmp4Url: widget.tabletFmp4Url || "",
+        tabletFullscreenFmp4Url: widget.tabletFullscreenFmp4Url || "",
         refreshMs: String(widget.refreshMs || 2000),
         fullscreenRefreshMs: String(widget.fullscreenRefreshMs || widget.refreshMs || 1000),
         maximizeStateId: widget.maximizeStateId || "",
@@ -332,8 +342,12 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
 
   const previewCameraMode = normalizeCameraSourceMode(draft.previewSourceMode);
   const fullscreenCameraMode = normalizeCameraSourceMode(draft.fullscreenSourceMode);
+  const tabletPreviewCameraMode = normalizeCameraSourceMode(draft.tabletPreviewSourceMode);
+  const tabletFullscreenCameraMode = normalizeCameraSourceMode(draft.tabletFullscreenSourceMode);
   const previewCameraUrl = getCameraUrlByMode(draft, previewCameraMode, false);
   const fullscreenCameraUrl = getCameraUrlByMode(draft, fullscreenCameraMode, true);
+  const tabletPreviewCameraUrl = getCameraUrlByMode(draft, tabletPreviewCameraMode, false, "tablet");
+  const tabletFullscreenCameraUrl = getCameraUrlByMode(draft, tabletFullscreenCameraMode, true, "tablet");
 
   const save = () => {
     const appearance = buildAppearance(draft);
@@ -374,39 +388,69 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     } else if (widget.type === "camera") {
       const previewSourceMode = previewCameraMode;
       const fullscreenSourceMode = fullscreenCameraMode;
+      const tabletPreviewSourceMode = tabletPreviewCameraMode;
+      const tabletFullscreenSourceMode = tabletFullscreenCameraMode;
       const snapshotUrl = normalizeOptionalInput(draft.snapshotUrl);
       const fullscreenSnapshotUrl = normalizeOptionalInput(draft.fullscreenSnapshotUrl);
+      const tabletSnapshotUrl = normalizeOptionalInput(draft.tabletSnapshotUrl);
+      const tabletFullscreenSnapshotUrl = normalizeOptionalInput(draft.tabletFullscreenSnapshotUrl);
       const mjpegUrl = normalizeOptionalInput(draft.mjpegUrl);
       const fullscreenMjpegUrl = normalizeOptionalInput(draft.fullscreenMjpegUrl);
+      const tabletMjpegUrl = normalizeOptionalInput(draft.tabletMjpegUrl);
+      const tabletFullscreenMjpegUrl = normalizeOptionalInput(draft.tabletFullscreenMjpegUrl);
       const flvUrl = normalizeOptionalInput(draft.flvUrl);
       const fullscreenFlvUrl = normalizeOptionalInput(draft.fullscreenFlvUrl);
+      const tabletFlvUrl = normalizeOptionalInput(draft.tabletFlvUrl);
+      const tabletFullscreenFlvUrl = normalizeOptionalInput(draft.tabletFullscreenFlvUrl);
       const fmp4Url = normalizeOptionalInput(draft.fmp4Url);
       const fullscreenFmp4Url = normalizeOptionalInput(draft.fullscreenFmp4Url);
+      const tabletFmp4Url = normalizeOptionalInput(draft.tabletFmp4Url);
+      const tabletFullscreenFmp4Url = normalizeOptionalInput(draft.tabletFullscreenFmp4Url);
       const cameraSourceChanged =
         normalizeCameraSourceMode(widget.previewSourceMode) !== previewSourceMode ||
         normalizeCameraSourceMode(widget.fullscreenSourceMode) !== fullscreenSourceMode ||
+        normalizeCameraSourceMode(widget.tabletPreviewSourceMode) !== tabletPreviewSourceMode ||
+        normalizeCameraSourceMode(widget.tabletFullscreenSourceMode) !== tabletFullscreenSourceMode ||
         normalizeOptionalInput(widget.snapshotUrl) !== snapshotUrl ||
         normalizeOptionalInput(widget.fullscreenSnapshotUrl) !== fullscreenSnapshotUrl ||
+        normalizeOptionalInput(widget.tabletSnapshotUrl) !== tabletSnapshotUrl ||
+        normalizeOptionalInput(widget.tabletFullscreenSnapshotUrl) !== tabletFullscreenSnapshotUrl ||
         normalizeOptionalInput(widget.mjpegUrl) !== mjpegUrl ||
         normalizeOptionalInput(widget.fullscreenMjpegUrl) !== fullscreenMjpegUrl ||
+        normalizeOptionalInput(widget.tabletMjpegUrl) !== tabletMjpegUrl ||
+        normalizeOptionalInput(widget.tabletFullscreenMjpegUrl) !== tabletFullscreenMjpegUrl ||
         normalizeOptionalInput(widget.flvUrl) !== flvUrl ||
         normalizeOptionalInput(widget.fullscreenFlvUrl) !== fullscreenFlvUrl ||
+        normalizeOptionalInput(widget.tabletFlvUrl) !== tabletFlvUrl ||
+        normalizeOptionalInput(widget.tabletFullscreenFlvUrl) !== tabletFullscreenFlvUrl ||
         normalizeOptionalInput(widget.fmp4Url) !== fmp4Url ||
-        normalizeOptionalInput(widget.fullscreenFmp4Url) !== fullscreenFmp4Url;
+        normalizeOptionalInput(widget.fullscreenFmp4Url) !== fullscreenFmp4Url ||
+        normalizeOptionalInput(widget.tabletFmp4Url) !== tabletFmp4Url ||
+        normalizeOptionalInput(widget.tabletFullscreenFmp4Url) !== tabletFullscreenFmp4Url;
       onSave(widget.id, {
         title: draft.title,
         showTitle: draft.showTitle !== "false",
         titleFontSize: clampInt(draft.titleFontSize, widget.titleFontSize || 14, 11),
         previewSourceMode,
         fullscreenSourceMode,
+        tabletPreviewSourceMode,
+        tabletFullscreenSourceMode,
         snapshotUrl,
         fullscreenSnapshotUrl,
+        tabletSnapshotUrl,
+        tabletFullscreenSnapshotUrl,
         mjpegUrl,
         fullscreenMjpegUrl,
+        tabletMjpegUrl,
+        tabletFullscreenMjpegUrl,
         flvUrl,
         fullscreenFlvUrl,
+        tabletFlvUrl,
+        tabletFullscreenFlvUrl,
         fmp4Url,
         fullscreenFmp4Url,
+        tabletFmp4Url,
+        tabletFullscreenFmp4Url,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 250),
         fullscreenRefreshMs: clampInt(
           draft.fullscreenRefreshMs,
@@ -950,8 +994,45 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={fullscreenCameraUrl}
                   />
                 </Field>
+                <Field label="Tablet Quelle Miniaturansicht">
+                  <ChoiceRow
+                    options={["snapshot", "mjpeg", "flv", "fmp4"]}
+                    value={tabletPreviewCameraMode}
+                    onSelect={(value) => setDraft((current) => ({ ...current, tabletPreviewSourceMode: value }))}
+                  />
+                </Field>
+                <Field label="Tablet Quelle Vollbildansicht">
+                  <ChoiceRow
+                    options={["snapshot", "mjpeg", "flv", "fmp4"]}
+                    value={tabletFullscreenCameraMode}
+                    onSelect={(value) => setDraft((current) => ({ ...current, tabletFullscreenSourceMode: value }))}
+                  />
+                </Field>
+                <Field label="Tablet URL Miniaturansicht">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) =>
+                      setDraft((current) => setCameraUrlByMode(current, tabletPreviewCameraMode, false, value, "tablet"))
+                    }
+                    style={styles.input}
+                    value={tabletPreviewCameraUrl}
+                  />
+                </Field>
+                <Field label="Tablet URL Vollbildansicht (optional)">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) =>
+                      setDraft((current) => setCameraUrlByMode(current, tabletFullscreenCameraMode, true, value, "tablet"))
+                    }
+                    style={styles.input}
+                    value={tabletFullscreenCameraUrl}
+                  />
+                </Field>
                 <Text style={styles.mappingHint}>
                   Die URL-Felder gelten jeweils fuer das oben gewaehlte Format (Snapshot, MJPEG, FLV oder fMP4).
+                </Text>
+                <Text style={styles.mappingHint}>
+                  Tablet-Profil gilt im Web fuer Breiten zwischen 700 und 1099px.
                 </Text>
                 <Text style={styles.mappingHint}>
                   FLV-Hinweis: Bei `CodecUnsupported` liefert der Stream meist kein browser-kompatibles H.264. Falls
@@ -2028,36 +2109,48 @@ function normalizeCameraSourceMode(raw: string | undefined) {
 function getCameraUrlByMode(
   draft: Record<string, string>,
   mode: "snapshot" | "mjpeg" | "flv" | "fmp4",
-  fullscreen: boolean
+  fullscreen: boolean,
+  scope: "default" | "tablet" = "default"
 ) {
+  const prefix = scope === "tablet" ? "tablet" : "";
+  const snapshotKey = `${prefix}${fullscreen ? "FullscreenSnapshotUrl" : "SnapshotUrl"}`;
+  const mjpegKey = `${prefix}${fullscreen ? "FullscreenMjpegUrl" : "MjpegUrl"}`;
+  const flvKey = `${prefix}${fullscreen ? "FullscreenFlvUrl" : "FlvUrl"}`;
+  const fmp4Key = `${prefix}${fullscreen ? "FullscreenFmp4Url" : "Fmp4Url"}`;
   if (mode === "snapshot") {
-    return fullscreen ? draft.fullscreenSnapshotUrl || "" : draft.snapshotUrl || "";
+    return draft[snapshotKey] || "";
   }
   if (mode === "mjpeg") {
-    return fullscreen ? draft.fullscreenMjpegUrl || "" : draft.mjpegUrl || "";
+    return draft[mjpegKey] || "";
   }
   if (mode === "flv") {
-    return fullscreen ? draft.fullscreenFlvUrl || "" : draft.flvUrl || "";
+    return draft[flvKey] || "";
   }
-  return fullscreen ? draft.fullscreenFmp4Url || "" : draft.fmp4Url || "";
+  return draft[fmp4Key] || "";
 }
 
 function setCameraUrlByMode(
   draft: Record<string, string>,
   mode: "snapshot" | "mjpeg" | "flv" | "fmp4",
   fullscreen: boolean,
-  value: string
+  value: string,
+  scope: "default" | "tablet" = "default"
 ) {
+  const prefix = scope === "tablet" ? "tablet" : "";
+  const snapshotKey = `${prefix}${fullscreen ? "FullscreenSnapshotUrl" : "SnapshotUrl"}`;
+  const mjpegKey = `${prefix}${fullscreen ? "FullscreenMjpegUrl" : "MjpegUrl"}`;
+  const flvKey = `${prefix}${fullscreen ? "FullscreenFlvUrl" : "FlvUrl"}`;
+  const fmp4Key = `${prefix}${fullscreen ? "FullscreenFmp4Url" : "Fmp4Url"}`;
   if (mode === "snapshot") {
-    return fullscreen ? { ...draft, fullscreenSnapshotUrl: value } : { ...draft, snapshotUrl: value };
+    return { ...draft, [snapshotKey]: value };
   }
   if (mode === "mjpeg") {
-    return fullscreen ? { ...draft, fullscreenMjpegUrl: value } : { ...draft, mjpegUrl: value };
+    return { ...draft, [mjpegKey]: value };
   }
   if (mode === "flv") {
-    return fullscreen ? { ...draft, fullscreenFlvUrl: value } : { ...draft, flvUrl: value };
+    return { ...draft, [flvKey]: value };
   }
-  return fullscreen ? { ...draft, fullscreenFmp4Url: value } : { ...draft, fmp4Url: value };
+  return { ...draft, [fmp4Key]: value };
 }
 
 function normalizeOptionalInput(value: string | undefined) {
