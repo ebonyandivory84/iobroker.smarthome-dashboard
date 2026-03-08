@@ -161,18 +161,6 @@ export function CameraWidget({
     : Math.max(100, config.refreshMs || 2000);
 
   const closeFullscreen = () => {
-    const isSameMjpegFeed =
-      previewFeed?.kind === "mjpeg" &&
-      fullscreenFeed?.kind === "mjpeg" &&
-      previewFeed.url === fullscreenFeed.url;
-    if (isSameMjpegFeed && currentFullscreenMjpegSrc && previewMjpegSources.length) {
-      const matchingIndex = previewMjpegSources.findIndex((source) => source === currentFullscreenMjpegSrc);
-      if (matchingIndex >= 0) {
-        setPreviewMjpegSourceIndex(matchingIndex);
-      }
-      setPreviewMjpegLoaded(false);
-      setPreviewStreamDebug(null);
-    }
     const isSameFlvFeed = previewFeed?.kind === "flv" && fullscreenFeed?.kind === "flv" && previewFeed.url === fullscreenFeed.url;
     if (isSameFlvFeed && previewFlvSources.length) {
       const matchingIndex = previewFlvSources.findIndex((source) => source === currentFullscreenFlvSrc);
@@ -224,11 +212,11 @@ export function CameraWidget({
   }, [activeRefreshMs, activeSnapshotBaseUrl]);
 
   useEffect(() => {
-    if (fullscreenOpen || previewFeed?.kind !== "mjpeg") {
+    if (previewFeed?.kind !== "mjpeg") {
       setPreviewStreamDebug(null);
       setPreviewMjpegLoaded(false);
     }
-  }, [fullscreenOpen, previewFeed?.kind]);
+  }, [previewFeed?.kind]);
 
   useEffect(() => {
     setPreviewMjpegSourceIndex(0);
