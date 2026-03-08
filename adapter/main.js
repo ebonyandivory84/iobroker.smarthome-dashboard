@@ -20,6 +20,8 @@ let objectEntriesPromise = null;
 let insecureHttpsDispatcher = null;
 let runningAdapter = null;
 const OBJECT_CACHE_TTL_MS = 5 * 60 * 1000;
+const CAMERA_SNAPSHOT_TIMEOUT_MS = 10_000;
+const CAMERA_STREAM_CONNECT_TIMEOUT_MS = 12_000;
 const CONFIG_STATE_ID = "dashboardConfig";
 const SAVED_DASHBOARDS_STATE_ID = "savedDashboards";
 let webShellCache = null;
@@ -256,11 +258,19 @@ async function main(adapter) {
 
     try {
       const requestConfig = buildCameraRequestConfig(targetUrl);
-      const response = await fetch(requestConfig.url, {
-        cache: "no-store",
-        headers: requestConfig.headers,
-        ...buildCameraFetchOptions(requestConfig.url),
-      });
+      const abortController = new AbortController();
+      const snapshotTimeout = setTimeout(() => abortController.abort(), CAMERA_SNAPSHOT_TIMEOUT_MS);
+      let response;
+      try {
+        response = await fetch(requestConfig.url, {
+          cache: "no-store",
+          headers: requestConfig.headers,
+          signal: abortController.signal,
+          ...buildCameraFetchOptions(requestConfig.url),
+        });
+      } finally {
+        clearTimeout(snapshotTimeout);
+      }
 
       if (!response.ok) {
         res.status(response.status).json({ error: `Snapshot fetch failed (${response.status})` });
@@ -473,6 +483,17 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
 
   const useHttps = parsed.protocol === "https:";
   const transport = useHttps ? https : http;
+  let streamConnected = false;
+  const connectTimeout = setTimeout(() => {
+    if (streamConnected) {
+      return;
+    }
+    try {
+      upstreamRequest.destroy(new Error("Camera stream connect timeout"));
+    } catch {
+      // ignore
+    }
+  }, CAMERA_STREAM_CONNECT_TIMEOUT_MS);
   const upstreamRequest = transport.request(
     {
       protocol: parsed.protocol,
@@ -489,6 +510,8 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
       rejectUnauthorized: !(useHttps && isLikelyLocalHost(parsed.hostname)),
     },
     (upstreamResponse) => {
+      streamConnected = true;
+      clearTimeout(connectTimeout);
       const statusCode = upstreamResponse.statusCode || 502;
       const location = upstreamResponse.headers.location;
       const upstreamContentType = upstreamResponse.headers["content-type"] || "";
@@ -592,6 +615,7 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
   );
 
   const closeUpstream = () => {
+    clearTimeout(connectTimeout);
     try {
       upstreamRequest.destroy();
     } catch {

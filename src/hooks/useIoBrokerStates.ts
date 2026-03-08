@@ -55,8 +55,13 @@ export function useIoBrokerStates() {
 
   useEffect(() => {
     let active = true;
+    let syncInFlight = false;
 
     const sync = async () => {
+      if (syncInFlight) {
+        return;
+      }
+      syncInFlight = true;
       try {
         const next = await client.readStates(pickStateIds(config.widgets));
         if (active) {
@@ -70,6 +75,8 @@ export function useIoBrokerStates() {
           setError(syncError instanceof Error ? syncError.message : "State sync failed");
           setIsOnline(false);
         }
+      } finally {
+        syncInFlight = false;
       }
     };
 

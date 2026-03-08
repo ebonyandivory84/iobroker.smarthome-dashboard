@@ -998,11 +998,29 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv" | 
 function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
   const includeDirect = shouldUseDirectWebStream(targetUrl, streamType);
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
+  const proxyFirstForMjpeg = shouldPreferProxyFirstForMjpeg();
   const sources =
     streamType === "mjpeg"
-      ? [...(includeDirect ? [targetUrl] : []), ...proxySources]
+      ? proxyFirstForMjpeg
+        ? [...proxySources, ...(includeDirect ? [targetUrl] : [])]
+        : [...(includeDirect ? [targetUrl] : []), ...proxySources]
       : [...proxySources, ...(includeDirect ? [targetUrl] : [])];
   return Array.from(new Set(sources.filter(Boolean)));
+}
+
+function shouldPreferProxyFirstForMjpeg() {
+  if (Platform.OS !== "web" || typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    const touchPoints = typeof navigator !== "undefined" ? Number(navigator.maxTouchPoints || 0) : 0;
+    const hasCoarsePointer = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+    const tabletLikeWidth = window.innerWidth < 1100;
+    return touchPoints > 0 || hasCoarsePointer || tabletLikeWidth;
+  } catch {
+    return false;
+  }
 }
 
 function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
