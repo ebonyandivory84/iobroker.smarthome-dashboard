@@ -1162,6 +1162,7 @@ function WebFlvPlayer({
   const [restartNonce, setRestartNonce] = useState(0);
   const currentSource = normalizedSources[Math.min(sourceIndex, maxSourceIndex)] || "";
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [hasVideoFrame, setHasVideoFrame] = useState(false);
 
   useEffect(() => {
     aspectRatioCallbackRef.current = onAspectRatioDetected;
@@ -1178,6 +1179,7 @@ function WebFlvPlayer({
 
   useEffect(() => {
     setErrorMessage(null);
+    setHasVideoFrame(false);
   }, [currentSource]);
 
   useEffect(() => {
@@ -1311,6 +1313,7 @@ function WebFlvPlayer({
           clearTimeout(watchdogTimer);
           watchdogTimer = null;
         }
+        setHasVideoFrame(true);
         tryPlay();
       };
       player.load();
@@ -1384,6 +1387,7 @@ function WebFlvPlayer({
         style: fullScreen ? fullscreenWebFlvStyle : webFlvStyle,
         title,
       })}
+      {!hasVideoFrame ? <View style={styles.flvLoadingOverlay} /> : null}
       {errorMessage ? (
         <View style={styles.flvErrorOverlay}>
           <Text style={styles.flvErrorText}>{errorMessage}</Text>
@@ -1757,6 +1761,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     backgroundColor: "rgba(160, 22, 40, 0.75)",
+  },
+  flvLoadingOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: "#000000",
   },
   flvErrorText: {
     color: "#ffffff",
