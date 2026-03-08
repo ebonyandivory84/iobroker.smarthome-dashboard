@@ -24,8 +24,9 @@ const LAYER_FADE_MS = 0;
 const pinnedColor = "#f3c84a";
 const FLV_SCRIPT_SRC = "https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js";
 const FLV_SCRIPT_LOAD_TIMEOUT_MS = 8000;
-const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 6_000;
+const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 2_500;
 let flvLoaderPromise: Promise<boolean> | null = null;
+const rememberedMjpegSourceByUrl = new Map<string, number>();
 
 export function CameraWidget({
   config,
@@ -214,7 +215,8 @@ export function CameraWidget({
   }, [fullscreenOpen, previewFeed?.kind]);
 
   useEffect(() => {
-    setPreviewMjpegSourceIndex(0);
+    const remembered = getRememberedSourceIndex(previewFeed?.url || null, previewMjpegSources);
+    setPreviewMjpegSourceIndex(remembered);
     setPreviewMjpegLoaded(false);
   }, [previewMjpegSources, previewFeed?.kind, previewFeed?.url]);
 
@@ -230,7 +232,8 @@ export function CameraWidget({
   }, [previewFeedKey]);
 
   useEffect(() => {
-    setFullscreenMjpegSourceIndex(0);
+    const remembered = getRememberedSourceIndex(fullscreenFeed?.url || null, fullscreenMjpegSources);
+    setFullscreenMjpegSourceIndex(remembered);
     setFullscreenMjpegLoaded(false);
   }, [fullscreenMjpegSources, fullscreenFeed?.kind, fullscreenFeed?.url]);
 
@@ -565,7 +568,7 @@ export function CameraWidget({
                       );
                 })
               : null}
-            {!fullscreenOpen && previewFeed.kind === "mjpeg" && previewFeed.url
+            {previewFeed.kind === "mjpeg" && previewFeed.url
               ? Platform.OS === "web"
                 ? createElement("img", {
                     alt: config.title || "Camera MJPEG",
@@ -598,6 +601,9 @@ export function CameraWidget({
                       }
                       setPreviewMjpegLoaded(true);
                       setPreviewStreamDebug(null);
+                      if (previewFeed?.url) {
+                        rememberSourceIndex(previewFeed.url, previewMjpegSourceIndex);
+                      }
                       reportAspectRatio(width, height);
                     },
                     src: currentPreviewMjpegSrc || previewFeed.url,
@@ -617,12 +623,12 @@ export function CameraWidget({
                     />
                   )
               : null}
-            {!fullscreenOpen && previewFeed.kind === "mjpeg" && previewStreamDebug ? (
+            {previewFeed.kind === "mjpeg" && previewStreamDebug ? (
               <View style={styles.streamDebugOverlay}>
                 <Text style={styles.streamDebugText}>{previewStreamDebug}</Text>
               </View>
             ) : null}
-            {!fullscreenOpen && previewFeed.kind === "flv" && previewFeed.url
+            {previewFeed.kind === "flv" && previewFeed.url
               ? Platform.OS === "web"
                 ? (
                     <WebFlvPlayer
@@ -640,7 +646,7 @@ export function CameraWidget({
                     </View>
                   )
               : null}
-            {!fullscreenOpen && previewFeed.kind === "fmp4" && previewFeed.url
+            {previewFeed.kind === "fmp4" && previewFeed.url
               ? Platform.OS === "web"
                 ? (
                     <WebFmp4Player
@@ -789,6 +795,9 @@ export function CameraWidget({
                         return;
                       }
                       setFullscreenMjpegLoaded(true);
+                      if (fullscreenFeed?.url) {
+                        rememberSourceIndex(fullscreenFeed.url, fullscreenMjpegSourceIndex);
+                      }
                       reportAspectRatio(width, height);
                     },
                     src: currentFullscreenMjpegSrc || fullscreenFeed.url,
@@ -1047,6 +1056,24 @@ function shouldDisableWebModalFadeOnTouch() {
   }
 }
 
+function getRememberedSourceIndex(targetUrl: string | null, sources: string[]) {
+  if (!targetUrl || !sources.length) {
+    return 0;
+  }
+  const remembered = rememberedMjpegSourceByUrl.get(targetUrl);
+  if (remembered === undefined) {
+    return 0;
+  }
+  return Math.max(0, Math.min(remembered, Math.max(0, sources.length - 1)));
+}
+
+function rememberSourceIndex(targetUrl: string, index: number) {
+  if (!targetUrl || !Number.isFinite(index) || index < 0) {
+    return;
+  }
+  rememberedMjpegSourceByUrl.set(targetUrl, index);
+}
+
 function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
   if (Platform.OS !== "web" || typeof window === "undefined") {
     return true;
@@ -1125,6 +1152,7 @@ function WebFlvPlayer({
   const [sourceIndex, setSourceIndex] = useState(Math.min(preferredSourceIndex, maxSourceIndex));
   const currentSource = normalizedSources[Math.min(sourceIndex, maxSourceIndex)] || "";
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     aspectRatioCallbackRef.current = onAspectRatioDetected;
@@ -1141,6 +1169,7 @@ function WebFlvPlayer({
 
   useEffect(() => {
     setErrorMessage(null);
+    setIsReady(false);
   }, [currentSource]);
 
   useEffect(() => {
@@ -1157,6 +1186,7 @@ function WebFlvPlayer({
     const safeSetError = (message: string) => {
       if (!disposed) {
         setErrorMessage(message);
+        setIsReady(false);
       }
     };
 
@@ -1183,6 +1213,9 @@ function WebFlvPlayer({
       void videoElement.play().catch(() => {
         // Ignore autoplay rejections; retry loop handles late-ready starts.
       });
+      if (videoElement.readyState >= 2 && !disposed) {
+        setIsReady(true);
+      }
     };
 
     const attach = async () => {
@@ -1235,6 +1268,9 @@ function WebFlvPlayer({
 
       player.attachMediaElement(videoElement);
       videoElement.onloadedmetadata = () => {
+        if (!disposed) {
+          setIsReady(true);
+        }
         const callback = aspectRatioCallbackRef.current;
         if (ratioReportedRef.current || !callback) {
           return;
@@ -1255,6 +1291,9 @@ function WebFlvPlayer({
         if (startupWatchdog) {
           clearTimeout(startupWatchdog);
           startupWatchdog = null;
+        }
+        if (!disposed) {
+          setIsReady(true);
         }
         tryPlay();
       };
@@ -1329,6 +1368,10 @@ function WebFlvPlayer({
         <View style={styles.flvErrorOverlay}>
           <Text style={styles.flvErrorText}>{errorMessage}</Text>
         </View>
+      ) : !isReady ? (
+        <View style={styles.streamLoadingOverlay}>
+          <Text style={styles.streamLoadingText}>Stream wird verbunden...</Text>
+        </View>
       ) : null}
     </>
   );
@@ -1363,6 +1406,7 @@ function WebFmp4Player({
   const [sourceIndex, setSourceIndex] = useState(Math.min(preferredSourceIndex, maxSourceIndex));
   const currentSource = normalizedSources[Math.min(sourceIndex, maxSourceIndex)] || "";
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     aspectRatioCallbackRef.current = onAspectRatioDetected;
@@ -1380,6 +1424,7 @@ function WebFmp4Player({
   useEffect(() => {
     setErrorMessage(null);
     ratioReportedRef.current = false;
+    setIsReady(false);
   }, [currentSource]);
 
   useEffect(() => {
@@ -1408,9 +1453,15 @@ function WebFmp4Player({
       void videoElement.play().catch(() => {
         // ignore autoplay issues
       });
+      if (videoElement.readyState >= 2 && !disposed) {
+        setIsReady(true);
+      }
     };
 
     const handleMetadata = () => {
+      if (!disposed) {
+        setIsReady(true);
+      }
       const callback = aspectRatioCallbackRef.current;
       if (ratioReportedRef.current || !callback) {
         return;
@@ -1432,6 +1483,7 @@ function WebFmp4Player({
       if (disposed) {
         return;
       }
+      setIsReady(false);
       if (!moveToNextSource("fMP4 Quelle fehlgeschlagen, versuche alternative Quelle...")) {
         setErrorMessage("fMP4 Stream konnte nicht gestartet werden.");
       }
@@ -1476,6 +1528,10 @@ function WebFmp4Player({
       {errorMessage ? (
         <View style={styles.flvErrorOverlay}>
           <Text style={styles.flvErrorText}>{errorMessage}</Text>
+        </View>
+      ) : !isReady ? (
+        <View style={styles.streamLoadingOverlay}>
+          <Text style={styles.streamLoadingText}>Stream wird verbunden...</Text>
         </View>
       ) : null}
     </>
@@ -1704,6 +1760,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
+  streamLoadingOverlay: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#000000",
+  },
+  streamLoadingText: {
+    color: "#d5deef",
+    fontSize: 12,
+    fontWeight: "700",
+  },
   flvTapOverlay: {
     position: "absolute",
     left: 12,
@@ -1812,7 +1883,7 @@ const webFlvStyle = {
   height: "100%",
   objectFit: "contain",
   display: "block",
-  backgroundColor: "transparent",
+  backgroundColor: "#000000",
 } as const;
 
 const fullscreenWebFlvStyle = {
