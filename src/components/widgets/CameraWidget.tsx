@@ -41,6 +41,9 @@ export function CameraWidget({
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [previewStreamDebug, setPreviewStreamDebug] = useState<string | null>(null);
+  const [previewMjpegSession, setPreviewMjpegSession] = useState(0);
+  const [fullscreenSession, setFullscreenSession] = useState(0);
+  const [previewFlvSession, setPreviewFlvSession] = useState(0);
   const [previewMjpegSourceIndex, setPreviewMjpegSourceIndex] = useState(0);
   const [fullscreenMjpegSourceIndex, setFullscreenMjpegSourceIndex] = useState(0);
   const [previewFlvSourceIndex, setPreviewFlvSourceIndex] = useState(0);
@@ -159,12 +162,20 @@ export function CameraWidget({
     : Math.max(100, config.refreshMs || 2000);
 
   const closeFullscreen = () => {
+    if (previewFeed?.kind === "mjpeg") {
+      setPreviewMjpegLoaded(false);
+      setPreviewMjpegSession((current) => current + 1);
+    }
+    if (previewFeed?.kind === "flv") {
+      setPreviewFlvSession((current) => current + 1);
+    }
     fullscreenVisibilityCallbackRef.current?.(false);
     setFullscreenOpen(false);
     setPinned(false);
   };
 
   const openFullscreen = () => {
+    setFullscreenSession((current) => current + 1);
     fullscreenVisibilityCallbackRef.current?.(true);
     setPinned(false);
     setFullscreenOpen(true);
@@ -243,25 +254,7 @@ export function CameraWidget({
       return;
     }
 
-    if (previewMjpegLoaded) {
-      return;
-    }
-
-    if (previewMjpegSources.length < 2) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setPreviewMjpegSourceIndex((current) => {
-        const next = current + 1 < previewMjpegSources.length ? current + 1 : current;
-        if (next !== current) {
-          setPreviewStreamDebug("MJPEG Preview: Quelle reagiert nicht, wechsle zur naechsten URL...");
-        }
-        return next;
-      });
-    }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
-
-    return () => clearTimeout(timer);
+    // No automatic source switching for MJPEG preview; keep one deterministic source.
   }, [
     currentPreviewMjpegSrc,
     fullscreenOpen,
@@ -275,21 +268,7 @@ export function CameraWidget({
       return;
     }
 
-    if (fullscreenMjpegLoaded) {
-      return;
-    }
-
-    if (fullscreenMjpegSources.length < 2) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setFullscreenMjpegSourceIndex((current) =>
-        current + 1 < fullscreenMjpegSources.length ? current + 1 : current
-      );
-    }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
-
-    return () => clearTimeout(timer);
+    // No automatic source switching for MJPEG fullscreen; keep one deterministic source.
   }, [
     currentFullscreenMjpegSrc,
     fullscreenFeed?.kind,
@@ -560,16 +539,11 @@ export function CameraWidget({
                     alt: config.title || "Camera MJPEG",
                     decoding: "sync",
                     draggable: false,
-                    key: `preview-mjpeg-${currentPreviewMjpegSrc || previewFeed.url}`,
+                    key: `preview-mjpeg-${currentPreviewMjpegSrc || previewFeed.url}:${previewMjpegSession}`,
                     loading: "eager",
                     onError: () => {
                       setPreviewMjpegLoaded(false);
-                      if (previewMjpegSourceIndex + 1 < previewMjpegSources.length) {
-                        setPreviewMjpegSourceIndex((current) => current + 1);
-                        setPreviewStreamDebug("MJPEG Preview: Quelle fehlgeschlagen, versuche naechste URL...");
-                        return;
-                      }
-                      setPreviewStreamDebug((current) => current || "MJPEG Preview: Bild konnte nicht geladen werden.");
+                      setPreviewStreamDebug("MJPEG Preview: Stream konnte nicht geladen werden.");
                     },
                     onLoad: (event: Event) => {
                       const target = event.currentTarget as HTMLImageElement | null;
@@ -577,11 +551,6 @@ export function CameraWidget({
                       const height = target?.naturalHeight || 0;
                       if (!width || !height) {
                         setPreviewMjpegLoaded(false);
-                        if (previewMjpegSourceIndex + 1 < previewMjpegSources.length) {
-                          setPreviewMjpegSourceIndex((current) => current + 1);
-                          setPreviewStreamDebug("MJPEG Preview: Ungueltige Bilddaten, wechsle zur naechsten URL...");
-                          return;
-                        }
                         setPreviewStreamDebug("MJPEG Preview: Stream liefert keine gueltigen Bilddaten.");
                         return;
                       }
@@ -589,7 +558,7 @@ export function CameraWidget({
                       setPreviewStreamDebug(null);
                       reportAspectRatio(width, height);
                     },
-                    src: currentPreviewMjpegSrc || previewFeed.url,
+                    src: withReconnectNonce(currentPreviewMjpegSrc || previewFeed.url, previewMjpegSession),
                     style: webMjpegStyle,
                   })
                 : (
@@ -601,7 +570,7 @@ export function CameraWidget({
                         }
                       }}
                       resizeMode="contain"
-                      source={{ uri: previewFeed.url }}
+                      source={{ uri: withReconnectNonce(previewFeed.url, previewMjpegSession) }}
                       style={styles.mjpegImage}
                     />
                   )
@@ -615,7 +584,7 @@ export function CameraWidget({
               ? Platform.OS === "web"
                 ? (
                     <WebFlvPlayer
-                      key={`preview-flv-${previewFeedKey}`}
+                      key={`preview-flv-${previewFeedKey}:${previewFlvSession}`}
                       onAspectRatioDetected={reportAspectRatioValue}
                       onSourceIndexChange={setPreviewFlvSourceIndex}
                       preferredSourceIndex={previewFlvSourceIndex}
@@ -758,13 +727,10 @@ export function CameraWidget({
                     alt: config.title || "Camera MJPEG fullscreen",
                     decoding: "sync",
                     draggable: false,
-                    key: `fullscreen-mjpeg-${currentFullscreenMjpegSrc || fullscreenFeed.url}`,
+                    key: `fullscreen-mjpeg-${currentFullscreenMjpegSrc || fullscreenFeed.url}:${fullscreenSession}`,
                     loading: "eager",
                     onError: () => {
                       setFullscreenMjpegLoaded(false);
-                      if (fullscreenMjpegSourceIndex + 1 < fullscreenMjpegSources.length) {
-                        setFullscreenMjpegSourceIndex((current) => current + 1);
-                      }
                     },
                     onLoad: (event: Event) => {
                       const target = event.currentTarget as HTMLImageElement | null;
@@ -772,15 +738,12 @@ export function CameraWidget({
                       const height = target?.naturalHeight || 0;
                       if (!width || !height) {
                         setFullscreenMjpegLoaded(false);
-                        if (fullscreenMjpegSourceIndex + 1 < fullscreenMjpegSources.length) {
-                          setFullscreenMjpegSourceIndex((current) => current + 1);
-                        }
                         return;
                       }
                       setFullscreenMjpegLoaded(true);
                       reportAspectRatio(width, height);
                     },
-                    src: currentFullscreenMjpegSrc || fullscreenFeed.url,
+                    src: withReconnectNonce(currentFullscreenMjpegSrc || fullscreenFeed.url, fullscreenSession),
                     style: fullscreenWebMjpegStyle,
                   })
                 : (
@@ -801,7 +764,7 @@ export function CameraWidget({
               ? Platform.OS === "web"
                 ? (
                     <WebFlvPlayer
-                      key={`fullscreen-flv-${fullscreenFeedKey}`}
+                      key={`fullscreen-flv-${fullscreenFeedKey}:${fullscreenSession}`}
                       fullScreen
                       onAspectRatioDetected={reportAspectRatioValue}
                       onSourceIndexChange={setFullscreenFlvSourceIndex}
@@ -1000,9 +963,25 @@ function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv" | 
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
   const sources =
     streamType === "mjpeg"
-      ? [...(includeDirect ? [targetUrl] : []), ...proxySources]
+      ? includeDirect
+        ? [targetUrl]
+        : proxySources
       : [...proxySources, ...(includeDirect ? [targetUrl] : [])];
   return Array.from(new Set(sources.filter(Boolean)));
+}
+
+function withReconnectNonce(url: string, nonce: number) {
+  if (!url) {
+    return url;
+  }
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set("_r", String(nonce));
+    return parsed.toString();
+  } catch {
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}_r=${nonce}`;
+  }
 }
 
 function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
