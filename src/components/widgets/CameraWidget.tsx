@@ -160,6 +160,8 @@ export function CameraWidget({
   const activeRefreshMs = fullscreenOpen
     ? Math.max(180, config.fullscreenRefreshMs || config.refreshMs || 2000)
     : Math.max(100, config.refreshMs || 2000);
+  const previewMjpegHasFallback = previewMjpegSourceIndex + 1 < previewMjpegSources.length;
+  const fullscreenMjpegHasFallback = fullscreenMjpegSourceIndex + 1 < fullscreenMjpegSources.length;
 
   const closeFullscreen = () => {
     if (previewFeed?.kind === "mjpeg") {
@@ -173,6 +175,25 @@ export function CameraWidget({
     setFullscreenOpen(false);
     setPinned(false);
   };
+
+  const movePreviewMjpegToNextSource = useCallback(() => {
+    if (!previewMjpegHasFallback) {
+      return false;
+    }
+    setPreviewMjpegLoaded(false);
+    setPreviewMjpegSourceIndex((current) => Math.min(previewMjpegSources.length - 1, current + 1));
+    setPreviewStreamDebug("MJPEG Preview: Quelle fehlgeschlagen, versuche alternative Quelle...");
+    return true;
+  }, [previewMjpegHasFallback, previewMjpegSources.length]);
+
+  const moveFullscreenMjpegToNextSource = useCallback(() => {
+    if (!fullscreenMjpegHasFallback) {
+      return false;
+    }
+    setFullscreenMjpegLoaded(false);
+    setFullscreenMjpegSourceIndex((current) => Math.min(fullscreenMjpegSources.length - 1, current + 1));
+    return true;
+  }, [fullscreenMjpegHasFallback, fullscreenMjpegSources.length]);
 
   const openFullscreen = () => {
     setFullscreenSession((current) => current + 1);
@@ -542,6 +563,9 @@ export function CameraWidget({
                     key: `preview-mjpeg-${currentPreviewMjpegSrc || previewFeed.url}:${previewMjpegSession}`,
                     loading: "eager",
                     onError: () => {
+                      if (movePreviewMjpegToNextSource()) {
+                        return;
+                      }
                       setPreviewMjpegLoaded(false);
                       setPreviewStreamDebug("MJPEG Preview: Stream konnte nicht geladen werden.");
                     },
@@ -550,6 +574,9 @@ export function CameraWidget({
                       const width = target?.naturalWidth || 0;
                       const height = target?.naturalHeight || 0;
                       if (!width || !height) {
+                        if (movePreviewMjpegToNextSource()) {
+                          return;
+                        }
                         setPreviewMjpegLoaded(false);
                         setPreviewStreamDebug("MJPEG Preview: Stream liefert keine gueltigen Bilddaten.");
                         return;
@@ -636,7 +663,17 @@ export function CameraWidget({
           <Text style={[styles.hint, { color: mutedTextColor }]}>Widget ist noch nicht konfiguriert.</Text>
         ) : null}
       </View>
-      <Modal animationType={Platform.OS === "web" ? "fade" : "none"} transparent visible={fullscreenOpen}>
+      <Modal
+        animationType={
+          Platform.OS === "web"
+            ? fullscreenFeed?.kind === "flv" || fullscreenFeed?.kind === "fmp4"
+              ? "none"
+              : "fade"
+            : "none"
+        }
+        transparent
+        visible={fullscreenOpen}
+      >
         <View style={styles.fullscreenBackdrop}>
           <View style={styles.fullscreenActions}>
             <Pressable
@@ -730,6 +767,9 @@ export function CameraWidget({
                     key: `fullscreen-mjpeg-${currentFullscreenMjpegSrc || fullscreenFeed.url}:${fullscreenSession}`,
                     loading: "eager",
                     onError: () => {
+                      if (moveFullscreenMjpegToNextSource()) {
+                        return;
+                      }
                       setFullscreenMjpegLoaded(false);
                     },
                     onLoad: (event: Event) => {
@@ -737,6 +777,9 @@ export function CameraWidget({
                       const width = target?.naturalWidth || 0;
                       const height = target?.naturalHeight || 0;
                       if (!width || !height) {
+                        if (moveFullscreenMjpegToNextSource()) {
+                          return;
+                        }
                         setFullscreenMjpegLoaded(false);
                         return;
                       }
@@ -961,12 +1004,7 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv" | 
 function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
   const includeDirect = shouldUseDirectWebStream(targetUrl, streamType);
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
-  const sources =
-    streamType === "mjpeg"
-      ? includeDirect
-        ? [targetUrl]
-        : proxySources
-      : [...proxySources, ...(includeDirect ? [targetUrl] : [])];
+  const sources = [...proxySources, ...(includeDirect ? [targetUrl] : [])];
   return Array.from(new Set(sources.filter(Boolean)));
 }
 
@@ -1728,7 +1766,7 @@ const webFlvStyle = {
   height: "100%",
   objectFit: "contain",
   display: "block",
-  backgroundColor: "transparent",
+  backgroundColor: "#000000",
 } as const;
 
 const fullscreenWebFlvStyle = {
