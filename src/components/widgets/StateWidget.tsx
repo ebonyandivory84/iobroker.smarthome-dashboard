@@ -36,6 +36,8 @@ export function StateWidget({ config, value, addonValue, onToggle, interactionSt
     ? `/smarthome-dashboard/widget-assets/${encodeURIComponent(config.iconImage)}`
     : null;
   const iconImageCrop = normalizeIconImageCrop(config.iconImageCrop);
+  const iconImageSizeMode = normalizeIconImageSizeMode(config.iconImageSizeMode);
+  const showMaximizedImage = Boolean(iconImageUri && iconImageSizeMode === "maximized");
   const iconImageResizeMode = iconImageCrop === "circle" ? "cover" : "contain";
 
   useEffect(() => {
@@ -55,47 +57,63 @@ export function StateWidget({ config, value, addonValue, onToggle, interactionSt
       onLayout={(event: LayoutChangeEvent) => setTileLayout(event.nativeEvent.layout)}
       style={[
         styles.tile,
+        showMaximizedImage ? styles.tileImageMaximized : null,
         compactTile ? styles.tileCompact : null,
         veryCompactTile ? styles.tileVeryCompact : null,
         { backgroundColor: tileBackground },
       ]}
     >
+      {showMaximizedImage && iconImageUri ? (
+        <Image
+          resizeMode="cover"
+          source={{ uri: iconImageUri }}
+          style={[
+            styles.maximizedImage,
+            iconImageCrop === "rounded" ? styles.maximizedImageRounded : null,
+            iconImageCrop === "circle" ? styles.maximizedImageCircle : null,
+          ]}
+        />
+      ) : null}
       {!showStatus ? <AddonChip config={config} value={resolvedAddonValue} /> : null}
       {showStatus ? <InteractionStatusChip state={interactionState === "confirmed" ? "confirmed" : interactionState} /> : null}
-      <View
-        style={[
-          styles.iconWrap,
-          compactTile ? styles.iconWrapCompact : null,
-          veryCompactTile ? styles.iconWrapVeryCompact : null,
-          iconImageCrop === "rounded" ? styles.iconWrapRounded : null,
-          iconImageCrop === "circle" ? styles.iconWrapCircle : null,
-        ]}
-      >
-        {iconImageUri ? (
-          <Image
-            resizeMode={iconImageResizeMode}
-            source={{ uri: iconImageUri }}
-            style={styles.iconImage}
-          />
-        ) : (
-          <MaterialCommunityIcons
-            color={iconColor}
-            name={(iconName || "toggle-switch-outline") as never}
-            size={iconSize}
-          />
-        )}
-      </View>
-      <View
-        style={[
-          styles.textBlock,
-          compactTile ? styles.textBlockCompact : null,
-          veryCompactTile ? styles.textBlockVeryCompact : null,
-        ]}
-      >
-        <Text ellipsizeMode="tail" numberOfLines={3} style={[styles.value, { color: mutedTextColor }]}>
-          {hasValue ? resolveStateLabel(config, value, active) : "Keine Daten"}
-        </Text>
-      </View>
+      {!showMaximizedImage ? (
+        <>
+          <View
+            style={[
+              styles.iconWrap,
+              compactTile ? styles.iconWrapCompact : null,
+              veryCompactTile ? styles.iconWrapVeryCompact : null,
+              iconImageCrop === "rounded" ? styles.iconWrapRounded : null,
+              iconImageCrop === "circle" ? styles.iconWrapCircle : null,
+            ]}
+          >
+            {iconImageUri ? (
+              <Image
+                resizeMode={iconImageResizeMode}
+                source={{ uri: iconImageUri }}
+                style={styles.iconImage}
+              />
+            ) : (
+              <MaterialCommunityIcons
+                color={iconColor}
+                name={(iconName || "toggle-switch-outline") as never}
+                size={iconSize}
+              />
+            )}
+          </View>
+          <View
+            style={[
+              styles.textBlock,
+              compactTile ? styles.textBlockCompact : null,
+              veryCompactTile ? styles.textBlockVeryCompact : null,
+            ]}
+          >
+            <Text ellipsizeMode="tail" numberOfLines={3} style={[styles.value, { color: mutedTextColor }]}>
+              {hasValue ? resolveStateLabel(config, value, active) : "Keine Daten"}
+            </Text>
+          </View>
+        </>
+      ) : null}
     </View>
   );
 
@@ -395,6 +413,13 @@ function normalizeIconImageCrop(value: StateWidgetConfig["iconImageCrop"]) {
   return "none";
 }
 
+function normalizeIconImageSizeMode(value: StateWidgetConfig["iconImageSizeMode"]) {
+  if (value === "maximized") {
+    return value;
+  }
+  return "standard";
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -414,6 +439,24 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 12,
     position: "relative",
+  },
+  tileImageMaximized: {
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    borderRadius: 0,
+    overflow: "hidden",
+  },
+  maximizedImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: undefined,
+    height: undefined,
+  },
+  maximizedImageRounded: {
+    borderRadius: 12,
+  },
+  maximizedImageCircle: {
+    borderRadius: 999,
   },
   tileCompact: {
     paddingHorizontal: 12,

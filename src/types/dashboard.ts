@@ -59,6 +59,7 @@ export type StateWidgetConfig = WidgetBase & {
   writeable: boolean;
   iconImage?: string;
   iconImageCrop?: "none" | "rounded" | "circle";
+  iconImageSizeMode?: "standard" | "maximized";
   onLabel?: string;
   offLabel?: string;
   activeValue?: string;
@@ -121,6 +122,7 @@ export type LinkWidgetConfig = WidgetBase & {
   url?: string;
   iconImage?: string;
   iconImageCrop?: "none" | "rounded" | "circle";
+  iconImageSizeMode?: "standard" | "maximized";
 };
 
 export type SolarNodeLayout = {

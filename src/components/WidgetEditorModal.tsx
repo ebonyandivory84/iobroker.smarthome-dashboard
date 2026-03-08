@@ -66,6 +66,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         stateId: widget.stateId,
         iconImage: widget.iconImage || "",
         iconImageCrop: widget.iconImageCrop || "none",
+        iconImageSizeMode: widget.iconImageSizeMode || "standard",
         onLabel: widget.onLabel || "",
         offLabel: widget.offLabel || "",
         activeValue: widget.activeValue || "",
@@ -202,6 +203,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         url: widget.url || "",
         iconImage: widget.iconImage || "",
         iconImageCrop: widget.iconImageCrop || "none",
+        iconImageSizeMode: widget.iconImageSizeMode || "standard",
         ...appearanceDraft,
       });
       return;
@@ -341,6 +343,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         stateId: draft.stateId || widget.stateId,
         iconImage: draft.iconImage || undefined,
         iconImageCrop: normalizeIconImageCrop(draft.iconImageCrop),
+        iconImageSizeMode: normalizeIconImageSizeMode(draft.iconImageSizeMode),
         onLabel: draft.onLabel || undefined,
         offLabel: draft.offLabel || undefined,
         activeValue: draft.activeValue || undefined,
@@ -461,6 +464,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         url: draft.url || undefined,
         iconImage: draft.iconImage || undefined,
         iconImageCrop: normalizeIconImageCrop(draft.iconImageCrop),
+        iconImageSizeMode: normalizeIconImageSizeMode(draft.iconImageSizeMode),
         interactionSounds: buildStoredInteractionSounds(
           widget.type,
           soundDraft,
@@ -809,6 +813,13 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       onSelect={(value) => setDraft((current) => ({ ...current, iconImageCrop: value }))}
                     />
                   </Field>
+                  <Field label="Bildgroesse">
+                    <ChoiceRow
+                      options={["standard", "maximized"]}
+                      value={draft.iconImageSizeMode || "standard"}
+                      onSelect={(value) => setDraft((current) => ({ ...current, iconImageSizeMode: value }))}
+                    />
+                  </Field>
                 </Field>
                 <Field label="Addon">
                   <ChoiceRow
@@ -1068,6 +1079,13 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     options={["none", "rounded", "circle"]}
                     value={draft.iconImageCrop || "none"}
                     onSelect={(value) => setDraft((current) => ({ ...current, iconImageCrop: value }))}
+                  />
+                </Field>
+                <Field label="Bildgroesse">
+                  <ChoiceRow
+                    options={["standard", "maximized"]}
+                    value={draft.iconImageSizeMode || "standard"}
+                    onSelect={(value) => setDraft((current) => ({ ...current, iconImageSizeMode: value }))}
                   />
                 </Field>
                 <Field label="Sounds bei Interaktion">
@@ -2041,6 +2059,13 @@ function normalizeIconImageCrop(raw: string | undefined) {
     return raw;
   }
   return "none";
+}
+
+function normalizeIconImageSizeMode(raw: string | undefined) {
+  if (raw === "maximized") {
+    return raw;
+  }
+  return "standard";
 }
 
 function parseValueLabels(raw: string | undefined) {

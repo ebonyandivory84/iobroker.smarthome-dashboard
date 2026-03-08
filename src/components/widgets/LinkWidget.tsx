@@ -17,6 +17,8 @@ export function LinkWidget({ config }: LinkWidgetProps) {
     ? `/smarthome-dashboard/widget-assets/${encodeURIComponent(config.iconImage)}`
     : null;
   const iconImageCrop = normalizeIconImageCrop(config.iconImageCrop);
+  const iconImageSizeMode = normalizeIconImageSizeMode(config.iconImageSizeMode);
+  const maximizedImage = Boolean(iconUri && iconImageSizeMode === "maximized");
 
   const close = () => {
     playConfiguredUiSound(config.interactionSounds?.close, "close", `${config.id}:close`);
@@ -48,16 +50,18 @@ export function LinkWidget({ config }: LinkWidgetProps) {
             playConfiguredUiSound(config.interactionSounds?.press, "tap", `${config.id}:press`);
             openOverlay();
           }}
-          style={[styles.openButton, iconUri ? styles.openButtonImageMode : null]}
+          style={[styles.openButton, maximizedImage ? styles.openButtonImageMode : null]}
         >
           {iconUri ? (
             <Image
               resizeMode={iconImageCrop === "circle" ? "cover" : "contain"}
               source={{ uri: iconUri }}
               style={[
-                styles.fullImage,
-                iconImageCrop === "rounded" ? styles.fullImageRounded : null,
-                iconImageCrop === "circle" ? styles.fullImageCircle : null,
+                maximizedImage ? styles.fullImage : styles.standardImage,
+                maximizedImage && iconImageCrop === "rounded" ? styles.fullImageRounded : null,
+                maximizedImage && iconImageCrop === "circle" ? styles.fullImageCircle : null,
+                !maximizedImage && iconImageCrop === "rounded" ? styles.standardImageRounded : null,
+                !maximizedImage && iconImageCrop === "circle" ? styles.standardImageCircle : null,
               ]}
             />
           ) : (
@@ -135,6 +139,13 @@ function normalizeIconImageCrop(value: LinkWidgetConfig["iconImageCrop"]) {
   return "none";
 }
 
+function normalizeIconImageSizeMode(value: LinkWidgetConfig["iconImageSizeMode"]) {
+  if (value === "maximized") {
+    return value;
+  }
+  return "standard";
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -166,10 +177,21 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 0,
   },
+  standardImage: {
+    width: "72%",
+    height: "72%",
+    borderRadius: 0,
+  },
   fullImageRounded: {
     borderRadius: 12,
   },
   fullImageCircle: {
+    borderRadius: 999,
+  },
+  standardImageRounded: {
+    borderRadius: 12,
+  },
+  standardImageCircle: {
     borderRadius: 999,
   },
   iconFallback: {
