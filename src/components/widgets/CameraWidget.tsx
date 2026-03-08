@@ -782,15 +782,16 @@ export function CameraWidget({
           <Text style={[styles.hint, { color: mutedTextColor }]}>Widget ist noch nicht konfiguriert.</Text>
         ) : null}
       </View>
-      <Modal
-        animationType={
-          Platform.OS === "web"
-            ? "none"
-            : "none"
-        }
-        transparent
-        visible={fullscreenOpen}
-      >
+      {fullscreenOpen ? (
+        <Modal
+          animationType={
+            Platform.OS === "web"
+              ? "none"
+              : "none"
+          }
+          transparent
+          visible
+        >
         <View style={styles.fullscreenBackdrop}>
           <View style={styles.fullscreenActions}>
             <Pressable
@@ -965,7 +966,8 @@ export function CameraWidget({
             </View>
           ) : null}
         </View>
-      </Modal>
+        </Modal>
+      ) : null}
     </>
   );
 }
