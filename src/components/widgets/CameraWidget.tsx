@@ -24,7 +24,7 @@ const LAYER_FADE_MS = 0;
 const pinnedColor = "#f3c84a";
 const FLV_SCRIPT_SRC = "https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js";
 const FLV_SCRIPT_LOAD_TIMEOUT_MS = 8000;
-const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 2_500;
+const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 8_000;
 const FLV_SOURCE_SWITCH_TIMEOUT_MS = 8_000;
 const FMP4_SOURCE_SWITCH_TIMEOUT_MS = 8_000;
 let flvLoaderPromise: Promise<boolean> | null = null;
@@ -170,6 +170,7 @@ export function CameraWidget({
 
   const closeFullscreen = () => {
     if (previewFeed?.kind === "mjpeg") {
+      setPreviewMjpegSourceIndex(0);
       setPreviewMjpegLoaded(false);
       setPreviewStreamDebug(null);
       setPreviewMjpegSession((current) => current + 1);
@@ -1047,7 +1048,7 @@ function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv" | 
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
   const sources =
     streamType === "mjpeg"
-      ? [...proxySources, ...(includeDirect ? [targetUrl] : [])]
+      ? [...(includeDirect ? [targetUrl] : []), ...proxySources]
       : [...(includeDirect ? [targetUrl] : []), ...proxySources];
   return Array.from(new Set(sources.filter(Boolean)));
 }
