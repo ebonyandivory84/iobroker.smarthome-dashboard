@@ -64,6 +64,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         title: widget.title,
         showTitle: widget.showTitle === false ? "false" : "true",
         stateId: widget.stateId,
+        iconImage: widget.iconImage || "",
+        iconImageCrop: widget.iconImageCrop || "none",
         onLabel: widget.onLabel || "",
         offLabel: widget.offLabel || "",
         activeValue: widget.activeValue || "",
@@ -336,6 +338,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         title: draft.title,
         showTitle: draft.showTitle !== "false",
         stateId: draft.stateId || widget.stateId,
+        iconImage: draft.iconImage || undefined,
+        iconImageCrop: normalizeIconImageCrop(draft.iconImageCrop),
         onLabel: draft.onLabel || undefined,
         offLabel: draft.offLabel || undefined,
         activeValue: draft.activeValue || undefined,
@@ -784,6 +788,25 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     selected={draft.iconInactive || "toggle-switch-off-outline"}
                     onSelect={(value) => setDraft((current) => ({ ...current, iconInactive: value }))}
                   />
+                </Field>
+                <Field label="Bild (optional)">
+                  <View style={styles.stateFieldRow}>
+                    <TextInput
+                      editable={false}
+                      style={[styles.input, styles.stateFieldInput]}
+                      value={draft.iconImage || ""}
+                    />
+                    <EditorButtonPressable onPress={() => setImagePickerField("iconImage")} style={styles.stateBrowseButton}>
+                      <Text style={styles.stateBrowseLabel}>Bild waehlen</Text>
+                    </EditorButtonPressable>
+                  </View>
+                  <Field label="Bildform">
+                    <ChoiceRow
+                      options={["none", "rounded", "circle"]}
+                      value={draft.iconImageCrop || "none"}
+                      onSelect={(value) => setDraft((current) => ({ ...current, iconImageCrop: value }))}
+                    />
+                  </Field>
                 </Field>
                 <Field label="Addon">
                   <ChoiceRow
@@ -1421,10 +1444,16 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       />
       <ImagePickerModal
         client={client}
-        title={imagePickerField === "iconImage" ? "Link-Icon waehlen" : "Solar-Hintergrund waehlen"}
+        title={
+          imagePickerField === "iconImage"
+            ? widget?.type === "state"
+              ? "State-Bild waehlen"
+              : "Link-Icon waehlen"
+            : "Solar-Hintergrund waehlen"
+        }
         helperText={
           imagePickerField === "iconImage"
-            ? "Waehle eine PNG-Datei aus dem Ordner `assets/`."
+            ? "Waehle eine Bilddatei aus dem Ordner `assets/`."
             : "Verwendet den festen Ordner `assets/` im Adapter-Paket."
         }
         onClose={() => setImagePickerField(null)}
@@ -1993,6 +2022,13 @@ function normalizeOptionalInput(value: string | undefined) {
 
 function normalizeAddonMode(raw: string | undefined) {
   if (raw === "circle" || raw === "text" || raw === "icon" || raw === "bars") {
+    return raw;
+  }
+  return "none";
+}
+
+function normalizeIconImageCrop(raw: string | undefined) {
+  if (raw === "rounded" || raw === "circle") {
     return raw;
   }
   return "none";

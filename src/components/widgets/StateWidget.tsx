@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from "react-native";
 import { StateWidgetConfig } from "../../types/dashboard";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
 import { palette } from "../../utils/theme";
@@ -32,6 +32,11 @@ export function StateWidget({ config, value, addonValue, onToggle, interactionSt
   const veryCompactTile = tileLayout.width > 0 && (tileLayout.width < 170 || tileLayout.height < 140);
   const iconSize = veryCompactTile ? 34 : compactTile ? 38 : 44;
   const showStatus = interactionState === "pending" || interactionState === "error" || showConfirmedPulse;
+  const iconImageUri = config.iconImage
+    ? `/smarthome-dashboard/widget-assets/${encodeURIComponent(config.iconImage)}`
+    : null;
+  const iconImageCrop = normalizeIconImageCrop(config.iconImageCrop);
+  const iconImageResizeMode = iconImageCrop === "circle" ? "cover" : "contain";
 
   useEffect(() => {
     if (interactionState !== "confirmed") {
@@ -62,13 +67,23 @@ export function StateWidget({ config, value, addonValue, onToggle, interactionSt
           styles.iconWrap,
           compactTile ? styles.iconWrapCompact : null,
           veryCompactTile ? styles.iconWrapVeryCompact : null,
+          iconImageCrop === "rounded" ? styles.iconWrapRounded : null,
+          iconImageCrop === "circle" ? styles.iconWrapCircle : null,
         ]}
       >
-        <MaterialCommunityIcons
-          color={iconColor}
-          name={(iconName || "toggle-switch-outline") as never}
-          size={iconSize}
-        />
+        {iconImageUri ? (
+          <Image
+            resizeMode={iconImageResizeMode}
+            source={{ uri: iconImageUri }}
+            style={styles.iconImage}
+          />
+        ) : (
+          <MaterialCommunityIcons
+            color={iconColor}
+            name={(iconName || "toggle-switch-outline") as never}
+            size={iconSize}
+          />
+        )}
       </View>
       <View
         style={[
@@ -373,6 +388,13 @@ function defaultStateValue(config: StateWidgetConfig, active: boolean) {
   return active ? "true" : "false";
 }
 
+function normalizeIconImageCrop(value: StateWidgetConfig["iconImageCrop"]) {
+  if (value === "rounded" || value === "circle") {
+    return value;
+  }
+  return "none";
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -423,6 +445,18 @@ const styles = StyleSheet.create({
     height: 42,
     top: 7,
     left: 7,
+  },
+  iconWrapRounded: {
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  iconWrapCircle: {
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+  iconImage: {
+    width: "100%",
+    height: "100%",
   },
   textBlock: {
     position: "absolute",

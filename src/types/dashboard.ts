@@ -57,6 +57,8 @@ export type StateWidgetConfig = WidgetBase & {
   type: "state";
   stateId: string;
   writeable: boolean;
+  iconImage?: string;
+  iconImageCrop?: "none" | "rounded" | "circle";
   onLabel?: string;
   offLabel?: string;
   activeValue?: string;
