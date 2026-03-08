@@ -41,6 +41,7 @@ export function CameraWidget({
   const [activeLayer, setActiveLayer] = useState<0 | 1>(0);
   const [loadingLayer, setLoadingLayer] = useState<0 | 1 | null>(null);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const [fullscreenSession, setFullscreenSession] = useState(0);
   const [pinned, setPinned] = useState(false);
   const [previewStreamDebug, setPreviewStreamDebug] = useState<string | null>(null);
   const [previewMjpegSourceIndex, setPreviewMjpegSourceIndex] = useState(0);
@@ -159,6 +160,7 @@ export function CameraWidget({
   const activeRefreshMs = fullscreenOpen
     ? Math.max(180, config.fullscreenRefreshMs || config.refreshMs || 2000)
     : Math.max(100, config.refreshMs || 2000);
+  const touchLikeWeb = isTouchLikeWeb();
 
   const closeFullscreen = () => {
     const isSameFlvFeed = previewFeed?.kind === "flv" && fullscreenFeed?.kind === "flv" && previewFeed.url === fullscreenFeed.url;
@@ -182,6 +184,7 @@ export function CameraWidget({
   };
 
   const openFullscreen = () => {
+    setFullscreenSession((current) => current + 1);
     fullscreenVisibilityCallbackRef.current?.(true);
     setPinned(false);
     setFullscreenOpen(true);
@@ -631,7 +634,13 @@ export function CameraWidget({
             ) : null}
             {!fullscreenOpen && previewFeed.kind === "flv" && previewFeed.url
               ? Platform.OS === "web"
-                ? (
+                ? touchLikeWeb
+                  ? (
+                      <View style={styles.touchPreviewPlaceholder}>
+                        <Text style={styles.touchPreviewPlaceholderText}>FLV Vorschau auf Tablet deaktiviert</Text>
+                      </View>
+                    )
+                  : (
                     <WebFlvPlayer
                       key={`preview-flv-${previewFeedKey}`}
                       onAspectRatioDetected={reportAspectRatioValue}
@@ -649,7 +658,13 @@ export function CameraWidget({
               : null}
             {!fullscreenOpen && previewFeed.kind === "fmp4" && previewFeed.url
               ? Platform.OS === "web"
-                ? (
+                ? touchLikeWeb
+                  ? (
+                      <View style={styles.touchPreviewPlaceholder}>
+                        <Text style={styles.touchPreviewPlaceholderText}>fMP4 Vorschau auf Tablet deaktiviert</Text>
+                      </View>
+                    )
+                  : (
                     <WebFmp4Player
                       key={`preview-fmp4-${previewFeedKey}:${currentPreviewFmp4Src || "none"}`}
                       onAspectRatioDetected={reportAspectRatioValue}
@@ -819,7 +834,7 @@ export function CameraWidget({
               ? Platform.OS === "web"
                 ? (
                     <WebFlvPlayer
-                      key={`fullscreen-flv-${fullscreenFeedKey}`}
+                      key={`fullscreen-flv-${fullscreenFeedKey}:${fullscreenSession}`}
                       fullScreen
                       onAspectRatioDetected={reportAspectRatioValue}
                       onSourceIndexChange={setFullscreenFlvSourceIndex}
@@ -838,7 +853,7 @@ export function CameraWidget({
               ? Platform.OS === "web"
                 ? (
                     <WebFmp4Player
-                      key={`fullscreen-fmp4-${fullscreenFeedKey}:${currentFullscreenFmp4Src || "none"}`}
+                      key={`fullscreen-fmp4-${fullscreenFeedKey}:${currentFullscreenFmp4Src || "none"}:${fullscreenSession}`}
                       fullScreen
                       onAspectRatioDetected={reportAspectRatioValue}
                       onSourceIndexChange={setFullscreenFmp4SourceIndex}
@@ -1021,6 +1036,19 @@ function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv" | 
       ? [...proxySources, ...(includeDirect ? [targetUrl] : [])]
       : [...(includeDirect ? [targetUrl] : []), ...proxySources];
   return Array.from(new Set(sources.filter(Boolean)));
+}
+
+function isTouchLikeWeb() {
+  if (Platform.OS !== "web" || typeof window === "undefined") {
+    return false;
+  }
+  try {
+    const touchPoints = typeof navigator !== "undefined" ? Number(navigator.maxTouchPoints || 0) : 0;
+    const coarsePointer = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+    return touchPoints > 0 || coarsePointer;
+  } catch {
+    return false;
+  }
 }
 
 function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
@@ -1754,6 +1782,19 @@ const styles = StyleSheet.create({
     color: "#ffe7e7",
     fontSize: 12,
     fontWeight: "700",
+  },
+  touchPreviewPlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#000000",
+  },
+  touchPreviewPlaceholderText: {
+    color: "#c5d2e6",
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
+    paddingHorizontal: 12,
   },
 });
 
