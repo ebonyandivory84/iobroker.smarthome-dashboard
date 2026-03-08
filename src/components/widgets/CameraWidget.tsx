@@ -27,8 +27,7 @@ const FLV_SCRIPT_LOAD_TIMEOUT_MS = 8000;
 const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 12_000;
 const MJPEG_RECONNECT_DELAY_MS = 1800;
 const FLV_RECONNECT_DELAY_MS = 1800;
-const MJPEG_HANDOFF_RETRY_MS = 900;
-const MJPEG_PREVIEW_RESUME_DELAY_MS = 900;
+const MJPEG_PREVIEW_RESUME_DELAY_MS = 2200;
 let flvLoaderPromise: Promise<boolean> | null = null;
 
 export function CameraWidget({
@@ -63,7 +62,6 @@ export function CameraWidget({
   const latestRequestedUrlRef = useRef<string | null>(null);
   const loadingJobRef = useRef<{ layer: 0 | 1; url: string } | null>(null);
   const fullscreenVisibilityCallbackRef = useRef(onFullscreenVisibilityChange);
-  const previewMjpegRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewMjpegResumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
@@ -224,16 +222,13 @@ export function CameraWidget({
   const fullscreenMjpegHasFallback = fullscreenMjpegSourceIndex + 1 < fullscreenMjpegSources.length;
 
   const closeFullscreen = () => {
-    if (previewMjpegRetryTimerRef.current) {
-      clearTimeout(previewMjpegRetryTimerRef.current);
-      previewMjpegRetryTimerRef.current = null;
-    }
     if (previewMjpegResumeTimerRef.current) {
       clearTimeout(previewMjpegResumeTimerRef.current);
       previewMjpegResumeTimerRef.current = null;
     }
     if (previewFeed?.kind === "mjpeg") {
       setPreviewMjpegLoaded(false);
+      setPreviewMjpegSourceIndex(0);
       setPreviewMjpegPaused(true);
       setPreviewStreamDebug("MJPEG Preview: Warte auf Stream-Freigabe...");
       previewMjpegResumeTimerRef.current = setTimeout(() => {
@@ -241,10 +236,6 @@ export function CameraWidget({
         restartPreviewMjpeg();
         previewMjpegResumeTimerRef.current = null;
       }, MJPEG_PREVIEW_RESUME_DELAY_MS);
-      previewMjpegRetryTimerRef.current = setTimeout(() => {
-        restartPreviewMjpeg();
-        previewMjpegRetryTimerRef.current = null;
-      }, MJPEG_PREVIEW_RESUME_DELAY_MS + MJPEG_HANDOFF_RETRY_MS);
     }
     if (previewFeed?.kind === "flv") {
       // Restart preview immediately to keep max/min transitions snappy on tablet.
@@ -320,6 +311,8 @@ export function CameraWidget({
       setPreviewMjpegLoaded(false);
       if (fullscreenOpen) {
         setPreviewMjpegPaused(true);
+      } else {
+        setPreviewMjpegPaused(false);
       }
     }
   }, [fullscreenOpen, previewFeed?.kind]);
@@ -362,7 +355,7 @@ export function CameraWidget({
   }, [fullscreenFmp4Sources, fullscreenFeed?.kind, fullscreenFeed?.url]);
 
   useEffect(() => {
-    if (Platform.OS !== "web" || fullscreenOpen || previewFeed?.kind !== "mjpeg" || !currentPreviewMjpegSrc) {
+    if (Platform.OS !== "web" || fullscreenOpen || previewMjpegPaused || previewFeed?.kind !== "mjpeg" || !currentPreviewMjpegSrc) {
       return;
     }
 
@@ -381,6 +374,7 @@ export function CameraWidget({
     currentPreviewMjpegSrc,
     fullscreenOpen,
     movePreviewMjpegToNextSource,
+    previewMjpegPaused,
     previewFeed?.kind,
     previewMjpegLoaded,
     restartPreviewMjpeg,
@@ -408,7 +402,14 @@ export function CameraWidget({
   ]);
 
   useEffect(() => {
-    if (Platform.OS !== "web" || fullscreenOpen || previewFeed?.kind !== "mjpeg" || previewMjpegLoaded || !previewStreamDebug) {
+    if (
+      Platform.OS !== "web" ||
+      fullscreenOpen ||
+      previewMjpegPaused ||
+      previewFeed?.kind !== "mjpeg" ||
+      previewMjpegLoaded ||
+      !previewStreamDebug
+    ) {
       return;
     }
 
@@ -417,7 +418,7 @@ export function CameraWidget({
     }, MJPEG_RECONNECT_DELAY_MS);
 
     return () => clearTimeout(retry);
-  }, [fullscreenOpen, previewFeed?.kind, previewMjpegLoaded, previewStreamDebug, restartPreviewMjpeg]);
+  }, [fullscreenOpen, previewMjpegPaused, previewFeed?.kind, previewMjpegLoaded, previewStreamDebug, restartPreviewMjpeg]);
 
   useEffect(() => {
     fullscreenVisibilityCallbackRef.current = onFullscreenVisibilityChange;
@@ -441,9 +442,6 @@ export function CameraWidget({
 
   useEffect(() => {
     return () => {
-      if (previewMjpegRetryTimerRef.current) {
-        clearTimeout(previewMjpegRetryTimerRef.current);
-      }
       if (previewMjpegResumeTimerRef.current) {
         clearTimeout(previewMjpegResumeTimerRef.current);
       }
