@@ -22,6 +22,7 @@ let runningAdapter = null;
 const OBJECT_CACHE_TTL_MS = 5 * 60 * 1000;
 const CAMERA_SNAPSHOT_TIMEOUT_MS = 10_000;
 const CAMERA_STREAM_CONNECT_TIMEOUT_MS = 12_000;
+const CAMERA_MJPEG_CONNECT_TIMEOUT_MS = 4_000;
 const CONFIG_STATE_ID = "dashboardConfig";
 const SAVED_DASHBOARDS_STATE_ID = "savedDashboards";
 let webShellCache = null;
@@ -484,6 +485,7 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
   const useHttps = parsed.protocol === "https:";
   const transport = useHttps ? https : http;
   let streamConnected = false;
+  const connectTimeoutMs = streamType === "mjpeg" ? CAMERA_MJPEG_CONNECT_TIMEOUT_MS : CAMERA_STREAM_CONNECT_TIMEOUT_MS;
   const connectTimeout = setTimeout(() => {
     if (streamConnected) {
       return;
@@ -493,7 +495,7 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
     } catch {
       // ignore
     }
-  }, CAMERA_STREAM_CONNECT_TIMEOUT_MS);
+  }, connectTimeoutMs);
   const upstreamRequest = transport.request(
     {
       protocol: parsed.protocol,

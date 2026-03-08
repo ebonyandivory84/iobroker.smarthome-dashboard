@@ -25,6 +25,8 @@ const pinnedColor = "#f3c84a";
 const FLV_SCRIPT_SRC = "https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js";
 const FLV_SCRIPT_LOAD_TIMEOUT_MS = 8000;
 const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 2_500;
+const FLV_SOURCE_SWITCH_TIMEOUT_MS = 8_000;
+const FMP4_SOURCE_SWITCH_TIMEOUT_MS = 8_000;
 let flvLoaderPromise: Promise<boolean> | null = null;
 const rememberedMjpegSourceByUrl = new Map<string, number>();
 
@@ -165,7 +167,8 @@ export function CameraWidget({
     if (isSameFeed) {
       if (previewFeed?.kind === "mjpeg") {
         setPreviewMjpegSourceIndex(fullscreenMjpegSourceIndex);
-        setPreviewMjpegLoaded(fullscreenMjpegLoaded);
+        setPreviewMjpegLoaded(false);
+        setPreviewStreamDebug(null);
       } else if (previewFeed?.kind === "flv") {
         setPreviewFlvSourceIndex(fullscreenFlvSourceIndex);
       } else if (previewFeed?.kind === "fmp4") {
@@ -568,7 +571,7 @@ export function CameraWidget({
                       );
                 })
               : null}
-            {previewFeed.kind === "mjpeg" && previewFeed.url
+            {!fullscreenOpen && previewFeed.kind === "mjpeg" && previewFeed.url
               ? Platform.OS === "web"
                 ? createElement("img", {
                     alt: config.title || "Camera MJPEG",
@@ -623,12 +626,12 @@ export function CameraWidget({
                     />
                   )
               : null}
-            {previewFeed.kind === "mjpeg" && previewStreamDebug ? (
+            {!fullscreenOpen && previewFeed.kind === "mjpeg" && previewStreamDebug ? (
               <View style={styles.streamDebugOverlay}>
                 <Text style={styles.streamDebugText}>{previewStreamDebug}</Text>
               </View>
             ) : null}
-            {previewFeed.kind === "flv" && previewFeed.url
+            {!fullscreenOpen && previewFeed.kind === "flv" && previewFeed.url
               ? Platform.OS === "web"
                 ? (
                     <WebFlvPlayer
@@ -646,7 +649,7 @@ export function CameraWidget({
                     </View>
                   )
               : null}
-            {previewFeed.kind === "fmp4" && previewFeed.url
+            {!fullscreenOpen && previewFeed.kind === "fmp4" && previewFeed.url
               ? Platform.OS === "web"
                 ? (
                     <WebFmp4Player
@@ -1311,7 +1314,7 @@ function WebFlvPlayer({
         if (!moveToNextSource("FLV Quelle reagiert nicht, versuche alternative Quelle...")) {
           safeSetError("FLV Stream reagiert nicht.");
         }
-      }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
+      }, FLV_SOURCE_SWITCH_TIMEOUT_MS);
       retryTimer = setInterval(() => {
         if (!videoElement || disposed || !videoElement.paused) {
           return;
@@ -1502,7 +1505,7 @@ function WebFmp4Player({
       if (!hasData) {
         handleError();
       }
-    }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
+    }, FMP4_SOURCE_SWITCH_TIMEOUT_MS);
 
     return () => {
       disposed = true;
