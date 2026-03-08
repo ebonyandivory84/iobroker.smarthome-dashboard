@@ -447,7 +447,7 @@ function buildCameraFetchOptions(targetUrl) {
   }
 }
 
-function proxyCameraStream(requestConfig, req, res, streamType, redirects, authRetries = 0) {
+function proxyCameraStream(requestConfig, req, res, streamType, redirects, authRetries = 0, requestRetries = 0) {
   if (
     streamType === "mjpeg" &&
     authRetries === 0 &&
@@ -484,6 +484,7 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
 
   const useHttps = parsed.protocol === "https:";
   const transport = useHttps ? https : http;
+  let closingRequested = false;
   let streamConnected = false;
   const connectTimeoutMs = streamType === "mjpeg" ? CAMERA_MJPEG_CONNECT_TIMEOUT_MS : CAMERA_STREAM_CONNECT_TIMEOUT_MS;
   const connectTimeout = setTimeout(() => {
@@ -505,10 +506,11 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
       path: `${parsed.pathname}${parsed.search}`,
       headers: {
         Accept: "*/*",
-        Connection: "keep-alive",
+        Connection: "close",
         "User-Agent": "ioBroker-smart-dashboard-camera-proxy/1.0",
         ...requestConfig.headers,
       },
+      agent: false,
       rejectUnauthorized: !(useHttps && isLikelyLocalHost(parsed.hostname)),
     },
     (upstreamResponse) => {
@@ -534,7 +536,7 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
         if (!redirectedConfig.headers.Authorization && requestConfig.headers.Authorization) {
           redirectedConfig.headers.Authorization = requestConfig.headers.Authorization;
         }
-        proxyCameraStream(redirectedConfig, req, res, streamType, redirects + 1, authRetries);
+        proxyCameraStream(redirectedConfig, req, res, streamType, redirects + 1, authRetries, requestRetries);
         return;
       }
 
@@ -560,7 +562,7 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
               )}`
             );
             upstreamResponse.resume();
-            proxyCameraStream(retryConfig, req, res, streamType, redirects, authRetries + 1);
+            proxyCameraStream(retryConfig, req, res, streamType, redirects, authRetries + 1, requestRetries);
             return;
           } catch {
             // fall through to normal error handling
@@ -617,6 +619,7 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
   );
 
   const closeUpstream = () => {
+    closingRequested = true;
     clearTimeout(connectTimeout);
     try {
       upstreamRequest.destroy();
@@ -629,9 +632,28 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
   res.on("close", closeUpstream);
 
   upstreamRequest.on("error", (error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    const isClientAbortPath = closingRequested || req.aborted || res.writableEnded || res.destroyed;
+    const isSocketHangup = /socket hang up/i.test(message) || /ECONNRESET/i.test(message);
+
+    if (!isClientAbortPath && !res.headersSent && isSocketHangup && requestRetries < 1) {
+      log?.warn(
+        `[camera-proxy] retry streamType=${streamType || "unknown"} after socket hang up url=${sanitizedUrl}`
+      );
+      proxyCameraStream(requestConfig, req, res, streamType, redirects, authRetries, requestRetries + 1);
+      return;
+    }
+
+    if (isClientAbortPath) {
+      log?.debug(
+        `[camera-proxy] client closed streamType=${streamType || "unknown"} url=${sanitizedUrl}: ${message}`
+      );
+      return;
+    }
+
     log?.warn(
       `[camera-proxy] request failed streamType=${streamType || "unknown"} url=${sanitizedUrl}: ${
-        error instanceof Error ? error.message : String(error)
+        message
       }`
     );
     if (!res.headersSent) {
