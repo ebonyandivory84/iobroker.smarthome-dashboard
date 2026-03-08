@@ -27,7 +27,6 @@ const FLV_SCRIPT_LOAD_TIMEOUT_MS = 8000;
 const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 12_000;
 const MJPEG_RECONNECT_DELAY_MS = 1800;
 const FLV_RECONNECT_DELAY_MS = 1800;
-const MJPEG_PREVIEW_RESUME_DELAY_MS = 2200;
 let flvLoaderPromise: Promise<boolean> | null = null;
 
 export function CameraWidget({
@@ -55,14 +54,12 @@ export function CameraWidget({
   const [fullscreenFmp4SourceIndex, setFullscreenFmp4SourceIndex] = useState(0);
   const [previewMjpegLoaded, setPreviewMjpegLoaded] = useState(false);
   const [fullscreenMjpegLoaded, setFullscreenMjpegLoaded] = useState(false);
-  const [previewMjpegPaused, setPreviewMjpegPaused] = useState(false);
   const hasReportedAspectRatio = useRef(false);
   const lastTriggerMatchRef = useRef(false);
   const activeLayerRef = useRef<0 | 1>(0);
   const latestRequestedUrlRef = useRef<string | null>(null);
   const loadingJobRef = useRef<{ layer: 0 | 1; url: string } | null>(null);
   const fullscreenVisibilityCallbackRef = useRef(onFullscreenVisibilityChange);
-  const previewMjpegResumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const titleFontSize = Math.max(11, Math.min(28, Math.round(config.titleFontSize || 14)));
@@ -221,29 +218,24 @@ export function CameraWidget({
   const previewMjpegHasFallback = previewMjpegSourceIndex + 1 < previewMjpegSources.length;
   const fullscreenMjpegHasFallback = fullscreenMjpegSourceIndex + 1 < fullscreenMjpegSources.length;
 
+  const coldStartPreviewMjpeg = useCallback(() => {
+    // Same startup path as initial dashboard load.
+    setPreviewMjpegLoaded(false);
+    setPreviewMjpegSourceIndex(0);
+    setPreviewStreamDebug(null);
+    setPreviewMjpegSession((current) => current + 1);
+  }, []);
+
   const closeFullscreen = () => {
-    if (previewMjpegResumeTimerRef.current) {
-      clearTimeout(previewMjpegResumeTimerRef.current);
-      previewMjpegResumeTimerRef.current = null;
-    }
     if (previewFeed?.kind === "mjpeg") {
-      setPreviewMjpegLoaded(false);
-      setPreviewMjpegSourceIndex(0);
-      setPreviewMjpegPaused(true);
-      setPreviewStreamDebug("MJPEG Preview: Warte auf Stream-Freigabe...");
-      previewMjpegResumeTimerRef.current = setTimeout(() => {
-        setPreviewMjpegPaused(false);
-        // On minimize, re-init exactly like an initial load.
-        setPreviewMjpegLoaded(false);
-        setPreviewMjpegSourceIndex(0);
-        setPreviewStreamDebug(null);
-        setPreviewMjpegSession((current) => current + 1);
-        previewMjpegResumeTimerRef.current = null;
-      }, MJPEG_PREVIEW_RESUME_DELAY_MS);
+      coldStartPreviewMjpeg();
     }
     if (previewFeed?.kind === "flv") {
-      // Restart preview immediately to keep max/min transitions snappy on tablet.
+      setPreviewFlvSourceIndex(0);
       setPreviewFlvSession((current) => current + 1);
+    }
+    if (previewFeed?.kind === "fmp4") {
+      setPreviewFmp4SourceIndex(0);
     }
     fullscreenVisibilityCallbackRef.current?.(false);
     setFullscreenOpen(false);
@@ -279,6 +271,16 @@ export function CameraWidget({
   }, [fullscreenMjpegHasFallback, fullscreenMjpegSources.length]);
 
   const openFullscreen = () => {
+    if (fullscreenFeed?.kind === "mjpeg") {
+      setFullscreenMjpegSourceIndex(0);
+      setFullscreenMjpegLoaded(false);
+    }
+    if (fullscreenFeed?.kind === "flv") {
+      setFullscreenFlvSourceIndex(0);
+    }
+    if (fullscreenFeed?.kind === "fmp4") {
+      setFullscreenFmp4SourceIndex(0);
+    }
     setFullscreenSession((current) => current + 1);
     fullscreenVisibilityCallbackRef.current?.(true);
     setPinned(false);
@@ -298,7 +300,7 @@ export function CameraWidget({
           }
         },
       }),
-    [config.id, config.interactionSounds?.scroll, onFullscreenSwipeClose]
+    [closeFullscreen, config.id, config.interactionSounds?.scroll, onFullscreenSwipeClose]
   );
 
   useEffect(() => {
@@ -313,18 +315,12 @@ export function CameraWidget({
     if (fullscreenOpen || previewFeed?.kind !== "mjpeg") {
       setPreviewStreamDebug(null);
       setPreviewMjpegLoaded(false);
-      if (fullscreenOpen) {
-        setPreviewMjpegPaused(true);
-      } else {
-        setPreviewMjpegPaused(false);
-      }
     }
   }, [fullscreenOpen, previewFeed?.kind]);
 
   useEffect(() => {
     setPreviewMjpegSourceIndex(0);
     setPreviewMjpegLoaded(false);
-    setPreviewMjpegPaused(false);
   }, [previewMjpegSources, previewFeed?.kind, previewFeed?.url]);
 
   useEffect(() => {
@@ -360,7 +356,7 @@ export function CameraWidget({
   }, [fullscreenFmp4Sources, fullscreenFeed?.kind, fullscreenFeed?.url]);
 
   useEffect(() => {
-    if (Platform.OS !== "web" || fullscreenOpen || previewMjpegPaused || previewFeed?.kind !== "mjpeg" || !currentPreviewMjpegSrc) {
+    if (Platform.OS !== "web" || fullscreenOpen || previewFeed?.kind !== "mjpeg" || !currentPreviewMjpegSrc) {
       return;
     }
 
@@ -379,7 +375,6 @@ export function CameraWidget({
     currentPreviewMjpegSrc,
     fullscreenOpen,
     movePreviewMjpegToNextSource,
-    previewMjpegPaused,
     previewFeed?.kind,
     previewMjpegLoaded,
     restartPreviewMjpeg,
@@ -410,7 +405,6 @@ export function CameraWidget({
     if (
       Platform.OS !== "web" ||
       fullscreenOpen ||
-      previewMjpegPaused ||
       previewFeed?.kind !== "mjpeg" ||
       previewMjpegLoaded ||
       !previewStreamDebug
@@ -423,7 +417,7 @@ export function CameraWidget({
     }, MJPEG_RECONNECT_DELAY_MS);
 
     return () => clearTimeout(retry);
-  }, [fullscreenOpen, previewMjpegPaused, previewFeed?.kind, previewMjpegLoaded, previewStreamDebug, restartPreviewMjpeg]);
+  }, [fullscreenOpen, previewFeed?.kind, previewMjpegLoaded, previewStreamDebug, restartPreviewMjpeg]);
 
   useEffect(() => {
     fullscreenVisibilityCallbackRef.current = onFullscreenVisibilityChange;
@@ -444,14 +438,6 @@ export function CameraWidget({
   useEffect(() => {
     fullscreenVisibilityCallbackRef.current?.(fullscreenOpen);
   }, [fullscreenOpen]);
-
-  useEffect(() => {
-    return () => {
-      if (previewMjpegResumeTimerRef.current) {
-        clearTimeout(previewMjpegResumeTimerRef.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined" || !fullscreenOpen) {
@@ -689,7 +675,7 @@ export function CameraWidget({
                       );
                 })
               : null}
-            {!fullscreenOpen && !previewMjpegPaused && previewFeed.kind === "mjpeg" && previewFeed.url
+            {!fullscreenOpen && previewFeed.kind === "mjpeg" && previewFeed.url
               ? Platform.OS === "web"
                 ? createElement("img", {
                     alt: config.title || "Camera MJPEG",
