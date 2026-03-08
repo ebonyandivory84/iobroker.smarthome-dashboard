@@ -233,7 +233,11 @@ export function CameraWidget({
       setPreviewStreamDebug("MJPEG Preview: Warte auf Stream-Freigabe...");
       previewMjpegResumeTimerRef.current = setTimeout(() => {
         setPreviewMjpegPaused(false);
-        restartPreviewMjpeg();
+        // On minimize, re-init exactly like an initial load.
+        setPreviewMjpegLoaded(false);
+        setPreviewMjpegSourceIndex(0);
+        setPreviewStreamDebug(null);
+        setPreviewMjpegSession((current) => current + 1);
         previewMjpegResumeTimerRef.current = null;
       }, MJPEG_PREVIEW_RESUME_DELAY_MS);
     }
@@ -320,6 +324,7 @@ export function CameraWidget({
   useEffect(() => {
     setPreviewMjpegSourceIndex(0);
     setPreviewMjpegLoaded(false);
+    setPreviewMjpegPaused(false);
   }, [previewMjpegSources, previewFeed?.kind, previewFeed?.url]);
 
   useEffect(() => {
