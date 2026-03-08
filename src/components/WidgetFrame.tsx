@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { WidgetConfig } from "../types/dashboard";
-import { constrainToPrimarySections, GRID_SNAP } from "../utils/gridLayout";
+import { constrainToPrimarySections, GRID_SNAP, GRID_VERTICAL_SNAP } from "../utils/gridLayout";
 import { playConfiguredUiSound } from "../utils/uiSounds";
 import { palette } from "../utils/theme";
 
@@ -79,7 +79,7 @@ export function WidgetFrame({
       const xSteps = snap(dx / (cellWidth + gap));
       const ySteps = snapWithStep(
         dy / (rowHeight + gap),
-        current.mode === "resize" && widget.type === "camera" ? 0.1 : GRID_SNAP
+        current.mode === "resize" && widget.type === "camera" ? 0.1 : GRID_VERTICAL_SNAP
       );
 
       if (current.mode === "drag") {

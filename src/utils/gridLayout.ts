@@ -1,11 +1,13 @@
 import { GridPosition, WidgetConfig } from "../types/dashboard";
 
 export const GRID_SNAP = 0.5;
+export const GRID_VERTICAL_SNAP = 0.1;
 export const PRIMARY_SECTION_COUNT = 3;
 
 type SectionConstraintOptions = {
   minHeight?: number;
   heightSnap?: number;
+  ySnap?: number;
 };
 
 export function resolveWidgetPosition(
@@ -51,7 +53,8 @@ export function constrainToPrimarySections(
   const minHeight = options?.minHeight ?? 1;
   const heightSnap = options?.heightSnap ?? GRID_SNAP;
   const h = Math.max(minHeight, snapWithStep(position.h, heightSnap));
-  const y = Math.max(0, snap(position.y));
+  const ySnap = options?.ySnap ?? GRID_VERTICAL_SNAP;
+  const y = Math.max(0, snapWithStep(position.y, ySnap));
   const tentativeX = Math.max(0, position.x);
   const center = tentativeX + w / 2;
   const sectionIndex = clamp(Math.floor(center / sectionWidth), 0, PRIMARY_SECTION_COUNT - 1);
@@ -72,7 +75,7 @@ function sanitizePosition(position: GridPosition, columns: number): GridPosition
   const w = clamp(snap(position.w), 1, columns);
   const h = Math.max(1, snap(position.h));
   const x = clamp(snap(position.x), 0, Math.max(0, columns - w));
-  const y = Math.max(0, snap(position.y));
+  const y = Math.max(0, snapWithStep(position.y, GRID_VERTICAL_SNAP));
 
   return { x, y, w, h };
 }
@@ -90,7 +93,7 @@ function findNearestFreeSlot(
   const startY = proposed.y;
   const scanDepth = Math.max(startY + 40, getMaxRow(widgets) + 20);
 
-  for (let y = startY; y <= scanDepth; y += GRID_SNAP) {
+  for (let y = startY; y <= scanDepth; y += GRID_VERTICAL_SNAP) {
     for (let x = 0; x <= maxX; x += GRID_SNAP) {
       const candidate = { ...proposed, x, y };
       if (!widgets.some((widget) => overlaps(candidate, widget.position))) {
@@ -102,7 +105,7 @@ function findNearestFreeSlot(
   return {
     ...proposed,
     x: 0,
-    y: scanDepth + 1,
+    y: scanDepth + GRID_VERTICAL_SNAP,
   };
 }
 

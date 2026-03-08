@@ -4,7 +4,7 @@ import { LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, useWindowDime
 import { StateWriteFeedback } from "../hooks/useIoBrokerStates";
 import { IoBrokerClient } from "../services/iobroker";
 import { DashboardSettings, StateSnapshot, WidgetConfig, WidgetInteractionSounds, WidgetType } from "../types/dashboard";
-import { constrainToPrimarySections, GRID_SNAP } from "../utils/gridLayout";
+import { constrainToPrimarySections, GRID_SNAP, GRID_VERTICAL_SNAP } from "../utils/gridLayout";
 import { playConfiguredUiSound } from "../utils/uiSounds";
 import { resolveThemeSettings } from "../utils/themeConfig";
 import { palette } from "../utils/theme";
@@ -612,7 +612,7 @@ function WebWidgetShell({
       const dx = snapUnits((event.clientX - active.startX) / stepX);
       const dy = snapUnits(
         (event.clientY - active.startY) / stepY,
-        active.mode === "resize" && widget.type === "camera" ? CAMERA_GRID_SNAP : GRID_SNAP
+        active.mode === "resize" && widget.type === "camera" ? CAMERA_GRID_SNAP : GRID_VERTICAL_SNAP
       );
 
       if (!allowManualLayout) {
