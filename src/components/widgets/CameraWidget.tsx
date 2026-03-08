@@ -25,6 +25,8 @@ const pinnedColor = "#f3c84a";
 const FLV_SCRIPT_SRC = "https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js";
 const FLV_SCRIPT_LOAD_TIMEOUT_MS = 8000;
 const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 12_000;
+const MJPEG_RECONNECT_DELAY_MS = 1800;
+const FLV_RECONNECT_DELAY_MS = 1800;
 let flvLoaderPromise: Promise<boolean> | null = null;
 
 export function CameraWidget({
@@ -282,7 +284,8 @@ export function CameraWidget({
       if (movePreviewMjpegToNextSource()) {
         return;
       }
-      setPreviewStreamDebug("MJPEG Preview: Stream konnte nicht gestartet werden.");
+      setPreviewStreamDebug("MJPEG Preview: Stream konnte nicht gestartet werden, Neuverbindung...");
+      setPreviewMjpegSession((current) => current + 1);
     }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
 
     return () => clearTimeout(watchdog);
@@ -315,6 +318,18 @@ export function CameraWidget({
     fullscreenOpen,
     moveFullscreenMjpegToNextSource,
   ]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || fullscreenOpen || previewFeed?.kind !== "mjpeg" || previewMjpegLoaded || !previewStreamDebug) {
+      return;
+    }
+
+    const retry = setTimeout(() => {
+      setPreviewMjpegSession((current) => current + 1);
+    }, MJPEG_RECONNECT_DELAY_MS);
+
+    return () => clearTimeout(retry);
+  }, [fullscreenOpen, previewFeed?.kind, previewMjpegLoaded, previewStreamDebug]);
 
   useEffect(() => {
     fullscreenVisibilityCallbackRef.current = onFullscreenVisibilityChange;
@@ -1116,6 +1131,7 @@ function WebFlvPlayer({
   );
   const maxSourceIndex = Math.max(0, normalizedSources.length - 1);
   const [sourceIndex, setSourceIndex] = useState(Math.min(preferredSourceIndex, maxSourceIndex));
+  const [restartNonce, setRestartNonce] = useState(0);
   const currentSource = normalizedSources[Math.min(sourceIndex, maxSourceIndex)] || "";
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -1145,12 +1161,26 @@ function WebFlvPlayer({
     let player: any = null;
     let retryTimer: ReturnType<typeof setInterval> | null = null;
     let watchdogTimer: ReturnType<typeof setTimeout> | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     const videoElement = videoRef.current;
 
     const safeSetError = (message: string) => {
       if (!disposed) {
         setErrorMessage(message);
       }
+    };
+
+    const scheduleReconnect = (message: string) => {
+      safeSetError(message);
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
+      reconnectTimer = setTimeout(() => {
+        if (disposed) {
+          return;
+        }
+        setRestartNonce((current) => current + 1);
+      }, FLV_RECONNECT_DELAY_MS);
     };
 
     const moveToNextSource = (message: string) => {
@@ -1188,7 +1218,7 @@ function WebFlvPlayer({
       const loaded = await ensureFlvJsLoaded();
       if (disposed || !loaded) {
         if (!moveToNextSource("FLV Quelle fehlgeschlagen, versuche alternative Quelle...")) {
-          safeSetError("FLV Player konnte nicht geladen werden.");
+          scheduleReconnect("FLV Player konnte nicht geladen werden, Neuverbindung...");
         }
         return;
       }
@@ -1222,7 +1252,11 @@ function WebFlvPlayer({
           if (moveToNextSource("FLV Quelle fehlgeschlagen, versuche alternative Quelle...")) {
             return;
           }
-          safeSetError(detail ? `FLV Stream konnte nicht gestartet werden (${detail}).` : "FLV Stream konnte nicht gestartet werden.");
+          scheduleReconnect(
+            detail
+              ? `FLV Stream konnte nicht gestartet werden (${detail}), Neuverbindung...`
+              : "FLV Stream konnte nicht gestartet werden, Neuverbindung..."
+          );
         });
       }
 
@@ -1265,7 +1299,7 @@ function WebFlvPlayer({
         if (moveToNextSource("FLV Quelle fehlgeschlagen, versuche alternative Quelle...")) {
           return;
         }
-        safeSetError("FLV Stream konnte nicht gestartet werden.");
+        scheduleReconnect("FLV Stream konnte nicht gestartet werden, Neuverbindung...");
       }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
       retryTimer = setInterval(() => {
         if (!videoElement || disposed || !videoElement.paused) {
@@ -1277,7 +1311,7 @@ function WebFlvPlayer({
 
     attach().catch(() => {
       if (!moveToNextSource("FLV Quelle fehlgeschlagen, versuche alternative Quelle...")) {
-        safeSetError("FLV Stream konnte nicht initialisiert werden.");
+        scheduleReconnect("FLV Stream konnte nicht initialisiert werden, Neuverbindung...");
       }
     });
 
@@ -1304,9 +1338,12 @@ function WebFlvPlayer({
       if (watchdogTimer) {
         clearTimeout(watchdogTimer);
       }
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
       playerRef.current = null;
     };
-  }, [currentSource, normalizedSources.length, sourceIndex]);
+  }, [currentSource, normalizedSources.length, restartNonce, sourceIndex]);
 
   return (
     <>
