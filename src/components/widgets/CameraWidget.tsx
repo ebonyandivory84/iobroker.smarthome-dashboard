@@ -79,6 +79,7 @@ export function CameraWidget({
     previewFlvUrl,
     previewFmp4Url
   );
+  const disableFlvOnTouchWeb = isTouchLikeWeb();
   const fullscreenSourceMode = resolveSourceMode(
     config.fullscreenSourceMode,
     fullscreenSnapshotBaseUrl,
@@ -92,14 +93,14 @@ export function CameraWidget({
     sourceMode: previewSourceMode,
     snapshotUrl: previewSnapshotBaseUrl,
     mjpegUrl: previewMjpegUrl,
-    flvUrl: previewFlvUrl,
+    flvUrl: disableFlvOnTouchWeb ? null : previewFlvUrl,
     fmp4Url: previewFmp4Url,
   });
   const fullscreenFeed = resolveCameraFeed({
     sourceMode: fullscreenSourceMode,
     snapshotUrl: fullscreenSnapshotBaseUrl,
     mjpegUrl: fullscreenMjpegUrl,
-    flvUrl: fullscreenFlvUrl,
+    flvUrl: disableFlvOnTouchWeb ? null : fullscreenFlvUrl,
     fmp4Url: fullscreenFmp4Url,
   });
   const activeFeed = fullscreenOpen ? fullscreenFeed : previewFeed;
