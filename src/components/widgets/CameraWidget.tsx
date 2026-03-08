@@ -157,6 +157,7 @@ export function CameraWidget({
   const activeRefreshMs = fullscreenOpen
     ? Math.max(180, config.fullscreenRefreshMs || config.refreshMs || 2000)
     : Math.max(100, config.refreshMs || 2000);
+  const modalAnimationType = Platform.OS === "web" && shouldDisableWebModalFadeOnTouch() ? "none" : "fade";
 
   const closeFullscreen = () => {
     fullscreenVisibilityCallbackRef.current?.(false);
@@ -436,11 +437,10 @@ export function CameraWidget({
     latestRequestedUrlRef.current = snapshotUrl;
 
     if (!snapshotUrl) {
+      // Keep the last successful snapshot layers in memory so a temporary switch
+      // to non-snapshot fullscreen sources does not blank the preview on close.
       loadingJobRef.current = null;
       setLoadingLayer(null);
-      setLayerUrls([null, null]);
-      setActiveLayer(0);
-      activeLayerRef.current = 0;
       return;
     }
 
@@ -667,7 +667,7 @@ export function CameraWidget({
           <Text style={[styles.hint, { color: mutedTextColor }]}>Widget ist noch nicht konfiguriert.</Text>
         ) : null}
       </View>
-      <Modal animationType={Platform.OS === "web" ? "fade" : "none"} transparent visible={fullscreenOpen}>
+      <Modal animationType={Platform.OS === "web" ? modalAnimationType : "none"} transparent visible={fullscreenOpen}>
         <View style={styles.fullscreenBackdrop}>
           <View style={styles.fullscreenActions}>
             <Pressable
@@ -1018,6 +1018,19 @@ function shouldPreferProxyFirstForMjpeg() {
     const hasCoarsePointer = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
     const tabletLikeWidth = window.innerWidth < 1100;
     return touchPoints > 0 || hasCoarsePointer || tabletLikeWidth;
+  } catch {
+    return false;
+  }
+}
+
+function shouldDisableWebModalFadeOnTouch() {
+  if (Platform.OS !== "web" || typeof window === "undefined") {
+    return false;
+  }
+  try {
+    const touchPoints = typeof navigator !== "undefined" ? Number(navigator.maxTouchPoints || 0) : 0;
+    const hasCoarsePointer = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+    return touchPoints > 0 || hasCoarsePointer;
   } catch {
     return false;
   }
