@@ -64,68 +64,16 @@ export function CameraWidget({
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const titleFontSize = Math.max(11, Math.min(28, Math.round(config.titleFontSize || 14)));
   const displayUrl = layerUrls[activeLayer];
-  const isTabletLikeWeb =
-    Platform.OS === "web" &&
-    typeof window !== "undefined" &&
-    window.innerWidth >= 700 &&
-    window.innerWidth < 1100;
-
-  const previewSnapshotBaseUrl = (
-    (isTabletLikeWeb ? config.tabletSnapshotUrl : undefined) ||
-    config.snapshotUrl ||
-    ""
-  ).trim() || null;
-  const fullscreenSnapshotBaseUrl = (
-    (isTabletLikeWeb ? config.tabletFullscreenSnapshotUrl : undefined) ||
-    (isTabletLikeWeb ? config.tabletSnapshotUrl : undefined) ||
-    config.fullscreenSnapshotUrl ||
-    config.snapshotUrl ||
-    ""
-  ).trim() || null;
-  const previewMjpegUrl = (
-    (isTabletLikeWeb ? config.tabletMjpegUrl : undefined) ||
-    config.mjpegUrl ||
-    ""
-  ).trim() || null;
-  const fullscreenMjpegUrl = (
-    (isTabletLikeWeb ? config.tabletFullscreenMjpegUrl : undefined) ||
-    (isTabletLikeWeb ? config.tabletMjpegUrl : undefined) ||
-    config.fullscreenMjpegUrl ||
-    config.mjpegUrl ||
-    ""
-  ).trim() || null;
-  const previewFlvUrl = (
-    (isTabletLikeWeb ? config.tabletFlvUrl : undefined) ||
-    config.flvUrl ||
-    config.fullscreenFlvUrl ||
-    ""
-  ).trim() || null;
-  const fullscreenFlvUrl = (
-    (isTabletLikeWeb ? config.tabletFullscreenFlvUrl : undefined) ||
-    (isTabletLikeWeb ? config.tabletFlvUrl : undefined) ||
-    config.fullscreenFlvUrl ||
-    config.flvUrl ||
-    ""
-  ).trim() || null;
-  const previewFmp4Url = (
-    (isTabletLikeWeb ? config.tabletFmp4Url : undefined) ||
-    config.fmp4Url ||
-    config.fullscreenFmp4Url ||
-    ""
-  ).trim() || null;
-  const fullscreenFmp4Url = (
-    (isTabletLikeWeb ? config.tabletFullscreenFmp4Url : undefined) ||
-    (isTabletLikeWeb ? config.tabletFmp4Url : undefined) ||
-    config.fullscreenFmp4Url ||
-    config.fmp4Url ||
-    ""
-  ).trim() || null;
-  const requestedPreviewSourceMode = isTabletLikeWeb
-    ? config.tabletPreviewSourceMode || config.previewSourceMode
-    : config.previewSourceMode;
-  const requestedFullscreenSourceMode = isTabletLikeWeb
-    ? config.tabletFullscreenSourceMode || config.fullscreenSourceMode
-    : config.fullscreenSourceMode;
+  const previewSnapshotBaseUrl = (config.snapshotUrl || "").trim() || null;
+  const fullscreenSnapshotBaseUrl = (config.fullscreenSnapshotUrl || config.snapshotUrl || "").trim() || null;
+  const previewMjpegUrl = (config.mjpegUrl || "").trim() || null;
+  const fullscreenMjpegUrl = (config.fullscreenMjpegUrl || config.mjpegUrl || "").trim() || null;
+  const previewFlvUrl = (config.flvUrl || config.fullscreenFlvUrl || "").trim() || null;
+  const fullscreenFlvUrl = (config.fullscreenFlvUrl || config.flvUrl || "").trim() || null;
+  const previewFmp4Url = (config.fmp4Url || config.fullscreenFmp4Url || "").trim() || null;
+  const fullscreenFmp4Url = (config.fullscreenFmp4Url || config.fmp4Url || "").trim() || null;
+  const requestedPreviewSourceMode = config.previewSourceMode;
+  const requestedFullscreenSourceMode = config.fullscreenSourceMode;
   const previewSourceMode = resolveSourceMode(
     requestedPreviewSourceMode,
     previewSnapshotBaseUrl,
