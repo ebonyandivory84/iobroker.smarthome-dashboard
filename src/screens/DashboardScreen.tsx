@@ -17,7 +17,7 @@ export function DashboardScreen() {
   const { width } = useWindowDimensions();
   const isCompact = width < 700;
   const [isTouchCapableWeb, setIsTouchCapableWeb] = useState(false);
-  const isTouchLayout = width < 1100 || isTouchCapableWeb;
+  const isTouchLayout = Platform.OS !== "web" && (width < 1100 || isTouchCapableWeb);
   const horizontalPagerRef = useRef<ScrollView | null>(null);
   const horizontalOffsetRef = useRef(0);
   const pageOffsetsRef = useRef<Record<string, number>>({});
