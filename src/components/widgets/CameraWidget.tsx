@@ -516,27 +516,14 @@ export function CameraWidget({
 
   return (
     <>
-      <View style={styles.container}>
+      <View style={[styles.container, showInPlaceFullscreen ? webInPlaceFullscreenHostStyle : null]}>
         <Pressable
           disabled={!previewFeed || showInPlaceFullscreen}
           onPress={() => {
             playConfiguredUiSound(config.interactionSounds?.open, "open", `${config.id}:open`);
             openFullscreen();
           }}
-          style={[
-            styles.preview,
-            showInPlaceFullscreen
-              ? ({
-                  position: "fixed",
-                  left: 0,
-                  top: 0,
-                  right: 0,
-                  bottom: 0,
-                  zIndex: 2400,
-                  backgroundColor: "rgba(0,0,0,0.96)",
-                } as any)
-              : null,
-          ]}
+          style={styles.preview}
         >
         {previewFeed ? (
           <View style={styles.snapshotWrap}>
@@ -1832,6 +1819,19 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+
+const webInPlaceFullscreenHostStyle =
+  Platform.OS === "web"
+    ? ({
+        position: "fixed",
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 2400,
+        backgroundColor: "rgba(0,0,0,0.96)",
+      } as any)
+    : null;
 
 function getWebLayerStyle(visible: boolean) {
   return {
