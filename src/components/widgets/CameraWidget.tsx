@@ -42,6 +42,7 @@ export function CameraWidget({
   const [activeLayer, setActiveLayer] = useState<0 | 1>(0);
   const [loadingLayer, setLoadingLayer] = useState<0 | 1 | null>(null);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const [webDocumentFullscreenActive, setWebDocumentFullscreenActive] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [previewStreamDebug, setPreviewStreamDebug] = useState<string | null>(null);
   const [previewMjpegSession, setPreviewMjpegSession] = useState(0);
@@ -61,22 +62,23 @@ export function CameraWidget({
   const latestRequestedUrlRef = useRef<string | null>(null);
   const loadingJobRef = useRef<{ layer: 0 | 1; url: string } | null>(null);
   const fullscreenVisibilityCallbackRef = useRef(onFullscreenVisibilityChange);
+  const inPlaceFullscreenHostRef = useRef<any>(null);
   const previewMjpegReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewMjpegReconnectAttemptsRef = useRef(0);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const titleFontSize = Math.max(11, Math.min(28, Math.round(config.titleFontSize || 14)));
   const displayUrl = layerUrls[activeLayer];
-  const previewSnapshotBaseUrl = (config.snapshotUrl || "").trim() || null;
-  const fullscreenSnapshotBaseUrl = (config.fullscreenSnapshotUrl || config.snapshotUrl || "").trim() || null;
-  const previewMjpegUrl = (config.mjpegUrl || "").trim() || null;
-  const fullscreenMjpegUrl = (config.fullscreenMjpegUrl || config.mjpegUrl || "").trim() || null;
+  const previewSnapshotBaseUrl = (config.snapshotUrl || config.fullscreenSnapshotUrl || "").trim() || null;
+  const fullscreenSnapshotBaseUrl = previewSnapshotBaseUrl;
+  const previewMjpegUrl = (config.mjpegUrl || config.fullscreenMjpegUrl || "").trim() || null;
+  const fullscreenMjpegUrl = previewMjpegUrl;
   const previewFlvUrl = (config.flvUrl || config.fullscreenFlvUrl || "").trim() || null;
-  const fullscreenFlvUrl = (config.fullscreenFlvUrl || config.flvUrl || "").trim() || null;
+  const fullscreenFlvUrl = previewFlvUrl;
   const previewFmp4Url = (config.fmp4Url || config.fullscreenFmp4Url || "").trim() || null;
-  const fullscreenFmp4Url = (config.fullscreenFmp4Url || config.fmp4Url || "").trim() || null;
-  const requestedPreviewSourceMode = config.previewSourceMode;
-  const requestedFullscreenSourceMode = config.fullscreenSourceMode;
+  const fullscreenFmp4Url = previewFmp4Url;
+  const requestedPreviewSourceMode = config.previewSourceMode || config.fullscreenSourceMode;
+  const requestedFullscreenSourceMode = requestedPreviewSourceMode;
   const previewSourceMode = resolveSourceMode(
     requestedPreviewSourceMode,
     previewSnapshotBaseUrl,
@@ -109,9 +111,10 @@ export function CameraWidget({
   });
   const useInPlaceFullscreen = Platform.OS === "web";
   const showInPlaceFullscreen = useInPlaceFullscreen && fullscreenOpen;
+  const showFixedFallbackFullscreen = showInPlaceFullscreen && !webDocumentFullscreenActive;
   const showPreviewFeed = !fullscreenOpen || useInPlaceFullscreen;
   const showNativeFullscreenModal = Platform.OS !== "web" && fullscreenOpen;
-  const activeFeed = useInPlaceFullscreen ? previewFeed : fullscreenOpen ? fullscreenFeed : previewFeed;
+  const activeFeed = previewFeed;
   const activeSnapshotBaseUrl = activeFeed?.kind === "snapshot" ? activeFeed.url : null;
   const previewMjpegSources = useMemo(
     () =>
@@ -167,9 +170,7 @@ export function CameraWidget({
     previewFmp4Sources[Math.min(previewFmp4SourceIndex, Math.max(0, previewFmp4Sources.length - 1))] || null;
   const currentFullscreenFmp4Src =
     fullscreenFmp4Sources[Math.min(fullscreenFmp4SourceIndex, Math.max(0, fullscreenFmp4Sources.length - 1))] || null;
-  const activeRefreshMs = fullscreenOpen
-    ? Math.max(180, config.fullscreenRefreshMs || config.refreshMs || 2000)
-    : Math.max(100, config.refreshMs || 2000);
+  const activeRefreshMs = Math.max(100, config.refreshMs || 2000);
   const fullscreenMjpegHasFallback = fullscreenMjpegSourceIndex + 1 < fullscreenMjpegSources.length;
 
   const clearPreviewMjpegReconnectTimer = useCallback(() => {
@@ -180,7 +181,7 @@ export function CameraWidget({
   }, []);
 
   const schedulePreviewMjpegReconnect = useCallback((message: string, allowSourceRotate = true) => {
-    if (fullscreenOpen || previewFeed?.kind !== "mjpeg") {
+    if (previewFeed?.kind !== "mjpeg") {
       return;
     }
 
@@ -199,7 +200,7 @@ export function CameraWidget({
       previewMjpegReconnectAttemptsRef.current = Math.min(previewMjpegReconnectAttemptsRef.current + 1, 6);
       setPreviewMjpegSession((current) => current + 1);
     }, delay);
-  }, [clearPreviewMjpegReconnectTimer, fullscreenOpen, previewFeed?.kind, previewMjpegSources.length]);
+  }, [clearPreviewMjpegReconnectTimer, previewFeed?.kind, previewMjpegSources.length]);
 
   const closeFullscreen = () => {
     if (previewFeed?.kind === "mjpeg") {
@@ -208,6 +209,18 @@ export function CameraWidget({
     fullscreenVisibilityCallbackRef.current?.(false);
     setFullscreenOpen(false);
     setPinned(false);
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      const webDocument = document as Document & {
+        webkitExitFullscreen?: () => Promise<void> | void;
+        webkitFullscreenElement?: Element | null;
+      };
+      const exitFullscreen = webDocument.exitFullscreen || webDocument.webkitExitFullscreen;
+      if (exitFullscreen && (webDocument.fullscreenElement || webDocument.webkitFullscreenElement)) {
+        void Promise.resolve(exitFullscreen.call(webDocument)).catch(() => {
+          // Ignore best-effort fullscreen exit errors.
+        });
+      }
+    }
   };
 
   const moveFullscreenMjpegToNextSource = useCallback(() => {
@@ -224,6 +237,17 @@ export function CameraWidget({
     fullscreenVisibilityCallbackRef.current?.(true);
     setPinned(false);
     setFullscreenOpen(true);
+    if (Platform.OS === "web") {
+      const host = inPlaceFullscreenHostRef.current as
+        | (Element & { webkitRequestFullscreen?: () => Promise<void> | void })
+        | null;
+      const requestFullscreen = host?.requestFullscreen || host?.webkitRequestFullscreen;
+      if (requestFullscreen) {
+        void Promise.resolve(requestFullscreen.call(host)).catch(() => {
+          // requestFullscreen may fail without user gesture (e.g. state-triggered maximize).
+        });
+      }
+    }
   };
 
   const fullscreenPanResponder = useMemo(
@@ -251,12 +275,12 @@ export function CameraWidget({
   }, [activeRefreshMs, activeSnapshotBaseUrl]);
 
   useEffect(() => {
-    if (fullscreenOpen || previewFeed?.kind !== "mjpeg") {
+    if ((!useInPlaceFullscreen && fullscreenOpen) || previewFeed?.kind !== "mjpeg") {
       clearPreviewMjpegReconnectTimer();
       setPreviewStreamDebug(null);
       setPreviewMjpegLoaded(false);
     }
-  }, [clearPreviewMjpegReconnectTimer, fullscreenOpen, previewFeed?.kind]);
+  }, [clearPreviewMjpegReconnectTimer, fullscreenOpen, previewFeed?.kind, useInPlaceFullscreen]);
 
   useEffect(() => {
     setPreviewMjpegSourceIndex(0);
@@ -298,7 +322,11 @@ export function CameraWidget({
   }, [fullscreenFmp4Sources, fullscreenFeed?.kind, fullscreenFeed?.url]);
 
   useEffect(() => {
-    if (Platform.OS !== "web" || fullscreenOpen || previewFeed?.kind !== "mjpeg" || !currentPreviewMjpegSrc) {
+    if (
+      Platform.OS !== "web" ||
+      ((!useInPlaceFullscreen && fullscreenOpen) || previewFeed?.kind !== "mjpeg") ||
+      !currentPreviewMjpegSrc
+    ) {
       return;
     }
 
@@ -316,10 +344,17 @@ export function CameraWidget({
     previewFeed?.kind,
     previewMjpegLoaded,
     schedulePreviewMjpegReconnect,
+    useInPlaceFullscreen,
   ]);
 
   useEffect(() => {
-    if (Platform.OS !== "web" || !fullscreenOpen || fullscreenFeed?.kind !== "mjpeg" || !currentFullscreenMjpegSrc) {
+    if (
+      Platform.OS !== "web" ||
+      useInPlaceFullscreen ||
+      !fullscreenOpen ||
+      fullscreenFeed?.kind !== "mjpeg" ||
+      !currentFullscreenMjpegSrc
+    ) {
       return;
     }
 
@@ -337,6 +372,7 @@ export function CameraWidget({
     fullscreenMjpegLoaded,
     fullscreenOpen,
     moveFullscreenMjpegToNextSource,
+    useInPlaceFullscreen,
   ]);
 
   useEffect(() => {
@@ -358,6 +394,34 @@ export function CameraWidget({
   useEffect(() => {
     fullscreenVisibilityCallbackRef.current?.(fullscreenOpen);
   }, [fullscreenOpen]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") {
+      return;
+    }
+
+    const webDocument = document as Document & {
+      webkitFullscreenElement?: Element | null;
+    };
+    const syncDocumentFullscreen = () => {
+      const activeElement = webDocument.fullscreenElement || webDocument.webkitFullscreenElement || null;
+      const host = inPlaceFullscreenHostRef.current as Element | null;
+      const active = Boolean(activeElement && host && (activeElement === host || host.contains(activeElement)));
+      setWebDocumentFullscreenActive(active);
+      if (!active && fullscreenOpen && useInPlaceFullscreen) {
+        setFullscreenOpen(false);
+        setPinned(false);
+      }
+    };
+
+    syncDocumentFullscreen();
+    webDocument.addEventListener("fullscreenchange", syncDocumentFullscreen);
+    webDocument.addEventListener("webkitfullscreenchange", syncDocumentFullscreen as EventListener);
+    return () => {
+      webDocument.removeEventListener("fullscreenchange", syncDocumentFullscreen);
+      webDocument.removeEventListener("webkitfullscreenchange", syncDocumentFullscreen as EventListener);
+    };
+  }, [fullscreenOpen, useInPlaceFullscreen]);
 
   useEffect(() => {
     return () => {
@@ -516,7 +580,7 @@ export function CameraWidget({
 
   return (
     <>
-      <View style={[styles.container, showInPlaceFullscreen ? webInPlaceFullscreenHostStyle : null]}>
+      <View ref={inPlaceFullscreenHostRef} style={[styles.container, showFixedFallbackFullscreen ? webInPlaceFullscreenHostStyle : null]}>
         <Pressable
           disabled={!previewFeed || showInPlaceFullscreen}
           onPress={() => {

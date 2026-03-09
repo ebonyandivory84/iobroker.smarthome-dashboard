@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { Platform, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Platform, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import { DashboardConfigProvider } from "./src/context/DashboardConfigContext";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
@@ -11,6 +11,15 @@ applyDefaultFont(Text as unknown as { defaultProps?: Record<string, unknown> });
 applyDefaultFont(TextInput as unknown as { defaultProps?: Record<string, unknown> });
 
 export default function App() {
+  const { width, height } = useWindowDimensions();
+  const [isTouchCapableWeb, setIsTouchCapableWeb] = useState(false);
+  const isPortrait = height > width;
+  const isTabletLike = useMemo(() => {
+    const longestEdge = Math.max(width, height);
+    return longestEdge >= 900;
+  }, [height, width]);
+  const blockPortraitOnTablet = Platform.OS === "web" && isTouchCapableWeb && isTabletLike && isPortrait;
+
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") {
       return;
@@ -38,6 +47,18 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") {
+      setIsTouchCapableWeb(false);
+      return;
+    }
+
+    const touchCapable =
+      (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0) ||
+      ("matchMedia" in window && window.matchMedia("(pointer: coarse)").matches);
+    setIsTouchCapableWeb(Boolean(touchCapable));
+  }, []);
+
   return (
     <DashboardConfigProvider>
       <SafeAreaView style={styles.safeArea}>
@@ -46,6 +67,12 @@ export default function App() {
         <View style={styles.app}>
           <DashboardScreen />
         </View>
+        {blockPortraitOnTablet ? (
+          <View style={styles.orientationOverlay}>
+            <Text style={styles.orientationTitle}>Landscape erforderlich</Text>
+            <Text style={styles.orientationHint}>Bitte Tablet ins Querformat drehen.</Text>
+          </View>
+        ) : null}
       </SafeAreaView>
     </DashboardConfigProvider>
   );
@@ -67,5 +94,26 @@ const styles = StyleSheet.create({
   },
   app: {
     flex: 1,
+  },
+  orientationOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    backgroundColor: "rgba(2, 6, 11, 0.98)",
+    zIndex: 9999,
+  },
+  orientationTitle: {
+    color: palette.text,
+    fontSize: 24,
+    fontWeight: "800",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  orientationHint: {
+    color: palette.textMuted,
+    fontSize: 15,
+    fontWeight: "600",
+    textAlign: "center",
   },
 });

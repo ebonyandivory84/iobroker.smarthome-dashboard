@@ -3,7 +3,7 @@
     "name": "SmartHome Dashboard",
     "slug": "smarthome-dashboard",
     "version": "0.1.0",
-    "orientation": "default",
+    "orientation": "landscape",
     "userInterfaceStyle": "dark",
     "assetBundlePatterns": [
       "**/*"
