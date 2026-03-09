@@ -582,8 +582,11 @@ export function CameraWidget({
     <>
       <View ref={inPlaceFullscreenHostRef} style={[styles.container, showFixedFallbackFullscreen ? webInPlaceFullscreenHostStyle : null]}>
         <Pressable
-          disabled={!previewFeed || showInPlaceFullscreen}
+          disabled={!previewFeed}
           onPress={() => {
+            if (fullscreenOpen) {
+              return;
+            }
             playConfiguredUiSound(config.interactionSounds?.open, "open", `${config.id}:open`);
             openFullscreen();
           }}
@@ -757,29 +760,6 @@ export function CameraWidget({
                 </Text>
               </View>
             ) : null}
-            {showInPlaceFullscreen ? (
-              <View style={styles.fullscreenActions}>
-                <Pressable
-                  onPress={() => setPinned((current) => !current)}
-                  style={[styles.fullscreenActionButton, styles.fullscreenActionSpacing, pinned ? styles.fullscreenPinActive : null]}
-                >
-                  <MaterialCommunityIcons
-                    color={pinned ? pinnedColor : palette.text}
-                    name={pinned ? "pin" : "pin-outline"}
-                    size={18}
-                  />
-                </Pressable>
-                <Pressable
-                  onPress={() => {
-                    playConfiguredUiSound(config.interactionSounds?.close, "close", `${config.id}:close`);
-                    closeFullscreen();
-                  }}
-                  style={styles.fullscreenActionButton}
-                >
-                  <MaterialCommunityIcons color={palette.text} name="close" size={20} />
-                </Pressable>
-              </View>
-            ) : null}
           </View>
         ) : (
           <View style={styles.empty}>
@@ -789,6 +769,31 @@ export function CameraWidget({
           </View>
         )}
         </Pressable>
+        {showInPlaceFullscreen ? (
+          <View pointerEvents="box-none" style={styles.inPlaceFullscreenHud}>
+            <View style={styles.fullscreenActions}>
+              <Pressable
+                onPress={() => setPinned((current) => !current)}
+                style={[styles.fullscreenActionButton, styles.fullscreenActionSpacing, pinned ? styles.fullscreenPinActive : null]}
+              >
+                <MaterialCommunityIcons
+                  color={pinned ? pinnedColor : palette.text}
+                  name={pinned ? "pin" : "pin-outline"}
+                  size={18}
+                />
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  playConfiguredUiSound(config.interactionSounds?.close, "close", `${config.id}:close`);
+                  closeFullscreen();
+                }}
+                style={styles.fullscreenActionButton}
+              >
+                <MaterialCommunityIcons color={palette.text} name="close" size={20} />
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
         {!previewFeed && !previewSnapshotBaseUrl && !previewMjpegUrl && !previewFlvUrl && !previewFmp4Url ? (
           <Text style={[styles.hint, { color: mutedTextColor }]}>Widget ist noch nicht konfiguriert.</Text>
         ) : null}
@@ -1797,11 +1802,16 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  inPlaceFullscreenHud: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 2600,
+    pointerEvents: "box-none",
+  },
   fullscreenActions: {
     position: "absolute",
     top: 24,
     right: 24,
-    zIndex: 20,
+    zIndex: 30,
     flexDirection: "row",
   },
   fullscreenActionButton: {
