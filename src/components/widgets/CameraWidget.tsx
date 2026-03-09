@@ -25,7 +25,8 @@ const pinnedColor = "#f3c84a";
 const FLV_SCRIPT_SRC = "https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js";
 const FLV_SCRIPT_LOAD_TIMEOUT_MS = 8000;
 const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 12_000;
-const MJPEG_RECONNECT_DELAY_MS = 1800;
+const MJPEG_RECONNECT_BASE_DELAY_MS = 700;
+const MJPEG_RECONNECT_MAX_DELAY_MS = 8000;
 const FLV_RECONNECT_DELAY_MS = 1800;
 let flvLoaderPromise: Promise<boolean> | null = null;
 
@@ -60,6 +61,8 @@ export function CameraWidget({
   const latestRequestedUrlRef = useRef<string | null>(null);
   const loadingJobRef = useRef<{ layer: 0 | 1; url: string } | null>(null);
   const fullscreenVisibilityCallbackRef = useRef(onFullscreenVisibilityChange);
+  const previewMjpegReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewMjpegReconnectAttemptsRef = useRef(0);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const titleFontSize = Math.max(11, Math.min(28, Math.round(config.titleFontSize || 14)));
@@ -163,51 +166,45 @@ export function CameraWidget({
   const activeRefreshMs = fullscreenOpen
     ? Math.max(180, config.fullscreenRefreshMs || config.refreshMs || 2000)
     : Math.max(100, config.refreshMs || 2000);
-  const previewMjpegHasFallback = previewMjpegSourceIndex + 1 < previewMjpegSources.length;
   const fullscreenMjpegHasFallback = fullscreenMjpegSourceIndex + 1 < fullscreenMjpegSources.length;
 
-  const coldStartPreviewMjpeg = useCallback(() => {
-    // Same startup path as initial dashboard load.
-    setPreviewMjpegLoaded(false);
-    setPreviewMjpegSourceIndex(0);
-    setPreviewStreamDebug(null);
-    setPreviewMjpegSession((current) => current + 1);
+  const clearPreviewMjpegReconnectTimer = useCallback(() => {
+    if (previewMjpegReconnectTimerRef.current) {
+      clearTimeout(previewMjpegReconnectTimerRef.current);
+      previewMjpegReconnectTimerRef.current = null;
+    }
   }, []);
+
+  const schedulePreviewMjpegReconnect = useCallback((message: string, allowSourceRotate = true) => {
+    if (fullscreenOpen || previewFeed?.kind !== "mjpeg") {
+      return;
+    }
+
+    clearPreviewMjpegReconnectTimer();
+    const attempt = previewMjpegReconnectAttemptsRef.current;
+    const delay = Math.min(MJPEG_RECONNECT_MAX_DELAY_MS, MJPEG_RECONNECT_BASE_DELAY_MS * 2 ** attempt);
+    const shouldRotate = allowSourceRotate && previewMjpegSources.length > 1 && attempt > 0;
+
+    if (shouldRotate) {
+      setPreviewMjpegSourceIndex((current) => (current + 1) % previewMjpegSources.length);
+    }
+
+    setPreviewStreamDebug(`${message} (Retry in ${Math.round(delay / 100) / 10}s)`);
+    previewMjpegReconnectTimerRef.current = setTimeout(() => {
+      previewMjpegReconnectTimerRef.current = null;
+      previewMjpegReconnectAttemptsRef.current = Math.min(previewMjpegReconnectAttemptsRef.current + 1, 6);
+      setPreviewMjpegSession((current) => current + 1);
+    }, delay);
+  }, [clearPreviewMjpegReconnectTimer, fullscreenOpen, previewFeed?.kind, previewMjpegSources.length]);
 
   const closeFullscreen = () => {
     if (previewFeed?.kind === "mjpeg") {
-      coldStartPreviewMjpeg();
-    }
-    if (previewFeed?.kind === "flv") {
-      setPreviewFlvSourceIndex(0);
-      setPreviewFlvSession((current) => current + 1);
-    }
-    if (previewFeed?.kind === "fmp4") {
-      setPreviewFmp4SourceIndex(0);
+      setPreviewStreamDebug(null);
     }
     fullscreenVisibilityCallbackRef.current?.(false);
     setFullscreenOpen(false);
     setPinned(false);
   };
-
-  const movePreviewMjpegToNextSource = useCallback(() => {
-    if (!previewMjpegHasFallback) {
-      return false;
-    }
-    setPreviewMjpegLoaded(false);
-    setPreviewMjpegSourceIndex((current) => Math.min(previewMjpegSources.length - 1, current + 1));
-    setPreviewStreamDebug("MJPEG Preview: Quelle fehlgeschlagen, versuche alternative Quelle...");
-    return true;
-  }, [previewMjpegHasFallback, previewMjpegSources.length]);
-
-  const restartPreviewMjpeg = useCallback((message = "MJPEG Preview: Neuverbindung...") => {
-    setPreviewMjpegLoaded(false);
-    setPreviewMjpegSourceIndex((current) =>
-      previewMjpegSources.length > 1 ? (current + 1) % previewMjpegSources.length : 0
-    );
-    setPreviewStreamDebug(message);
-    setPreviewMjpegSession((current) => current + 1);
-  }, [previewMjpegSources.length]);
 
   const moveFullscreenMjpegToNextSource = useCallback(() => {
     if (!fullscreenMjpegHasFallback) {
@@ -219,16 +216,6 @@ export function CameraWidget({
   }, [fullscreenMjpegHasFallback, fullscreenMjpegSources.length]);
 
   const openFullscreen = () => {
-    if (fullscreenFeed?.kind === "mjpeg") {
-      setFullscreenMjpegSourceIndex(0);
-      setFullscreenMjpegLoaded(false);
-    }
-    if (fullscreenFeed?.kind === "flv") {
-      setFullscreenFlvSourceIndex(0);
-    }
-    if (fullscreenFeed?.kind === "fmp4") {
-      setFullscreenFmp4SourceIndex(0);
-    }
     setFullscreenSession((current) => current + 1);
     fullscreenVisibilityCallbackRef.current?.(true);
     setPinned(false);
@@ -261,14 +248,17 @@ export function CameraWidget({
 
   useEffect(() => {
     if (fullscreenOpen || previewFeed?.kind !== "mjpeg") {
+      clearPreviewMjpegReconnectTimer();
       setPreviewStreamDebug(null);
       setPreviewMjpegLoaded(false);
     }
-  }, [fullscreenOpen, previewFeed?.kind]);
+  }, [clearPreviewMjpegReconnectTimer, fullscreenOpen, previewFeed?.kind]);
 
   useEffect(() => {
     setPreviewMjpegSourceIndex(0);
     setPreviewMjpegLoaded(false);
+    previewMjpegReconnectAttemptsRef.current = 0;
+    clearPreviewMjpegReconnectTimer();
   }, [previewMjpegSources, previewFeed?.kind, previewFeed?.url]);
 
   useEffect(() => {
@@ -312,20 +302,16 @@ export function CameraWidget({
       if (previewMjpegLoaded) {
         return;
       }
-      if (movePreviewMjpegToNextSource()) {
-        return;
-      }
-      restartPreviewMjpeg();
+      schedulePreviewMjpegReconnect("MJPEG Preview: Stream konnte nicht gestartet werden.");
     }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
 
     return () => clearTimeout(watchdog);
   }, [
     currentPreviewMjpegSrc,
     fullscreenOpen,
-    movePreviewMjpegToNextSource,
     previewFeed?.kind,
     previewMjpegLoaded,
-    restartPreviewMjpeg,
+    schedulePreviewMjpegReconnect,
   ]);
 
   useEffect(() => {
@@ -350,24 +336,6 @@ export function CameraWidget({
   ]);
 
   useEffect(() => {
-    if (
-      Platform.OS !== "web" ||
-      fullscreenOpen ||
-      previewFeed?.kind !== "mjpeg" ||
-      previewMjpegLoaded ||
-      !previewStreamDebug
-    ) {
-      return;
-    }
-
-    const retry = setTimeout(() => {
-      restartPreviewMjpeg();
-    }, MJPEG_RECONNECT_DELAY_MS);
-
-    return () => clearTimeout(retry);
-  }, [fullscreenOpen, previewFeed?.kind, previewMjpegLoaded, previewStreamDebug, restartPreviewMjpeg]);
-
-  useEffect(() => {
     fullscreenVisibilityCallbackRef.current = onFullscreenVisibilityChange;
   }, [onFullscreenVisibilityChange]);
 
@@ -386,6 +354,12 @@ export function CameraWidget({
   useEffect(() => {
     fullscreenVisibilityCallbackRef.current?.(fullscreenOpen);
   }, [fullscreenOpen]);
+
+  useEffect(() => {
+    return () => {
+      clearPreviewMjpegReconnectTimer();
+    };
+  }, [clearPreviewMjpegReconnectTimer]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined" || !fullscreenOpen) {
@@ -632,22 +606,18 @@ export function CameraWidget({
                     key: `preview-mjpeg-${currentPreviewMjpegSrc || previewFeed.url}:${previewMjpegSession}`,
                     loading: "eager",
                     onError: () => {
-                      if (movePreviewMjpegToNextSource()) {
-                        return;
-                      }
-                      restartPreviewMjpeg("MJPEG Preview: Quelle nicht erreichbar, Neuverbindung...");
+                      schedulePreviewMjpegReconnect("MJPEG Preview: Quelle nicht erreichbar.");
                     },
                     onLoad: (event: Event) => {
                       const target = event.currentTarget as HTMLImageElement | null;
                       const width = target?.naturalWidth || 0;
                       const height = target?.naturalHeight || 0;
                       if (!width || !height) {
-                        if (movePreviewMjpegToNextSource()) {
-                          return;
-                        }
-                        restartPreviewMjpeg("MJPEG Preview: Ungueltige Bilddaten, Neuverbindung...");
+                        schedulePreviewMjpegReconnect("MJPEG Preview: Ungueltige Bilddaten.");
                         return;
                       }
+                      clearPreviewMjpegReconnectTimer();
+                      previewMjpegReconnectAttemptsRef.current = 0;
                       setPreviewMjpegLoaded(true);
                       setPreviewStreamDebug(null);
                       reportAspectRatio(width, height);
