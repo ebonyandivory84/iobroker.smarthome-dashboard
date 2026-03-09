@@ -28,6 +28,8 @@ const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 12_000;
 const MJPEG_RECONNECT_BASE_DELAY_MS = 700;
 const MJPEG_RECONNECT_MAX_DELAY_MS = 8000;
 const FLV_RECONNECT_DELAY_MS = 1800;
+const WEB_FULLSCREEN_MIN_ZOOM = 1;
+const WEB_FULLSCREEN_MAX_ZOOM = 4;
 let flvLoaderPromise: Promise<boolean> | null = null;
 
 export function CameraWidget({
@@ -43,6 +45,7 @@ export function CameraWidget({
   const [loadingLayer, setLoadingLayer] = useState<0 | 1 | null>(null);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [webDocumentFullscreenActive, setWebDocumentFullscreenActive] = useState(false);
+  const [webFullscreenZoom, setWebFullscreenZoom] = useState(1);
   const [pinned, setPinned] = useState(false);
   const [previewStreamDebug, setPreviewStreamDebug] = useState<string | null>(null);
   const [previewMjpegSession, setPreviewMjpegSession] = useState(0);
@@ -63,6 +66,10 @@ export function CameraWidget({
   const loadingJobRef = useRef<{ layer: 0 | 1; url: string } | null>(null);
   const fullscreenVisibilityCallbackRef = useRef(onFullscreenVisibilityChange);
   const inPlaceFullscreenHostRef = useRef<any>(null);
+  const wasDocumentFullscreenRef = useRef(false);
+  const webPinchStartDistanceRef = useRef<number | null>(null);
+  const webPinchStartZoomRef = useRef(1);
+  const webPinchingRef = useRef(false);
   const previewMjpegReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewMjpegReconnectAttemptsRef = useRef(0);
   const textColor = config.appearance?.textColor || palette.text;
@@ -110,9 +117,9 @@ export function CameraWidget({
     fmp4Url: fullscreenFmp4Url,
   });
   const useInPlaceFullscreen = Platform.OS === "web";
-  const showInPlaceFullscreen = useInPlaceFullscreen && fullscreenOpen;
+  const showInPlaceFullscreen = useInPlaceFullscreen && (fullscreenOpen || webDocumentFullscreenActive);
   const showFixedFallbackFullscreen = showInPlaceFullscreen && !webDocumentFullscreenActive;
-  const showPreviewFeed = !fullscreenOpen || useInPlaceFullscreen;
+  const showPreviewFeed = !fullscreenOpen || showInPlaceFullscreen;
   const showNativeFullscreenModal = Platform.OS !== "web" && fullscreenOpen;
   const activeFeed = previewFeed;
   const activeSnapshotBaseUrl = activeFeed?.kind === "snapshot" ? activeFeed.url : null;
@@ -188,7 +195,7 @@ export function CameraWidget({
     clearPreviewMjpegReconnectTimer();
     const attempt = previewMjpegReconnectAttemptsRef.current;
     const delay = Math.min(MJPEG_RECONNECT_MAX_DELAY_MS, MJPEG_RECONNECT_BASE_DELAY_MS * 2 ** attempt);
-    const shouldRotate = allowSourceRotate && previewMjpegSources.length > 1 && attempt > 0;
+    const shouldRotate = allowSourceRotate && previewMjpegSources.length > 1;
 
     if (shouldRotate) {
       setPreviewMjpegSourceIndex((current) => (current + 1) % previewMjpegSources.length);
@@ -233,6 +240,10 @@ export function CameraWidget({
   }, [fullscreenMjpegHasFallback, fullscreenMjpegSources.length]);
 
   const openFullscreen = () => {
+    webPinchingRef.current = false;
+    webPinchStartDistanceRef.current = null;
+    webPinchStartZoomRef.current = 1;
+    setWebFullscreenZoom(1);
     setFullscreenSession((current) => current + 1);
     fullscreenVisibilityCallbackRef.current?.(true);
     setPinned(false);
@@ -408,10 +419,11 @@ export function CameraWidget({
       const host = inPlaceFullscreenHostRef.current as Element | null;
       const active = Boolean(activeElement && host && (activeElement === host || host.contains(activeElement)));
       setWebDocumentFullscreenActive(active);
-      if (!active && fullscreenOpen && useInPlaceFullscreen) {
+      if (!active && wasDocumentFullscreenRef.current && fullscreenOpen && useInPlaceFullscreen) {
         setFullscreenOpen(false);
         setPinned(false);
       }
+      wasDocumentFullscreenRef.current = active;
     };
 
     syncDocumentFullscreen();
@@ -428,6 +440,69 @@ export function CameraWidget({
       clearPreviewMjpegReconnectTimer();
     };
   }, [clearPreviewMjpegReconnectTimer]);
+
+  useEffect(() => {
+    if (showInPlaceFullscreen) {
+      return;
+    }
+    webPinchingRef.current = false;
+    webPinchStartDistanceRef.current = null;
+    webPinchStartZoomRef.current = 1;
+    setWebFullscreenZoom(1);
+  }, [showInPlaceFullscreen]);
+
+  const handleWebPinchStart = useCallback((event: any) => {
+    if (!showInPlaceFullscreen || Platform.OS !== "web") {
+      return;
+    }
+    const touches = event?.nativeEvent?.touches;
+    if (!touches || touches.length !== 2) {
+      return;
+    }
+    const distance = getTouchDistance(touches);
+    if (!distance) {
+      return;
+    }
+    webPinchStartDistanceRef.current = distance;
+    webPinchStartZoomRef.current = webFullscreenZoom;
+    webPinchingRef.current = true;
+    event?.preventDefault?.();
+  }, [showInPlaceFullscreen, webFullscreenZoom]);
+
+  const handleWebPinchMove = useCallback((event: any) => {
+    if (!showInPlaceFullscreen || Platform.OS !== "web") {
+      return;
+    }
+    const touches = event?.nativeEvent?.touches;
+    if (!touches || touches.length !== 2 || !webPinchStartDistanceRef.current) {
+      return;
+    }
+    const distance = getTouchDistance(touches);
+    if (!distance) {
+      return;
+    }
+    const nextZoom = clampZoom(webPinchStartZoomRef.current * (distance / webPinchStartDistanceRef.current));
+    if (Math.abs(nextZoom - webFullscreenZoom) > 0.01) {
+      setWebFullscreenZoom(nextZoom);
+    }
+    webPinchingRef.current = true;
+    event?.preventDefault?.();
+  }, [showInPlaceFullscreen, webFullscreenZoom]);
+
+  const handleWebPinchEnd = useCallback((event: any) => {
+    if (Platform.OS !== "web") {
+      return;
+    }
+    const touches = event?.nativeEvent?.touches;
+    if (touches && touches.length >= 2) {
+      return;
+    }
+    webPinchStartDistanceRef.current = null;
+    webPinchStartZoomRef.current = webFullscreenZoom;
+    setTimeout(() => {
+      webPinchingRef.current = false;
+    }, 0);
+  }, [webFullscreenZoom]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined" || !fullscreenOpen) {
@@ -583,8 +658,12 @@ export function CameraWidget({
       <View ref={inPlaceFullscreenHostRef} style={[styles.container, showFixedFallbackFullscreen ? webInPlaceFullscreenHostStyle : null]}>
         <Pressable
           disabled={!previewFeed}
+          onTouchCancel={handleWebPinchEnd}
+          onTouchEnd={handleWebPinchEnd}
+          onTouchMove={handleWebPinchMove}
+          onTouchStart={handleWebPinchStart}
           onPress={() => {
-            if (fullscreenOpen) {
+            if (fullscreenOpen || webPinchingRef.current) {
               return;
             }
             playConfiguredUiSound(config.interactionSounds?.open, "open", `${config.id}:open`);
@@ -635,7 +714,9 @@ export function CameraWidget({
                           }
                         },
                         src: url,
-                        style: showInPlaceFullscreen ? getFullscreenWebLayerStyle(isVisible) : getWebLayerStyle(isVisible),
+                        style: showInPlaceFullscreen
+                          ? getFullscreenWebLayerStyle(isVisible, webFullscreenZoom)
+                          : getWebLayerStyle(isVisible),
                       })
                     : (
                         <Image
@@ -694,7 +775,7 @@ export function CameraWidget({
                       reportAspectRatio(width, height);
                     },
                     src: withReconnectNonce(currentPreviewMjpegSrc || previewFeed.url, previewMjpegSession),
-                    style: showInPlaceFullscreen ? fullscreenWebMjpegStyle : webMjpegStyle,
+                    style: showInPlaceFullscreen ? getFullscreenWebMjpegStyle(webFullscreenZoom) : webMjpegStyle,
                   })
                 : (
                     <Image
@@ -721,6 +802,7 @@ export function CameraWidget({
                     <WebFlvPlayer
                       key={`preview-flv-${previewFeedKey}:${previewFlvSession}`}
                       fullScreen={showInPlaceFullscreen}
+                      zoomScale={webFullscreenZoom}
                       onAspectRatioDetected={reportAspectRatioValue}
                       onSourceIndexChange={setPreviewFlvSourceIndex}
                       preferredSourceIndex={previewFlvSourceIndex}
@@ -740,6 +822,7 @@ export function CameraWidget({
                     <WebFmp4Player
                       key={`preview-fmp4-${previewFeedKey}:${currentPreviewFmp4Src || "none"}`}
                       fullScreen={showInPlaceFullscreen}
+                      zoomScale={webFullscreenZoom}
                       onAspectRatioDetected={reportAspectRatioValue}
                       onSourceIndexChange={setPreviewFmp4SourceIndex}
                       preferredSourceIndex={previewFmp4SourceIndex}
@@ -1146,7 +1229,12 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv" | 
 function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
   const includeDirect = shouldUseDirectWebStream(targetUrl, streamType);
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
-  const sources = [...proxySources, ...(includeDirect ? [targetUrl] : [])];
+  const directFirst = includeDirect && shouldPrioritizeDirectWebStream(targetUrl, streamType);
+  const sources = includeDirect
+    ? directFirst
+      ? [targetUrl, ...proxySources]
+      : [...proxySources, targetUrl]
+    : proxySources;
   return Array.from(new Set(sources.filter(Boolean)));
 }
 
@@ -1200,6 +1288,38 @@ function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv"
   return true;
 }
 
+function shouldPrioritizeDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
+  if (streamType !== "mjpeg" || Platform.OS !== "web" || typeof window === "undefined") {
+    return false;
+  }
+
+  if (isMixedContentBlocked(targetUrl)) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(targetUrl);
+    const hasEmbeddedCredentials = Boolean(parsed.username || parsed.password);
+    const hasQueryCredentials =
+      Boolean(parsed.searchParams.get("user")) ||
+      Boolean(parsed.searchParams.get("username")) ||
+      Boolean(parsed.searchParams.get("password")) ||
+      Boolean(parsed.searchParams.get("pass")) ||
+      Boolean(parsed.searchParams.get("pwd"));
+    const localHostLike =
+      parsed.hostname === "localhost" ||
+      parsed.hostname === "127.0.0.1" ||
+      parsed.hostname === "::1" ||
+      parsed.hostname.endsWith(".local") ||
+      parsed.hostname.startsWith("192.168.") ||
+      parsed.hostname.startsWith("10.") ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(parsed.hostname);
+    return hasEmbeddedCredentials || hasQueryCredentials || localHostLike;
+  } catch {
+    return true;
+  }
+}
+
 function isMixedContentBlocked(targetUrl: string) {
   if (Platform.OS !== "web" || typeof window === "undefined") {
     return false;
@@ -1216,6 +1336,7 @@ function WebFlvPlayer({
   sources,
   title,
   fullScreen = false,
+  zoomScale = 1,
   onAspectRatioDetected,
   preferredSourceIndex = 0,
   onSourceIndexChange,
@@ -1223,6 +1344,7 @@ function WebFlvPlayer({
   sources: string[];
   title: string;
   fullScreen?: boolean;
+  zoomScale?: number;
   onAspectRatioDetected?: (ratio: number) => void;
   preferredSourceIndex?: number;
   onSourceIndexChange?: (index: number) => void;
@@ -1465,7 +1587,7 @@ function WebFlvPlayer({
         muted: true,
         playsInline: true,
         ref: setVideoRef,
-        style: fullScreen ? fullscreenWebFlvStyle : webFlvStyle,
+        style: fullScreen ? getFullscreenWebFlvStyle(zoomScale) : webFlvStyle,
         title,
       })}
       {!hasVideoFrame ? <View style={styles.flvLoadingOverlay} /> : null}
@@ -1482,6 +1604,7 @@ function WebFmp4Player({
   sources,
   title,
   fullScreen = false,
+  zoomScale = 1,
   onAspectRatioDetected,
   preferredSourceIndex = 0,
   onSourceIndexChange,
@@ -1489,6 +1612,7 @@ function WebFmp4Player({
   sources: string[];
   title: string;
   fullScreen?: boolean;
+  zoomScale?: number;
   onAspectRatioDetected?: (ratio: number) => void;
   preferredSourceIndex?: number;
   onSourceIndexChange?: (index: number) => void;
@@ -1614,7 +1738,7 @@ function WebFmp4Player({
         playsInline: true,
         ref: setVideoRef,
         src: currentSource || undefined,
-        style: fullScreen ? fullscreenWebFmp4Style : webFmp4Style,
+        style: fullScreen ? getFullscreenWebFmp4Style(zoomScale) : webFmp4Style,
         title,
       })}
       {errorMessage ? (
@@ -1916,13 +2040,65 @@ function getWebLayerStyle(visible: boolean) {
   } as const;
 }
 
-function getFullscreenWebLayerStyle(visible: boolean) {
+function getFullscreenWebLayerStyle(visible: boolean, zoomScale: number = 1) {
   return {
     ...baseFullscreenWebLayerStyle,
+    ...getZoomTransformStyle(zoomScale),
     opacity: visible ? 1 : 0,
     visibility: visible ? "visible" : "hidden",
     zIndex: visible ? 2 : 1,
   } as const;
+}
+
+function getFullscreenWebMjpegStyle(zoomScale: number = 1) {
+  return {
+    ...fullscreenWebMjpegStyle,
+    ...getZoomTransformStyle(zoomScale),
+  } as const;
+}
+
+function getFullscreenWebFlvStyle(zoomScale: number = 1) {
+  return {
+    ...fullscreenWebFlvStyle,
+    ...getZoomTransformStyle(zoomScale),
+  } as const;
+}
+
+function getFullscreenWebFmp4Style(zoomScale: number = 1) {
+  return {
+    ...fullscreenWebFmp4Style,
+    ...getZoomTransformStyle(zoomScale),
+  } as const;
+}
+
+function getZoomTransformStyle(zoomScale: number) {
+  const safeZoom = clampZoom(zoomScale);
+  if (safeZoom <= 1.001) {
+    return {};
+  }
+  return {
+    transform: `scale(${safeZoom})`,
+    transformOrigin: "center center",
+  } as const;
+}
+
+function clampZoom(value: number) {
+  if (!Number.isFinite(value)) {
+    return WEB_FULLSCREEN_MIN_ZOOM;
+  }
+  return Math.max(WEB_FULLSCREEN_MIN_ZOOM, Math.min(WEB_FULLSCREEN_MAX_ZOOM, value));
+}
+
+function getTouchDistance(touches: ArrayLike<{ pageX?: number; pageY?: number }>) {
+  if (!touches || touches.length < 2) {
+    return null;
+  }
+  const first = touches[0];
+  const second = touches[1];
+  const dx = Number((first?.pageX ?? 0) - (second?.pageX ?? 0));
+  const dy = Number((first?.pageY ?? 0) - (second?.pageY ?? 0));
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  return Number.isFinite(distance) && distance > 0 ? distance : null;
 }
 
 const baseWebLayerStyle = {

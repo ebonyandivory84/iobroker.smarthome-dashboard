@@ -368,14 +368,16 @@ function buildCameraRequestConfig(rawUrl) {
   const queryPassword =
     parsed.searchParams.get("password") ||
     parsed.searchParams.get("pass") ||
+    parsed.searchParams.get("pwd") ||
     parsed.searchParams.get("Password") ||
     parsed.searchParams.get("Pass") ||
+    parsed.searchParams.get("Pwd") ||
     "";
+  const resolvedUsername = decodeURIComponent(parsed.username || queryUser || "");
+  const resolvedPassword = decodeURIComponent(parsed.password || queryPassword || "");
 
   if (authFromUserInfo || queryUser || queryPassword) {
-    const username = decodeURIComponent(parsed.username || queryUser || "");
-    const password = decodeURIComponent(parsed.password || queryPassword || "");
-    const auth = Buffer.from(`${username}:${password}`).toString("base64");
+    const auth = Buffer.from(`${resolvedUsername}:${resolvedPassword}`).toString("base64");
     headers.Authorization = `Basic ${auth}`;
     if (authFromUserInfo) {
       parsed.username = "";
@@ -387,8 +389,8 @@ function buildCameraRequestConfig(rawUrl) {
     url: parsed.toString(),
     headers,
     auth: {
-      username: decodeURIComponent(parsed.username || queryUser || ""),
-      password: decodeURIComponent(parsed.password || queryPassword || ""),
+      username: resolvedUsername,
+      password: resolvedPassword,
       hasQueryCredentials: Boolean(queryUser || queryPassword),
     },
   };
