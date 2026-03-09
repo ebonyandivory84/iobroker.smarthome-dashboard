@@ -107,7 +107,11 @@ export function CameraWidget({
     flvUrl: fullscreenFlvUrl,
     fmp4Url: fullscreenFmp4Url,
   });
-  const activeFeed = fullscreenOpen ? fullscreenFeed : previewFeed;
+  const useInPlaceFullscreen = Platform.OS === "web";
+  const showInPlaceFullscreen = useInPlaceFullscreen && fullscreenOpen;
+  const showPreviewFeed = !fullscreenOpen || useInPlaceFullscreen;
+  const showNativeFullscreenModal = Platform.OS !== "web" && fullscreenOpen;
+  const activeFeed = useInPlaceFullscreen ? previewFeed : fullscreenOpen ? fullscreenFeed : previewFeed;
   const activeSnapshotBaseUrl = activeFeed?.kind === "snapshot" ? activeFeed.url : null;
   const previewMjpegSources = useMemo(
     () =>
@@ -514,16 +518,29 @@ export function CameraWidget({
     <>
       <View style={styles.container}>
         <Pressable
-          disabled={!previewFeed}
+          disabled={!previewFeed || showInPlaceFullscreen}
           onPress={() => {
             playConfiguredUiSound(config.interactionSounds?.open, "open", `${config.id}:open`);
             openFullscreen();
           }}
-          style={styles.preview}
+          style={[
+            styles.preview,
+            showInPlaceFullscreen
+              ? ({
+                  position: "fixed",
+                  left: 0,
+                  top: 0,
+                  right: 0,
+                  bottom: 0,
+                  zIndex: 2400,
+                  backgroundColor: "rgba(0,0,0,0.96)",
+                } as any)
+              : null,
+          ]}
         >
         {previewFeed ? (
           <View style={styles.snapshotWrap}>
-            {!fullscreenOpen && previewFeed.kind === "snapshot"
+            {showPreviewFeed && previewFeed.kind === "snapshot"
               ? ([0, 1] as const).map((layer) => {
                   const url = layerUrls[layer];
                   if (!url) {
@@ -564,7 +581,7 @@ export function CameraWidget({
                           }
                         },
                         src: url,
-                        style: getWebLayerStyle(isVisible),
+                        style: showInPlaceFullscreen ? getFullscreenWebLayerStyle(isVisible) : getWebLayerStyle(isVisible),
                       })
                     : (
                         <Image
@@ -597,7 +614,7 @@ export function CameraWidget({
                       );
                 })
               : null}
-            {!fullscreenOpen && previewFeed.kind === "mjpeg" && previewFeed.url
+            {showPreviewFeed && previewFeed.kind === "mjpeg" && previewFeed.url
               ? Platform.OS === "web"
                 ? createElement("img", {
                     alt: config.title || "Camera MJPEG",
@@ -623,7 +640,7 @@ export function CameraWidget({
                       reportAspectRatio(width, height);
                     },
                     src: withReconnectNonce(currentPreviewMjpegSrc || previewFeed.url, previewMjpegSession),
-                    style: webMjpegStyle,
+                    style: showInPlaceFullscreen ? fullscreenWebMjpegStyle : webMjpegStyle,
                   })
                 : (
                     <Image
@@ -639,16 +656,17 @@ export function CameraWidget({
                     />
                   )
               : null}
-            {!fullscreenOpen && previewFeed.kind === "mjpeg" && previewStreamDebug ? (
+            {showPreviewFeed && previewFeed.kind === "mjpeg" && previewStreamDebug ? (
               <View style={styles.streamDebugOverlay}>
                 <Text style={styles.streamDebugText}>{previewStreamDebug}</Text>
               </View>
             ) : null}
-            {!fullscreenOpen && previewFeed.kind === "flv" && previewFeed.url
+            {showPreviewFeed && previewFeed.kind === "flv" && previewFeed.url
               ? Platform.OS === "web"
                 ? (
                     <WebFlvPlayer
                       key={`preview-flv-${previewFeedKey}:${previewFlvSession}`}
+                      fullScreen={showInPlaceFullscreen}
                       onAspectRatioDetected={reportAspectRatioValue}
                       onSourceIndexChange={setPreviewFlvSourceIndex}
                       preferredSourceIndex={previewFlvSourceIndex}
@@ -662,11 +680,12 @@ export function CameraWidget({
                     </View>
                   )
               : null}
-            {!fullscreenOpen && previewFeed.kind === "fmp4" && previewFeed.url
+            {showPreviewFeed && previewFeed.kind === "fmp4" && previewFeed.url
               ? Platform.OS === "web"
                 ? (
                     <WebFmp4Player
                       key={`preview-fmp4-${previewFeedKey}:${currentPreviewFmp4Src || "none"}`}
+                      fullScreen={showInPlaceFullscreen}
                       onAspectRatioDetected={reportAspectRatioValue}
                       onSourceIndexChange={setPreviewFmp4SourceIndex}
                       preferredSourceIndex={previewFmp4SourceIndex}
@@ -687,6 +706,29 @@ export function CameraWidget({
                 </Text>
               </View>
             ) : null}
+            {showInPlaceFullscreen ? (
+              <View style={styles.fullscreenActions}>
+                <Pressable
+                  onPress={() => setPinned((current) => !current)}
+                  style={[styles.fullscreenActionButton, styles.fullscreenActionSpacing, pinned ? styles.fullscreenPinActive : null]}
+                >
+                  <MaterialCommunityIcons
+                    color={pinned ? pinnedColor : palette.text}
+                    name={pinned ? "pin" : "pin-outline"}
+                    size={18}
+                  />
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    playConfiguredUiSound(config.interactionSounds?.close, "close", `${config.id}:close`);
+                    closeFullscreen();
+                  }}
+                  style={styles.fullscreenActionButton}
+                >
+                  <MaterialCommunityIcons color={palette.text} name="close" size={20} />
+                </Pressable>
+              </View>
+            ) : null}
           </View>
         ) : (
           <View style={styles.empty}>
@@ -700,7 +742,7 @@ export function CameraWidget({
           <Text style={[styles.hint, { color: mutedTextColor }]}>Widget ist noch nicht konfiguriert.</Text>
         ) : null}
       </View>
-      {fullscreenOpen ? (
+      {showNativeFullscreenModal ? (
         <Modal
           animationType={
             Platform.OS === "web"
