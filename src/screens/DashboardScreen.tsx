@@ -65,6 +65,7 @@ export function DashboardScreen() {
   const [visiblePageId, setVisiblePageId] = useState(activePageId);
   const lastContentScrollAt = useRef(0);
   const activePageIndex = Math.max(0, dashboardPages.findIndex((page) => page.id === activePageId));
+  const visiblePageIndex = Math.max(0, dashboardPages.findIndex((page) => page.id === visiblePageId));
 
   const pageConfigs = useMemo(
     () =>
@@ -477,64 +478,74 @@ export function DashboardScreen() {
         onMomentumScrollEnd={handlePageMomentumEnd}
         onScrollEndDrag={handlePageDragEnd}
       >
-        {pageConfigs.map((pageConfig) => (
-          <View key={pageConfig.activePageId} style={[styles.page, { width }]}>
-            <ScrollView
-              contentContainerStyle={styles.scrollContent}
-              style={styles.pageScroll}
-              onScroll={handlePageContentScroll(pageConfig.activePageId)}
-              onMomentumScrollEnd={handleContentScrollEnd}
-              onScrollEndDrag={handleContentScrollEnd}
-              onTouchStart={handlePageTouchStart(pageConfig.activePageId)}
-              onTouchMove={handlePageTouchMove(pageConfig.activePageId)}
-              onTouchEnd={handlePageTouchEnd(pageConfig.activePageId)}
-            >
-              <GridCanvas
-                client={client}
-                config={pageConfig}
-                isLayoutMode={layoutMode}
-                onCameraFullscreenSwipeClose={() => {
-                  pullRefreshBlockedUntilRef.current = Date.now() + 2500;
-                  pullGestureRef.current = {
-                    pageId: null,
-                    startX: null,
-                    startY: null,
-                    lastX: null,
-                    lastY: null,
-                    armed: false,
-                    startedAt: 0,
-                    movedAt: 0,
-                  };
-                }}
-                onCameraFullscreenVisibilityChange={(widgetId, open) => {
-                  fullscreenCameraMapRef.current[widgetId] = open;
-                  if (!open) {
-                    pullRefreshBlockedUntilRef.current = Date.now() + 2500;
-                  }
-                  pullGestureRef.current = {
-                    pageId: null,
-                    startX: null,
-                    startY: null,
-                    lastX: null,
-                    lastY: null,
-                    armed: false,
-                    startedAt: 0,
-                    movedAt: 0,
-                  };
-                }}
-                onEditWidget={setEditingWidgetId}
-                onRemoveWidget={removeWidget}
-                onUpdateWidget={handleUpdateWidget}
-                onWriteState={writeStateTracked}
-                onDragAcrossPageEdge={(direction, widgetId, position) =>
-                  handleDragAcrossPageEdge(pageConfig.activePageId, direction, widgetId, position)
-                }
-                stateWrites={stateWrites}
-                states={states}
-              />
-            </ScrollView>
-          </View>
-        ))}
+        {pageConfigs.map((pageConfig, pageIndex) => {
+          const isNearViewport = Math.abs(pageIndex - visiblePageIndex) <= 1;
+          const isActive = pageIndex === activePageIndex;
+          const shouldRenderContent = isNearViewport || isActive;
+
+          return (
+            <View key={pageConfig.activePageId} style={[styles.page, { width }]}>
+              {shouldRenderContent ? (
+                <ScrollView
+                  contentContainerStyle={styles.scrollContent}
+                  style={styles.pageScroll}
+                  onScroll={handlePageContentScroll(pageConfig.activePageId)}
+                  onMomentumScrollEnd={handleContentScrollEnd}
+                  onScrollEndDrag={handleContentScrollEnd}
+                  onTouchStart={handlePageTouchStart(pageConfig.activePageId)}
+                  onTouchMove={handlePageTouchMove(pageConfig.activePageId)}
+                  onTouchEnd={handlePageTouchEnd(pageConfig.activePageId)}
+                >
+                  <GridCanvas
+                    client={client}
+                    config={pageConfig}
+                    isLayoutMode={layoutMode}
+                    onCameraFullscreenSwipeClose={() => {
+                      pullRefreshBlockedUntilRef.current = Date.now() + 2500;
+                      pullGestureRef.current = {
+                        pageId: null,
+                        startX: null,
+                        startY: null,
+                        lastX: null,
+                        lastY: null,
+                        armed: false,
+                        startedAt: 0,
+                        movedAt: 0,
+                      };
+                    }}
+                    onCameraFullscreenVisibilityChange={(widgetId, open) => {
+                      fullscreenCameraMapRef.current[widgetId] = open;
+                      if (!open) {
+                        pullRefreshBlockedUntilRef.current = Date.now() + 2500;
+                      }
+                      pullGestureRef.current = {
+                        pageId: null,
+                        startX: null,
+                        startY: null,
+                        lastX: null,
+                        lastY: null,
+                        armed: false,
+                        startedAt: 0,
+                        movedAt: 0,
+                      };
+                    }}
+                    onEditWidget={setEditingWidgetId}
+                    onRemoveWidget={removeWidget}
+                    onUpdateWidget={handleUpdateWidget}
+                    onWriteState={writeStateTracked}
+                    onDragAcrossPageEdge={(direction, widgetId, position) =>
+                      handleDragAcrossPageEdge(pageConfig.activePageId, direction, widgetId, position)
+                    }
+                    stateWrites={stateWrites}
+                    states={states}
+                  />
+                </ScrollView>
+              ) : (
+                <View style={styles.pagePlaceholder} />
+              )}
+            </View>
+          );
+        })}
       </ScrollView>
       <WidgetLibraryModal
         onCreateDashboard={createDashboardPage}
@@ -668,6 +679,9 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   page: {
+    flex: 1,
+  },
+  pagePlaceholder: {
     flex: 1,
   },
   pageScroll: {

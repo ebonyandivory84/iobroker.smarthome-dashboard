@@ -45,6 +45,9 @@ const pickStateIds = (widgets: ReturnType<typeof useDashboardConfig>["config"]["
     return [];
   });
 
+const normalizeStateIds = (stateIds: string[]) =>
+  Array.from(new Set(stateIds.map((entry) => entry.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "de"));
+
 export function useIoBrokerStates() {
   const { config } = useDashboardConfig();
   const [states, setStates] = useState<StateSnapshot>({});
@@ -52,13 +55,21 @@ export function useIoBrokerStates() {
   const [error, setError] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(false);
   const client = useMemo(() => new IoBrokerClient(config), [config]);
+  const watchedStateIds = useMemo(() => normalizeStateIds(pickStateIds(config.widgets)), [config.widgets]);
 
   useEffect(() => {
     let active = true;
+    let syncInFlight = false;
+    let syncPending = false;
 
     const sync = async () => {
+      if (syncInFlight) {
+        syncPending = true;
+        return;
+      }
+      syncInFlight = true;
       try {
-        const next = await client.readStates(pickStateIds(config.widgets));
+        const next = await client.readStates(watchedStateIds);
         if (active) {
           setStates(next);
           setStateWrites((current) => resolveStateWriteFeedback(current, next));
@@ -70,18 +81,26 @@ export function useIoBrokerStates() {
           setError(syncError instanceof Error ? syncError.message : "State sync failed");
           setIsOnline(false);
         }
+      } finally {
+        syncInFlight = false;
+        if (active && syncPending) {
+          syncPending = false;
+          void sync();
+        }
       }
     };
 
-    sync();
+    void sync();
     client.primeObjectCache();
-    const timer = setInterval(sync, config.pollingMs);
+    const timer = setInterval(() => {
+      void sync();
+    }, Math.max(250, config.pollingMs));
 
     return () => {
       active = false;
       clearInterval(timer);
     };
-  }, [client, config]);
+  }, [client, config.pollingMs, watchedStateIds]);
 
   const writeStateTracked = async (stateId: string, value: unknown) => {
     const startedAt = Date.now();
