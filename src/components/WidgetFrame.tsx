@@ -207,22 +207,21 @@ export function WidgetFrame({
       >
         {children}
       </View>
-      <View pointerEvents="box-none" style={styles.footerRow}>
-        <View />
-        {isLayoutMode && allowManualLayout && allowResize ? (
+      {isLayoutMode && allowManualLayout && allowResize ? (
+        <View pointerEvents="box-none" style={styles.resizeWrap}>
           <View style={styles.resizeHandle}>
             <MaterialCommunityIcons color={palette.textMuted} name="resize-bottom-right" size={18} />
           </View>
-        ) : null}
-        {Platform.OS === "web" && isLayoutMode && allowManualLayout && allowResize ? (
-          <div
-            draggable={false}
-            onDragStart={(event) => event.preventDefault()}
-            onPointerDown={handleWebPointerDown("resize")}
-            style={webResizeLayerStyle}
-          />
-        ) : null}
-      </View>
+          {Platform.OS === "web" ? (
+            <div
+              draggable={false}
+              onDragStart={(event) => event.preventDefault()}
+              onPointerDown={handleWebPointerDown("resize")}
+              style={webResizeLayerStyle}
+            />
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -307,17 +306,20 @@ const styles = StyleSheet.create({
   contentInset: {
     padding: 16,
   },
-  footerRow: {
+  resizeWrap: {
     position: "absolute",
-    right: 12,
-    bottom: 12,
-    left: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
+    right: 8,
+    bottom: 8,
+    width: 50,
+    height: 50,
+    alignItems: "flex-end",
+    justifyContent: "flex-end",
+    zIndex: 18,
   },
   resizeHandle: {
+    position: "absolute",
+    right: 0,
+    bottom: 0,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 8,
@@ -326,7 +328,7 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     flexDirection: "row",
     alignItems: "center",
-    position: "relative",
+    zIndex: 19,
   },
 });
 
@@ -337,7 +339,7 @@ const webDragLayerStyle: CSSProperties = {
   bottom: 0,
   left: 0,
   cursor: "grab",
-  zIndex: 5,
+  zIndex: 8,
   userSelect: "none",
   WebkitUserSelect: "none",
   touchAction: "none",
@@ -345,12 +347,14 @@ const webDragLayerStyle: CSSProperties = {
 
 const webResizeLayerStyle: CSSProperties = {
   position: "absolute",
-  top: 0,
+  top: "auto",
   right: 0,
   bottom: 0,
-  left: 0,
+  left: "auto",
+  width: "50px",
+  height: "50px",
   cursor: "nwse-resize",
-  zIndex: 5,
+  zIndex: 30,
   userSelect: "none",
   WebkitUserSelect: "none",
   touchAction: "none",
