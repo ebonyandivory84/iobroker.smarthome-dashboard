@@ -253,6 +253,7 @@ function SolarFlowScene({
   const flowDotSize = Math.max(8, Math.min(12, Math.round(fittedScene.width * 0.012)));
   const lineGap = Math.max(2, Math.round(fittedScene.width * 0.01));
   const verticalGap = Math.max(8, Math.round(fittedScene.height * 0.02));
+  const sceneScale = clamp(fittedScene.width / SOLAR_SCENE_BASE_WIDTH, 0.52, 1);
   const homeMidX = homeBox.x + homeBox.w / 2;
   const batteryMidY = batteryBox.y + batteryBox.h / 2;
   const homeMidY = homeBox.y + homeBox.h / 2;
@@ -325,6 +326,7 @@ function SolarFlowScene({
         widgetAppearance={widgetAppearance}
         compact={compactMode}
         veryCompact={veryCompactMode}
+        sceneScale={sceneScale}
         style={{ ...styles.nodePosition, top: pvBox.y, left: pvBox.x, width: pvBox.w, minHeight: pvBox.h }}
         value={fmtW(pvNow)}
         highlight={pvDir !== "idle"}
@@ -341,6 +343,7 @@ function SolarFlowScene({
         widgetAppearance={widgetAppearance}
         compact={compactMode}
         veryCompact={veryCompactMode}
+        sceneScale={sceneScale}
         style={{ ...styles.nodePosition, top: homeBox.y, left: homeBox.x, width: homeBox.w, minHeight: homeBox.h }}
         value={fmtW(homeNow)}
         highlight
@@ -357,6 +360,7 @@ function SolarFlowScene({
         widgetAppearance={widgetAppearance}
         compact={compactMode}
         veryCompact={veryCompactMode}
+        sceneScale={sceneScale}
         style={{ ...styles.nodePosition, top: batteryBox.y, left: batteryBox.x, width: batteryBox.w, minHeight: batteryBox.h }}
         value={fmtW(battPower || null)}
         meta={
@@ -382,6 +386,7 @@ function SolarFlowScene({
         widgetAppearance={widgetAppearance}
         compact={compactMode}
         veryCompact={veryCompactMode}
+        sceneScale={sceneScale}
         style={{ ...styles.nodePosition, top: gridBox.y, left: gridBox.x, width: gridBox.w, minHeight: gridBox.h }}
         value={fmtW(gridPower || null)}
         meta={gridDir === "toHome" ? "Bezug" : gridDir === "fromHome" ? "Einspeisung" : "Idle"}
@@ -399,6 +404,7 @@ function SolarFlowScene({
         widgetAppearance={widgetAppearance}
         compact={compactMode}
         veryCompact={veryCompactMode}
+        sceneScale={sceneScale}
         style={{ ...styles.nodePosition, top: carBox.y, left: carBox.x, width: carBox.w, minHeight: carBox.h }}
         value="—"
       />
@@ -465,6 +471,7 @@ function NodeCard({
   iconSurface,
   compact,
   veryCompact,
+  sceneScale,
 }: {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   label: string;
@@ -481,8 +488,20 @@ function NodeCard({
   iconSurface?: string;
   compact?: boolean;
   veryCompact?: boolean;
+  sceneScale?: number;
 }) {
-  const iconSize = veryCompact ? 18 : compact ? 20 : 24;
+  const scale = clamp(sceneScale ?? 1, 0.52, 1);
+  const iconSize = Math.round(clamp(24 * scale, 14, 24));
+  const cardPadding = Math.round(clamp(10 * scale, 5, 10));
+  const cardRadius = Math.round(clamp(20 * scale, 12, 20));
+  const iconBox = Math.round(clamp(40 * scale, 24, 40));
+  const iconRadius = Math.round(clamp(15 * scale, 10, 15));
+  const iconInnerBox = Math.round(clamp(30 * scale, 18, 30));
+  const iconInnerRadius = Math.round(clamp(12 * scale, 7, 12));
+  const valueFontSize = Math.round(clamp(16 * scale, 11, 16));
+  const valueMarginTop = Math.round(clamp(8 * scale, 4, 8));
+  const metaFontSize = Math.round(clamp(9 * scale, 7, 9));
+  const metaMarginTop = Math.round(clamp(4 * scale, 2, 4));
 
   return (
     <View
@@ -491,9 +510,9 @@ function NodeCard({
         {
           backgroundColor: nodeColor || widgetAppearance?.cardColor || theme.solar.nodeCardBackground,
           borderColor: theme.solar.nodeCardBorder,
+          borderRadius: cardRadius,
+          padding: cardPadding,
         },
-        compact ? styles.nodeCardCompact : null,
-        veryCompact ? styles.nodeCardVeryCompact : null,
         style,
         highlight ? styles.nodeCardActive : null,
       ]}
@@ -501,17 +520,23 @@ function NodeCard({
       <View
         style={[
           styles.nodeIcon,
-          { backgroundColor: iconSurface || "rgba(255,255,255,0.08)" },
-          compact ? styles.nodeIconCompact : null,
-          veryCompact ? styles.nodeIconVeryCompact : null,
+          {
+            backgroundColor: iconSurface || "rgba(255,255,255,0.08)",
+            width: iconBox,
+            height: iconBox,
+            borderRadius: iconRadius,
+          },
           highlight ? styles.nodeIconActive : null,
         ]}
       >
         <View
           style={[
             styles.nodeIconInner,
-            compact ? styles.nodeIconInnerCompact : null,
-            veryCompact ? styles.nodeIconInnerVeryCompact : null,
+            {
+              width: iconInnerBox,
+              height: iconInnerBox,
+              borderRadius: iconInnerRadius,
+            },
           ]}
         >
           <MaterialCommunityIcons
@@ -523,14 +548,15 @@ function NodeCard({
       </View>
       <Text
         adjustsFontSizeToFit
-        minimumFontScale={0.72}
+        minimumFontScale={0.58}
         numberOfLines={1}
         style={[
           styles.nodeValue,
-          styles.nodeValueCompact,
-          compact ? styles.nodeValueCompactText : null,
-          veryCompact ? styles.nodeValueVeryCompactText : null,
-          { color: textColor },
+          {
+            color: textColor,
+            marginTop: valueMarginTop,
+            fontSize: valueFontSize,
+          },
         ]}
       >
         {value}
@@ -540,9 +566,12 @@ function NodeCard({
           numberOfLines={2}
           style={[
             styles.nodeMeta,
-            compact ? styles.nodeMetaCompact : null,
-            veryCompact ? styles.nodeMetaVeryCompact : null,
-            { color: mutedTextColor },
+            {
+              color: mutedTextColor,
+              marginTop: metaMarginTop,
+              fontSize: metaFontSize,
+              lineHeight: Math.round(metaFontSize * 1.25),
+            },
           ]}
         >
           {meta}
@@ -734,11 +763,11 @@ function resolveBatteryIcon(soc: number | null): keyof typeof MaterialCommunityI
 
 function getDefaultNodeLayout(): SolarLayoutConfig {
   return {
-    pv: { x: 0.4, y: 0.03, w: 0.2, h: 0.17 },
-    home: { x: 0.39, y: 0.4, w: 0.22, h: 0.2 },
-    battery: { x: 0.08, y: 0.46, w: 0.19, h: 0.18 },
-    grid: { x: 0.73, y: 0.46, w: 0.19, h: 0.18 },
-    car: { x: 0.35, y: 0.78, w: 0.3, h: 0.16 },
+    pv: { x: 0.4, y: 0.01, w: 0.2, h: 0.15 },
+    home: { x: 0.39, y: 0.47, w: 0.22, h: 0.2 },
+    battery: { x: 0.08, y: 0.53, w: 0.19, h: 0.18 },
+    grid: { x: 0.73, y: 0.53, w: 0.19, h: 0.18 },
+    car: { x: 0.35, y: 0.87, w: 0.3, h: 0.12 },
   };
 }
 
