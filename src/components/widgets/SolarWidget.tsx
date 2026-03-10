@@ -764,10 +764,10 @@ function resolveBatteryIcon(soc: number | null): keyof typeof MaterialCommunityI
 function getDefaultNodeLayout(): SolarLayoutConfig {
   return {
     pv: { x: 0.4, y: 0.0, w: 0.2, h: 0.12 },
-    home: { x: 0.39, y: 0.58, w: 0.22, h: 0.16 },
-    battery: { x: 0.08, y: 0.58, w: 0.19, h: 0.16 },
-    grid: { x: 0.73, y: 0.58, w: 0.19, h: 0.16 },
-    car: { x: 0.35, y: 0.92, w: 0.3, h: 0.08 },
+    home: { x: 0.39, y: 0.62, w: 0.22, h: 0.16 },
+    battery: { x: 0.03, y: 0.64, w: 0.19, h: 0.16 },
+    grid: { x: 0.78, y: 0.64, w: 0.19, h: 0.16 },
+    car: { x: 0.37, y: 0.94, w: 0.26, h: 0.07 },
   };
 }
 
