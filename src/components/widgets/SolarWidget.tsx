@@ -70,6 +70,11 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
   const backgroundBlur = clamp(config.backgroundImageBlur ?? 8, 0, 24);
   const compactWidget = widgetLayout.width > 0 && (widgetLayout.width < 520 || widgetLayout.height < 420);
   const veryCompactWidget = widgetLayout.width > 0 && (widgetLayout.width < 420 || widgetLayout.height < 340);
+  const statScale = clamp(
+    Math.min((widgetLayout.width || SOLAR_SCENE_BASE_WIDTH) / SOLAR_SCENE_BASE_WIDTH, 1),
+    0.5,
+    1
+  );
   const customStatValues = {
     first: config.stats?.first?.stateId ? states[config.stats.first.stateId] : undefined,
     second: config.stats?.second?.stateId ? states[config.stats.second.stateId] : undefined,
@@ -164,6 +169,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
             textColor={textColor}
             theme={resolvedTheme}
             value={stat.value}
+            scale={statScale}
           />
         ))}
       </View>
@@ -590,6 +596,7 @@ function MiniStat({
   mutedTextColor,
   compact,
   cornerCompact,
+  scale,
 }: {
   appearance?: SolarWidgetConfig["appearance"];
   label: string;
@@ -599,7 +606,14 @@ function MiniStat({
   mutedTextColor: string;
   compact?: boolean;
   cornerCompact?: boolean;
+  scale?: number;
 }) {
+  const effectiveScale = clamp((scale ?? 1) * (compact ? 0.9 : 1), 0.45, 1);
+  const cardPadding = Math.round(clamp(12 * effectiveScale, 6, 12));
+  const cardRadius = Math.round(clamp(16 * effectiveScale, 10, 16));
+  const valueFontSize = Math.round(clamp(18 * effectiveScale, 10, 18));
+  const labelFontSize = Math.round(clamp(12 * effectiveScale, 8, 12));
+
   return (
     <View
       style={[
@@ -607,13 +621,37 @@ function MiniStat({
         {
           backgroundColor: appearance?.statColor || theme.solar.statCardBackground,
           borderColor: theme.solar.statCardBorder,
+          padding: cardPadding,
+          borderRadius: cardRadius,
         },
         compact ? styles.miniCompact : null,
         cornerCompact ? styles.miniCornerCompact : null,
       ]}
     >
-      <Text style={[styles.miniValue, compact ? styles.miniValueCompact : null, { color: textColor }]}>{value}</Text>
-      <Text style={[styles.miniLabel, compact ? styles.miniLabelCompact : null, { color: mutedTextColor }]}>{label}</Text>
+      <Text
+        adjustsFontSizeToFit
+        minimumFontScale={0.75}
+        numberOfLines={1}
+        style={[
+          styles.miniValue,
+          compact ? styles.miniValueCompact : null,
+          { color: textColor, fontSize: valueFontSize, lineHeight: Math.round(valueFontSize * 1.12) },
+        ]}
+      >
+        {value}
+      </Text>
+      <Text
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+        numberOfLines={1}
+        style={[
+          styles.miniLabel,
+          compact ? styles.miniLabelCompact : null,
+          { color: mutedTextColor, fontSize: labelFontSize, lineHeight: Math.round(labelFontSize * 1.15) },
+        ]}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
@@ -975,7 +1013,7 @@ const styles = StyleSheet.create({
   bottomRow: {
     flexDirection: "row",
     gap: 10,
-    flexWrap: "wrap",
+    flexWrap: "nowrap",
     marginTop: 18,
   },
   bottomRowOverlay: {
@@ -1004,7 +1042,8 @@ const styles = StyleSheet.create({
   },
   mini: {
     flexGrow: 1,
-    flexBasis: 140,
+    flexBasis: 0,
+    minWidth: 0,
     borderRadius: 16,
     padding: 12,
     borderWidth: 1,
