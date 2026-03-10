@@ -297,3 +297,8 @@ export type WidgetImageEntry = {
   name: string;
   url: string;
 };
+
+export type WidgetSoundEntry = {
+  name: string;
+  url: string;
+};

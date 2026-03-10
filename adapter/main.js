@@ -38,11 +38,17 @@ function startAdapter(options) {
 async function main(adapter) {
   runningAdapter = adapter;
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: "20mb" }));
   const webRoot = resolveWebRoot(adapter);
-  const widgetAssetsRoot = path.resolve(__dirname, "..", "assets");
+  const bundledWidgetAssetsRoot = path.resolve(__dirname, "..", "assets");
+  const customDataRoot = utils.getAbsoluteInstanceDataDir(adapter);
+  const customWidgetAssetsRoot = path.join(customDataRoot, "widget-assets");
+  const customWidgetSoundsRoot = path.join(customDataRoot, "widget-sounds");
   const devServerUrl =
     adapter.config && typeof adapter.config.devServerUrl === "string" ? adapter.config.devServerUrl.trim() : "";
+
+  await ensureDirectory(customWidgetAssetsRoot);
+  await ensureDirectory(customWidgetSoundsRoot);
 
   await adapter.setObjectNotExistsAsync(CONFIG_STATE_ID, {
     type: "state",
@@ -232,18 +238,96 @@ async function main(adapter) {
 
   app.get("/smarthome-dashboard/api/images", async (_req, res) => {
     try {
-      const files = await fs.promises.readdir(widgetAssetsRoot, { withFileTypes: true });
-      const images = files
-        .filter((entry) => entry.isFile() && /\.(png|jpe?g|webp|gif)$/i.test(entry.name))
-        .map((entry) => ({
-          name: entry.name,
-          url: `/smarthome-dashboard/widget-assets/${encodeURIComponent(entry.name)}`,
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name, "de"));
+      const images = await listUploadEntries(
+        [customWidgetAssetsRoot, bundledWidgetAssetsRoot],
+        /\.(png|jpe?g|webp|gif)$/i,
+        "/smarthome-dashboard/widget-assets"
+      );
 
       res.json(images);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Image list failed" });
+    }
+  });
+
+  app.post("/smarthome-dashboard/api/images/upload", async (req, res) => {
+    const rawName = typeof req.body?.name === "string" ? req.body.name : "";
+    const dataUrl = typeof req.body?.dataUrl === "string" ? req.body.dataUrl : "";
+    const normalizedName = normalizeUploadFileName(rawName, /\.(png|jpe?g|webp|gif)$/i);
+    if (!normalizedName) {
+      res.status(400).json({ error: "Invalid image file name" });
+      return;
+    }
+    if (!dataUrl) {
+      res.status(400).json({ error: "dataUrl missing" });
+      return;
+    }
+
+    try {
+      const { buffer, mimeType } = decodeUploadDataUrl(dataUrl);
+      if (!/^image\/(png|jpeg|jpg|webp|gif)$/i.test(mimeType)) {
+        res.status(400).json({ error: "Unsupported image mime type" });
+        return;
+      }
+      if (buffer.length > 8 * 1024 * 1024) {
+        res.status(413).json({ error: "Image exceeds 8 MB" });
+        return;
+      }
+      await ensureDirectory(customWidgetAssetsRoot);
+      await fs.promises.writeFile(path.join(customWidgetAssetsRoot, normalizedName), buffer);
+      res.json({
+        name: normalizedName,
+        url: `/smarthome-dashboard/widget-assets/${encodeURIComponent(normalizedName)}`,
+      });
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Image upload failed" });
+    }
+  });
+
+  app.get("/smarthome-dashboard/api/sounds", async (_req, res) => {
+    try {
+      const sounds = await listUploadEntries(
+        [customWidgetSoundsRoot],
+        /\.(mp3|wav|ogg|m4a)$/i,
+        "/smarthome-dashboard/widget-sounds"
+      );
+      res.json(sounds);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Sound list failed" });
+    }
+  });
+
+  app.post("/smarthome-dashboard/api/sounds/upload", async (req, res) => {
+    const rawName = typeof req.body?.name === "string" ? req.body.name : "";
+    const dataUrl = typeof req.body?.dataUrl === "string" ? req.body.dataUrl : "";
+    const normalizedName = normalizeUploadFileName(rawName, /\.(mp3|wav|ogg|m4a)$/i);
+    if (!normalizedName) {
+      res.status(400).json({ error: "Invalid sound file name" });
+      return;
+    }
+    if (!dataUrl) {
+      res.status(400).json({ error: "dataUrl missing" });
+      return;
+    }
+
+    try {
+      const { buffer, mimeType } = decodeUploadDataUrl(dataUrl);
+      if (!/^audio\/(mpeg|mp3|wav|x-wav|ogg|mp4|m4a|x-m4a)$/i.test(mimeType)) {
+        res.status(400).json({ error: "Unsupported sound mime type" });
+        return;
+      }
+      if (buffer.length > 16 * 1024 * 1024) {
+        res.status(413).json({ error: "Sound exceeds 16 MB" });
+        return;
+      }
+      await ensureDirectory(customWidgetSoundsRoot);
+      await fs.promises.writeFile(path.join(customWidgetSoundsRoot, normalizedName), buffer);
+      res.json({
+        name: normalizedName,
+        url: `/smarthome-dashboard/widget-sounds/${encodeURIComponent(normalizedName)}`,
+      });
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Sound upload failed" });
     }
   });
 
@@ -296,7 +380,9 @@ async function main(adapter) {
   app.get("/smarthome-dashboard/api/camera-stream", handleCameraStreamProxy);
   app.get("/smarthome-dashboard/api/camera-mjpeg", handleCameraStreamProxy);
 
-  app.use("/smarthome-dashboard/widget-assets", express.static(widgetAssetsRoot));
+  app.use("/smarthome-dashboard/widget-assets", express.static(customWidgetAssetsRoot));
+  app.use("/smarthome-dashboard/widget-assets", express.static(bundledWidgetAssetsRoot));
+  app.use("/smarthome-dashboard/widget-sounds", express.static(customWidgetSoundsRoot));
 
   if (devServerUrl) {
     const target = devServerUrl.replace(/\/+$/, "");
@@ -352,6 +438,66 @@ async function main(adapter) {
 
 function normalizeDashboardName(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+async function ensureDirectory(directoryPath) {
+  await fs.promises.mkdir(directoryPath, { recursive: true });
+}
+
+async function listUploadEntries(roots, extensionPattern, baseRoutePath) {
+  const entryMap = new Map();
+
+  for (const root of roots) {
+    let files = [];
+    try {
+      files = await fs.promises.readdir(root, { withFileTypes: true });
+    } catch {
+      files = [];
+    }
+    files
+      .filter((entry) => entry.isFile() && extensionPattern.test(entry.name))
+      .forEach((entry) => {
+        if (!entryMap.has(entry.name)) {
+          entryMap.set(entry.name, {
+            name: entry.name,
+            url: `${baseRoutePath}/${encodeURIComponent(entry.name)}`,
+          });
+        }
+      });
+  }
+
+  return [...entryMap.values()].sort((a, b) => a.name.localeCompare(b.name, "de"));
+}
+
+function normalizeUploadFileName(name, extensionPattern) {
+  if (typeof name !== "string") {
+    return "";
+  }
+  const baseName = path.basename(name).trim();
+  if (!baseName || !extensionPattern.test(baseName)) {
+    return "";
+  }
+  return baseName.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+function decodeUploadDataUrl(dataUrl) {
+  if (typeof dataUrl !== "string") {
+    throw new Error("Invalid dataUrl");
+  }
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) {
+    throw new Error("dataUrl must be base64 data URI");
+  }
+  const mimeType = match[1];
+  const base64Payload = match[2];
+  const buffer = Buffer.from(base64Payload, "base64");
+  if (!buffer.length) {
+    throw new Error("Uploaded payload is empty");
+  }
+  return {
+    mimeType,
+    buffer,
+  };
 }
 
 function buildCameraRequestConfig(rawUrl) {
