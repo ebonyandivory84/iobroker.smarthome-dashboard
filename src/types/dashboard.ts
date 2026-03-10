@@ -147,6 +147,16 @@ export type SolarStatConfig = {
   stateId?: string;
 };
 
+export type SolarTapAction =
+  | {
+      type: "dashboard";
+      dashboardId: string;
+    }
+  | {
+      type: "url";
+      url: string;
+    };
+
 export type EnergyWidgetConfig = WidgetBase & {
   type: "energy";
   pvStateId: string;
@@ -177,10 +187,13 @@ export type SolarWidgetConfig = WidgetBase & {
   dailyEnergyUnit?: "auto" | "Wh" | "kWh";
   nodeLayout?: Partial<SolarLayoutConfig>;
   stats?: {
+    count?: number;
+    cards?: SolarStatConfig[];
     first?: SolarStatConfig;
     second?: SolarStatConfig;
     third?: SolarStatConfig;
   };
+  tapAction?: SolarTapAction;
 };
 
 export type WidgetConfig =

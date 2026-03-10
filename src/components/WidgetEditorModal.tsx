@@ -22,7 +22,7 @@ type WidgetEditorModalProps = {
 };
 
 export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: WidgetEditorModalProps) {
-  const { config, patchConfig } = useDashboardConfig();
+  const { config, patchConfig, dashboardPages } = useDashboardConfig();
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [soundDraft, setSoundDraft] = useState<Record<string, string[]>>({});
   const [weatherSuggestions, setWeatherSuggestions] = useState<Array<{
@@ -221,6 +221,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       return;
     }
 
+    const solarStatDraft = buildSolarStatEditorDraft(widget.stats);
     setSoundDraft({});
     setWeatherSuggestions([]);
     setWeatherSearchBusy(false);
@@ -243,12 +244,22 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       keyDaySelf: widget.keys.daySelf,
       keyPvTotal: widget.keys.pvTotal || "",
       keyBattTemp: widget.keys.battTemp || "",
-      stat1Label: widget.stats?.first?.label || "Eigenverbrauch",
-      stat1StateId: widget.stats?.first?.stateId || "",
-      stat2Label: widget.stats?.second?.label || "Verbraucht",
-      stat2StateId: widget.stats?.second?.stateId || "",
-      stat3Label: widget.stats?.third?.label || "Autarkie",
-      stat3StateId: widget.stats?.third?.stateId || "",
+      statCount: String(solarStatDraft.count),
+      stat1Label: solarStatDraft.cards[0].label,
+      stat1StateId: solarStatDraft.cards[0].stateId,
+      stat2Label: solarStatDraft.cards[1].label,
+      stat2StateId: solarStatDraft.cards[1].stateId,
+      stat3Label: solarStatDraft.cards[2].label,
+      stat3StateId: solarStatDraft.cards[2].stateId,
+      stat4Label: solarStatDraft.cards[3].label,
+      stat4StateId: solarStatDraft.cards[3].stateId,
+      stat5Label: solarStatDraft.cards[4].label,
+      stat5StateId: solarStatDraft.cards[4].stateId,
+      stat6Label: solarStatDraft.cards[5].label,
+      stat6StateId: solarStatDraft.cards[5].stateId,
+      solarTapType: widget.tapAction?.type || "none",
+      solarTapDashboardId: widget.tapAction?.type === "dashboard" ? widget.tapAction.dashboardId : "",
+      solarTapUrl: widget.tapAction?.type === "url" ? widget.tapAction.url : "",
       ...appearanceDraft,
     });
   }, [editorTargetKey]);
@@ -326,6 +337,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
 
   const cameraMode = normalizeCameraSourceMode(draft.previewSourceMode || draft.fullscreenSourceMode);
   const cameraUrl = getCameraUrlByMode(draft, cameraMode);
+  const solarStatCount = clampSolarStatCount(draft.statCount);
 
   const save = () => {
     const appearance = buildAppearance(draft);
@@ -490,6 +502,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           battTemp: draft.keyBattTemp || undefined,
         },
         stats: buildSolarStats(draft),
+        tapAction: buildSolarTapAction(draft),
         appearance,
       });
     }
@@ -1355,58 +1368,84 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={draft.keyPvTotal || ""}
                   />
                 </Field>
+                <Text style={styles.sectionTitle}>Klick-Aktion</Text>
+                <Field label="Aktion">
+                  <ChoiceRow
+                    options={["none", "dashboard", "url"]}
+                    value={draft.solarTapType || "none"}
+                    onSelect={(value) => setDraft((current) => ({ ...current, solarTapType: value }))}
+                  />
+                </Field>
+                {draft.solarTapType === "dashboard" ? (
+                  <Field label="Ziel-Dashboard">
+                    <View style={styles.modeRow}>
+                      {dashboardPages.map((page) => (
+                        <EditorButtonPressable
+                          key={`solar-target-${page.id}`}
+                          onPress={() => setDraft((current) => ({ ...current, solarTapDashboardId: page.id }))}
+                          style={[
+                            styles.modeButton,
+                            (draft.solarTapDashboardId || "") === page.id ? styles.modeButtonActive : null,
+                          ]}
+                        >
+                          <Text style={styles.modeLabel}>{page.title}</Text>
+                        </EditorButtonPressable>
+                      ))}
+                    </View>
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, solarTapDashboardId: value }))}
+                      placeholder="Dashboard ID"
+                      placeholderTextColor={palette.textMuted}
+                      style={styles.input}
+                      value={draft.solarTapDashboardId || ""}
+                    />
+                  </Field>
+                ) : null}
+                {draft.solarTapType === "url" ? (
+                  <Field label="Ziel-URL">
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, solarTapUrl: value }))}
+                      placeholder="https://example.com"
+                      placeholderTextColor={palette.textMuted}
+                      style={styles.input}
+                      value={draft.solarTapUrl || ""}
+                    />
+                  </Field>
+                ) : null}
                 <Text style={styles.sectionTitle}>Stats</Text>
-                <View style={styles.splitRow}>
-                  <Field label="Stat 1 Label">
-                    <TextInput
-                      onChangeText={(value) => setDraft((current) => ({ ...current, stat1Label: value }))}
-                      style={styles.input}
-                      value={draft.stat1Label || ""}
-                    />
-                  </Field>
-                  <Field label="Stat 1 Datenpunkt">
-                    <StateFieldInput
-                      browseLabel="Objekt"
-                      onBrowse={() => setPickerField("stat1StateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, stat1StateId: value }))}
-                      value={draft.stat1StateId || ""}
-                    />
-                  </Field>
-                </View>
-                <View style={styles.splitRow}>
-                  <Field label="Stat 2 Label">
-                    <TextInput
-                      onChangeText={(value) => setDraft((current) => ({ ...current, stat2Label: value }))}
-                      style={styles.input}
-                      value={draft.stat2Label || ""}
-                    />
-                  </Field>
-                  <Field label="Stat 2 Datenpunkt">
-                    <StateFieldInput
-                      browseLabel="Objekt"
-                      onBrowse={() => setPickerField("stat2StateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, stat2StateId: value }))}
-                      value={draft.stat2StateId || ""}
-                    />
-                  </Field>
-                </View>
-                <View style={styles.splitRow}>
-                  <Field label="Stat 3 Label">
-                    <TextInput
-                      onChangeText={(value) => setDraft((current) => ({ ...current, stat3Label: value }))}
-                      style={styles.input}
-                      value={draft.stat3Label || ""}
-                    />
-                  </Field>
-                  <Field label="Stat 3 Datenpunkt">
-                    <StateFieldInput
-                      browseLabel="Objekt"
-                      onBrowse={() => setPickerField("stat3StateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, stat3StateId: value }))}
-                      value={draft.stat3StateId || ""}
-                    />
-                  </Field>
-                </View>
+                <Field label="Anzahl Stat-Cards">
+                  <ChoiceRow
+                    options={["1", "2", "3", "4", "5", "6"]}
+                    value={String(solarStatCount)}
+                    onSelect={(value) => setDraft((current) => ({ ...current, statCount: value }))}
+                  />
+                </Field>
+                {Array.from({ length: solarStatCount }, (_, index) => {
+                  const item = index + 1;
+                  const labelKey = `stat${item}Label`;
+                  const stateKey = `stat${item}StateId`;
+                  return (
+                    <View key={`solar-stat-editor-${item}`} style={styles.splitRow}>
+                      <Field label={`Stat ${item} Label`}>
+                        <TextInput
+                          onChangeText={(value) => setDraft((current) => ({ ...current, [labelKey]: value }))}
+                          style={styles.input}
+                          value={draft[labelKey] || ""}
+                        />
+                      </Field>
+                      <Field label={`Stat ${item} Datenpunkt`}>
+                        <StateFieldInput
+                          browseLabel="Objekt"
+                          onBrowse={() => setPickerField(stateKey)}
+                          onChangeText={(value) => setDraft((current) => ({ ...current, [stateKey]: value }))}
+                          value={draft[stateKey] || ""}
+                        />
+                      </Field>
+                    </View>
+                  );
+                })}
                 <Text style={styles.mappingHint}>
                   Leer lassen, um den bisherigen Standardwert des Solar-Widgets zu nutzen. Wenn ein Datenpunkt gesetzt ist,
                   wird dessen aktueller Wert direkt angezeigt.
@@ -1658,21 +1697,81 @@ function clampFloat(raw: string | undefined, fallback: number) {
   return parsed;
 }
 
+const SOLAR_STAT_LIMIT = 6;
+const SOLAR_DEFAULT_STAT_LABELS = [
+  "Eigenverbrauch",
+  "Verbraucht",
+  "Stat 3",
+  "Stat 4",
+  "Stat 5",
+  "Stat 6",
+];
+
+function clampSolarStatCount(raw: string | number | undefined, fallback = 2) {
+  const parsed = typeof raw === "number" ? raw : Number.parseInt(raw || "", 10);
+  if (!Number.isFinite(parsed)) {
+    return Math.max(1, Math.min(SOLAR_STAT_LIMIT, fallback));
+  }
+  return Math.max(1, Math.min(SOLAR_STAT_LIMIT, Math.round(parsed)));
+}
+
+function getSolarDefaultStatLabel(index: number) {
+  return SOLAR_DEFAULT_STAT_LABELS[index] || `Stat ${index + 1}`;
+}
+
+function buildSolarStatEditorDraft(stats: Extract<WidgetConfig, { type: "solar" }>["stats"] | undefined) {
+  const legacyCards = [stats?.first, stats?.second, stats?.third].filter(Boolean) as Array<{
+    label: string;
+    stateId?: string;
+  }>;
+  const sourceCards = Array.isArray(stats?.cards) && stats.cards.length ? stats.cards : legacyCards;
+  const count = clampSolarStatCount(stats?.count, sourceCards.length || 2);
+  const cards = Array.from({ length: SOLAR_STAT_LIMIT }, (_, index) => {
+    const source = sourceCards[index];
+    return {
+      label: (source?.label || getSolarDefaultStatLabel(index)).trim() || getSolarDefaultStatLabel(index),
+      stateId: (source?.stateId || "").trim(),
+    };
+  });
+
+  return { count, cards };
+}
+
 function buildSolarStats(draft: Record<string, string>) {
+  const count = clampSolarStatCount(draft.statCount);
+  const cards = Array.from({ length: count }, (_, index) => {
+    const item = index + 1;
+    const label = (draft[`stat${item}Label`] || getSolarDefaultStatLabel(index)).trim() || getSolarDefaultStatLabel(index);
+    const stateId = (draft[`stat${item}StateId`] || "").trim() || undefined;
+    return { label, stateId };
+  });
+
   return {
-    first: {
-      label: (draft.stat1Label || "Eigenverbrauch").trim() || "Eigenverbrauch",
-      stateId: (draft.stat1StateId || "").trim() || undefined,
-    },
-    second: {
-      label: (draft.stat2Label || "Verbraucht").trim() || "Verbraucht",
-      stateId: (draft.stat2StateId || "").trim() || undefined,
-    },
-    third: {
-      label: (draft.stat3Label || "Autarkie").trim() || "Autarkie",
-      stateId: (draft.stat3StateId || "").trim() || undefined,
-    },
+    count,
+    cards,
+    first: cards[0],
+    second: cards[1],
+    third: cards[2],
   };
+}
+
+function buildSolarTapAction(draft: Record<string, string>) {
+  const tapType = draft.solarTapType;
+  if (tapType === "dashboard") {
+    const dashboardId = (draft.solarTapDashboardId || "").trim();
+    if (!dashboardId) {
+      return undefined;
+    }
+    return { type: "dashboard", dashboardId } as const;
+  }
+  if (tapType === "url") {
+    const url = normalizeOptionalInput(draft.solarTapUrl);
+    if (!url) {
+      return undefined;
+    }
+    return { type: "url", url } as const;
+  }
+  return undefined;
 }
 
 function buildAppearanceDraft(
