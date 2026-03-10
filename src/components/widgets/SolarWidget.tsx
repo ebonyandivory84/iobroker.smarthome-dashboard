@@ -1,7 +1,18 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { createElement } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, ImageBackground, LayoutChangeEvent, Platform, StyleSheet, Text, View } from "react-native";
+import {
+  Animated,
+  Easing,
+  ImageBackground,
+  LayoutChangeEvent,
+  Platform,
+  StyleProp,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+} from "react-native";
 import { SolarLayoutConfig, SolarNodeLayout, SolarWidgetConfig, StateSnapshot, ThemeSettings } from "../../types/dashboard";
 import { resolveThemeSettings } from "../../utils/themeConfig";
 import { palette } from "../../utils/theme";
@@ -70,11 +81,6 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
   const backgroundBlur = clamp(config.backgroundImageBlur ?? 8, 0, 24);
   const compactWidget = widgetLayout.width > 0 && (widgetLayout.width < 520 || widgetLayout.height < 420);
   const veryCompactWidget = widgetLayout.width > 0 && (widgetLayout.width < 420 || widgetLayout.height < 340);
-  const statScale = clamp(
-    Math.min((widgetLayout.width || SOLAR_SCENE_BASE_WIDTH) / SOLAR_SCENE_BASE_WIDTH, 1),
-    0.5,
-    1
-  );
   const customStatValues = {
     first: config.stats?.first?.stateId ? states[config.stats.first.stateId] : undefined,
     second: config.stats?.second?.stateId ? states[config.stats.second.stateId] : undefined,
@@ -146,32 +152,8 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
           compactMode={compactWidget}
           veryCompactMode={veryCompactWidget}
           nodeLayout={config.nodeLayout}
+          statCards={statCards}
         />
-      </View>
-
-      <View
-        style={[
-          styles.bottomRow,
-          compactWidget ? styles.bottomRowCompact : null,
-          veryCompactWidget ? styles.bottomRowVeryCompact : null,
-          compactWidget ? styles.bottomRowOverlay : null,
-          veryCompactWidget ? styles.bottomRowOverlayVeryCompact : null,
-        ]}
-      >
-        {statCards.map((stat, index) => (
-          <MiniStat
-            key={`solar-stat-${index}`}
-            appearance={widgetAppearance}
-            compact={compactWidget}
-            cornerCompact={compactWidget}
-            label={stat.label}
-            mutedTextColor={mutedTextColor}
-            textColor={textColor}
-            theme={resolvedTheme}
-            value={stat.value}
-            scale={statScale}
-          />
-        ))}
       </View>
 
       {!compactWidget ? (
@@ -202,6 +184,7 @@ function SolarFlowScene({
   compactMode,
   veryCompactMode,
   nodeLayout,
+  statCards,
 }: {
   pvDir: FlowDir;
   pvNow: number | null;
@@ -219,6 +202,7 @@ function SolarFlowScene({
   compactMode?: boolean;
   veryCompactMode?: boolean;
   nodeLayout?: Partial<SolarLayoutConfig>;
+  statCards: Array<{ label: string; value: string }>;
 }) {
   const progress = useRef(new Animated.Value(0)).current;
   const [sceneLayout, setSceneLayout] = useState({ width: SOLAR_SCENE_BASE_WIDTH, height: SOLAR_SCENE_BASE_HEIGHT });
@@ -261,6 +245,9 @@ function SolarFlowScene({
   const lineGap = Math.max(2, Math.round(fittedScene.width * 0.01));
   const verticalGap = Math.max(8, Math.round(fittedScene.height * 0.02));
   const sceneScale = clamp(fittedScene.width / SOLAR_SCENE_BASE_WIDTH, 0.52, 1);
+  const statScale = clamp(fittedScene.width / SOLAR_SCENE_BASE_WIDTH, 0.42, 1);
+  const statWidth = Math.round(clamp(fittedScene.width * 0.33, 110, 340));
+  const statBottom = Math.round(clamp(fittedScene.height * 0.008, 2, 14));
   const homeMidX = homeBox.x + homeBox.w / 2;
   const batteryMidY = batteryBox.y + batteryBox.h / 2;
   const homeMidY = homeBox.y + homeBox.h / 2;
@@ -414,6 +401,35 @@ function SolarFlowScene({
         style={{ ...styles.nodePosition, top: carBox.y, left: carBox.x, width: carBox.w, minHeight: carBox.h }}
         value="—"
       />
+
+      {statCards[0] ? (
+        <MiniStat
+          appearance={widgetAppearance}
+          compact={compactMode}
+          cornerCompact={compactMode}
+          label={statCards[0].label}
+          mutedTextColor={mutedTextColor}
+          textColor={textColor}
+          theme={theme}
+          value={statCards[0].value}
+          scale={statScale}
+          style={[styles.sceneStat, styles.sceneStatLeft, { bottom: statBottom, width: statWidth }]}
+        />
+      ) : null}
+      {statCards[1] ? (
+        <MiniStat
+          appearance={widgetAppearance}
+          compact={compactMode}
+          cornerCompact={compactMode}
+          label={statCards[1].label}
+          mutedTextColor={mutedTextColor}
+          textColor={textColor}
+          theme={theme}
+          value={statCards[1].value}
+          scale={statScale}
+          style={[styles.sceneStat, styles.sceneStatRight, { bottom: statBottom, width: statWidth }]}
+        />
+      ) : null}
     </View>
   );
 }
@@ -597,6 +613,7 @@ function MiniStat({
   compact,
   cornerCompact,
   scale,
+  style,
 }: {
   appearance?: SolarWidgetConfig["appearance"];
   label: string;
@@ -607,6 +624,7 @@ function MiniStat({
   compact?: boolean;
   cornerCompact?: boolean;
   scale?: number;
+  style?: StyleProp<ViewStyle>;
 }) {
   const effectiveScale = clamp((scale ?? 1) * (compact ? 0.9 : 1), 0.45, 1);
   const cardPadding = Math.round(clamp(12 * effectiveScale, 6, 12));
@@ -626,6 +644,7 @@ function MiniStat({
         },
         compact ? styles.miniCompact : null,
         cornerCompact ? styles.miniCornerCompact : null,
+        style,
       ]}
     >
       <Text
@@ -801,11 +820,11 @@ function resolveBatteryIcon(soc: number | null): keyof typeof MaterialCommunityI
 
 function getDefaultNodeLayout(): SolarLayoutConfig {
   return {
-    pv: { x: 0.4, y: 0.0, w: 0.2, h: 0.12 },
-    home: { x: 0.39, y: 0.62, w: 0.22, h: 0.16 },
-    battery: { x: 0.03, y: 0.64, w: 0.19, h: 0.16 },
-    grid: { x: 0.78, y: 0.64, w: 0.19, h: 0.16 },
-    car: { x: 0.37, y: 0.94, w: 0.26, h: 0.07 },
+    pv: { x: 0.4, y: 0.03, w: 0.2, h: 0.12 },
+    home: { x: 0.39, y: 0.43, w: 0.22, h: 0.16 },
+    battery: { x: 0.03, y: 0.45, w: 0.19, h: 0.16 },
+    grid: { x: 0.78, y: 0.45, w: 0.19, h: 0.16 },
+    car: { x: 0.37, y: 0.74, w: 0.26, h: 0.1 },
   };
 }
 
@@ -1010,35 +1029,15 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 7,
   },
-  bottomRow: {
-    flexDirection: "row",
-    gap: 10,
-    flexWrap: "nowrap",
-    marginTop: 18,
-  },
-  bottomRowOverlay: {
+  sceneStat: {
     position: "absolute",
+    zIndex: 6,
+  },
+  sceneStatLeft: {
     left: 0,
+  },
+  sceneStatRight: {
     right: 0,
-    bottom: 0,
-    justifyContent: "space-between",
-    flexWrap: "nowrap",
-    alignItems: "flex-end",
-    marginTop: 0,
-    paddingHorizontal: 4,
-    zIndex: 5,
-  },
-  bottomRowOverlayVeryCompact: {
-    bottom: 2,
-    paddingHorizontal: 2,
-  },
-  bottomRowCompact: {
-    gap: 8,
-    marginTop: 10,
-  },
-  bottomRowVeryCompact: {
-    gap: 6,
-    marginTop: 8,
   },
   mini: {
     flexGrow: 1,
