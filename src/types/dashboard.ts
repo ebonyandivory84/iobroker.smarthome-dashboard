@@ -167,9 +167,11 @@ export type EnergyWidgetConfig = WidgetBase & {
 
 export type SolarWidgetConfig = WidgetBase & {
   type: "solar";
+  manualHeightOverride?: boolean;
   backgroundMode?: "color" | "image";
   backgroundImage?: string;
   backgroundImageBlur?: number;
+  statTextScale?: number;
   statePrefix: string;
   keys: {
     pvNow: string;

@@ -173,6 +173,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
           compactMode={compactWidget}
           veryCompactMode={veryCompactWidget}
           nodeLayout={config.nodeLayout}
+          statTextScale={config.statTextScale}
           statCards={statCards}
         />
       </View>
@@ -205,6 +206,7 @@ function SolarFlowScene({
   compactMode,
   veryCompactMode,
   nodeLayout,
+  statTextScale,
   statCards,
 }: {
   pvDir: FlowDir;
@@ -223,6 +225,7 @@ function SolarFlowScene({
   compactMode?: boolean;
   veryCompactMode?: boolean;
   nodeLayout?: Partial<SolarLayoutConfig>;
+  statTextScale?: number;
   statCards: Array<{ label: string; value: string }>;
 }) {
   const progress = useRef(new Animated.Value(0)).current;
@@ -267,6 +270,7 @@ function SolarFlowScene({
   const verticalGap = Math.max(8, Math.round(fittedScene.height * 0.02));
   const sceneScale = clamp(fittedScene.width / SOLAR_SCENE_BASE_WIDTH, 0.52, 1);
   const statScale = clamp(fittedScene.width / SOLAR_SCENE_BASE_WIDTH, 0.38, 1);
+  const effectiveStatTextScale = clamp(statTextScale ?? 1, 0.6, 2);
   const statWidth = Math.round(clamp(fittedScene.width * 0.33, 110, 340));
   const statBottom = Math.round(clamp(fittedScene.height * 0.008, 2, 14));
   const statGap = Math.round(clamp(8 * statScale, 4, 10));
@@ -341,8 +345,8 @@ function SolarFlowScene({
       <NodeCard
         icon="white-balance-sunny"
         label="PV"
-        iconColor="#8af7d3"
-        iconSurface="rgba(35, 98, 88, 0.34)"
+        iconColor="#ffd34f"
+        iconSurface="rgba(120, 98, 24, 0.36)"
         nodeColor={widgetAppearance?.pvCardColor}
         theme={theme}
         textColor={textColor}
@@ -443,6 +447,7 @@ function SolarFlowScene({
           theme={theme}
           value={card.value}
           scale={statScale}
+          textScale={effectiveStatTextScale}
           style={[
             styles.sceneStat,
             styles.sceneStatLeft,
@@ -465,6 +470,7 @@ function SolarFlowScene({
           theme={theme}
           value={card.value}
           scale={statScale}
+          textScale={effectiveStatTextScale}
           style={[
             styles.sceneStat,
             styles.sceneStatRight,
@@ -559,12 +565,12 @@ function NodeCard({
   sceneScale?: number;
 }) {
   const scale = clamp(sceneScale ?? 1, 0.52, 1);
-  const iconSize = Math.round(clamp(24 * scale, 14, 24));
+  const iconSize = Math.round(clamp(30 * scale, 18, 30));
   const cardPadding = Math.round(clamp(10 * scale, 5, 10));
   const cardRadius = Math.round(clamp(20 * scale, 12, 20));
-  const iconBox = Math.round(clamp(40 * scale, 24, 40));
+  const iconBox = Math.round(clamp(48 * scale, 28, 48));
   const iconRadius = Math.round(clamp(15 * scale, 10, 15));
-  const iconInnerBox = Math.round(clamp(30 * scale, 18, 30));
+  const iconInnerBox = Math.round(clamp(36 * scale, 22, 36));
   const iconInnerRadius = Math.round(clamp(12 * scale, 7, 12));
   const valueFontSize = Math.round(clamp(16 * scale, 11, 16));
   const valueMarginTop = Math.round(clamp(8 * scale, 4, 8));
@@ -658,6 +664,7 @@ function MiniStat({
   mutedTextColor,
   compact,
   scale,
+  textScale,
   style,
 }: {
   appearance?: SolarWidgetConfig["appearance"];
@@ -668,13 +675,15 @@ function MiniStat({
   mutedTextColor: string;
   compact?: boolean;
   scale?: number;
+  textScale?: number;
   style?: StyleProp<ViewStyle>;
 }) {
   const effectiveScale = clamp((scale ?? 1) * (compact ? 0.9 : 1), 0.45, 1);
+  const effectiveTextScale = clamp(textScale ?? 1, 0.6, 2);
   const cardPadding = Math.round(clamp(12 * effectiveScale, 6, 12));
   const cardRadius = Math.round(clamp(16 * effectiveScale, 10, 16));
-  const valueFontSize = Math.round(clamp(18 * effectiveScale, 10, 18));
-  const labelFontSize = Math.round(clamp(12 * effectiveScale, 8, 12));
+  const valueFontSize = Math.round(clamp(18 * effectiveScale * effectiveTextScale, 9, 30));
+  const labelFontSize = Math.round(clamp(12 * effectiveScale * effectiveTextScale, 7, 20));
 
   return (
     <View

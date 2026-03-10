@@ -244,6 +244,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       keyDaySelf: widget.keys.daySelf,
       keyPvTotal: widget.keys.pvTotal || "",
       keyBattTemp: widget.keys.battTemp || "",
+      statTextScalePct: String(Math.round((widget.statTextScale ?? 1) * 100)),
       statCount: String(solarStatDraft.count),
       stat1Label: solarStatDraft.cards[0].label,
       stat1StateId: solarStatDraft.cards[0].stateId,
@@ -501,6 +502,12 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           pvTotal: draft.keyPvTotal || undefined,
           battTemp: draft.keyBattTemp || undefined,
         },
+        statTextScale: clampFloatRange(
+          draft.statTextScalePct,
+          (widget.statTextScale ?? 1) * 100,
+          60,
+          200
+        ) / 100,
         stats: buildSolarStats(draft),
         tapAction: buildSolarTapAction(draft),
         appearance,
@@ -1368,6 +1375,14 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={draft.keyPvTotal || ""}
                   />
                 </Field>
+                <Field label="Stat Textgroesse (%)">
+                  <TextInput
+                    keyboardType="numeric"
+                    onChangeText={(value) => setDraft((current) => ({ ...current, statTextScalePct: value }))}
+                    style={styles.input}
+                    value={draft.statTextScalePct || "100"}
+                  />
+                </Field>
                 <Text style={styles.sectionTitle}>Klick-Aktion</Text>
                 <Field label="Aktion">
                   <ChoiceRow
@@ -1695,6 +1710,14 @@ function clampFloat(raw: string | undefined, fallback: number) {
     return fallback;
   }
   return parsed;
+}
+
+function clampFloatRange(raw: string | undefined, fallback: number, min: number, max: number) {
+  const parsed = Number.parseFloat(raw || "");
+  if (Number.isNaN(parsed)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, parsed));
 }
 
 const SOLAR_STAT_LIMIT = 6;

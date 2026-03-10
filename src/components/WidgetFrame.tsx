@@ -84,7 +84,7 @@ export function WidgetFrame({
       const xSteps = snap(dx / (cellWidth + gap));
       const ySteps = snapWithStep(
         dy / (rowHeight + gap),
-        current.mode === "resize" && widget.type === "camera" ? 0.1 : GRID_VERTICAL_SNAP
+        current.mode === "resize" && (widget.type === "camera" || widget.type === "solar") ? 0.1 : GRID_VERTICAL_SNAP
       );
 
       if (current.mode === "drag") {
@@ -92,13 +92,21 @@ export function WidgetFrame({
           ...widget.position,
           x: clamp(current.startPosition.x + xSteps, 0, columns - current.startPosition.w),
           y: Math.max(0, current.startPosition.y + ySteps),
-        }, columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : undefined));
+        }, columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : undefined));
       } else {
-        onCommitPosition(widget.id, constrainToPrimarySections({
-          ...widget.position,
-          w: clamp(current.startPosition.w + xSteps, 1, columns),
-          h: Math.max(widget.type === "camera" ? 0.5 : 1, current.startPosition.h + ySteps),
-        }, columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : undefined));
+        if (widget.type === "camera" || widget.type === "solar") {
+          onCommitPosition(widget.id, constrainToPrimarySections({
+            ...widget.position,
+            w: current.startPosition.w,
+            h: Math.max(widget.type === "camera" ? 0.5 : 2.5, current.startPosition.h + ySteps),
+          }, columns, { minHeight: widget.type === "camera" ? 0.5 : 2.5, heightSnap: 0.1 }));
+        } else {
+          onCommitPosition(widget.id, constrainToPrimarySections({
+            ...widget.position,
+            w: clamp(current.startPosition.w + xSteps, 1, columns),
+            h: Math.max(1, current.startPosition.h + ySteps),
+          }, columns));
+        }
       }
 
       interaction.current = null;

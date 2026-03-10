@@ -172,11 +172,16 @@ export function DashboardScreen() {
       return;
     }
     if (partial.position) {
-      const cameraConstraint = currentWidget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : undefined;
+      const positionConstraint =
+        currentWidget.type === "camera"
+          ? { minHeight: 0.5, heightSnap: 0.1 }
+          : currentWidget.type === "solar"
+            ? { minHeight: 2.5, heightSnap: 0.1 }
+            : undefined;
       updateWidget(widgetId, {
         ...partial,
-        position: constrainToPrimarySections(partial.position, config.grid.columns, cameraConstraint),
-        ...(currentWidget.type === "camera" ? { manualHeightOverride: true } : null),
+        position: constrainToPrimarySections(partial.position, config.grid.columns, positionConstraint),
+        ...(currentWidget.type === "camera" || currentWidget.type === "solar" ? { manualHeightOverride: true } : null),
       });
       return;
     }
