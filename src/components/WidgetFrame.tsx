@@ -54,6 +54,11 @@ export function WidgetFrame({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [interactionMode, setInteractionMode] = useState<"drag" | "resize" | null>(null);
   const useFreeGridConstraint = columns <= 3;
+  const isVerticalResizeWidget =
+    widget.type === "camera" ||
+    widget.type === "solar" ||
+    widget.type === "weather" ||
+    widget.type === "grafana";
 
   useEffect(() => {
     if (Platform.OS !== "web") {
@@ -85,7 +90,7 @@ export function WidgetFrame({
       const xSteps = snap(dx / (cellWidth + gap));
       const ySteps = snapWithStep(
         dy / (rowHeight + gap),
-        current.mode === "resize" && (widget.type === "camera" || widget.type === "solar") ? 0.1 : GRID_VERTICAL_SNAP
+        current.mode === "resize" && isVerticalResizeWidget ? 0.1 : GRID_VERTICAL_SNAP
       );
 
       if (current.mode === "drag") {
@@ -95,12 +100,13 @@ export function WidgetFrame({
           y: Math.max(0, current.startPosition.y + ySteps),
         }, columns, widget.type, useFreeGridConstraint, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : undefined));
       } else {
-        if (widget.type === "camera" || widget.type === "solar") {
+        if (isVerticalResizeWidget) {
+          const minHeight = widget.type === "camera" ? 0.5 : widget.type === "solar" ? 2.5 : 1;
           onCommitPosition(widget.id, constrainPositionForLayout({
             ...current.startPosition,
             w: current.startPosition.w,
-            h: Math.max(widget.type === "camera" ? 0.5 : 2.5, current.startPosition.h + ySteps),
-          }, columns, widget.type, useFreeGridConstraint, { minHeight: widget.type === "camera" ? 0.5 : 2.5, heightSnap: 0.1 }));
+            h: Math.max(minHeight, current.startPosition.h + ySteps),
+          }, columns, widget.type, useFreeGridConstraint, { minHeight, heightSnap: 0.1 }));
         } else {
           onCommitPosition(widget.id, constrainPositionForLayout({
             ...current.startPosition,
@@ -124,7 +130,7 @@ export function WidgetFrame({
       window.removeEventListener("pointerup", handlePointerUp);
       window.removeEventListener("pointercancel", handlePointerUp);
     };
-  }, [cellWidth, columns, gap, onCommitPosition, rowHeight, useFreeGridConstraint, widget]);
+  }, [cellWidth, columns, gap, isVerticalResizeWidget, onCommitPosition, rowHeight, useFreeGridConstraint, widget]);
 
   const beginInteraction = (mode: "drag" | "resize", clientX: number, clientY: number) => {
     interaction.current = {

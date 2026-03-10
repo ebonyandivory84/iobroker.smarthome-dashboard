@@ -139,7 +139,11 @@ export function GridCanvas({
                 gap={displayConfig.grid.gap}
                 isLayoutMode={effectiveLayoutMode}
                 allowManualLayout={!isCompactViewport || Platform.OS === "web"}
-                allowResize={widget.type === "camera" || widget.type === "solar"}
+                allowResize={
+                  widget.type === "camera" ||
+                  widget.type === "solar" ||
+                  (isCompactViewport && (widget.type === "weather" || widget.type === "grafana"))
+                }
                 onCommitPosition={(widgetId, position) =>
                   onUpdateWidget(widgetId, {
                     position: mapDisplayPositionToSourceHint(position, displayConfig.grid.columns, config.grid.columns, {
