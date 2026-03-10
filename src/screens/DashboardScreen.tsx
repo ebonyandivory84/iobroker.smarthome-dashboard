@@ -172,6 +172,18 @@ export function DashboardScreen() {
     if (!currentWidget) {
       return;
     }
+    if (partial.mobilePosition) {
+      updateWidget(widgetId, {
+        ...partial,
+        ...(currentWidget.type === "camera" ||
+        currentWidget.type === "solar" ||
+        currentWidget.type === "weather" ||
+        currentWidget.type === "grafana"
+          ? { manualHeightOverride: true }
+          : null),
+      });
+      return;
+    }
     if (partial.position) {
       const positionConstraint =
         currentWidget.type === "camera"

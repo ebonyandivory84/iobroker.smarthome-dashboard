@@ -102,6 +102,21 @@ export function GridCanvas({
     return maxRow * (renderRowHeight + displayConfig.grid.gap) + 120;
   }, [displayConfig.grid.gap, displayConfig.widgets, renderRowHeight]);
 
+  useEffect(() => {
+    if (!isCompactViewport) {
+      return;
+    }
+
+    const sourceById = new Map(config.widgets.map((widget) => [widget.id, widget]));
+    for (const displayWidget of displayConfig.widgets) {
+      const sourceWidget = sourceById.get(displayWidget.id);
+      if (!sourceWidget || sourceWidget.mobilePosition) {
+        continue;
+      }
+      onUpdateWidget(displayWidget.id, { mobilePosition: displayWidget.position });
+    }
+  }, [config.widgets, displayConfig.widgets, isCompactViewport, onUpdateWidget]);
+
   const handleLayout = (event: LayoutChangeEvent) => {
     const nextWidth = event.nativeEvent.layout.width;
     setContainerWidth(nextWidth);
@@ -153,14 +168,19 @@ export function GridCanvas({
                   (Platform.OS === "web" && (widget.type === "weather" || widget.type === "grafana"))
                 }
                 onCommitPosition={(widgetId, position) =>
-                  onUpdateWidget(widgetId, {
-                    position: mapDisplayPositionToSourceHint(position, displayConfig.grid.columns, config.grid.columns, {
-                      stackPrimarySections: isCompactViewport,
-                      displayCurrent: widget.position,
-                      sourceCurrent: config.widgets.find((entry) => entry.id === widgetId)?.position,
-                      widgetType: widget.type,
-                    }),
-                  })
+                  onUpdateWidget(
+                    widgetId,
+                    isCompactViewport
+                      ? { mobilePosition: position }
+                      : {
+                          position: mapDisplayPositionToSourceHint(position, displayConfig.grid.columns, config.grid.columns, {
+                            stackPrimarySections: isCompactViewport,
+                            displayCurrent: widget.position,
+                            sourceCurrent: config.widgets.find((entry) => entry.id === widgetId)?.position,
+                            widgetType: widget.type,
+                          }),
+                        }
+                  )
                 }
                 onEdit={onEditWidget}
                 onRemove={onRemoveWidget}
@@ -275,19 +295,22 @@ function buildCompactStackedLayoutConfig(
   const sectionCount = 3;
   const sectionSpacing = 0.5;
   const sortedWidgets = [...config.widgets].sort((a, b) => {
-    if (a.position.y !== b.position.y) {
-      return a.position.y - b.position.y;
+    const aSeed = a.mobilePosition || a.position;
+    const bSeed = b.mobilePosition || b.position;
+    if (aSeed.y !== bSeed.y) {
+      return aSeed.y - bSeed.y;
     }
-    if (a.position.x !== b.position.x) {
-      return a.position.x - b.position.x;
+    if (aSeed.x !== bSeed.x) {
+      return aSeed.x - bSeed.x;
     }
     return a.id.localeCompare(b.id);
   });
 
   const sectionMinY = Array.from({ length: sectionCount }, () => Number.POSITIVE_INFINITY);
   for (const widget of sortedWidgets) {
+    const seed = widget.mobilePosition || widget.position;
     const sectionIndex = getPreferredDesktopSection(widget, sourceColumns);
-    sectionMinY[sectionIndex] = Math.min(sectionMinY[sectionIndex], Math.max(0, widget.position.y));
+    sectionMinY[sectionIndex] = Math.min(sectionMinY[sectionIndex], Math.max(0, seed.y));
   }
   for (let index = 0; index < sectionCount; index += 1) {
     if (!Number.isFinite(sectionMinY[index])) {
@@ -300,15 +323,21 @@ function buildCompactStackedLayoutConfig(
   );
   const sectionBottoms = Array.from({ length: sectionCount }, () => 0);
   const widgetsWithSection = sortedWidgets.map((widget) => {
-    const spec = getAutoLayoutSpec(widget, columns, options);
+    const seed = widget.mobilePosition || widget.position;
+    const mobileAwareWidget = widget.mobilePosition ? { ...widget, position: seed } : widget;
+    const spec = getAutoLayoutSpec(mobileAwareWidget, columns, options);
     const sectionIndex = getPreferredDesktopSection(widget, sourceColumns);
     const sourceSectionWidth = sourceColumns / sectionCount;
     const sectionStart = sectionIndex * sourceSectionWidth;
-    const normalizedLocalX = sourceSectionWidth > 0 ? (widget.position.x - sectionStart) / sourceSectionWidth : 0;
+    const normalizedLocalX = widget.mobilePosition
+      ? (columns > 0 ? seed.x / columns : 0)
+      : sourceSectionWidth > 0
+        ? (seed.x - sectionStart) / sourceSectionWidth
+        : 0;
     const desiredStart = spec.w >= columns
       ? 0
       : clamp(Math.round(normalizedLocalX * columns), 0, Math.max(0, columns - spec.w));
-    const desiredY = Math.max(0, widget.position.y - sectionMinY[sectionIndex]);
+    const desiredY = Math.max(0, seed.y - sectionMinY[sectionIndex]);
     const sectionHeights = sectionColumnHeights[sectionIndex];
     const maxStart = Math.max(0, columns - spec.w);
     let bestStart = desiredStart;

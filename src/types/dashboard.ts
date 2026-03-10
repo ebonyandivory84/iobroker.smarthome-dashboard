@@ -41,6 +41,7 @@ export type WidgetBase = {
   showTitle?: boolean;
   iconPair?: IconPair;
   position: GridPosition;
+  mobilePosition?: GridPosition;
   appearance?: WidgetAppearance;
   interactionSounds?: WidgetInteractionSounds;
 };
