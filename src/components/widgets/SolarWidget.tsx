@@ -13,6 +13,8 @@ type SolarWidgetProps = {
 };
 
 type FlowDir = "toHome" | "fromHome" | "idle";
+const SOLAR_SCENE_BASE_WIDTH = 960;
+const SOLAR_SCENE_BASE_HEIGHT = 520;
 
 export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
   const resolvedTheme = resolveThemeSettings(theme);
@@ -213,7 +215,7 @@ function SolarFlowScene({
   nodeLayout?: Partial<SolarLayoutConfig>;
 }) {
   const progress = useRef(new Animated.Value(0)).current;
-  const [sceneLayout, setSceneLayout] = useState({ width: 960, height: 520 });
+  const [sceneLayout, setSceneLayout] = useState({ width: SOLAR_SCENE_BASE_WIDTH, height: SOLAR_SCENE_BASE_HEIGHT });
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -228,16 +230,29 @@ function SolarFlowScene({
     return () => loop.stop();
   }, [progress]);
 
-  const defaults = getDefaultNodeLayout(sceneLayout, compactMode, veryCompactMode);
-  const effectiveNodeLayout = compactMode || veryCompactMode ? undefined : nodeLayout;
-  const pvBox = resolveNodeBox(effectiveNodeLayout?.pv, defaults.pv, sceneLayout);
-  const homeBox = resolveNodeBox(effectiveNodeLayout?.home, defaults.home, sceneLayout);
-  const batteryBox = resolveNodeBox(effectiveNodeLayout?.battery, defaults.battery, sceneLayout);
-  const gridBox = resolveNodeBox(effectiveNodeLayout?.grid, defaults.grid, sceneLayout);
-  const carBox = resolveNodeBox(effectiveNodeLayout?.car, defaults.car, sceneLayout);
-  const flowDotSize = veryCompactMode ? 8 : compactMode ? 10 : 12;
-  const lineGap = veryCompactMode ? 8 : compactMode ? 10 : 2;
-  const verticalGap = veryCompactMode ? 10 : compactMode ? 14 : 10;
+  const fittedScene = useMemo(() => {
+    const availableWidth = Math.max(1, sceneLayout.width);
+    const availableHeight = Math.max(1, sceneLayout.height);
+    const scale = Math.min(availableWidth / SOLAR_SCENE_BASE_WIDTH, availableHeight / SOLAR_SCENE_BASE_HEIGHT);
+    const width = Math.max(1, SOLAR_SCENE_BASE_WIDTH * scale);
+    const height = Math.max(1, SOLAR_SCENE_BASE_HEIGHT * scale);
+    return {
+      x: (availableWidth - width) / 2,
+      y: (availableHeight - height) / 2,
+      width,
+      height,
+    };
+  }, [sceneLayout]);
+
+  const defaults = getDefaultNodeLayout();
+  const pvBox = resolveNodeBox(nodeLayout?.pv, defaults.pv, fittedScene);
+  const homeBox = resolveNodeBox(nodeLayout?.home, defaults.home, fittedScene);
+  const batteryBox = resolveNodeBox(nodeLayout?.battery, defaults.battery, fittedScene);
+  const gridBox = resolveNodeBox(nodeLayout?.grid, defaults.grid, fittedScene);
+  const carBox = resolveNodeBox(nodeLayout?.car, defaults.car, fittedScene);
+  const flowDotSize = Math.max(8, Math.min(12, Math.round(fittedScene.width * 0.012)));
+  const lineGap = Math.max(2, Math.round(fittedScene.width * 0.01));
+  const verticalGap = Math.max(8, Math.round(fittedScene.height * 0.02));
   const homeMidX = homeBox.x + homeBox.w / 2;
   const batteryMidY = batteryBox.y + batteryBox.h / 2;
   const homeMidY = homeBox.y + homeBox.h / 2;
@@ -717,34 +732,7 @@ function resolveBatteryIcon(soc: number | null): keyof typeof MaterialCommunityI
   return "battery-outline";
 }
 
-function getDefaultNodeLayout(
-  scene: { width: number; height: number },
-  compactMode?: boolean,
-  veryCompactMode?: boolean
-): SolarLayoutConfig {
-  const compactSingleColumn = veryCompactMode || scene.width <= 420 || scene.height <= 260;
-  const compactTablet = (!compactSingleColumn && compactMode) || (scene.width > 420 && scene.width <= 620) || scene.height <= 340;
-
-  if (compactSingleColumn) {
-    return {
-      pv: { x: 0.385, y: 0.015, w: 0.23, h: 0.2 },
-      home: { x: 0.38, y: 0.355, w: 0.24, h: 0.24 },
-      battery: { x: 0.0, y: 0.385, w: 0.2, h: 0.18 },
-      grid: { x: 0.8, y: 0.385, w: 0.2, h: 0.18 },
-      car: { x: 0.35, y: 0.76, w: 0.3, h: 0.16 },
-    };
-  }
-
-  if (compactTablet) {
-    return {
-      pv: { x: 0.38, y: 0.02, w: 0.24, h: 0.18 },
-      home: { x: 0.39, y: 0.52, w: 0.22, h: 0.2 },
-      battery: { x: 0.0, y: 0.53, w: 0.22, h: 0.18 },
-      grid: { x: 0.78, y: 0.53, w: 0.22, h: 0.18 },
-      car: { x: 0.35, y: 0.9, w: 0.3, h: 0.14 },
-    };
-  }
-
+function getDefaultNodeLayout(): SolarLayoutConfig {
   return {
     pv: { x: 0.44, y: 0.02, w: 0.12, h: 0.18 },
     home: { x: 0.44, y: 0.25, w: 0.12, h: 0.18 },
@@ -757,16 +745,18 @@ function getDefaultNodeLayout(
 function resolveNodeBox(
   partial: Partial<SolarNodeLayout> | undefined,
   fallback: SolarNodeLayout,
-  scene: { width: number; height: number }
+  scene: { x?: number; y?: number; width: number; height: number }
 ) {
+  const offsetX = Number.isFinite(scene.x) ? Number(scene.x) : 0;
+  const offsetY = Number.isFinite(scene.y) ? Number(scene.y) : 0;
   const x = clamp(typeof partial?.x === "number" ? partial.x : fallback.x, 0, 1);
   const y = clamp(typeof partial?.y === "number" ? partial.y : fallback.y, 0, 1);
   const w = clamp(typeof partial?.w === "number" ? partial.w : fallback.w, 0.06, 0.4);
   const h = clamp(typeof partial?.h === "number" ? partial.h : fallback.h, 0.08, 0.4);
   const width = scene.width * w;
   const height = scene.height * h;
-  const left = clamp(scene.width * x, 0, Math.max(0, scene.width - width));
-  const top = clamp(scene.height * y, 0, Math.max(0, scene.height - height));
+  const left = offsetX + clamp(scene.width * x, 0, Math.max(0, scene.width - width));
+  const top = offsetY + clamp(scene.height * y, 0, Math.max(0, scene.height - height));
 
   return {
     x: left,
