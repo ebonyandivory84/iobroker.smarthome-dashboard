@@ -464,6 +464,7 @@ function getAutoLayoutSpec(
   columns: number,
   options?: {
     isTabletLikeWeb?: boolean;
+    stackPrimarySections?: boolean;
   }
 ) {
   const fallbackHeight = widget.position.h;
@@ -485,8 +486,14 @@ function getAutoLayoutSpec(
         }
         return { w: 1, h: roundGridUnit(3.8) };
       case "grafana":
+        if (widget.manualHeightOverride) {
+          return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
+        }
         return { w: 1, h: roundGridUnit(2.8) };
       case "weather":
+        if (widget.manualHeightOverride) {
+          return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
+        }
         return { w: 1, h: roundGridUnit(1.8) };
       case "energy":
         return { w: 1, h: roundGridUnit(2) };
@@ -520,8 +527,14 @@ function getAutoLayoutSpec(
       // while still leaving enough room for in-scene stat cards.
       return { w: mainColumnWidth, h: roundGridUnit(3.5) };
     case "grafana":
+      if (options?.stackPrimarySections && widget.manualHeightOverride) {
+        return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(fallbackHeight)) };
+      }
       return { w: mainColumnWidth, h: roundGridUnit(2.2) };
     case "weather":
+      if (options?.stackPrimarySections && widget.manualHeightOverride) {
+        return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(fallbackHeight)) };
+      }
       return { w: mainColumnWidth, h: roundGridUnit(2.2) };
     case "energy":
       return { w: mainColumnWidth, h: roundGridUnit(2.4) };

@@ -99,6 +99,7 @@ export type CameraWidgetConfig = WidgetBase & {
 
 export type GrafanaWidgetConfig = WidgetBase & {
   type: "grafana";
+  manualHeightOverride?: boolean;
   url: string;
   refreshMs?: number;
   allowInteractions?: boolean;
@@ -106,6 +107,7 @@ export type GrafanaWidgetConfig = WidgetBase & {
 
 export type WeatherWidgetConfig = WidgetBase & {
   type: "weather";
+  manualHeightOverride?: boolean;
   latitude: number;
   longitude: number;
   locationName?: string;
