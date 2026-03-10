@@ -378,7 +378,9 @@ function getAutoLayoutSpec(
       return { w: mainColumnWidth, h: Math.max(0.5, roundCameraGridUnit(mainColumnWidth / ratio)) };
     }
     case "solar":
-      return { w: mainColumnWidth, h: roundGridUnit(options?.isTabletLikeWeb ? 5.5 : 3.2) };
+      // Keep solar height stable across breakpoints to avoid abrupt vertical jumps
+      // while still leaving enough room for in-scene stat cards.
+      return { w: mainColumnWidth, h: roundGridUnit(3.5) };
     case "grafana":
       return { w: mainColumnWidth, h: roundGridUnit(2.2) };
     case "weather":
