@@ -14,7 +14,7 @@ type SolarWidgetProps = {
 
 type FlowDir = "toHome" | "fromHome" | "idle";
 const SOLAR_SCENE_BASE_WIDTH = 960;
-const SOLAR_SCENE_BASE_HEIGHT = 520;
+const SOLAR_SCENE_BASE_HEIGHT = 960;
 
 export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
   const resolvedTheme = resolveThemeSettings(theme);
