@@ -238,7 +238,8 @@ function SolarFlowScene({
     const height = Math.max(1, SOLAR_SCENE_BASE_HEIGHT * scale);
     return {
       x: (availableWidth - width) / 2,
-      y: (availableHeight - height) / 2,
+      // Anchor to top so vertical space is used for larger node distances.
+      y: 0,
       width,
       height,
     };
@@ -389,7 +390,6 @@ function SolarFlowScene({
         sceneScale={sceneScale}
         style={{ ...styles.nodePosition, top: gridBox.y, left: gridBox.x, width: gridBox.w, minHeight: gridBox.h }}
         value={fmtW(gridPower || null)}
-        meta={gridDir === "toHome" ? "Bezug" : gridDir === "fromHome" ? "Einspeisung" : "Idle"}
         highlight={gridDir !== "idle"}
       />
       <NodeCard
@@ -764,9 +764,9 @@ function resolveBatteryIcon(soc: number | null): keyof typeof MaterialCommunityI
 function getDefaultNodeLayout(): SolarLayoutConfig {
   return {
     pv: { x: 0.4, y: 0.0, w: 0.2, h: 0.12 },
-    home: { x: 0.39, y: 0.5, w: 0.22, h: 0.16 },
-    battery: { x: 0.08, y: 0.5, w: 0.19, h: 0.16 },
-    grid: { x: 0.73, y: 0.5, w: 0.19, h: 0.16 },
+    home: { x: 0.39, y: 0.58, w: 0.22, h: 0.16 },
+    battery: { x: 0.08, y: 0.58, w: 0.19, h: 0.16 },
+    grid: { x: 0.73, y: 0.58, w: 0.19, h: 0.16 },
     car: { x: 0.35, y: 0.92, w: 0.3, h: 0.08 },
   };
 }
