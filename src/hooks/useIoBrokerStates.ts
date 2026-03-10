@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { IoBrokerClient } from "../services/iobroker";
-import { StateSnapshot } from "../types/dashboard";
+import { StateSnapshot, WidgetConfig } from "../types/dashboard";
+import { resolveMobileWidget } from "../utils/mobileWidget";
 
 export type StateWriteFeedback = {
   expectedValue: unknown;
@@ -9,40 +10,45 @@ export type StateWriteFeedback = {
   updatedAt: number;
 };
 
+const collectWidgetStateIds = (widget: WidgetConfig) => {
+  if (widget.type === "state") {
+    return [widget.stateId];
+  }
+  if (widget.type === "energy") {
+    return [
+      widget.pvStateId,
+      widget.houseStateId,
+      widget.batteryStateId || "",
+      widget.gridStateId || "",
+    ];
+  }
+  if (widget.type === "solar") {
+    const prefix = widget.statePrefix;
+    const withPrefix = (key?: string) => (key ? `${prefix}.${key}` : "");
+    return [
+      withPrefix(widget.keys.pvNow),
+      withPrefix(widget.keys.homeNow),
+      withPrefix(widget.keys.gridIn),
+      withPrefix(widget.keys.gridOut),
+      withPrefix(widget.keys.soc),
+      withPrefix(widget.keys.battIn),
+      withPrefix(widget.keys.battOut),
+      withPrefix(widget.keys.dayConsumed),
+      withPrefix(widget.keys.daySelf),
+      withPrefix(widget.keys.pvTotal),
+      withPrefix(widget.keys.battTemp),
+      widget.stats?.first?.stateId || "",
+      widget.stats?.second?.stateId || "",
+      widget.stats?.third?.stateId || "",
+    ];
+  }
+  return [];
+};
+
 const pickStateIds = (widgets: ReturnType<typeof useDashboardConfig>["config"]["widgets"]) =>
   widgets.flatMap((widget) => {
-    if (widget.type === "state") {
-      return [widget.stateId];
-    }
-    if (widget.type === "energy") {
-      return [
-        widget.pvStateId,
-        widget.houseStateId,
-        widget.batteryStateId || "",
-        widget.gridStateId || "",
-      ];
-    }
-    if (widget.type === "solar") {
-      const prefix = widget.statePrefix;
-      const withPrefix = (key?: string) => (key ? `${prefix}.${key}` : "");
-      return [
-        withPrefix(widget.keys.pvNow),
-        withPrefix(widget.keys.homeNow),
-        withPrefix(widget.keys.gridIn),
-        withPrefix(widget.keys.gridOut),
-        withPrefix(widget.keys.soc),
-        withPrefix(widget.keys.battIn),
-        withPrefix(widget.keys.battOut),
-        withPrefix(widget.keys.dayConsumed),
-        withPrefix(widget.keys.daySelf),
-        withPrefix(widget.keys.pvTotal),
-        withPrefix(widget.keys.battTemp),
-        widget.stats?.first?.stateId || "",
-        widget.stats?.second?.stateId || "",
-        widget.stats?.third?.stateId || "",
-      ];
-    }
-    return [];
+    const mobileVariant = resolveMobileWidget(widget);
+    return [...collectWidgetStateIds(widget), ...collectWidgetStateIds(mobileVariant)];
   });
 
 const normalizeStateIds = (stateIds: string[]) =>

@@ -9,6 +9,7 @@ import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { useIoBrokerStates } from "../hooks/useIoBrokerStates";
 import { BackgroundMode, WidgetConfig, WidgetType } from "../types/dashboard";
 import { constrainToPrimarySections, normalizeWidgetLayout, resolveWidgetPosition } from "../utils/gridLayout";
+import { buildMobileOverrideFromWidget, resolveMobileWidget } from "../utils/mobileWidget";
 import { configureUiSounds, playConfiguredUiSound, primeConfiguredSounds } from "../utils/uiSounds";
 import { buildWidgetTemplate } from "../utils/widgetFactory";
 import { palette } from "../utils/theme";
@@ -16,6 +17,7 @@ import { palette } from "../utils/theme";
 export function DashboardScreen() {
   const { width } = useWindowDimensions();
   const isCompact = width < 700;
+  const activeLayoutTarget: "desktop" | "mobile" = isCompact ? "mobile" : "desktop";
   const [isTouchCapableWeb, setIsTouchCapableWeb] = useState(false);
   const isTouchLayout = width < 1100 || isTouchCapableWeb;
   const horizontalPagerRef = useRef<ScrollView | null>(null);
@@ -173,6 +175,23 @@ export function DashboardScreen() {
       return;
     }
     if (partial.mobilePosition) {
+      if (activeLayoutTarget === "mobile") {
+        const currentMobile = resolveMobileWidget(currentWidget);
+        const nextMobileOverride = {
+          ...buildMobileOverrideFromWidget(currentMobile),
+          ...(currentWidget.type === "camera" ||
+          currentWidget.type === "solar" ||
+          currentWidget.type === "weather" ||
+          currentWidget.type === "grafana"
+            ? { manualHeightOverride: true }
+            : null),
+        };
+        updateWidget(widgetId, {
+          mobilePosition: partial.mobilePosition,
+          mobileOverride: nextMobileOverride,
+        });
+        return;
+      }
       updateWidget(widgetId, {
         ...partial,
         ...(currentWidget.type === "camera" ||
@@ -181,6 +200,26 @@ export function DashboardScreen() {
         currentWidget.type === "grafana"
           ? { manualHeightOverride: true }
           : null),
+      });
+      return;
+    }
+    if (activeLayoutTarget === "mobile") {
+      const currentMobile = resolveMobileWidget(currentWidget);
+      const nextMobileWidget = {
+        ...currentMobile,
+        ...partial,
+      } as WidgetConfig;
+      const nextMobileOverride = {
+        ...buildMobileOverrideFromWidget(nextMobileWidget),
+        ...(currentWidget.type === "camera" ||
+        currentWidget.type === "solar" ||
+        currentWidget.type === "weather" ||
+        currentWidget.type === "grafana"
+          ? { manualHeightOverride: true }
+          : null),
+      };
+      updateWidget(widgetId, {
+        mobileOverride: nextMobileOverride,
       });
       return;
     }
@@ -239,8 +278,13 @@ export function DashboardScreen() {
     playConfiguredUiSound(config.uiSounds?.pageSounds?.swipe, "swipe", "global:dragEdgePageTransfer");
   };
 
-  const editingWidget: WidgetConfig | null =
+  const editingWidgetBase: WidgetConfig | null =
     config.widgets.find((widget) => widget.id === editingWidgetId) || null;
+  const editingWidget: WidgetConfig | null = editingWidgetBase
+    ? activeLayoutTarget === "mobile"
+      ? resolveMobileWidget(editingWidgetBase)
+      : editingWidgetBase
+    : null;
 
   const resolvePageFromOffset = (offsetX: number) => {
     if (!width) {

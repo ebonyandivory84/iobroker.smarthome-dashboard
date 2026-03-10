@@ -168,7 +168,8 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
             </View>
             <Text style={styles.helper}>
               Es gibt zwei getrennte JSON-Editoren: Desktop/Tablet und Mobile. Du kannst Desktop direkt nach
-              Mobile kopieren und dort Positionen und Groessen separat feintunen.
+              Mobile kopieren und dort alle Widget-Einstellungen (z.B. Trigger, Bilder, Sounds, Position/Groesse)
+              separat feintunen.
             </Text>
             <View style={styles.metaRow}>
               <MetaPill label="Home" value={config.homeLabel || "My Home"} />

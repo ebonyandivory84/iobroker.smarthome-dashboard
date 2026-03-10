@@ -5,6 +5,7 @@ import { StateWriteFeedback } from "../hooks/useIoBrokerStates";
 import { IoBrokerClient } from "../services/iobroker";
 import { DashboardSettings, StateSnapshot, WidgetConfig, WidgetInteractionSounds, WidgetType } from "../types/dashboard";
 import { constrainToPrimarySections, GRID_SNAP, GRID_VERTICAL_SNAP } from "../utils/gridLayout";
+import { applyMobileOverridesToSettings } from "../utils/mobileWidget";
 import { playConfiguredUiSound } from "../utils/uiSounds";
 import { resolveThemeSettings } from "../utils/themeConfig";
 import { palette } from "../utils/theme";
@@ -65,9 +66,13 @@ export function GridCanvas({
   const effectiveLayoutMode = isLayoutMode;
   const displayGap = Platform.OS === "web" && !isCompactWeb ? Math.max(config.grid.gap, 18) : config.grid.gap;
   const mainColumnExtraGap = Platform.OS === "web" && !isCompactWeb ? displayGap * 2 : 0;
+  const renderConfig = useMemo(
+    () => (isCompactViewport ? applyMobileOverridesToSettings(config) : config),
+    [config, isCompactViewport]
+  );
   const displayConfig = useMemo(
     () => {
-      const next = buildResponsiveAutoLayoutConfig(config, displayColumns, {
+      const next = buildResponsiveAutoLayoutConfig(renderConfig, displayColumns, {
         isTabletLikeWeb,
         stackPrimarySections: isCompactViewport,
       });
@@ -79,7 +84,7 @@ export function GridCanvas({
         },
       };
     },
-    [config, displayColumns, displayGap, isCompactViewport, isTabletLikeWeb]
+    [displayColumns, displayGap, isCompactViewport, isTabletLikeWeb, renderConfig]
   );
   const useStructuredGridSizing = true;
   const canvasInset = Platform.OS === "web" ? 64 : 60;

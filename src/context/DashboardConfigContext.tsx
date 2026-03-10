@@ -9,6 +9,7 @@ import {
 import { CameraWidgetConfig, DashboardPage, DashboardSettings, UiSoundSettings, WidgetConfig } from "../types/dashboard";
 import { defaultConfig } from "../utils/defaultConfig";
 import { normalizeSoundSelection } from "../utils/lcarsSounds";
+import { buildMobileOverrideFromWidget, resolveMobileWidget, stripMobileWidgetMeta } from "../utils/mobileWidget";
 
 type DashboardConfigContextValue = {
   config: DashboardSettings;
@@ -519,12 +520,8 @@ function buildMobileJsonSnapshot(input: DashboardSettings) {
   const pages = (normalized.pages || []).map((page) => ({
     ...page,
     widgets: page.widgets.map((widget) => {
-      const mobilePosition = widget.mobilePosition || widget.position;
-      return {
-        ...widget,
-        position: mobilePosition,
-        mobilePosition: undefined,
-      } as WidgetConfig;
+      const mobileWidget = resolveMobileWidget(widget);
+      return stripMobileWidgetMeta(mobileWidget);
     }),
   }));
   const activePage =
@@ -572,6 +569,7 @@ function applyMobileLayoutConfig(
       return {
         ...widget,
         mobilePosition: source.mobilePosition || source.position,
+        mobileOverride: buildMobileOverrideFromWidget(source),
       };
     }),
   }));

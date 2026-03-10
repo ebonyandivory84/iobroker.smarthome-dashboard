@@ -42,6 +42,7 @@ export type WidgetBase = {
   iconPair?: IconPair;
   position: GridPosition;
   mobilePosition?: GridPosition;
+  mobileOverride?: Record<string, unknown>;
   appearance?: WidgetAppearance;
   interactionSounds?: WidgetInteractionSounds;
 };
