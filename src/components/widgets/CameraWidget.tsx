@@ -1371,12 +1371,7 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv" | 
 function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
   const includeDirect = shouldUseDirectWebStream(targetUrl, streamType);
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
-  const directFirst = includeDirect && shouldPrioritizeDirectWebStream(targetUrl, streamType);
-  const sources = includeDirect
-    ? directFirst
-      ? [targetUrl, ...proxySources]
-      : [...proxySources, targetUrl]
-    : proxySources;
+  const sources = [...proxySources, ...(includeDirect ? [targetUrl] : [])];
   return Array.from(new Set(sources.filter(Boolean)));
 }
 
@@ -1428,38 +1423,6 @@ function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv"
   }
 
   return true;
-}
-
-function shouldPrioritizeDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
-  if (streamType !== "mjpeg" || Platform.OS !== "web" || typeof window === "undefined") {
-    return false;
-  }
-
-  if (isMixedContentBlocked(targetUrl)) {
-    return false;
-  }
-
-  try {
-    const parsed = new URL(targetUrl);
-    const hasEmbeddedCredentials = Boolean(parsed.username || parsed.password);
-    const hasQueryCredentials =
-      Boolean(parsed.searchParams.get("user")) ||
-      Boolean(parsed.searchParams.get("username")) ||
-      Boolean(parsed.searchParams.get("password")) ||
-      Boolean(parsed.searchParams.get("pass")) ||
-      Boolean(parsed.searchParams.get("pwd"));
-    const localHostLike =
-      parsed.hostname === "localhost" ||
-      parsed.hostname === "127.0.0.1" ||
-      parsed.hostname === "::1" ||
-      parsed.hostname.endsWith(".local") ||
-      parsed.hostname.startsWith("192.168.") ||
-      parsed.hostname.startsWith("10.") ||
-      /^172\.(1[6-9]|2\d|3[0-1])\./.test(parsed.hostname);
-    return hasEmbeddedCredentials || hasQueryCredentials || localHostLike;
-  } catch {
-    return true;
-  }
 }
 
 function isMixedContentBlocked(targetUrl: string) {

@@ -439,26 +439,6 @@ function buildCameraFetchOptions(targetUrl) {
 }
 
 function proxyCameraStream(requestConfig, req, res, streamType, redirects, authRetries = 0) {
-  if (
-    streamType === "mjpeg" &&
-    authRetries === 0 &&
-    requestConfig.auth?.username &&
-    !requestConfig.auth?.hasQueryCredentials
-  ) {
-    try {
-      const enrichedUrl = new URL(requestConfig.url);
-      enrichedUrl.searchParams.set("user", requestConfig.auth.username);
-      enrichedUrl.searchParams.set("pwd", requestConfig.auth.password || "");
-      const enrichedConfig = buildCameraRequestConfig(enrichedUrl.toString());
-      if (!enrichedConfig.headers.Authorization && requestConfig.headers.Authorization) {
-        enrichedConfig.headers.Authorization = requestConfig.headers.Authorization;
-      }
-      requestConfig = enrichedConfig;
-    } catch {
-      // keep original requestConfig if URL enrichment fails
-    }
-  }
-
   const sanitizedUrl = sanitizeCameraUrlForLog(requestConfig.url);
   const log = runningAdapter?.log;
   let parsed;
