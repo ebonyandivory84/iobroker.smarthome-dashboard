@@ -187,6 +187,7 @@ export type SolarWidgetConfig = WidgetBase & {
     battTemp?: string;
   };
   dailyEnergyUnit?: "auto" | "Wh" | "kWh";
+  statValueUnit?: "none" | "W" | "kW" | "Wh" | "kWh";
   nodeLayout?: Partial<SolarLayoutConfig>;
   stats?: {
     count?: number;

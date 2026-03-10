@@ -171,6 +171,7 @@ export function buildWidgetTemplate(
       battTemp: "battery_temp",
     },
     dailyEnergyUnit: "auto",
+    statValueUnit: "none",
     position: {
       ...basePosition,
       w: Math.min(8, grid.columns),

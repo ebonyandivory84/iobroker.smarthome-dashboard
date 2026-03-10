@@ -839,7 +839,7 @@ function resolveSolarStatCards(
     const fallback = index === 0 ? fmtKWh(daySelfKWh) : index === 1 ? fmtKWh(dayConsumedKWh) : "—";
     return {
       label: entry.label,
-      value: resolveSolarStatValue(rawValue, fallback),
+      value: resolveSolarStatValue(rawValue, fallback, config.statValueUnit || "none"),
     };
   });
 }
@@ -886,13 +886,24 @@ function normalizeExternalUrl(raw: string) {
   return `https://${value}`;
 }
 
-function resolveSolarStatValue(rawValue: unknown, fallback: string) {
+function resolveSolarStatValue(
+  rawValue: unknown,
+  fallback: string,
+  unit: SolarWidgetConfig["statValueUnit"] = "none"
+) {
   if (rawValue === undefined) {
     return fallback;
   }
   if (rawValue === null) {
     return "—";
   }
+
+  const parsedNumber = asNumber(rawValue);
+
+  if (parsedNumber !== null && unit && unit !== "none") {
+    return formatSolarStatNumberWithUnit(parsedNumber, unit);
+  }
+
   if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
     if (Math.abs(rawValue) >= 1000) {
       return rawValue.toLocaleString("de-DE", { maximumFractionDigits: 0 });
@@ -903,6 +914,12 @@ function resolveSolarStatValue(rawValue: unknown, fallback: string) {
     return rawValue.toLocaleString("de-DE", { maximumFractionDigits: 1 });
   }
   return String(rawValue);
+}
+
+function formatSolarStatNumberWithUnit(value: number, unit: "W" | "kW" | "Wh" | "kWh") {
+  const fractionDigits = unit === "kW" || unit === "kWh" ? 1 : 0;
+  const formatted = value.toLocaleString("de-DE", { maximumFractionDigits: fractionDigits });
+  return `${formatted} ${unit}`;
 }
 
 function resolveBatteryIcon(soc: number | null): keyof typeof MaterialCommunityIcons.glyphMap {

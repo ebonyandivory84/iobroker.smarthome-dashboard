@@ -70,6 +70,9 @@ export function WidgetFrame({
       if (!current) {
         return;
       }
+      if (event.cancelable) {
+        event.preventDefault();
+      }
 
       const dx = event.clientX - current.startX;
       const dy = event.clientY - current.startY;
@@ -83,6 +86,9 @@ export function WidgetFrame({
       const current = interaction.current;
       if (!current) {
         return;
+      }
+      if (event.cancelable) {
+        event.preventDefault();
       }
 
       const dx = event.clientX - current.startX;

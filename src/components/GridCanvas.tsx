@@ -49,9 +49,16 @@ export function GridCanvas({
   onCameraFullscreenVisibilityChange,
   onDragAcrossPageEdge,
 }: GridCanvasProps) {
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
-  const isCompactViewport = windowWidth < 700;
+  const isCoarsePointerWeb =
+    Platform.OS === "web" &&
+    (((typeof navigator !== "undefined" && navigator.maxTouchPoints > 0) ||
+      (typeof window !== "undefined" &&
+        "matchMedia" in window &&
+        window.matchMedia("(pointer: coarse)").matches)));
+  const isPhoneLikeWeb = isCoarsePointerWeb && Math.max(windowWidth, windowHeight) < 1000;
+  const isCompactViewport = windowWidth < 700 || isPhoneLikeWeb;
   const isCompactWeb = Platform.OS === "web" && isCompactViewport;
   const isTabletLikeWeb = Platform.OS === "web" && windowWidth >= 700 && windowWidth < 1100;
   const displayColumns = isCompactViewport ? 3 : 9;
@@ -143,7 +150,7 @@ export function GridCanvas({
                 allowResize={
                   widget.type === "camera" ||
                   widget.type === "solar" ||
-                  (isCompactViewport && (widget.type === "weather" || widget.type === "grafana"))
+                  (Platform.OS === "web" && (widget.type === "weather" || widget.type === "grafana"))
                 }
                 onCommitPosition={(widgetId, position) =>
                   onUpdateWidget(widgetId, {

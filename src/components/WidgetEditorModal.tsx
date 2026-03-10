@@ -233,6 +233,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       backgroundImageBlur: String(widget.backgroundImageBlur ?? 8),
       statePrefix: widget.statePrefix,
       dailyEnergyUnit: widget.dailyEnergyUnit || "auto",
+      statValueUnit: widget.statValueUnit || "none",
       keyPvNow: widget.keys.pvNow,
       keyHomeNow: widget.keys.homeNow,
       keyGridIn: widget.keys.gridIn,
@@ -489,6 +490,13 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         statePrefix: draft.statePrefix || widget.statePrefix,
         dailyEnergyUnit:
           draft.dailyEnergyUnit === "Wh" || draft.dailyEnergyUnit === "kWh" ? draft.dailyEnergyUnit : "auto",
+        statValueUnit:
+          draft.statValueUnit === "W" ||
+          draft.statValueUnit === "kW" ||
+          draft.statValueUnit === "Wh" ||
+          draft.statValueUnit === "kWh"
+            ? draft.statValueUnit
+            : "none",
         keys: {
           pvNow: draft.keyPvNow || widget.keys.pvNow,
           homeNow: draft.keyHomeNow || widget.keys.homeNow,
@@ -1269,6 +1277,22 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                         style={[
                           styles.modeButton,
                           draft.dailyEnergyUnit === unit ? styles.modeButtonActive : null,
+                        ]}
+                      >
+                        <Text style={styles.modeLabel}>{unit}</Text>
+                      </EditorButtonPressable>
+                    ))}
+                  </View>
+                </Field>
+                <Field label="Stat-Cards Einheit">
+                  <View style={styles.modeRow}>
+                    {["none", "W", "kW", "Wh", "kWh"].map((unit) => (
+                      <EditorButtonPressable
+                        key={`stat-unit-${unit}`}
+                        onPress={() => setDraft((current) => ({ ...current, statValueUnit: unit }))}
+                        style={[
+                          styles.modeButton,
+                          (draft.statValueUnit || "none") === unit ? styles.modeButtonActive : null,
                         ]}
                       >
                         <Text style={styles.modeLabel}>{unit}</Text>

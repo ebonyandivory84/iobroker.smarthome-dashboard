@@ -76,6 +76,7 @@ const defaultWidgets: DashboardSettings["widgets"] = [
         battTemp: "akku_temp_bms1",
       },
       dailyEnergyUnit: "auto",
+      statValueUnit: "none",
       position: { x: 0, y: 5, w: 12, h: 5 },
     },
   ];
