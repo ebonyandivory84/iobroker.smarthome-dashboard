@@ -291,6 +291,9 @@ export function DashboardScreen() {
       if (!isTouchLayout) {
         return;
       }
+      if (layoutMode) {
+        return;
+      }
       const hasFullscreenCamera = Object.values(fullscreenCameraMapRef.current).some(Boolean);
       if (hasFullscreenCamera || Date.now() < pullRefreshBlockedUntilRef.current) {
         pullGestureRef.current = {
@@ -340,6 +343,9 @@ export function DashboardScreen() {
       if (!isTouchLayout) {
         return;
       }
+      if (layoutMode) {
+        return;
+      }
       const hasFullscreenCamera = Object.values(fullscreenCameraMapRef.current).some(Boolean);
       if (hasFullscreenCamera || Date.now() < pullRefreshBlockedUntilRef.current) {
         return;
@@ -374,6 +380,19 @@ export function DashboardScreen() {
     (pageId: string) =>
     (event: unknown) => {
       if (!isTouchLayout || Platform.OS !== "web" || typeof window === "undefined") {
+        return;
+      }
+      if (layoutMode) {
+        pullGestureRef.current = {
+          pageId: null,
+          startX: null,
+          startY: null,
+          lastX: null,
+          lastY: null,
+          armed: false,
+          startedAt: 0,
+          movedAt: 0,
+        };
         return;
       }
 

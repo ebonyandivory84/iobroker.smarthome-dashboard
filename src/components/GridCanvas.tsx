@@ -129,6 +129,7 @@ export function GridCanvas({
             top: widget.position.y * (renderRowHeight + displayConfig.grid.gap),
             width: displaySpan(widget.position.x, widget.position.w, cellWidth, displayConfig.grid.gap, mainColumnExtraGap),
             height: widget.position.h * renderRowHeight + (widget.position.h - 1) * displayConfig.grid.gap,
+            zIndex: effectiveLayoutMode ? Math.max(1, 10000 - Math.round(widget.position.y * 10)) : 1,
           };
 
           return (
