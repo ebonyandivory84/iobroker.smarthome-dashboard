@@ -78,7 +78,7 @@ npm run web
 ```
 
 3. Open:
-   `http://<iobroker-host>:8099/smarthome-dashboard`
+   `http://<iobroker-host>:<adapter-port>/smarthome-dashboard` (default: `8109`)
 
 In this mode:
 
@@ -113,6 +113,8 @@ Use H.264-compatible stream variants (often sub/ext stream).
 
 - Black camera preview in web:
   verify URL reachability from ioBroker host, auth format, and camera session limits
+- API endpoints return HTML instead of JSON/MJPEG:
+  verify that you are on the adapter port (`8109` by default) and not another local web service
 - No sound:
   check `UI-Sounds` enabled, volume > 0, browser tab/device audio not muted
 - No assets in image picker:

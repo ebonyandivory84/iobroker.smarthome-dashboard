@@ -7,7 +7,7 @@
       "label": "Port",
       "min": 1,
       "max": 65535,
-      "default": 8099,
+      "default": 8109,
       "sm": 6,
       "md": 4,
       "lg": 3

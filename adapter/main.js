@@ -339,7 +339,7 @@ async function main(adapter) {
     });
   }
 
-  const port = Number(adapter.config.port) || 8099;
+  const port = Number(adapter.config.port) || 8109;
   app.listen(port, () => {
     if (devServerUrl) {
       adapter.log.info(`SmartHome Dashboard dev proxy enabled: ${devServerUrl}`);
