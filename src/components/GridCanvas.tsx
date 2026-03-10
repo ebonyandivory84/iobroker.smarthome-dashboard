@@ -51,9 +51,10 @@ export function GridCanvas({
 }: GridCanvasProps) {
   const { width: windowWidth } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
-  const isCompactWeb = Platform.OS === "web" && windowWidth < 700;
+  const isCompactViewport = windowWidth < 700;
+  const isCompactWeb = Platform.OS === "web" && isCompactViewport;
   const isTabletLikeWeb = Platform.OS === "web" && windowWidth >= 700 && windowWidth < 1100;
-  const displayColumns = isCompactWeb ? 3 : 9;
+  const displayColumns = isCompactViewport ? 3 : 9;
   const effectiveLayoutMode = isLayoutMode;
   const displayGap = Platform.OS === "web" && !isCompactWeb ? Math.max(config.grid.gap, 18) : config.grid.gap;
   const mainColumnExtraGap = Platform.OS === "web" && !isCompactWeb ? displayGap * 2 : 0;
@@ -61,7 +62,7 @@ export function GridCanvas({
     () => {
       const next = buildResponsiveAutoLayoutConfig(config, displayColumns, {
         isTabletLikeWeb,
-        stackPrimarySections: isCompactWeb,
+        stackPrimarySections: isCompactViewport,
       });
       return {
         ...next,
@@ -71,7 +72,7 @@ export function GridCanvas({
         },
       };
     },
-    [config, displayColumns, displayGap, isCompactWeb, isTabletLikeWeb]
+    [config, displayColumns, displayGap, isCompactViewport, isTabletLikeWeb]
   );
   const useStructuredGridSizing = true;
   const canvasInset = Platform.OS === "web" ? 64 : 60;
@@ -82,7 +83,9 @@ export function GridCanvas({
     const totalMainExtraGap = mainColumnExtraGap * 2;
     return (canvasWidth - totalGap - totalMainExtraGap) / displayConfig.grid.columns;
   }, [canvasWidth, displayConfig.grid.columns, displayConfig.grid.gap, mainColumnExtraGap]);
-  const renderRowHeight = useStructuredGridSizing ? cellWidth : displayConfig.grid.rowHeight;
+  const renderRowHeight = useStructuredGridSizing
+    ? (isCompactViewport ? cellWidth * 0.72 : cellWidth)
+    : displayConfig.grid.rowHeight;
 
   const canvasHeight = useMemo(() => {
     const maxRow = displayConfig.widgets.reduce((largest, widget) => {
@@ -99,7 +102,7 @@ export function GridCanvas({
   };
 
   const content =
-    Platform.OS === "web" && !isCompactWeb ? (
+    Platform.OS === "web" && !isCompactViewport ? (
       <WebGridCanvas
         canvasHeight={canvasHeight}
         cellWidth={cellWidth}
@@ -135,7 +138,7 @@ export function GridCanvas({
                 columns={displayConfig.grid.columns}
                 gap={displayConfig.grid.gap}
                 isLayoutMode={effectiveLayoutMode}
-                allowManualLayout={!isCompactWeb}
+                allowManualLayout={!isCompactViewport}
                 allowResize={widget.type === "camera" || widget.type === "solar"}
                 onCommitPosition={(widgetId, position) =>
                   onUpdateWidget(widgetId, {
@@ -290,10 +293,24 @@ function buildCompactStackedLayoutConfig(
       : clamp(Math.round(normalizedLocalX * columns), 0, Math.max(0, columns - spec.w));
     const desiredY = Math.max(0, widget.position.y - sectionMinY[sectionIndex]);
     const sectionHeights = sectionColumnHeights[sectionIndex];
-    const bestY = Math.max(desiredY, ...sectionHeights.slice(desiredStart, desiredStart + spec.w));
+    const maxStart = Math.max(0, columns - spec.w);
+    let bestStart = desiredStart;
+    let bestY = Math.max(desiredY, ...sectionHeights.slice(desiredStart, desiredStart + spec.w));
+
+    for (let start = 0; start <= maxStart; start += 1) {
+      const candidateY = Math.max(desiredY, ...sectionHeights.slice(start, start + spec.w));
+      if (
+        candidateY < bestY ||
+        (candidateY === bestY && Math.abs(start - desiredStart) < Math.abs(bestStart - desiredStart))
+      ) {
+        bestStart = start;
+        bestY = candidateY;
+      }
+    }
+
     const snappedBottom = ceilGridUnitForWidget(bestY + spec.h, widget.type);
 
-    for (let index = desiredStart; index < desiredStart + spec.w; index += 1) {
+    for (let index = bestStart; index < bestStart + spec.w; index += 1) {
       sectionHeights[index] = snappedBottom;
     }
 
@@ -304,7 +321,7 @@ function buildCompactStackedLayoutConfig(
       widget: {
         ...widget,
         position: {
-          x: desiredStart,
+          x: bestStart,
           y: bestY,
           w: spec.w,
           h: spec.h,
