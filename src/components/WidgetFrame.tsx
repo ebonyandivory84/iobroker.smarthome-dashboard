@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { CSSProperties } from "react";
-import type { MouseEvent as ReactMouseEvent } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useDashboardConfig } from "../context/DashboardConfigContext";
@@ -53,13 +53,14 @@ export function WidgetFrame({
   } | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [interactionMode, setInteractionMode] = useState<"drag" | "resize" | null>(null);
+  const useFreeGridConstraint = columns <= 3;
 
   useEffect(() => {
-    if (Platform.OS !== "web" || !interaction.current) {
+    if (Platform.OS !== "web") {
       return;
     }
 
-    const handleMouseMove = (event: MouseEvent) => {
+    const handlePointerMove = (event: PointerEvent) => {
       const current = interaction.current;
       if (!current) {
         return;
@@ -73,7 +74,7 @@ export function WidgetFrame({
       }
     };
 
-    const handleMouseUp = (event: MouseEvent) => {
+    const handlePointerUp = (event: PointerEvent) => {
       const current = interaction.current;
       if (!current) {
         return;
@@ -88,24 +89,24 @@ export function WidgetFrame({
       );
 
       if (current.mode === "drag") {
-        onCommitPosition(widget.id, constrainToPrimarySections({
-          ...widget.position,
+        onCommitPosition(widget.id, constrainPositionForLayout({
+          ...current.startPosition,
           x: clamp(current.startPosition.x + xSteps, 0, columns - current.startPosition.w),
           y: Math.max(0, current.startPosition.y + ySteps),
-        }, columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : undefined));
+        }, columns, widget.type, useFreeGridConstraint, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : undefined));
       } else {
         if (widget.type === "camera" || widget.type === "solar") {
-          onCommitPosition(widget.id, constrainToPrimarySections({
-            ...widget.position,
+          onCommitPosition(widget.id, constrainPositionForLayout({
+            ...current.startPosition,
             w: current.startPosition.w,
             h: Math.max(widget.type === "camera" ? 0.5 : 2.5, current.startPosition.h + ySteps),
-          }, columns, { minHeight: widget.type === "camera" ? 0.5 : 2.5, heightSnap: 0.1 }));
+          }, columns, widget.type, useFreeGridConstraint, { minHeight: widget.type === "camera" ? 0.5 : 2.5, heightSnap: 0.1 }));
         } else {
-          onCommitPosition(widget.id, constrainToPrimarySections({
-            ...widget.position,
+          onCommitPosition(widget.id, constrainPositionForLayout({
+            ...current.startPosition,
             w: clamp(current.startPosition.w + xSteps, 1, columns),
             h: Math.max(1, current.startPosition.h + ySteps),
-          }, columns));
+          }, columns, widget.type, useFreeGridConstraint));
         }
       }
 
@@ -114,14 +115,16 @@ export function WidgetFrame({
       setDragOffset({ x: 0, y: 0 });
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
 
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
     };
-  }, [cellWidth, columns, gap, onCommitPosition, rowHeight, widget]);
+  }, [cellWidth, columns, gap, onCommitPosition, rowHeight, useFreeGridConstraint, widget]);
 
   const beginInteraction = (mode: "drag" | "resize", clientX: number, clientY: number) => {
     interaction.current = {
@@ -133,11 +136,12 @@ export function WidgetFrame({
     setInteractionMode(mode);
   };
 
-  const handleWebMouseDown =
+  const handleWebPointerDown =
     (mode: "drag" | "resize") =>
-    (event: ReactMouseEvent<HTMLDivElement>) => {
+    (event: ReactPointerEvent<HTMLDivElement>) => {
       event.preventDefault();
       event.stopPropagation();
+      event.currentTarget.setPointerCapture?.(event.pointerId);
       beginInteraction(mode, event.clientX, event.clientY);
     };
 
@@ -179,7 +183,7 @@ export function WidgetFrame({
         <div
           draggable={false}
           onDragStart={(event) => event.preventDefault()}
-          onMouseDown={handleWebMouseDown("drag")}
+          onPointerDown={handleWebPointerDown("drag")}
           style={webDragLayerStyle}
         />
       ) : null}
@@ -208,7 +212,7 @@ export function WidgetFrame({
           <div
             draggable={false}
             onDragStart={(event) => event.preventDefault()}
-            onMouseDown={handleWebMouseDown("resize")}
+            onPointerDown={handleWebPointerDown("resize")}
             style={webResizeLayerStyle}
           />
         ) : null}
@@ -221,6 +225,30 @@ const clamp = (value: number, min: number, max: number) => Math.max(min, Math.mi
 
 const snap = (value: number) => Math.round(value / GRID_SNAP) * GRID_SNAP;
 const snapWithStep = (value: number, step: number) => Math.round(value / step) * step;
+
+function constrainPositionForLayout(
+  position: WidgetConfig["position"],
+  columns: number,
+  widgetType: WidgetConfig["type"],
+  useFreeGridConstraint: boolean,
+  options?: {
+    minHeight?: number;
+    heightSnap?: number;
+  }
+) {
+  if (!useFreeGridConstraint) {
+    return constrainToPrimarySections(position, columns, options);
+  }
+
+  const minHeight = options?.minHeight ?? 1;
+  const heightSnap = options?.heightSnap ?? (widgetType === "camera" || widgetType === "solar" ? 0.1 : GRID_SNAP);
+  const w = clamp(snap(position.w), 1, columns);
+  const h = Math.max(minHeight, snapWithStep(position.h, heightSnap));
+  const x = clamp(snap(position.x), 0, Math.max(0, columns - w));
+  const y = Math.max(0, snapWithStep(position.y, GRID_VERTICAL_SNAP));
+
+  return { x, y, w, h };
+}
 
 const styles = StyleSheet.create({
   shell: {

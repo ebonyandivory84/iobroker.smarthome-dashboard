@@ -138,11 +138,16 @@ export function GridCanvas({
                 columns={displayConfig.grid.columns}
                 gap={displayConfig.grid.gap}
                 isLayoutMode={effectiveLayoutMode}
-                allowManualLayout={!isCompactViewport}
+                allowManualLayout={!isCompactViewport || Platform.OS === "web"}
                 allowResize={widget.type === "camera" || widget.type === "solar"}
                 onCommitPosition={(widgetId, position) =>
                   onUpdateWidget(widgetId, {
-                    position: mapDisplayPositionToSourceHint(position, displayConfig.grid.columns, config.grid.columns),
+                    position: mapDisplayPositionToSourceHint(position, displayConfig.grid.columns, config.grid.columns, {
+                      stackPrimarySections: isCompactViewport,
+                      displayCurrent: widget.position,
+                      sourceCurrent: config.widgets.find((entry) => entry.id === widgetId)?.position,
+                      widgetType: widget.type,
+                    }),
                   })
                 }
                 onEdit={onEditWidget}
@@ -543,7 +548,39 @@ function ceilGridUnitForWidget(value: number, widgetType: WidgetType) {
   return ceilGridUnit(value);
 }
 
-function mapDisplayPositionToSourceHint(position: WidgetConfig["position"], displayColumns: number, sourceColumns: number) {
+function mapDisplayPositionToSourceHint(
+  position: WidgetConfig["position"],
+  displayColumns: number,
+  sourceColumns: number,
+  options?: {
+    stackPrimarySections?: boolean;
+    displayCurrent?: WidgetConfig["position"];
+    sourceCurrent?: WidgetConfig["position"];
+    widgetType?: WidgetType;
+  }
+) {
+  if (options?.stackPrimarySections && options.displayCurrent && options.sourceCurrent) {
+    const sourceSectionWidth = sourceColumns / 3;
+    const sourceCurrent = options.sourceCurrent;
+    const displayCurrent = options.displayCurrent;
+    const sourceCenter = sourceCurrent.x + sourceCurrent.w / 2;
+    const sectionIndex = clamp(Math.floor(sourceCenter / Math.max(1, sourceSectionWidth)), 0, 2);
+    const localDisplayMax = Math.max(0, displayColumns - position.w);
+    const sourceLocalMax = Math.max(0, sourceSectionWidth - sourceCurrent.w);
+    const localRatio = localDisplayMax > 0 ? clamp(position.x / localDisplayMax, 0, 1) : 0;
+    const mappedX = sectionIndex * sourceSectionWidth + sourceLocalMax * localRatio;
+    const mappedY = Math.max(0, sourceCurrent.y + (position.y - displayCurrent.y));
+    const minHeight = options.widgetType === "camera" ? 0.5 : options.widgetType === "solar" ? 2.5 : 1;
+    const mappedH = Math.max(minHeight, sourceCurrent.h + (position.h - displayCurrent.h));
+
+    return {
+      ...sourceCurrent,
+      x: mappedX,
+      y: mappedY,
+      h: mappedH,
+    };
+  }
+
   if (displayColumns <= 1 || sourceColumns <= 1 || displayColumns === sourceColumns) {
     return position;
   }
