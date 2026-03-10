@@ -500,22 +500,28 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
 
       if (statusCode >= 400) {
         if (
-          statusCode === 401 &&
+          (statusCode === 401 || statusCode === 403) &&
           streamType === "mjpeg" &&
-          authRetries < 1 &&
+          authRetries < 3 &&
           requestConfig.auth?.username &&
-          !requestConfig.auth?.hasQueryCredentials
+          requestConfig.auth?.password !== undefined
         ) {
           try {
-            const retryUrl = new URL(requestConfig.url);
-            retryUrl.searchParams.set("user", requestConfig.auth.username);
-            retryUrl.searchParams.set("pwd", requestConfig.auth.password || "");
-            const retryConfig = buildCameraRequestConfig(retryUrl.toString());
-            if (!retryConfig.headers.Authorization && requestConfig.headers.Authorization) {
+            const variant = authRetries === 0 ? "userPwd" : authRetries === 1 ? "usernamePassword" : "both";
+            const retryUrl = withCameraQueryCredentials(
+              requestConfig.url,
+              requestConfig.auth.username,
+              requestConfig.auth.password || "",
+              variant
+            );
+            const retryConfig = buildCameraRequestConfig(retryUrl);
+            if (authRetries >= 2) {
+              delete retryConfig.headers.Authorization;
+            } else if (!retryConfig.headers.Authorization && requestConfig.headers.Authorization) {
               retryConfig.headers.Authorization = requestConfig.headers.Authorization;
             }
             log?.warn(
-              `[camera-proxy] upstream 401 streamType=mjpeg, retry with query credentials url=${sanitizeCameraUrlForLog(
+              `[camera-proxy] upstream ${statusCode} streamType=mjpeg, retry auth strategy=${variant} url=${sanitizeCameraUrlForLog(
                 retryConfig.url
               )}`
             );
@@ -618,6 +624,24 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
   });
 
   upstreamRequest.end();
+}
+
+function withCameraQueryCredentials(rawUrl, username, password, variant = "userPwd") {
+  const parsed = new URL(rawUrl);
+  const user = String(username || "");
+  const pass = String(password || "");
+
+  if (variant === "userPwd" || variant === "both") {
+    parsed.searchParams.set("user", user);
+    parsed.searchParams.set("pwd", pass);
+  }
+
+  if (variant === "usernamePassword" || variant === "both") {
+    parsed.searchParams.set("username", user);
+    parsed.searchParams.set("password", pass);
+  }
+
+  return parsed.toString();
 }
 
 function getInsecureHttpsDispatcher() {
