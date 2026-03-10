@@ -53,7 +53,7 @@ export function GridCanvas({
   const [containerWidth, setContainerWidth] = useState(0);
   const isCompactWeb = Platform.OS === "web" && windowWidth < 700;
   const isTabletLikeWeb = Platform.OS === "web" && windowWidth >= 700 && windowWidth < 1100;
-  const displayColumns = isCompactWeb ? 1 : 9;
+  const displayColumns = isCompactWeb ? 3 : 9;
   const effectiveLayoutMode = isLayoutMode;
   const displayGap = Platform.OS === "web" && !isCompactWeb ? Math.max(config.grid.gap, 18) : config.grid.gap;
   const mainColumnExtraGap = Platform.OS === "web" && !isCompactWeb ? displayGap * 2 : 0;
@@ -61,6 +61,7 @@ export function GridCanvas({
     () => {
       const next = buildResponsiveAutoLayoutConfig(config, displayColumns, {
         isTabletLikeWeb,
+        stackPrimarySections: isCompactWeb,
       });
       return {
         ...next,
@@ -70,7 +71,7 @@ export function GridCanvas({
         },
       };
     },
-    [config, displayColumns, displayGap, isTabletLikeWeb]
+    [config, displayColumns, displayGap, isCompactWeb, isTabletLikeWeb]
   );
   const useStructuredGridSizing = true;
   const canvasInset = Platform.OS === "web" ? 64 : 60;
@@ -188,10 +189,15 @@ function buildResponsiveAutoLayoutConfig(
   columns: number,
   options?: {
     isTabletLikeWeb?: boolean;
+    stackPrimarySections?: boolean;
   }
 ): DashboardSettings {
   if (columns === 9) {
     return buildDesktopAutoLayoutConfig(config, options);
+  }
+
+  if (columns === 3 && options?.stackPrimarySections) {
+    return buildCompactStackedLayoutConfig(config, options);
   }
 
   const sortedWidgets = [...config.widgets].sort((a, b) => {
@@ -235,6 +241,98 @@ function buildResponsiveAutoLayoutConfig(
       columns,
     },
     widgets,
+  };
+}
+
+function buildCompactStackedLayoutConfig(
+  config: DashboardSettings,
+  options?: {
+    isTabletLikeWeb?: boolean;
+  }
+): DashboardSettings {
+  const columns = 3;
+  const sourceColumns = Math.max(1, config.grid.columns);
+  const sectionCount = 3;
+  const sectionSpacing = 0.5;
+  const sortedWidgets = [...config.widgets].sort((a, b) => {
+    if (a.position.y !== b.position.y) {
+      return a.position.y - b.position.y;
+    }
+    if (a.position.x !== b.position.x) {
+      return a.position.x - b.position.x;
+    }
+    return a.id.localeCompare(b.id);
+  });
+
+  const sectionMinY = Array.from({ length: sectionCount }, () => Number.POSITIVE_INFINITY);
+  for (const widget of sortedWidgets) {
+    const sectionIndex = getPreferredDesktopSection(widget, sourceColumns);
+    sectionMinY[sectionIndex] = Math.min(sectionMinY[sectionIndex], Math.max(0, widget.position.y));
+  }
+  for (let index = 0; index < sectionCount; index += 1) {
+    if (!Number.isFinite(sectionMinY[index])) {
+      sectionMinY[index] = 0;
+    }
+  }
+
+  const sectionColumnHeights = Array.from({ length: sectionCount }, () =>
+    Array.from({ length: columns }, () => 0)
+  );
+  const sectionBottoms = Array.from({ length: sectionCount }, () => 0);
+  const widgetsWithSection = sortedWidgets.map((widget) => {
+    const spec = getAutoLayoutSpec(widget, columns, options);
+    const sectionIndex = getPreferredDesktopSection(widget, sourceColumns);
+    const sourceSectionWidth = sourceColumns / sectionCount;
+    const sectionStart = sectionIndex * sourceSectionWidth;
+    const normalizedLocalX = sourceSectionWidth > 0 ? (widget.position.x - sectionStart) / sourceSectionWidth : 0;
+    const desiredStart = spec.w >= columns
+      ? 0
+      : clamp(Math.round(normalizedLocalX * columns), 0, Math.max(0, columns - spec.w));
+    const desiredY = Math.max(0, widget.position.y - sectionMinY[sectionIndex]);
+    const sectionHeights = sectionColumnHeights[sectionIndex];
+    const bestY = Math.max(desiredY, ...sectionHeights.slice(desiredStart, desiredStart + spec.w));
+    const snappedBottom = ceilGridUnitForWidget(bestY + spec.h, widget.type);
+
+    for (let index = desiredStart; index < desiredStart + spec.w; index += 1) {
+      sectionHeights[index] = snappedBottom;
+    }
+
+    sectionBottoms[sectionIndex] = Math.max(sectionBottoms[sectionIndex], snappedBottom);
+
+    return {
+      sectionIndex,
+      widget: {
+        ...widget,
+        position: {
+          x: desiredStart,
+          y: bestY,
+          w: spec.w,
+          h: spec.h,
+        },
+      },
+    };
+  });
+
+  const sectionOffsets = Array.from({ length: sectionCount }, () => 0);
+  let runningOffset = 0;
+  for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex += 1) {
+    sectionOffsets[sectionIndex] = runningOffset;
+    runningOffset += sectionBottoms[sectionIndex] + (sectionIndex < sectionCount - 1 ? sectionSpacing : 0);
+  }
+
+  return {
+    ...config,
+    grid: {
+      ...config.grid,
+      columns,
+    },
+    widgets: widgetsWithSection.map(({ sectionIndex, widget }) => ({
+      ...widget,
+      position: {
+        ...widget.position,
+        y: widget.position.y + sectionOffsets[sectionIndex],
+      },
+    })),
   };
 }
 
