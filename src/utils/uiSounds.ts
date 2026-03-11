@@ -129,6 +129,8 @@ let masterGainNode: GainNode | null = null;
 let uiSoundSettings: UiSoundSettings = DEFAULT_UI_SOUND_SETTINGS;
 const soundCursor = new Map<string, number>();
 const decodedAudioCache = new Map<string, Promise<AudioBuffer | null>>();
+const MAX_DECODED_AUDIO_CACHE = 48;
+const MAX_SOUND_CURSOR_KEYS = 320;
 
 export function configureUiSounds(settings?: UiSoundSettings) {
   uiSoundSettings = normalizeUiSoundSettings(settings);
@@ -236,6 +238,9 @@ function playDecodedAudio(soundId: string, fallback: UiSound) {
 function loadDecodedAudio(soundId: string) {
   const cached = decodedAudioCache.get(soundId);
   if (cached) {
+    // Refresh insertion order for a light LRU behavior.
+    decodedAudioCache.delete(soundId);
+    decodedAudioCache.set(soundId, cached);
     return cached;
   }
 
@@ -254,9 +259,16 @@ function loadDecodedAudio(soundId: string) {
       return response.arrayBuffer();
     })
     .then((buffer) => context.decodeAudioData(buffer.slice(0)))
-    .catch(() => null);
+    .catch(() => null)
+    .then((decoded) => {
+      if (!decoded) {
+        decodedAudioCache.delete(soundId);
+      }
+      return decoded;
+    });
 
   decodedAudioCache.set(soundId, loader);
+  trimDecodedAudioCache();
   return loader;
 }
 
@@ -270,12 +282,12 @@ async function playNextConfiguredSound(
     const index = (startIndex + offset) % selection.length;
     const didPlay = await playSingleDecodedAudio(selection[index], undefined);
     if (didPlay) {
-      soundCursor.set(cursorKey, (index + 1) % selection.length);
+      rememberSoundCursor(cursorKey, (index + 1) % selection.length);
       return;
     }
   }
 
-  soundCursor.set(cursorKey, 0);
+  rememberSoundCursor(cursorKey, 0);
   playSynthSound(fallback);
 }
 
@@ -381,5 +393,30 @@ async function ensureAudioContextRunning(context: AudioContext) {
     await context.resume();
   } catch {
     // Keep silent if browser still blocks audio.
+  }
+}
+
+function trimDecodedAudioCache() {
+  while (decodedAudioCache.size > MAX_DECODED_AUDIO_CACHE) {
+    const oldest = decodedAudioCache.keys().next().value as string | undefined;
+    if (!oldest) {
+      break;
+    }
+    decodedAudioCache.delete(oldest);
+  }
+}
+
+function rememberSoundCursor(key: string, value: number) {
+  if (soundCursor.has(key)) {
+    soundCursor.delete(key);
+  }
+  soundCursor.set(key, value);
+
+  while (soundCursor.size > MAX_SOUND_CURSOR_KEYS) {
+    const oldest = soundCursor.keys().next().value as string | undefined;
+    if (!oldest) {
+      break;
+    }
+    soundCursor.delete(oldest);
   }
 }

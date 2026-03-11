@@ -13,16 +13,20 @@ type SettingsModalProps = {
 export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const {
     config,
-    rawJson,
+    rawDesktopJson,
+    rawMobileJson,
     resetConfig,
-    updateConfigFromJson,
+    updateDesktopConfigFromJson,
+    updateMobileConfigFromJson,
     savedDashboards,
     refreshSavedDashboards,
     saveNamedDashboard,
     loadNamedDashboard,
     deleteNamedDashboard,
   } = useDashboardConfig();
-  const [draft, setDraft] = useState(rawJson);
+  const [desktopDraft, setDesktopDraft] = useState(rawDesktopJson);
+  const [mobileDraft, setMobileDraft] = useState(rawMobileJson);
+  const [activeJsonTarget, setActiveJsonTarget] = useState<"desktop" | "mobile">("desktop");
   const [dashboardName, setDashboardName] = useState("");
   const [homeLabel, setHomeLabel] = useState("");
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -44,7 +48,9 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
       return;
     }
 
-    setDraft(rawJson);
+    setDesktopDraft(rawDesktopJson);
+    setMobileDraft(rawMobileJson);
+    setActiveJsonTarget("desktop");
     setDashboardName(config.title || "");
     setHomeLabel(config.homeLabel || "My Home");
     setSoundEnabled(config.uiSounds?.enabled !== false);
@@ -61,10 +67,20 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     setEditorButtonSounds(config.uiSounds?.pageSounds?.editorButton || []);
     setError(null);
     refreshSavedDashboards();
-  }, [config.homeLabel, config.title, rawJson, visible]);
+  }, [config.homeLabel, config.title, rawDesktopJson, rawMobileJson, visible]);
 
   const save = () => {
-    let nextDraft = draft;
+    if (activeJsonTarget === "mobile") {
+      const result = updateMobileConfigFromJson(mobileDraft);
+      if (!result.ok) {
+        setError(result.error || "JSON invalid");
+        return;
+      }
+      onClose();
+      return;
+    }
+
+    let nextDraft = desktopDraft;
     const normalizedVolume = Number.parseInt(soundVolume, 10);
 
     if (!Number.isFinite(normalizedVolume)) {
@@ -73,7 +89,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
     }
 
     try {
-      const parsed = JSON.parse(draft) as Record<string, unknown>;
+      const parsed = JSON.parse(desktopDraft) as Record<string, unknown>;
       parsed.homeLabel = (homeLabel || "").trim() || "My Home";
       parsed.uiSounds = {
         enabled: soundEnabled,
@@ -97,12 +113,18 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
       // Let the existing JSON validation path surface the error.
     }
 
-    const result = updateConfigFromJson(nextDraft);
+    const result = updateDesktopConfigFromJson(nextDraft);
     if (!result.ok) {
       setError(result.error || "JSON invalid");
       return;
     }
     onClose();
+  };
+
+  const copyDesktopToMobile = () => {
+    setMobileDraft(desktopDraft);
+    setActiveJsonTarget("mobile");
+    setError(null);
   };
 
   const saveCurrentAsNamed = async () => {
@@ -139,14 +161,15 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
         <ScrollView contentContainerStyle={styles.modalScrollContent} style={styles.modalScroll}>
           <View style={styles.card}>
             <View style={styles.header}>
-              <Text style={styles.title}>Dashboard JSON</Text>
+              <Text style={styles.title}>Dashboard Einstellungen</Text>
               <Pressable onPress={onClose}>
                 <Text style={styles.close}>Schliessen</Text>
               </Pressable>
             </View>
             <Text style={styles.helper}>
-              Die gesamte Dashboard-Konfiguration ist JSON-basiert. Hier bearbeitest du Titel, Grid,
-              ioBroker-Ziele, Widget-Typen und alle Widget-Einstellungen direkt in einer Datei.
+              Es gibt zwei getrennte JSON-Editoren: Desktop/Tablet und Mobile. Du kannst Desktop direkt nach
+              Mobile kopieren und dort alle Widget-Einstellungen (z.B. Trigger, Bilder, Sounds, Position/Groesse)
+              separat feintunen.
             </Text>
             <View style={styles.metaRow}>
               <MetaPill label="Home" value={config.homeLabel || "My Home"} />
@@ -293,14 +316,42 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
               </View>
             </View>
             <View style={styles.editorWrap}>
+              <View style={styles.libraryCard}>
+                <Text style={styles.sectionTitle}>JSON-Editor</Text>
+                <View style={styles.choiceRow}>
+                  <Pressable
+                    onPress={() => setActiveJsonTarget("desktop")}
+                    style={[styles.choiceChip, activeJsonTarget === "desktop" ? styles.choiceChipActive : null]}
+                  >
+                    <Text
+                      style={[styles.choiceChipLabel, activeJsonTarget === "desktop" ? styles.choiceChipLabelActive : null]}
+                    >
+                      Desktop/Tablet JSON
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setActiveJsonTarget("mobile")}
+                    style={[styles.choiceChip, activeJsonTarget === "mobile" ? styles.choiceChipActive : null]}
+                  >
+                    <Text
+                      style={[styles.choiceChipLabel, activeJsonTarget === "mobile" ? styles.choiceChipLabelActive : null]}
+                    >
+                      Mobile JSON
+                    </Text>
+                  </Pressable>
+                </View>
+                <Pressable onPress={copyDesktopToMobile} style={[styles.button, styles.secondaryButton]}>
+                  <Text style={styles.secondaryLabel}>Desktop JSON nach Mobile kopieren</Text>
+                </Pressable>
+              </View>
               <TextInput
                 autoCapitalize="none"
                 autoCorrect={false}
                 multiline
-                onChangeText={setDraft}
+                onChangeText={activeJsonTarget === "desktop" ? setDesktopDraft : setMobileDraft}
                 style={styles.editor}
                 textAlignVertical="top"
-                value={draft}
+                value={activeJsonTarget === "desktop" ? desktopDraft : mobileDraft}
               />
             </View>
             {error ? <Text style={styles.error}>{error}</Text> : null}

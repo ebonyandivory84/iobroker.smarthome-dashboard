@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { CSSProperties } from "react";
-import type { MouseEvent as ReactMouseEvent } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useDashboardConfig } from "../context/DashboardConfigContext";
@@ -53,16 +53,25 @@ export function WidgetFrame({
   } | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [interactionMode, setInteractionMode] = useState<"drag" | "resize" | null>(null);
+  const useFreeGridConstraint = columns <= 3;
+  const isVerticalResizeWidget =
+    widget.type === "camera" ||
+    widget.type === "solar" ||
+    widget.type === "weather" ||
+    widget.type === "grafana";
 
   useEffect(() => {
-    if (Platform.OS !== "web" || !interaction.current) {
+    if (Platform.OS !== "web") {
       return;
     }
 
-    const handleMouseMove = (event: MouseEvent) => {
+    const handlePointerMove = (event: PointerEvent) => {
       const current = interaction.current;
       if (!current) {
         return;
+      }
+      if (event.cancelable) {
+        event.preventDefault();
       }
 
       const dx = event.clientX - current.startX;
@@ -73,10 +82,13 @@ export function WidgetFrame({
       }
     };
 
-    const handleMouseUp = (event: MouseEvent) => {
+    const handlePointerUp = (event: PointerEvent) => {
       const current = interaction.current;
       if (!current) {
         return;
+      }
+      if (event.cancelable) {
+        event.preventDefault();
       }
 
       const dx = event.clientX - current.startX;
@@ -84,21 +96,30 @@ export function WidgetFrame({
       const xSteps = snap(dx / (cellWidth + gap));
       const ySteps = snapWithStep(
         dy / (rowHeight + gap),
-        current.mode === "resize" && widget.type === "camera" ? 0.1 : GRID_VERTICAL_SNAP
+        current.mode === "resize" && isVerticalResizeWidget ? 0.1 : GRID_VERTICAL_SNAP
       );
 
       if (current.mode === "drag") {
-        onCommitPosition(widget.id, constrainToPrimarySections({
-          ...widget.position,
+        onCommitPosition(widget.id, constrainPositionForLayout({
+          ...current.startPosition,
           x: clamp(current.startPosition.x + xSteps, 0, columns - current.startPosition.w),
           y: Math.max(0, current.startPosition.y + ySteps),
-        }, columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : undefined));
+        }, columns, widget.type, useFreeGridConstraint, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : undefined));
       } else {
-        onCommitPosition(widget.id, constrainToPrimarySections({
-          ...widget.position,
-          w: clamp(current.startPosition.w + xSteps, 1, columns),
-          h: Math.max(widget.type === "camera" ? 0.5 : 1, current.startPosition.h + ySteps),
-        }, columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : undefined));
+        if (isVerticalResizeWidget) {
+          const minHeight = widget.type === "camera" ? 0.5 : widget.type === "solar" ? 2.5 : 1;
+          onCommitPosition(widget.id, constrainPositionForLayout({
+            ...current.startPosition,
+            w: current.startPosition.w,
+            h: Math.max(minHeight, current.startPosition.h + ySteps),
+          }, columns, widget.type, useFreeGridConstraint, { minHeight, heightSnap: 0.1 }));
+        } else {
+          onCommitPosition(widget.id, constrainPositionForLayout({
+            ...current.startPosition,
+            w: clamp(current.startPosition.w + xSteps, 1, columns),
+            h: Math.max(1, current.startPosition.h + ySteps),
+          }, columns, widget.type, useFreeGridConstraint));
+        }
       }
 
       interaction.current = null;
@@ -106,14 +127,16 @@ export function WidgetFrame({
       setDragOffset({ x: 0, y: 0 });
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
 
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
     };
-  }, [cellWidth, columns, gap, onCommitPosition, rowHeight, widget]);
+  }, [cellWidth, columns, gap, isVerticalResizeWidget, onCommitPosition, rowHeight, useFreeGridConstraint, widget]);
 
   const beginInteraction = (mode: "drag" | "resize", clientX: number, clientY: number) => {
     interaction.current = {
@@ -125,11 +148,12 @@ export function WidgetFrame({
     setInteractionMode(mode);
   };
 
-  const handleWebMouseDown =
+  const handleWebPointerDown =
     (mode: "drag" | "resize") =>
-    (event: ReactMouseEvent<HTMLDivElement>) => {
+    (event: ReactPointerEvent<HTMLDivElement>) => {
       event.preventDefault();
       event.stopPropagation();
+      event.currentTarget.setPointerCapture?.(event.pointerId);
       beginInteraction(mode, event.clientX, event.clientY);
     };
 
@@ -171,7 +195,7 @@ export function WidgetFrame({
         <div
           draggable={false}
           onDragStart={(event) => event.preventDefault()}
-          onMouseDown={handleWebMouseDown("drag")}
+          onPointerDown={handleWebPointerDown("drag")}
           style={webDragLayerStyle}
         />
       ) : null}
@@ -189,22 +213,21 @@ export function WidgetFrame({
       >
         {children}
       </View>
-      <View pointerEvents="box-none" style={styles.footerRow}>
-        <View />
-        {isLayoutMode && allowManualLayout && allowResize ? (
+      {isLayoutMode && allowManualLayout && allowResize ? (
+        <View pointerEvents="box-none" style={styles.resizeWrap}>
           <View style={styles.resizeHandle}>
             <MaterialCommunityIcons color={palette.textMuted} name="resize-bottom-right" size={18} />
           </View>
-        ) : null}
-        {Platform.OS === "web" && isLayoutMode && allowManualLayout && allowResize ? (
-          <div
-            draggable={false}
-            onDragStart={(event) => event.preventDefault()}
-            onMouseDown={handleWebMouseDown("resize")}
-            style={webResizeLayerStyle}
-          />
-        ) : null}
-      </View>
+          {Platform.OS === "web" ? (
+            <div
+              draggable={false}
+              onDragStart={(event) => event.preventDefault()}
+              onPointerDown={handleWebPointerDown("resize")}
+              style={webResizeLayerStyle}
+            />
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -213,6 +236,30 @@ const clamp = (value: number, min: number, max: number) => Math.max(min, Math.mi
 
 const snap = (value: number) => Math.round(value / GRID_SNAP) * GRID_SNAP;
 const snapWithStep = (value: number, step: number) => Math.round(value / step) * step;
+
+function constrainPositionForLayout(
+  position: WidgetConfig["position"],
+  columns: number,
+  widgetType: WidgetConfig["type"],
+  useFreeGridConstraint: boolean,
+  options?: {
+    minHeight?: number;
+    heightSnap?: number;
+  }
+) {
+  if (!useFreeGridConstraint) {
+    return constrainToPrimarySections(position, columns, options);
+  }
+
+  const minHeight = options?.minHeight ?? 1;
+  const heightSnap = options?.heightSnap ?? (widgetType === "camera" || widgetType === "solar" ? 0.1 : GRID_SNAP);
+  const w = clamp(snap(position.w), 1, columns);
+  const h = Math.max(minHeight, snapWithStep(position.h, heightSnap));
+  const x = clamp(snap(position.x), 0, Math.max(0, columns - w));
+  const y = Math.max(0, snapWithStep(position.y, GRID_VERTICAL_SNAP));
+
+  return { x, y, w, h };
+}
 
 const styles = StyleSheet.create({
   shell: {
@@ -265,17 +312,20 @@ const styles = StyleSheet.create({
   contentInset: {
     padding: 16,
   },
-  footerRow: {
+  resizeWrap: {
     position: "absolute",
-    right: 12,
-    bottom: 12,
-    left: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
+    right: 8,
+    bottom: 8,
+    width: 50,
+    height: 50,
+    alignItems: "flex-end",
+    justifyContent: "flex-end",
+    zIndex: 18,
   },
   resizeHandle: {
+    position: "absolute",
+    right: 0,
+    bottom: 0,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 8,
@@ -284,7 +334,7 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     flexDirection: "row",
     alignItems: "center",
-    position: "relative",
+    zIndex: 19,
   },
 });
 
@@ -295,7 +345,7 @@ const webDragLayerStyle: CSSProperties = {
   bottom: 0,
   left: 0,
   cursor: "grab",
-  zIndex: 5,
+  zIndex: 8,
   userSelect: "none",
   WebkitUserSelect: "none",
   touchAction: "none",
@@ -303,12 +353,14 @@ const webDragLayerStyle: CSSProperties = {
 
 const webResizeLayerStyle: CSSProperties = {
   position: "absolute",
-  top: 0,
+  top: "auto",
   right: 0,
   bottom: 0,
-  left: 0,
+  left: "auto",
+  width: "50px",
+  height: "50px",
   cursor: "nwse-resize",
-  zIndex: 5,
+  zIndex: 30,
   userSelect: "none",
   WebkitUserSelect: "none",
   touchAction: "none",

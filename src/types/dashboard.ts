@@ -41,6 +41,8 @@ export type WidgetBase = {
   showTitle?: boolean;
   iconPair?: IconPair;
   position: GridPosition;
+  mobilePosition?: GridPosition;
+  mobileOverride?: Record<string, unknown>;
   appearance?: WidgetAppearance;
   interactionSounds?: WidgetInteractionSounds;
 };
@@ -99,6 +101,7 @@ export type CameraWidgetConfig = WidgetBase & {
 
 export type GrafanaWidgetConfig = WidgetBase & {
   type: "grafana";
+  manualHeightOverride?: boolean;
   url: string;
   refreshMs?: number;
   allowInteractions?: boolean;
@@ -106,6 +109,7 @@ export type GrafanaWidgetConfig = WidgetBase & {
 
 export type WeatherWidgetConfig = WidgetBase & {
   type: "weather";
+  manualHeightOverride?: boolean;
   latitude: number;
   longitude: number;
   locationName?: string;
@@ -147,6 +151,16 @@ export type SolarStatConfig = {
   stateId?: string;
 };
 
+export type SolarTapAction =
+  | {
+      type: "dashboard";
+      dashboardId: string;
+    }
+  | {
+      type: "url";
+      url: string;
+    };
+
 export type EnergyWidgetConfig = WidgetBase & {
   type: "energy";
   pvStateId: string;
@@ -157,9 +171,11 @@ export type EnergyWidgetConfig = WidgetBase & {
 
 export type SolarWidgetConfig = WidgetBase & {
   type: "solar";
+  manualHeightOverride?: boolean;
   backgroundMode?: "color" | "image";
   backgroundImage?: string;
   backgroundImageBlur?: number;
+  statTextScale?: number;
   statePrefix: string;
   keys: {
     pvNow: string;
@@ -175,12 +191,16 @@ export type SolarWidgetConfig = WidgetBase & {
     battTemp?: string;
   };
   dailyEnergyUnit?: "auto" | "Wh" | "kWh";
+  statValueUnit?: "none" | "W" | "kW" | "Wh" | "kWh";
   nodeLayout?: Partial<SolarLayoutConfig>;
   stats?: {
+    count?: number;
+    cards?: SolarStatConfig[];
     first?: SolarStatConfig;
     second?: SolarStatConfig;
     third?: SolarStatConfig;
   };
+  tapAction?: SolarTapAction;
 };
 
 export type WidgetConfig =
@@ -279,6 +299,11 @@ export type IoBrokerObjectEntry = {
 };
 
 export type WidgetImageEntry = {
+  name: string;
+  url: string;
+};
+
+export type WidgetSoundEntry = {
   name: string;
   url: string;
 };

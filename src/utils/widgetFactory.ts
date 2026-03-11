@@ -67,15 +67,10 @@ export function buildWidgetTemplate(
       title: `Kamera ${suffix}`,
       titleFontSize: 14,
       previewSourceMode: "snapshot",
-      fullscreenSourceMode: "snapshot",
       snapshotUrl: "",
-      fullscreenSnapshotUrl: "",
       mjpegUrl: "",
-      fullscreenMjpegUrl: "",
       flvUrl: "",
-      fullscreenFlvUrl: "",
       fmp4Url: "",
-      fullscreenFmp4Url: "",
       refreshMs: 2000,
       position: {
         ...basePosition,
@@ -176,6 +171,7 @@ export function buildWidgetTemplate(
       battTemp: "battery_temp",
     },
     dailyEnergyUnit: "auto",
+    statValueUnit: "none",
     position: {
       ...basePosition,
       w: Math.min(8, grid.columns),

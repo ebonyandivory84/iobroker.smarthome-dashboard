@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { createElement, useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { IoBrokerClient } from "../services/iobroker";
 import { WidgetImageEntry } from "../types/dashboard";
 import { palette } from "../utils/theme";
@@ -26,38 +26,54 @@ export function ImagePickerModal({
   const [images, setImages] = useState<WidgetImageEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const loadImages = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const entries = await client.listWidgetImages();
+      setImages(entries);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Bilder konnten nicht geladen werden");
+    } finally {
+      setLoading(false);
+    }
+  }, [client]);
+
+  const uploadFiles = useCallback(
+    async (files: FileList | File[]) => {
+      if (!files || !files.length) {
+        return;
+      }
+      setUploadBusy(true);
+      setUploadError(null);
+      try {
+        for (const file of Array.from(files)) {
+          if (!file.type.startsWith("image/")) {
+            continue;
+          }
+          const dataUrl = await readFileAsDataUrl(file);
+          await client.uploadWidgetImage(file.name, dataUrl);
+        }
+        await loadImages();
+      } catch (uploadErr) {
+        setUploadError(uploadErr instanceof Error ? uploadErr.message : "Bild-Upload fehlgeschlagen");
+      } finally {
+        setUploadBusy(false);
+      }
+    },
+    [client, loadImages]
+  );
 
   useEffect(() => {
     if (!visible) {
       return;
     }
-
-    let active = true;
-    setLoading(true);
-    setError(null);
-
-    client
-      .listWidgetImages()
-      .then((entries) => {
-        if (active) {
-          setImages(entries);
-        }
-      })
-      .catch((loadError) => {
-        if (active) {
-          setError(loadError instanceof Error ? loadError.message : "Bilder konnten nicht geladen werden");
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [client, visible]);
+    setUploadError(null);
+    void loadImages();
+  }, [loadImages, visible]);
 
   return (
     <Modal animationType="fade" transparent visible={visible}>
@@ -69,9 +85,40 @@ export function ImagePickerModal({
               <Text style={styles.close}>Schliessen</Text>
             </Pressable>
           </View>
-          <Text style={styles.helper}>{helperText || "Verwendet den festen Ordner `assets/` im Adapter-Paket."}</Text>
+          <Text style={styles.helper}>{helperText || "Eigene Bilder koennen per Drag-and-Drop hochgeladen und sofort verwendet werden."}</Text>
+          {Platform.OS === "web"
+            ? createElement(
+                "div",
+                {
+                  style: webDropZoneStyle,
+                  onDragOver: (event: DragEvent) => event.preventDefault(),
+                  onDrop: (event: DragEvent) => {
+                    event.preventDefault();
+                    if (event.dataTransfer?.files?.length) {
+                      void uploadFiles(event.dataTransfer.files);
+                    }
+                  },
+                },
+                createElement("div", { style: webDropZoneTextStyle }, "Bilder hierher ziehen oder auswaehlen"),
+                createElement("input", {
+                  type: "file",
+                  accept: "image/*",
+                  multiple: true,
+                  onChange: (event: { target: { files?: FileList | null; value: string } }) => {
+                    const files = event.target.files;
+                    if (files && files.length) {
+                      void uploadFiles(files);
+                    }
+                    event.target.value = "";
+                  },
+                  style: webFileInputStyle,
+                })
+              )
+            : null}
           {loading ? <ActivityIndicator color={palette.accent} size="small" /> : null}
+          {uploadBusy ? <ActivityIndicator color={palette.accent} size="small" /> : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
+          {uploadError ? <Text style={styles.error}>{uploadError}</Text> : null}
           <ScrollView contentContainerStyle={styles.grid}>
             {images.map((image) => {
               const active = selectedName === image.name;
@@ -88,12 +135,27 @@ export function ImagePickerModal({
                 </Pressable>
               );
             })}
-            {!loading && !images.length ? <Text style={styles.helper}>Keine Bilder in `assets/` gefunden.</Text> : null}
+            {!loading && !images.length ? <Text style={styles.helper}>Keine Bilder gefunden.</Text> : null}
           </ScrollView>
         </View>
       </View>
     </Modal>
   );
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Datei konnte nicht gelesen werden"));
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("Datei konnte nicht gelesen werden"));
+      }
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 const styles = StyleSheet.create({
@@ -164,3 +226,24 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+
+const webDropZoneStyle = {
+  border: `1px dashed ${palette.border}`,
+  borderRadius: "12px",
+  padding: "12px",
+  marginBottom: "10px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "8px",
+  background: "rgba(255,255,255,0.03)",
+};
+
+const webDropZoneTextStyle = {
+  color: palette.textMuted,
+  fontSize: "12px",
+  lineHeight: "18px",
+};
+
+const webFileInputStyle = {
+  color: palette.text,
+};

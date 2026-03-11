@@ -1,8 +1,22 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { createElement } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, ImageBackground, LayoutChangeEvent, Platform, StyleSheet, Text, View } from "react-native";
+import {
+  Animated,
+  Easing,
+  ImageBackground,
+  LayoutChangeEvent,
+  Linking,
+  Platform,
+  Pressable,
+  StyleProp,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+} from "react-native";
 import { SolarLayoutConfig, SolarNodeLayout, SolarWidgetConfig, StateSnapshot, ThemeSettings } from "../../types/dashboard";
+import { useDashboardConfig } from "../../context/DashboardConfigContext";
 import { resolveThemeSettings } from "../../utils/themeConfig";
 import { palette } from "../../utils/theme";
 
@@ -13,8 +27,20 @@ type SolarWidgetProps = {
 };
 
 type FlowDir = "toHome" | "fromHome" | "idle";
+const SOLAR_SCENE_BASE_WIDTH = 960;
+const SOLAR_SCENE_BASE_HEIGHT = 960;
+const SOLAR_MAX_STAT_CARDS = 6;
+const SOLAR_DEFAULT_STAT_LABELS = [
+  "Eigenverbrauch",
+  "Verbraucht",
+  "Stat 3",
+  "Stat 4",
+  "Stat 5",
+  "Stat 6",
+];
 
 export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
+  const { dashboardPages, setActivePage } = useDashboardConfig();
   const resolvedTheme = resolveThemeSettings(theme);
   const widgetAppearance = config.appearance;
   const textColor = widgetAppearance?.textColor || palette.text;
@@ -54,7 +80,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
     return () => clearTimeout(timer);
   }, [incomingSnapshot]);
 
-  const { pvNow, homeNow, gridIn, gridOut, soc, battIn, battOut, battTemp, pvTotalKWh, dayConsumedKWh, daySelfKWh } =
+  const { pvNow, homeNow, gridIn, gridOut, soc, battIn, battOut, battTemp, dayConsumedKWh, daySelfKWh } =
     displaySnapshot;
   const missingCore = pvNow === null && homeNow === null && gridIn === null && gridOut === null;
 
@@ -68,25 +94,33 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
   const backgroundBlur = clamp(config.backgroundImageBlur ?? 8, 0, 24);
   const compactWidget = widgetLayout.width > 0 && (widgetLayout.width < 520 || widgetLayout.height < 420);
   const veryCompactWidget = widgetLayout.width > 0 && (widgetLayout.width < 420 || widgetLayout.height < 340);
-  const customStatValues = {
-    first: config.stats?.first?.stateId ? states[config.stats.first.stateId] : undefined,
-    second: config.stats?.second?.stateId ? states[config.stats.second.stateId] : undefined,
+  const statCards = useMemo(
+    () => resolveSolarStatCards(config, states, daySelfKWh, dayConsumedKWh),
+    [config, states, dayConsumedKWh, daySelfKWh]
+  );
+  const tapAction = normalizeSolarTapAction(config.tapAction);
+  const isActionable = tapAction.type !== "none";
+
+  const handleWidgetPress = () => {
+    if (tapAction.type === "dashboard") {
+      if (dashboardPages.some((page) => page.id === tapAction.dashboardId)) {
+        setActivePage(tapAction.dashboardId);
+      }
+      return;
+    }
+    if (tapAction.type === "url") {
+      const resolvedUrl = normalizeExternalUrl(tapAction.url);
+      if (resolvedUrl) {
+        void Linking.openURL(resolvedUrl);
+      }
+    }
   };
-  const statCards = [
-    {
-      label: config.stats?.first?.label || "Eigenverbrauch",
-      value: resolveSolarStatValue(customStatValues.first, fmtKWh(daySelfKWh)),
-    },
-    {
-      label: config.stats?.second?.label || "Verbraucht",
-      value: resolveSolarStatValue(customStatValues.second, fmtKWh(dayConsumedKWh)),
-    },
-  ];
 
   return (
-    <View
+    <Pressable
       onLayout={(event: LayoutChangeEvent) => setWidgetLayout(event.nativeEvent.layout)}
-      style={styles.container}
+      onPress={isActionable ? handleWidgetPress : undefined}
+      style={[styles.container, isActionable ? styles.containerActionable : null]}
     >
       {config.backgroundMode === "image" && config.backgroundImage ? (
         Platform.OS === "web" ? (
@@ -139,31 +173,9 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
           compactMode={compactWidget}
           veryCompactMode={veryCompactWidget}
           nodeLayout={config.nodeLayout}
+          statTextScale={config.statTextScale}
+          statCards={statCards}
         />
-      </View>
-
-      <View
-        style={[
-          styles.bottomRow,
-          compactWidget ? styles.bottomRowCompact : null,
-          veryCompactWidget ? styles.bottomRowVeryCompact : null,
-          compactWidget ? styles.bottomRowOverlay : null,
-          veryCompactWidget ? styles.bottomRowOverlayVeryCompact : null,
-        ]}
-      >
-        {statCards.map((stat, index) => (
-          <MiniStat
-            key={`solar-stat-${index}`}
-            appearance={widgetAppearance}
-            compact={compactWidget}
-            cornerCompact={compactWidget}
-            label={stat.label}
-            mutedTextColor={mutedTextColor}
-            textColor={textColor}
-            theme={resolvedTheme}
-            value={stat.value}
-          />
-        ))}
       </View>
 
       {!compactWidget ? (
@@ -173,7 +185,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
         </Text>
       ) : null}
       {missingCore ? <Text style={styles.warning}>Keine Solar-Daten gefunden. Pruefe Prefix und Key-Mapping.</Text> : null}
-    </View>
+    </Pressable>
   );
 }
 
@@ -194,6 +206,8 @@ function SolarFlowScene({
   compactMode,
   veryCompactMode,
   nodeLayout,
+  statTextScale,
+  statCards,
 }: {
   pvDir: FlowDir;
   pvNow: number | null;
@@ -211,9 +225,11 @@ function SolarFlowScene({
   compactMode?: boolean;
   veryCompactMode?: boolean;
   nodeLayout?: Partial<SolarLayoutConfig>;
+  statTextScale?: number;
+  statCards: Array<{ label: string; value: string }>;
 }) {
   const progress = useRef(new Animated.Value(0)).current;
-  const [sceneLayout, setSceneLayout] = useState({ width: 960, height: 520 });
+  const [sceneLayout, setSceneLayout] = useState({ width: SOLAR_SCENE_BASE_WIDTH, height: SOLAR_SCENE_BASE_HEIGHT });
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -228,16 +244,44 @@ function SolarFlowScene({
     return () => loop.stop();
   }, [progress]);
 
-  const defaults = getDefaultNodeLayout(sceneLayout, compactMode, veryCompactMode);
-  const effectiveNodeLayout = compactMode || veryCompactMode ? undefined : nodeLayout;
-  const pvBox = resolveNodeBox(effectiveNodeLayout?.pv, defaults.pv, sceneLayout);
-  const homeBox = resolveNodeBox(effectiveNodeLayout?.home, defaults.home, sceneLayout);
-  const batteryBox = resolveNodeBox(effectiveNodeLayout?.battery, defaults.battery, sceneLayout);
-  const gridBox = resolveNodeBox(effectiveNodeLayout?.grid, defaults.grid, sceneLayout);
-  const carBox = resolveNodeBox(effectiveNodeLayout?.car, defaults.car, sceneLayout);
-  const flowDotSize = veryCompactMode ? 8 : compactMode ? 10 : 12;
-  const lineGap = veryCompactMode ? 8 : compactMode ? 10 : 2;
-  const verticalGap = veryCompactMode ? 10 : compactMode ? 14 : 10;
+  const fittedScene = useMemo(() => {
+    const availableWidth = Math.max(1, sceneLayout.width);
+    const availableHeight = Math.max(1, sceneLayout.height);
+    const scale = Math.min(availableWidth / SOLAR_SCENE_BASE_WIDTH, availableHeight / SOLAR_SCENE_BASE_HEIGHT);
+    const width = Math.max(1, SOLAR_SCENE_BASE_WIDTH * scale);
+    const height = Math.max(1, SOLAR_SCENE_BASE_HEIGHT * scale);
+    return {
+      x: (availableWidth - width) / 2,
+      // Anchor to top so vertical space is used for larger node distances.
+      y: 0,
+      width,
+      height,
+    };
+  }, [sceneLayout]);
+
+  const defaults = getDefaultNodeLayout();
+  const pvBox = resolveNodeBox(nodeLayout?.pv, defaults.pv, fittedScene);
+  const homeBox = resolveNodeBox(nodeLayout?.home, defaults.home, fittedScene);
+  const batteryBox = resolveNodeBox(nodeLayout?.battery, defaults.battery, fittedScene);
+  const gridBox = resolveNodeBox(nodeLayout?.grid, defaults.grid, fittedScene);
+  const carBox = resolveNodeBox(nodeLayout?.car, defaults.car, fittedScene);
+  const flowDotSize = Math.max(8, Math.min(12, Math.round(fittedScene.width * 0.012)));
+  const lineGap = Math.max(2, Math.round(fittedScene.width * 0.01));
+  const verticalGap = Math.max(8, Math.round(fittedScene.height * 0.02));
+  const sceneScale = clamp(fittedScene.width / SOLAR_SCENE_BASE_WIDTH, 0.52, 1);
+  const statScale = clamp(fittedScene.width / SOLAR_SCENE_BASE_WIDTH, 0.38, 1);
+  const effectiveStatTextScale = clamp(statTextScale ?? 1, 0.6, 2);
+  const statWidth = Math.round(clamp(fittedScene.width * 0.33, 110, 340));
+  const statBottom = Math.round(clamp(fittedScene.height * 0.008, 2, 14));
+  const statGap = Math.round(clamp(8 * statScale, 4, 10));
+  const leftStatCount = Math.ceil(statCards.length / 2);
+  const leftStats = statCards.slice(0, leftStatCount);
+  const rightStats = statCards.slice(leftStatCount);
+  const maxStackCount = Math.max(leftStats.length, rightStats.length, 1);
+  const maxStatStackHeight = Math.round(clamp(fittedScene.height * 0.34, 120, 260));
+  const statMinHeight = Math.round(
+    clamp((maxStatStackHeight - statGap * Math.max(0, maxStackCount - 1)) / maxStackCount, 36, 96)
+  );
   const homeMidX = homeBox.x + homeBox.w / 2;
   const batteryMidY = batteryBox.y + batteryBox.h / 2;
   const homeMidY = homeBox.y + homeBox.h / 2;
@@ -301,8 +345,8 @@ function SolarFlowScene({
       <NodeCard
         icon="white-balance-sunny"
         label="PV"
-        iconColor="#8af7d3"
-        iconSurface="rgba(35, 98, 88, 0.34)"
+        iconColor="#ffd34f"
+        iconSurface="rgba(120, 98, 24, 0.36)"
         nodeColor={widgetAppearance?.pvCardColor}
         theme={theme}
         textColor={textColor}
@@ -310,6 +354,7 @@ function SolarFlowScene({
         widgetAppearance={widgetAppearance}
         compact={compactMode}
         veryCompact={veryCompactMode}
+        sceneScale={sceneScale}
         style={{ ...styles.nodePosition, top: pvBox.y, left: pvBox.x, width: pvBox.w, minHeight: pvBox.h }}
         value={fmtW(pvNow)}
         highlight={pvDir !== "idle"}
@@ -326,6 +371,7 @@ function SolarFlowScene({
         widgetAppearance={widgetAppearance}
         compact={compactMode}
         veryCompact={veryCompactMode}
+        sceneScale={sceneScale}
         style={{ ...styles.nodePosition, top: homeBox.y, left: homeBox.x, width: homeBox.w, minHeight: homeBox.h }}
         value={fmtW(homeNow)}
         highlight
@@ -342,6 +388,7 @@ function SolarFlowScene({
         widgetAppearance={widgetAppearance}
         compact={compactMode}
         veryCompact={veryCompactMode}
+        sceneScale={sceneScale}
         style={{ ...styles.nodePosition, top: batteryBox.y, left: batteryBox.x, width: batteryBox.w, minHeight: batteryBox.h }}
         value={fmtW(battPower || null)}
         meta={
@@ -367,9 +414,9 @@ function SolarFlowScene({
         widgetAppearance={widgetAppearance}
         compact={compactMode}
         veryCompact={veryCompactMode}
+        sceneScale={sceneScale}
         style={{ ...styles.nodePosition, top: gridBox.y, left: gridBox.x, width: gridBox.w, minHeight: gridBox.h }}
         value={fmtW(gridPower || null)}
-        meta={gridDir === "toHome" ? "Bezug" : gridDir === "fromHome" ? "Einspeisung" : "Idle"}
         highlight={gridDir !== "idle"}
       />
       <NodeCard
@@ -384,9 +431,57 @@ function SolarFlowScene({
         widgetAppearance={widgetAppearance}
         compact={compactMode}
         veryCompact={veryCompactMode}
+        sceneScale={sceneScale}
         style={{ ...styles.nodePosition, top: carBox.y, left: carBox.x, width: carBox.w, minHeight: carBox.h }}
         value="—"
       />
+
+      {leftStats.map((card, index) => (
+        <MiniStat
+          key={`solar-left-stat-${index}`}
+          appearance={widgetAppearance}
+          compact={compactMode}
+          label={card.label}
+          mutedTextColor={mutedTextColor}
+          textColor={textColor}
+          theme={theme}
+          value={card.value}
+          scale={statScale}
+          textScale={effectiveStatTextScale}
+          style={[
+            styles.sceneStat,
+            styles.sceneStatLeft,
+            {
+              bottom: statBottom + index * (statMinHeight + statGap),
+              width: statWidth,
+              minHeight: statMinHeight,
+            },
+          ]}
+        />
+      ))}
+      {rightStats.map((card, index) => (
+        <MiniStat
+          key={`solar-right-stat-${index}`}
+          appearance={widgetAppearance}
+          compact={compactMode}
+          label={card.label}
+          mutedTextColor={mutedTextColor}
+          textColor={textColor}
+          theme={theme}
+          value={card.value}
+          scale={statScale}
+          textScale={effectiveStatTextScale}
+          style={[
+            styles.sceneStat,
+            styles.sceneStatRight,
+            {
+              bottom: statBottom + index * (statMinHeight + statGap),
+              width: statWidth,
+              minHeight: statMinHeight,
+            },
+          ]}
+        />
+      ))}
     </View>
   );
 }
@@ -450,6 +545,7 @@ function NodeCard({
   iconSurface,
   compact,
   veryCompact,
+  sceneScale,
 }: {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   label: string;
@@ -466,8 +562,20 @@ function NodeCard({
   iconSurface?: string;
   compact?: boolean;
   veryCompact?: boolean;
+  sceneScale?: number;
 }) {
-  const iconSize = veryCompact ? 18 : compact ? 20 : 24;
+  const scale = clamp(sceneScale ?? 1, 0.52, 1);
+  const iconSize = Math.round(clamp(30 * scale, 18, 30));
+  const cardPadding = Math.round(clamp(10 * scale, 5, 10));
+  const cardRadius = Math.round(clamp(20 * scale, 12, 20));
+  const iconBox = Math.round(clamp(48 * scale, 28, 48));
+  const iconRadius = Math.round(clamp(15 * scale, 10, 15));
+  const iconInnerBox = Math.round(clamp(36 * scale, 22, 36));
+  const iconInnerRadius = Math.round(clamp(12 * scale, 7, 12));
+  const valueFontSize = Math.round(clamp(16 * scale, 11, 16));
+  const valueMarginTop = Math.round(clamp(8 * scale, 4, 8));
+  const metaFontSize = Math.round(clamp(9 * scale, 7, 9));
+  const metaMarginTop = Math.round(clamp(4 * scale, 2, 4));
 
   return (
     <View
@@ -476,9 +584,9 @@ function NodeCard({
         {
           backgroundColor: nodeColor || widgetAppearance?.cardColor || theme.solar.nodeCardBackground,
           borderColor: theme.solar.nodeCardBorder,
+          borderRadius: cardRadius,
+          padding: cardPadding,
         },
-        compact ? styles.nodeCardCompact : null,
-        veryCompact ? styles.nodeCardVeryCompact : null,
         style,
         highlight ? styles.nodeCardActive : null,
       ]}
@@ -486,17 +594,23 @@ function NodeCard({
       <View
         style={[
           styles.nodeIcon,
-          { backgroundColor: iconSurface || "rgba(255,255,255,0.08)" },
-          compact ? styles.nodeIconCompact : null,
-          veryCompact ? styles.nodeIconVeryCompact : null,
+          {
+            backgroundColor: iconSurface || "rgba(255,255,255,0.08)",
+            width: iconBox,
+            height: iconBox,
+            borderRadius: iconRadius,
+          },
           highlight ? styles.nodeIconActive : null,
         ]}
       >
         <View
           style={[
             styles.nodeIconInner,
-            compact ? styles.nodeIconInnerCompact : null,
-            veryCompact ? styles.nodeIconInnerVeryCompact : null,
+            {
+              width: iconInnerBox,
+              height: iconInnerBox,
+              borderRadius: iconInnerRadius,
+            },
           ]}
         >
           <MaterialCommunityIcons
@@ -508,14 +622,15 @@ function NodeCard({
       </View>
       <Text
         adjustsFontSizeToFit
-        minimumFontScale={0.72}
+        minimumFontScale={0.58}
         numberOfLines={1}
         style={[
           styles.nodeValue,
-          styles.nodeValueCompact,
-          compact ? styles.nodeValueCompactText : null,
-          veryCompact ? styles.nodeValueVeryCompactText : null,
-          { color: textColor },
+          {
+            color: textColor,
+            marginTop: valueMarginTop,
+            fontSize: valueFontSize,
+          },
         ]}
       >
         {value}
@@ -525,9 +640,12 @@ function NodeCard({
           numberOfLines={2}
           style={[
             styles.nodeMeta,
-            compact ? styles.nodeMetaCompact : null,
-            veryCompact ? styles.nodeMetaVeryCompact : null,
-            { color: mutedTextColor },
+            {
+              color: mutedTextColor,
+              marginTop: metaMarginTop,
+              fontSize: metaFontSize,
+              lineHeight: Math.round(metaFontSize * 1.25),
+            },
           ]}
         >
           {meta}
@@ -545,7 +663,9 @@ function MiniStat({
   textColor,
   mutedTextColor,
   compact,
-  cornerCompact,
+  scale,
+  textScale,
+  style,
 }: {
   appearance?: SolarWidgetConfig["appearance"];
   label: string;
@@ -554,8 +674,17 @@ function MiniStat({
   textColor: string;
   mutedTextColor: string;
   compact?: boolean;
-  cornerCompact?: boolean;
+  scale?: number;
+  textScale?: number;
+  style?: StyleProp<ViewStyle>;
 }) {
+  const effectiveScale = clamp((scale ?? 1) * (compact ? 0.9 : 1), 0.45, 1);
+  const effectiveTextScale = clamp(textScale ?? 1, 0.6, 2);
+  const cardPadding = Math.round(clamp(12 * effectiveScale, 6, 12));
+  const cardRadius = Math.round(clamp(16 * effectiveScale, 10, 16));
+  const valueFontSize = Math.round(clamp(18 * effectiveScale * effectiveTextScale, 9, 30));
+  const labelFontSize = Math.round(clamp(12 * effectiveScale * effectiveTextScale, 7, 20));
+
   return (
     <View
       style={[
@@ -563,13 +692,37 @@ function MiniStat({
         {
           backgroundColor: appearance?.statColor || theme.solar.statCardBackground,
           borderColor: theme.solar.statCardBorder,
+          padding: cardPadding,
+          borderRadius: cardRadius,
         },
         compact ? styles.miniCompact : null,
-        cornerCompact ? styles.miniCornerCompact : null,
+        style,
       ]}
     >
-      <Text style={[styles.miniValue, compact ? styles.miniValueCompact : null, { color: textColor }]}>{value}</Text>
-      <Text style={[styles.miniLabel, compact ? styles.miniLabelCompact : null, { color: mutedTextColor }]}>{label}</Text>
+      <Text
+        adjustsFontSizeToFit
+        minimumFontScale={0.75}
+        numberOfLines={1}
+        style={[
+          styles.miniValue,
+          compact ? styles.miniValueCompact : null,
+          { color: textColor, fontSize: valueFontSize, lineHeight: Math.round(valueFontSize * 1.12) },
+        ]}
+      >
+        {value}
+      </Text>
+      <Text
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+        numberOfLines={1}
+        style={[
+          styles.miniLabel,
+          compact ? styles.miniLabelCompact : null,
+          { color: mutedTextColor, fontSize: labelFontSize, lineHeight: Math.round(labelFontSize * 1.15) },
+        ]}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
@@ -674,13 +827,83 @@ function fmtKWh(n: number | null) {
   return `${n.toFixed(1)} kWh`;
 }
 
-function resolveSolarStatValue(rawValue: unknown, fallback: string) {
+function resolveSolarStatCards(
+  config: SolarWidgetConfig,
+  states: StateSnapshot,
+  daySelfKWh: number | null,
+  dayConsumedKWh: number | null
+) {
+  const statDefinitions = resolveSolarStatDefinitions(config);
+  return statDefinitions.map((entry, index) => {
+    const rawValue = entry.stateId ? states[entry.stateId] : undefined;
+    const fallback = index === 0 ? fmtKWh(daySelfKWh) : index === 1 ? fmtKWh(dayConsumedKWh) : "—";
+    return {
+      label: entry.label,
+      value: resolveSolarStatValue(rawValue, fallback, config.statValueUnit || "none"),
+    };
+  });
+}
+
+function resolveSolarStatDefinitions(config: SolarWidgetConfig) {
+  const legacyCards = [config.stats?.first, config.stats?.second, config.stats?.third].filter(Boolean) as Array<{
+    label: string;
+    stateId?: string;
+  }>;
+  const configuredCards =
+    Array.isArray(config.stats?.cards) && config.stats.cards.length ? config.stats.cards : legacyCards;
+  const configuredCount = Number.isFinite(config.stats?.count) ? Number(config.stats?.count) : configuredCards.length;
+  const count = clamp(Math.round(configuredCount || 2), 1, SOLAR_MAX_STAT_CARDS);
+
+  return Array.from({ length: count }, (_, index) => {
+    const source = configuredCards[index];
+    const label = (source?.label || SOLAR_DEFAULT_STAT_LABELS[index] || `Stat ${index + 1}`).trim();
+    const stateId = (source?.stateId || "").trim() || undefined;
+    return {
+      label: label || `Stat ${index + 1}`,
+      stateId,
+    };
+  });
+}
+
+function normalizeSolarTapAction(raw: SolarWidgetConfig["tapAction"] | undefined) {
+  if (raw?.type === "dashboard" && typeof raw.dashboardId === "string" && raw.dashboardId.trim()) {
+    return { type: "dashboard" as const, dashboardId: raw.dashboardId.trim() };
+  }
+  if (raw?.type === "url" && typeof raw.url === "string" && raw.url.trim()) {
+    return { type: "url" as const, url: raw.url.trim() };
+  }
+  return { type: "none" as const };
+}
+
+function normalizeExternalUrl(raw: string) {
+  const value = raw.trim();
+  if (!value) {
+    return "";
+  }
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+  return `https://${value}`;
+}
+
+function resolveSolarStatValue(
+  rawValue: unknown,
+  fallback: string,
+  unit: SolarWidgetConfig["statValueUnit"] = "none"
+) {
   if (rawValue === undefined) {
     return fallback;
   }
   if (rawValue === null) {
     return "—";
   }
+
+  const parsedNumber = asNumber(rawValue);
+
+  if (parsedNumber !== null && unit && unit !== "none") {
+    return formatSolarStatNumberWithUnit(parsedNumber, unit);
+  }
+
   if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
     if (Math.abs(rawValue) >= 1000) {
       return rawValue.toLocaleString("de-DE", { maximumFractionDigits: 0 });
@@ -691,6 +914,12 @@ function resolveSolarStatValue(rawValue: unknown, fallback: string) {
     return rawValue.toLocaleString("de-DE", { maximumFractionDigits: 1 });
   }
   return String(rawValue);
+}
+
+function formatSolarStatNumberWithUnit(value: number, unit: "W" | "kW" | "Wh" | "kWh") {
+  const fractionDigits = unit === "kW" || unit === "kWh" ? 1 : 0;
+  const formatted = value.toLocaleString("de-DE", { maximumFractionDigits: fractionDigits });
+  return `${formatted} ${unit}`;
 }
 
 function resolveBatteryIcon(soc: number | null): keyof typeof MaterialCommunityIcons.glyphMap {
@@ -717,56 +946,31 @@ function resolveBatteryIcon(soc: number | null): keyof typeof MaterialCommunityI
   return "battery-outline";
 }
 
-function getDefaultNodeLayout(
-  scene: { width: number; height: number },
-  compactMode?: boolean,
-  veryCompactMode?: boolean
-): SolarLayoutConfig {
-  const compactSingleColumn = veryCompactMode || scene.width <= 420 || scene.height <= 260;
-  const compactTablet = (!compactSingleColumn && compactMode) || (scene.width > 420 && scene.width <= 620) || scene.height <= 340;
-
-  if (compactSingleColumn) {
-    return {
-      pv: { x: 0.385, y: 0.015, w: 0.23, h: 0.2 },
-      home: { x: 0.38, y: 0.355, w: 0.24, h: 0.24 },
-      battery: { x: 0.0, y: 0.385, w: 0.2, h: 0.18 },
-      grid: { x: 0.8, y: 0.385, w: 0.2, h: 0.18 },
-      car: { x: 0.35, y: 0.76, w: 0.3, h: 0.16 },
-    };
-  }
-
-  if (compactTablet) {
-    return {
-      pv: { x: 0.38, y: 0.02, w: 0.24, h: 0.18 },
-      home: { x: 0.39, y: 0.52, w: 0.22, h: 0.2 },
-      battery: { x: 0.0, y: 0.53, w: 0.22, h: 0.18 },
-      grid: { x: 0.78, y: 0.53, w: 0.22, h: 0.18 },
-      car: { x: 0.35, y: 0.9, w: 0.3, h: 0.14 },
-    };
-  }
-
+function getDefaultNodeLayout(): SolarLayoutConfig {
   return {
-    pv: { x: 0.44, y: 0.02, w: 0.12, h: 0.18 },
-    home: { x: 0.44, y: 0.25, w: 0.12, h: 0.18 },
-    battery: { x: 0.14, y: 0.27, w: 0.1, h: 0.14 },
-    grid: { x: 0.76, y: 0.27, w: 0.1, h: 0.14 },
-    car: { x: 0.45, y: 0.63, w: 0.1, h: 0.14 },
+    pv: { x: 0.4, y: 0.03, w: 0.2, h: 0.12 },
+    home: { x: 0.39, y: 0.43, w: 0.22, h: 0.16 },
+    battery: { x: 0.03, y: 0.45, w: 0.19, h: 0.16 },
+    grid: { x: 0.78, y: 0.45, w: 0.19, h: 0.16 },
+    car: { x: 0.37, y: 0.74, w: 0.26, h: 0.1 },
   };
 }
 
 function resolveNodeBox(
   partial: Partial<SolarNodeLayout> | undefined,
   fallback: SolarNodeLayout,
-  scene: { width: number; height: number }
+  scene: { x?: number; y?: number; width: number; height: number }
 ) {
+  const offsetX = Number.isFinite(scene.x) ? Number(scene.x) : 0;
+  const offsetY = Number.isFinite(scene.y) ? Number(scene.y) : 0;
   const x = clamp(typeof partial?.x === "number" ? partial.x : fallback.x, 0, 1);
   const y = clamp(typeof partial?.y === "number" ? partial.y : fallback.y, 0, 1);
   const w = clamp(typeof partial?.w === "number" ? partial.w : fallback.w, 0.06, 0.4);
   const h = clamp(typeof partial?.h === "number" ? partial.h : fallback.h, 0.08, 0.4);
   const width = scene.width * w;
   const height = scene.height * h;
-  const left = clamp(scene.width * x, 0, Math.max(0, scene.width - width));
-  const top = clamp(scene.height * y, 0, Math.max(0, scene.height - height));
+  const left = offsetX + clamp(scene.width * x, 0, Math.max(0, scene.width - width));
+  const top = offsetY + clamp(scene.height * y, 0, Math.max(0, scene.height - height));
 
   return {
     x: left,
@@ -795,6 +999,9 @@ const styles = StyleSheet.create({
     gap: 12,
     position: "relative",
     overflow: "hidden",
+  },
+  containerActionable: {
+    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as const) : {}),
   },
   widgetBackground: {
     ...StyleSheet.absoluteFillObject,
@@ -953,39 +1160,22 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 7,
   },
-  bottomRow: {
-    flexDirection: "row",
-    gap: 10,
-    flexWrap: "wrap",
-    marginTop: 18,
-  },
-  bottomRowOverlay: {
+  sceneStat: {
     position: "absolute",
+    zIndex: 6,
+    flexGrow: 0,
+    flexBasis: "auto",
+  },
+  sceneStatLeft: {
     left: 0,
+  },
+  sceneStatRight: {
     right: 0,
-    bottom: 0,
-    justifyContent: "space-between",
-    flexWrap: "nowrap",
-    alignItems: "flex-end",
-    marginTop: 0,
-    paddingHorizontal: 4,
-    zIndex: 5,
-  },
-  bottomRowOverlayVeryCompact: {
-    bottom: 2,
-    paddingHorizontal: 2,
-  },
-  bottomRowCompact: {
-    gap: 8,
-    marginTop: 10,
-  },
-  bottomRowVeryCompact: {
-    gap: 6,
-    marginTop: 8,
   },
   mini: {
     flexGrow: 1,
-    flexBasis: 140,
+    flexBasis: 0,
+    minWidth: 0,
     borderRadius: 16,
     padding: 12,
     borderWidth: 1,
@@ -995,11 +1185,6 @@ const styles = StyleSheet.create({
     flexBasis: 110,
     padding: 10,
     borderRadius: 14,
-  },
-  miniCornerCompact: {
-    flexGrow: 0,
-    flexBasis: "auto",
-    width: "34%",
   },
   miniValue: {
     color: palette.text,

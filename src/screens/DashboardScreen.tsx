@@ -9,6 +9,7 @@ import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { useIoBrokerStates } from "../hooks/useIoBrokerStates";
 import { BackgroundMode, WidgetConfig, WidgetType } from "../types/dashboard";
 import { constrainToPrimarySections, normalizeWidgetLayout, resolveWidgetPosition } from "../utils/gridLayout";
+import { buildMobileOverrideFromWidget, resolveMobileWidget } from "../utils/mobileWidget";
 import { configureUiSounds, playConfiguredUiSound, primeConfiguredSounds } from "../utils/uiSounds";
 import { buildWidgetTemplate } from "../utils/widgetFactory";
 import { palette } from "../utils/theme";
@@ -16,12 +17,14 @@ import { palette } from "../utils/theme";
 export function DashboardScreen() {
   const { width } = useWindowDimensions();
   const isCompact = width < 700;
+  const activeLayoutTarget: "desktop" | "mobile" = isCompact ? "mobile" : "desktop";
   const [isTouchCapableWeb, setIsTouchCapableWeb] = useState(false);
   const isTouchLayout = width < 1100 || isTouchCapableWeb;
   const horizontalPagerRef = useRef<ScrollView | null>(null);
   const horizontalOffsetRef = useRef(0);
   const pageOffsetsRef = useRef<Record<string, number>>({});
   const pullRefreshBlockedUntilRef = useRef(0);
+  const pullRefreshInFlightRef = useRef(false);
   const edgeTransferCooldownRef = useRef(0);
   const fullscreenCameraMapRef = useRef<Record<string, boolean>>({});
   const pullGestureRef = useRef<{
@@ -64,6 +67,7 @@ export function DashboardScreen() {
   const [visiblePageId, setVisiblePageId] = useState(activePageId);
   const lastContentScrollAt = useRef(0);
   const activePageIndex = Math.max(0, dashboardPages.findIndex((page) => page.id === activePageId));
+  const visiblePageIndex = Math.max(0, dashboardPages.findIndex((page) => page.id === visiblePageId));
 
   const pageConfigs = useMemo(
     () =>
@@ -170,12 +174,73 @@ export function DashboardScreen() {
     if (!currentWidget) {
       return;
     }
-    if (partial.position) {
-      const cameraConstraint = currentWidget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : undefined;
+    if (partial.mobilePosition) {
+      if (activeLayoutTarget === "mobile") {
+        const currentMobile = resolveMobileWidget(currentWidget);
+        const nextMobileOverride = {
+          ...buildMobileOverrideFromWidget(currentMobile),
+          ...(currentWidget.type === "camera" ||
+          currentWidget.type === "solar" ||
+          currentWidget.type === "weather" ||
+          currentWidget.type === "grafana"
+            ? { manualHeightOverride: true }
+            : null),
+        };
+        updateWidget(widgetId, {
+          mobilePosition: partial.mobilePosition,
+          mobileOverride: nextMobileOverride,
+        });
+        return;
+      }
       updateWidget(widgetId, {
         ...partial,
-        position: constrainToPrimarySections(partial.position, config.grid.columns, cameraConstraint),
-        ...(currentWidget.type === "camera" ? { manualHeightOverride: true } : null),
+        ...(currentWidget.type === "camera" ||
+        currentWidget.type === "solar" ||
+        currentWidget.type === "weather" ||
+        currentWidget.type === "grafana"
+          ? { manualHeightOverride: true }
+          : null),
+      });
+      return;
+    }
+    if (activeLayoutTarget === "mobile") {
+      const currentMobile = resolveMobileWidget(currentWidget);
+      const nextMobileWidget = {
+        ...currentMobile,
+        ...partial,
+      } as WidgetConfig;
+      const nextMobileOverride = {
+        ...buildMobileOverrideFromWidget(nextMobileWidget),
+        ...(currentWidget.type === "camera" ||
+        currentWidget.type === "solar" ||
+        currentWidget.type === "weather" ||
+        currentWidget.type === "grafana"
+          ? { manualHeightOverride: true }
+          : null),
+      };
+      updateWidget(widgetId, {
+        mobileOverride: nextMobileOverride,
+      });
+      return;
+    }
+    if (partial.position) {
+      const positionConstraint =
+        currentWidget.type === "camera"
+          ? { minHeight: 0.5, heightSnap: 0.1 }
+          : currentWidget.type === "solar"
+            ? { minHeight: 2.5, heightSnap: 0.1 }
+            : currentWidget.type === "weather" || currentWidget.type === "grafana"
+              ? { minHeight: 1, heightSnap: 0.1 }
+            : undefined;
+      updateWidget(widgetId, {
+        ...partial,
+        position: constrainToPrimarySections(partial.position, config.grid.columns, positionConstraint),
+        ...(currentWidget.type === "camera" ||
+        currentWidget.type === "solar" ||
+        currentWidget.type === "weather" ||
+        currentWidget.type === "grafana"
+          ? { manualHeightOverride: true }
+          : null),
       });
       return;
     }
@@ -213,8 +278,13 @@ export function DashboardScreen() {
     playConfiguredUiSound(config.uiSounds?.pageSounds?.swipe, "swipe", "global:dragEdgePageTransfer");
   };
 
-  const editingWidget: WidgetConfig | null =
+  const editingWidgetBase: WidgetConfig | null =
     config.widgets.find((widget) => widget.id === editingWidgetId) || null;
+  const editingWidget: WidgetConfig | null = editingWidgetBase
+    ? activeLayoutTarget === "mobile"
+      ? resolveMobileWidget(editingWidgetBase)
+      : editingWidgetBase
+    : null;
 
   const resolvePageFromOffset = (offsetX: number) => {
     if (!width) {
@@ -284,6 +354,9 @@ export function DashboardScreen() {
       if (!isTouchLayout) {
         return;
       }
+      if (layoutMode) {
+        return;
+      }
       const hasFullscreenCamera = Object.values(fullscreenCameraMapRef.current).some(Boolean);
       if (hasFullscreenCamera || Date.now() < pullRefreshBlockedUntilRef.current) {
         pullGestureRef.current = {
@@ -333,6 +406,9 @@ export function DashboardScreen() {
       if (!isTouchLayout) {
         return;
       }
+      if (layoutMode) {
+        return;
+      }
       const hasFullscreenCamera = Object.values(fullscreenCameraMapRef.current).some(Boolean);
       if (hasFullscreenCamera || Date.now() < pullRefreshBlockedUntilRef.current) {
         return;
@@ -367,6 +443,19 @@ export function DashboardScreen() {
     (pageId: string) =>
     (event: unknown) => {
       if (!isTouchLayout || Platform.OS !== "web" || typeof window === "undefined") {
+        return;
+      }
+      if (layoutMode) {
+        pullGestureRef.current = {
+          pageId: null,
+          startX: null,
+          startY: null,
+          lastX: null,
+          lastY: null,
+          armed: false,
+          startedAt: 0,
+          movedAt: 0,
+        };
         return;
       }
 
@@ -408,12 +497,14 @@ export function DashboardScreen() {
         isFreshGesture &&
         currentOffset <= 0 &&
         deltaY > 96 &&
-        deltaY > Math.abs(deltaX) + 32
+        deltaY > Math.abs(deltaX) + 32 &&
+        !pullRefreshInFlightRef.current
       ) {
+        pullRefreshInFlightRef.current = true;
         playConfiguredUiSound(config.uiSounds?.pageSounds?.pullToRefresh, "page", "global:pullToRefresh");
         window.setTimeout(() => {
           window.location.reload();
-        }, 140);
+        }, 160);
       }
 
       pullGestureRef.current = {
@@ -469,64 +560,74 @@ export function DashboardScreen() {
         onMomentumScrollEnd={handlePageMomentumEnd}
         onScrollEndDrag={handlePageDragEnd}
       >
-        {pageConfigs.map((pageConfig) => (
-          <View key={pageConfig.activePageId} style={[styles.page, { width }]}>
-            <ScrollView
-              contentContainerStyle={styles.scrollContent}
-              style={styles.pageScroll}
-              onScroll={handlePageContentScroll(pageConfig.activePageId)}
-              onMomentumScrollEnd={handleContentScrollEnd}
-              onScrollEndDrag={handleContentScrollEnd}
-              onTouchStart={handlePageTouchStart(pageConfig.activePageId)}
-              onTouchMove={handlePageTouchMove(pageConfig.activePageId)}
-              onTouchEnd={handlePageTouchEnd(pageConfig.activePageId)}
-            >
-              <GridCanvas
-                client={client}
-                config={pageConfig}
-                isLayoutMode={layoutMode}
-                onCameraFullscreenSwipeClose={() => {
-                  pullRefreshBlockedUntilRef.current = Date.now() + 2500;
-                  pullGestureRef.current = {
-                    pageId: null,
-                    startX: null,
-                    startY: null,
-                    lastX: null,
-                    lastY: null,
-                    armed: false,
-                    startedAt: 0,
-                    movedAt: 0,
-                  };
-                }}
-                onCameraFullscreenVisibilityChange={(widgetId, open) => {
-                  fullscreenCameraMapRef.current[widgetId] = open;
-                  if (!open) {
-                    pullRefreshBlockedUntilRef.current = Date.now() + 2500;
-                  }
-                  pullGestureRef.current = {
-                    pageId: null,
-                    startX: null,
-                    startY: null,
-                    lastX: null,
-                    lastY: null,
-                    armed: false,
-                    startedAt: 0,
-                    movedAt: 0,
-                  };
-                }}
-                onEditWidget={setEditingWidgetId}
-                onRemoveWidget={removeWidget}
-                onUpdateWidget={handleUpdateWidget}
-                onWriteState={writeStateTracked}
-                onDragAcrossPageEdge={(direction, widgetId, position) =>
-                  handleDragAcrossPageEdge(pageConfig.activePageId, direction, widgetId, position)
-                }
-                stateWrites={stateWrites}
-                states={states}
-              />
-            </ScrollView>
-          </View>
-        ))}
+        {pageConfigs.map((pageConfig, pageIndex) => {
+          const isNearViewport = Math.abs(pageIndex - visiblePageIndex) <= 1;
+          const isActive = pageIndex === activePageIndex;
+          const shouldRenderContent = isNearViewport || isActive;
+
+          return (
+            <View key={pageConfig.activePageId} style={[styles.page, { width }]}>
+              {shouldRenderContent ? (
+                <ScrollView
+                  contentContainerStyle={styles.scrollContent}
+                  style={styles.pageScroll}
+                  onScroll={handlePageContentScroll(pageConfig.activePageId)}
+                  onMomentumScrollEnd={handleContentScrollEnd}
+                  onScrollEndDrag={handleContentScrollEnd}
+                  onTouchStart={handlePageTouchStart(pageConfig.activePageId)}
+                  onTouchMove={handlePageTouchMove(pageConfig.activePageId)}
+                  onTouchEnd={handlePageTouchEnd(pageConfig.activePageId)}
+                >
+                  <GridCanvas
+                    client={client}
+                    config={pageConfig}
+                    isLayoutMode={layoutMode}
+                    onCameraFullscreenSwipeClose={() => {
+                      pullRefreshBlockedUntilRef.current = Date.now() + 2500;
+                      pullGestureRef.current = {
+                        pageId: null,
+                        startX: null,
+                        startY: null,
+                        lastX: null,
+                        lastY: null,
+                        armed: false,
+                        startedAt: 0,
+                        movedAt: 0,
+                      };
+                    }}
+                    onCameraFullscreenVisibilityChange={(widgetId, open) => {
+                      fullscreenCameraMapRef.current[widgetId] = open;
+                      if (!open) {
+                        pullRefreshBlockedUntilRef.current = Date.now() + 2500;
+                      }
+                      pullGestureRef.current = {
+                        pageId: null,
+                        startX: null,
+                        startY: null,
+                        lastX: null,
+                        lastY: null,
+                        armed: false,
+                        startedAt: 0,
+                        movedAt: 0,
+                      };
+                    }}
+                    onEditWidget={setEditingWidgetId}
+                    onRemoveWidget={removeWidget}
+                    onUpdateWidget={handleUpdateWidget}
+                    onWriteState={writeStateTracked}
+                    onDragAcrossPageEdge={(direction, widgetId, position) =>
+                      handleDragAcrossPageEdge(pageConfig.activePageId, direction, widgetId, position)
+                    }
+                    stateWrites={stateWrites}
+                    states={states}
+                  />
+                </ScrollView>
+              ) : (
+                <View style={styles.pagePlaceholder} />
+              )}
+            </View>
+          );
+        })}
       </ScrollView>
       <WidgetLibraryModal
         onCreateDashboard={createDashboardPage}
@@ -608,6 +709,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     shadowRadius: 0,
     shadowOffset: { width: 0, height: 0 },
+    ...(Platform.OS === "web"
+      ? {
+          overscrollBehaviorY: "contain" as const,
+        }
+      : null),
   },
   scrollCompact: {
     margin: 0,
@@ -657,7 +763,16 @@ const styles = StyleSheet.create({
   page: {
     flex: 1,
   },
+  pagePlaceholder: {
+    flex: 1,
+  },
   pageScroll: {
     flex: 1,
+    ...(Platform.OS === "web"
+      ? {
+          overscrollBehaviorY: "contain" as const,
+          touchAction: "pan-y" as const,
+        }
+      : null),
   },
 });

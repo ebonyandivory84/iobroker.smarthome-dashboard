@@ -22,7 +22,7 @@ type WidgetEditorModalProps = {
 };
 
 export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: WidgetEditorModalProps) {
-  const { config, patchConfig } = useDashboardConfig();
+  const { config, patchConfig, dashboardPages } = useDashboardConfig();
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [soundDraft, setSoundDraft] = useState<Record<string, string[]>>({});
   const [weatherSuggestions, setWeatherSuggestions] = useState<Array<{
@@ -114,18 +114,12 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         title: widget.title,
         showTitle: widget.showTitle === false ? "false" : "true",
         titleFontSize: String(widget.titleFontSize || 14),
-        previewSourceMode: widget.previewSourceMode || "snapshot",
-        fullscreenSourceMode: widget.fullscreenSourceMode || "snapshot",
-        snapshotUrl: widget.snapshotUrl || "",
-        fullscreenSnapshotUrl: widget.fullscreenSnapshotUrl || "",
-        mjpegUrl: widget.mjpegUrl || "",
-        fullscreenMjpegUrl: widget.fullscreenMjpegUrl || "",
-        flvUrl: widget.flvUrl || "",
-        fullscreenFlvUrl: widget.fullscreenFlvUrl || "",
-        fmp4Url: widget.fmp4Url || "",
-        fullscreenFmp4Url: widget.fullscreenFmp4Url || "",
-        refreshMs: String(widget.refreshMs || 2000),
-        fullscreenRefreshMs: String(widget.fullscreenRefreshMs || widget.refreshMs || 1000),
+        previewSourceMode: widget.previewSourceMode || widget.fullscreenSourceMode || "snapshot",
+        snapshotUrl: widget.snapshotUrl || widget.fullscreenSnapshotUrl || "",
+        mjpegUrl: widget.mjpegUrl || widget.fullscreenMjpegUrl || "",
+        flvUrl: widget.flvUrl || widget.fullscreenFlvUrl || "",
+        fmp4Url: widget.fmp4Url || widget.fullscreenFmp4Url || "",
+        refreshMs: String(widget.refreshMs || widget.fullscreenRefreshMs || 2000),
         maximizeStateId: widget.maximizeStateId || "",
         maximizeTriggerFormat: widget.maximizeTriggerFormat || "boolean",
         maximizeTriggerValue: widget.maximizeTriggerValue || "",
@@ -227,6 +221,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       return;
     }
 
+    const solarStatDraft = buildSolarStatEditorDraft(widget.stats);
     setSoundDraft({});
     setWeatherSuggestions([]);
     setWeatherSearchBusy(false);
@@ -238,6 +233,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       backgroundImageBlur: String(widget.backgroundImageBlur ?? 8),
       statePrefix: widget.statePrefix,
       dailyEnergyUnit: widget.dailyEnergyUnit || "auto",
+      statValueUnit: widget.statValueUnit || "none",
       keyPvNow: widget.keys.pvNow,
       keyHomeNow: widget.keys.homeNow,
       keyGridIn: widget.keys.gridIn,
@@ -249,12 +245,23 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       keyDaySelf: widget.keys.daySelf,
       keyPvTotal: widget.keys.pvTotal || "",
       keyBattTemp: widget.keys.battTemp || "",
-      stat1Label: widget.stats?.first?.label || "Eigenverbrauch",
-      stat1StateId: widget.stats?.first?.stateId || "",
-      stat2Label: widget.stats?.second?.label || "Verbraucht",
-      stat2StateId: widget.stats?.second?.stateId || "",
-      stat3Label: widget.stats?.third?.label || "Autarkie",
-      stat3StateId: widget.stats?.third?.stateId || "",
+      statTextScalePct: String(Math.round((widget.statTextScale ?? 1) * 100)),
+      statCount: String(solarStatDraft.count),
+      stat1Label: solarStatDraft.cards[0].label,
+      stat1StateId: solarStatDraft.cards[0].stateId,
+      stat2Label: solarStatDraft.cards[1].label,
+      stat2StateId: solarStatDraft.cards[1].stateId,
+      stat3Label: solarStatDraft.cards[2].label,
+      stat3StateId: solarStatDraft.cards[2].stateId,
+      stat4Label: solarStatDraft.cards[3].label,
+      stat4StateId: solarStatDraft.cards[3].stateId,
+      stat5Label: solarStatDraft.cards[4].label,
+      stat5StateId: solarStatDraft.cards[4].stateId,
+      stat6Label: solarStatDraft.cards[5].label,
+      stat6StateId: solarStatDraft.cards[5].stateId,
+      solarTapType: widget.tapAction?.type || "none",
+      solarTapDashboardId: widget.tapAction?.type === "dashboard" ? widget.tapAction.dashboardId : "",
+      solarTapUrl: widget.tapAction?.type === "url" ? widget.tapAction.url : "",
       ...appearanceDraft,
     });
   }, [editorTargetKey]);
@@ -330,10 +337,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     return null;
   }
 
-  const previewCameraMode = normalizeCameraSourceMode(draft.previewSourceMode);
-  const fullscreenCameraMode = normalizeCameraSourceMode(draft.fullscreenSourceMode);
-  const previewCameraUrl = getCameraUrlByMode(draft, previewCameraMode, false);
-  const fullscreenCameraUrl = getCameraUrlByMode(draft, fullscreenCameraMode, true);
+  const cameraMode = normalizeCameraSourceMode(draft.previewSourceMode || draft.fullscreenSourceMode);
+  const cameraUrl = getCameraUrlByMode(draft, cameraMode);
+  const solarStatCount = clampSolarStatCount(draft.statCount);
 
   const save = () => {
     const appearance = buildAppearance(draft);
@@ -372,47 +378,33 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         appearance,
       });
     } else if (widget.type === "camera") {
-      const previewSourceMode = previewCameraMode;
-      const fullscreenSourceMode = fullscreenCameraMode;
+      const previewSourceMode = cameraMode;
       const snapshotUrl = normalizeOptionalInput(draft.snapshotUrl);
-      const fullscreenSnapshotUrl = normalizeOptionalInput(draft.fullscreenSnapshotUrl);
       const mjpegUrl = normalizeOptionalInput(draft.mjpegUrl);
-      const fullscreenMjpegUrl = normalizeOptionalInput(draft.fullscreenMjpegUrl);
       const flvUrl = normalizeOptionalInput(draft.flvUrl);
-      const fullscreenFlvUrl = normalizeOptionalInput(draft.fullscreenFlvUrl);
       const fmp4Url = normalizeOptionalInput(draft.fmp4Url);
-      const fullscreenFmp4Url = normalizeOptionalInput(draft.fullscreenFmp4Url);
       const cameraSourceChanged =
         normalizeCameraSourceMode(widget.previewSourceMode) !== previewSourceMode ||
-        normalizeCameraSourceMode(widget.fullscreenSourceMode) !== fullscreenSourceMode ||
         normalizeOptionalInput(widget.snapshotUrl) !== snapshotUrl ||
-        normalizeOptionalInput(widget.fullscreenSnapshotUrl) !== fullscreenSnapshotUrl ||
         normalizeOptionalInput(widget.mjpegUrl) !== mjpegUrl ||
-        normalizeOptionalInput(widget.fullscreenMjpegUrl) !== fullscreenMjpegUrl ||
         normalizeOptionalInput(widget.flvUrl) !== flvUrl ||
-        normalizeOptionalInput(widget.fullscreenFlvUrl) !== fullscreenFlvUrl ||
-        normalizeOptionalInput(widget.fmp4Url) !== fmp4Url ||
-        normalizeOptionalInput(widget.fullscreenFmp4Url) !== fullscreenFmp4Url;
+        normalizeOptionalInput(widget.fmp4Url) !== fmp4Url;
       onSave(widget.id, {
         title: draft.title,
         showTitle: draft.showTitle !== "false",
         titleFontSize: clampInt(draft.titleFontSize, widget.titleFontSize || 14, 11),
         previewSourceMode,
-        fullscreenSourceMode,
+        fullscreenSourceMode: undefined,
         snapshotUrl,
-        fullscreenSnapshotUrl,
+        fullscreenSnapshotUrl: undefined,
         mjpegUrl,
-        fullscreenMjpegUrl,
+        fullscreenMjpegUrl: undefined,
         flvUrl,
-        fullscreenFlvUrl,
+        fullscreenFlvUrl: undefined,
         fmp4Url,
-        fullscreenFmp4Url,
+        fullscreenFmp4Url: undefined,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 250),
-        fullscreenRefreshMs: clampInt(
-          draft.fullscreenRefreshMs,
-          widget.fullscreenRefreshMs || widget.refreshMs || 1000,
-          100
-        ),
+        fullscreenRefreshMs: undefined,
         manualHeightOverride: cameraSourceChanged ? false : widget.manualHeightOverride,
         snapshotAspectRatio: cameraSourceChanged ? undefined : widget.snapshotAspectRatio,
         maximizeStateId: draft.maximizeStateId || undefined,
@@ -498,6 +490,13 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         statePrefix: draft.statePrefix || widget.statePrefix,
         dailyEnergyUnit:
           draft.dailyEnergyUnit === "Wh" || draft.dailyEnergyUnit === "kWh" ? draft.dailyEnergyUnit : "auto",
+        statValueUnit:
+          draft.statValueUnit === "W" ||
+          draft.statValueUnit === "kW" ||
+          draft.statValueUnit === "Wh" ||
+          draft.statValueUnit === "kWh"
+            ? draft.statValueUnit
+            : "none",
         keys: {
           pvNow: draft.keyPvNow || widget.keys.pvNow,
           homeNow: draft.keyHomeNow || widget.keys.homeNow,
@@ -511,7 +510,14 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           pvTotal: draft.keyPvTotal || undefined,
           battTemp: draft.keyBattTemp || undefined,
         },
+        statTextScale: clampFloatRange(
+          draft.statTextScalePct,
+          (widget.statTextScale ?? 1) * 100,
+          60,
+          200
+        ) / 100,
         stats: buildSolarStats(draft),
+        tapAction: buildSolarTapAction(draft),
         appearance,
       });
     }
@@ -916,42 +922,23 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   value={draft.textColor || ""}
                   onChange={(value) => setDraft((current) => ({ ...current, textColor: value }))}
                 />
-                <Field label="Quelle Miniaturansicht">
+                <Field label="Quelle">
                   <ChoiceRow
                     options={["snapshot", "mjpeg", "flv", "fmp4"]}
-                    value={previewCameraMode}
+                    value={cameraMode}
                     onSelect={(value) => setDraft((current) => ({ ...current, previewSourceMode: value }))}
                   />
                 </Field>
-                <Field label="Quelle Vollbildansicht">
-                  <ChoiceRow
-                    options={["snapshot", "mjpeg", "flv", "fmp4"]}
-                    value={fullscreenCameraMode}
-                    onSelect={(value) => setDraft((current) => ({ ...current, fullscreenSourceMode: value }))}
-                  />
-                </Field>
-                <Field label="URL Miniaturansicht">
+                <Field label="URL">
                   <TextInput
                     autoCapitalize="none"
-                    onChangeText={(value) =>
-                      setDraft((current) => setCameraUrlByMode(current, previewCameraMode, false, value))
-                    }
+                    onChangeText={(value) => setDraft((current) => setCameraUrlByMode(current, cameraMode, value))}
                     style={styles.input}
-                    value={previewCameraUrl}
-                  />
-                </Field>
-                <Field label="URL Vollbildansicht (optional)">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) =>
-                      setDraft((current) => setCameraUrlByMode(current, fullscreenCameraMode, true, value))
-                    }
-                    style={styles.input}
-                    value={fullscreenCameraUrl}
+                    value={cameraUrl}
                   />
                 </Field>
                 <Text style={styles.mappingHint}>
-                  Die URL-Felder gelten jeweils fuer das oben gewaehlte Format (Snapshot, MJPEG, FLV oder fMP4).
+                  Die URL gilt fuer das oben gewaehlte Format (Snapshot, MJPEG, FLV oder fMP4).
                 </Text>
                 <Text style={styles.mappingHint}>
                   FLV-Hinweis: Bei `CodecUnsupported` liefert der Stream meist kein browser-kompatibles H.264. Falls
@@ -959,32 +946,17 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 </Text>
                 <Field label="Refresh (ms)">
                   <TextInput
-                    editable={previewCameraMode === "snapshot"}
+                    editable={cameraMode === "snapshot"}
                     keyboardType="numeric"
                     onChangeText={(value) => setDraft((current) => ({ ...current, refreshMs: value }))}
                     style={[
                       styles.input,
-                      previewCameraMode !== "snapshot" ? styles.disabledInput : null,
+                      cameraMode !== "snapshot" ? styles.disabledInput : null,
                     ]}
                     value={draft.refreshMs || ""}
                   />
-                  {previewCameraMode !== "snapshot" ? (
+                  {cameraMode !== "snapshot" ? (
                     <Text style={styles.mappingHint}>Refresh gilt nur fuer Snapshot.</Text>
-                  ) : null}
-                </Field>
-                <Field label="Refresh Vollbild (ms)">
-                  <TextInput
-                    editable={fullscreenCameraMode === "snapshot"}
-                    keyboardType="numeric"
-                    onChangeText={(value) => setDraft((current) => ({ ...current, fullscreenRefreshMs: value }))}
-                    style={[
-                      styles.input,
-                      fullscreenCameraMode !== "snapshot" ? styles.disabledInput : null,
-                    ]}
-                    value={draft.fullscreenRefreshMs || ""}
-                  />
-                  {fullscreenCameraMode !== "snapshot" ? (
-                    <Text style={styles.mappingHint}>Refresh gilt im Vollbild nur fuer Snapshot.</Text>
                   ) : null}
                 </Field>
                 <Field label="Maximieren per Datenpunkt">
@@ -1312,6 +1284,22 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     ))}
                   </View>
                 </Field>
+                <Field label="Stat-Cards Einheit">
+                  <View style={styles.modeRow}>
+                    {["none", "W", "kW", "Wh", "kWh"].map((unit) => (
+                      <EditorButtonPressable
+                        key={`stat-unit-${unit}`}
+                        onPress={() => setDraft((current) => ({ ...current, statValueUnit: unit }))}
+                        style={[
+                          styles.modeButton,
+                          (draft.statValueUnit || "none") === unit ? styles.modeButtonActive : null,
+                        ]}
+                      >
+                        <Text style={styles.modeLabel}>{unit}</Text>
+                      </EditorButtonPressable>
+                    ))}
+                  </View>
+                </Field>
                 <Text style={styles.sectionTitle}>Key-Mapping</Text>
                 <View style={styles.splitRow}>
                   <Field label="PV aktuell">
@@ -1411,58 +1399,92 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={draft.keyPvTotal || ""}
                   />
                 </Field>
+                <Field label="Stat Textgroesse (%)">
+                  <TextInput
+                    keyboardType="numeric"
+                    onChangeText={(value) => setDraft((current) => ({ ...current, statTextScalePct: value }))}
+                    style={styles.input}
+                    value={draft.statTextScalePct || "100"}
+                  />
+                </Field>
+                <Text style={styles.sectionTitle}>Klick-Aktion</Text>
+                <Field label="Aktion">
+                  <ChoiceRow
+                    options={["none", "dashboard", "url"]}
+                    value={draft.solarTapType || "none"}
+                    onSelect={(value) => setDraft((current) => ({ ...current, solarTapType: value }))}
+                  />
+                </Field>
+                {draft.solarTapType === "dashboard" ? (
+                  <Field label="Ziel-Dashboard">
+                    <View style={styles.modeRow}>
+                      {dashboardPages.map((page) => (
+                        <EditorButtonPressable
+                          key={`solar-target-${page.id}`}
+                          onPress={() => setDraft((current) => ({ ...current, solarTapDashboardId: page.id }))}
+                          style={[
+                            styles.modeButton,
+                            (draft.solarTapDashboardId || "") === page.id ? styles.modeButtonActive : null,
+                          ]}
+                        >
+                          <Text style={styles.modeLabel}>{page.title}</Text>
+                        </EditorButtonPressable>
+                      ))}
+                    </View>
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, solarTapDashboardId: value }))}
+                      placeholder="Dashboard ID"
+                      placeholderTextColor={palette.textMuted}
+                      style={styles.input}
+                      value={draft.solarTapDashboardId || ""}
+                    />
+                  </Field>
+                ) : null}
+                {draft.solarTapType === "url" ? (
+                  <Field label="Ziel-URL">
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, solarTapUrl: value }))}
+                      placeholder="https://example.com"
+                      placeholderTextColor={palette.textMuted}
+                      style={styles.input}
+                      value={draft.solarTapUrl || ""}
+                    />
+                  </Field>
+                ) : null}
                 <Text style={styles.sectionTitle}>Stats</Text>
-                <View style={styles.splitRow}>
-                  <Field label="Stat 1 Label">
-                    <TextInput
-                      onChangeText={(value) => setDraft((current) => ({ ...current, stat1Label: value }))}
-                      style={styles.input}
-                      value={draft.stat1Label || ""}
-                    />
-                  </Field>
-                  <Field label="Stat 1 Datenpunkt">
-                    <StateFieldInput
-                      browseLabel="Objekt"
-                      onBrowse={() => setPickerField("stat1StateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, stat1StateId: value }))}
-                      value={draft.stat1StateId || ""}
-                    />
-                  </Field>
-                </View>
-                <View style={styles.splitRow}>
-                  <Field label="Stat 2 Label">
-                    <TextInput
-                      onChangeText={(value) => setDraft((current) => ({ ...current, stat2Label: value }))}
-                      style={styles.input}
-                      value={draft.stat2Label || ""}
-                    />
-                  </Field>
-                  <Field label="Stat 2 Datenpunkt">
-                    <StateFieldInput
-                      browseLabel="Objekt"
-                      onBrowse={() => setPickerField("stat2StateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, stat2StateId: value }))}
-                      value={draft.stat2StateId || ""}
-                    />
-                  </Field>
-                </View>
-                <View style={styles.splitRow}>
-                  <Field label="Stat 3 Label">
-                    <TextInput
-                      onChangeText={(value) => setDraft((current) => ({ ...current, stat3Label: value }))}
-                      style={styles.input}
-                      value={draft.stat3Label || ""}
-                    />
-                  </Field>
-                  <Field label="Stat 3 Datenpunkt">
-                    <StateFieldInput
-                      browseLabel="Objekt"
-                      onBrowse={() => setPickerField("stat3StateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, stat3StateId: value }))}
-                      value={draft.stat3StateId || ""}
-                    />
-                  </Field>
-                </View>
+                <Field label="Anzahl Stat-Cards">
+                  <ChoiceRow
+                    options={["1", "2", "3", "4", "5", "6"]}
+                    value={String(solarStatCount)}
+                    onSelect={(value) => setDraft((current) => ({ ...current, statCount: value }))}
+                  />
+                </Field>
+                {Array.from({ length: solarStatCount }, (_, index) => {
+                  const item = index + 1;
+                  const labelKey = `stat${item}Label`;
+                  const stateKey = `stat${item}StateId`;
+                  return (
+                    <View key={`solar-stat-editor-${item}`} style={styles.splitRow}>
+                      <Field label={`Stat ${item} Label`}>
+                        <TextInput
+                          onChangeText={(value) => setDraft((current) => ({ ...current, [labelKey]: value }))}
+                          style={styles.input}
+                          value={draft[labelKey] || ""}
+                        />
+                      </Field>
+                      <Field label={`Stat ${item} Datenpunkt`}>
+                        <StateFieldInput
+                          browseLabel="Objekt"
+                          onBrowse={() => setPickerField(stateKey)}
+                          onChangeText={(value) => setDraft((current) => ({ ...current, [stateKey]: value }))}
+                          value={draft[stateKey] || ""}
+                        />
+                      </Field>
+                    </View>
+                  );
+                })}
                 <Text style={styles.mappingHint}>
                   Leer lassen, um den bisherigen Standardwert des Solar-Widgets zu nutzen. Wenn ein Datenpunkt gesetzt ist,
                   wird dessen aktueller Wert direkt angezeigt.
@@ -1714,21 +1736,89 @@ function clampFloat(raw: string | undefined, fallback: number) {
   return parsed;
 }
 
+function clampFloatRange(raw: string | undefined, fallback: number, min: number, max: number) {
+  const parsed = Number.parseFloat(raw || "");
+  if (Number.isNaN(parsed)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, parsed));
+}
+
+const SOLAR_STAT_LIMIT = 6;
+const SOLAR_DEFAULT_STAT_LABELS = [
+  "Eigenverbrauch",
+  "Verbraucht",
+  "Stat 3",
+  "Stat 4",
+  "Stat 5",
+  "Stat 6",
+];
+
+function clampSolarStatCount(raw: string | number | undefined, fallback = 2) {
+  const parsed = typeof raw === "number" ? raw : Number.parseInt(raw || "", 10);
+  if (!Number.isFinite(parsed)) {
+    return Math.max(1, Math.min(SOLAR_STAT_LIMIT, fallback));
+  }
+  return Math.max(1, Math.min(SOLAR_STAT_LIMIT, Math.round(parsed)));
+}
+
+function getSolarDefaultStatLabel(index: number) {
+  return SOLAR_DEFAULT_STAT_LABELS[index] || `Stat ${index + 1}`;
+}
+
+function buildSolarStatEditorDraft(stats: Extract<WidgetConfig, { type: "solar" }>["stats"] | undefined) {
+  const legacyCards = [stats?.first, stats?.second, stats?.third].filter(Boolean) as Array<{
+    label: string;
+    stateId?: string;
+  }>;
+  const sourceCards = Array.isArray(stats?.cards) && stats.cards.length ? stats.cards : legacyCards;
+  const count = clampSolarStatCount(stats?.count, sourceCards.length || 2);
+  const cards = Array.from({ length: SOLAR_STAT_LIMIT }, (_, index) => {
+    const source = sourceCards[index];
+    return {
+      label: (source?.label || getSolarDefaultStatLabel(index)).trim() || getSolarDefaultStatLabel(index),
+      stateId: (source?.stateId || "").trim(),
+    };
+  });
+
+  return { count, cards };
+}
+
 function buildSolarStats(draft: Record<string, string>) {
+  const count = clampSolarStatCount(draft.statCount);
+  const cards = Array.from({ length: count }, (_, index) => {
+    const item = index + 1;
+    const label = (draft[`stat${item}Label`] || getSolarDefaultStatLabel(index)).trim() || getSolarDefaultStatLabel(index);
+    const stateId = (draft[`stat${item}StateId`] || "").trim() || undefined;
+    return { label, stateId };
+  });
+
   return {
-    first: {
-      label: (draft.stat1Label || "Eigenverbrauch").trim() || "Eigenverbrauch",
-      stateId: (draft.stat1StateId || "").trim() || undefined,
-    },
-    second: {
-      label: (draft.stat2Label || "Verbraucht").trim() || "Verbraucht",
-      stateId: (draft.stat2StateId || "").trim() || undefined,
-    },
-    third: {
-      label: (draft.stat3Label || "Autarkie").trim() || "Autarkie",
-      stateId: (draft.stat3StateId || "").trim() || undefined,
-    },
+    count,
+    cards,
+    first: cards[0],
+    second: cards[1],
+    third: cards[2],
   };
+}
+
+function buildSolarTapAction(draft: Record<string, string>) {
+  const tapType = draft.solarTapType;
+  if (tapType === "dashboard") {
+    const dashboardId = (draft.solarTapDashboardId || "").trim();
+    if (!dashboardId) {
+      return undefined;
+    }
+    return { type: "dashboard", dashboardId } as const;
+  }
+  if (tapType === "url") {
+    const url = normalizeOptionalInput(draft.solarTapUrl);
+    if (!url) {
+      return undefined;
+    }
+    return { type: "url", url } as const;
+  }
+  return undefined;
 }
 
 function buildAppearanceDraft(
@@ -2027,37 +2117,35 @@ function normalizeCameraSourceMode(raw: string | undefined) {
 
 function getCameraUrlByMode(
   draft: Record<string, string>,
-  mode: "snapshot" | "mjpeg" | "flv" | "fmp4",
-  fullscreen: boolean
+  mode: "snapshot" | "mjpeg" | "flv" | "fmp4"
 ) {
   if (mode === "snapshot") {
-    return fullscreen ? draft.fullscreenSnapshotUrl || "" : draft.snapshotUrl || "";
+    return draft.snapshotUrl || "";
   }
   if (mode === "mjpeg") {
-    return fullscreen ? draft.fullscreenMjpegUrl || "" : draft.mjpegUrl || "";
+    return draft.mjpegUrl || "";
   }
   if (mode === "flv") {
-    return fullscreen ? draft.fullscreenFlvUrl || "" : draft.flvUrl || "";
+    return draft.flvUrl || "";
   }
-  return fullscreen ? draft.fullscreenFmp4Url || "" : draft.fmp4Url || "";
+  return draft.fmp4Url || "";
 }
 
 function setCameraUrlByMode(
   draft: Record<string, string>,
   mode: "snapshot" | "mjpeg" | "flv" | "fmp4",
-  fullscreen: boolean,
   value: string
 ) {
   if (mode === "snapshot") {
-    return fullscreen ? { ...draft, fullscreenSnapshotUrl: value } : { ...draft, snapshotUrl: value };
+    return { ...draft, snapshotUrl: value };
   }
   if (mode === "mjpeg") {
-    return fullscreen ? { ...draft, fullscreenMjpegUrl: value } : { ...draft, mjpegUrl: value };
+    return { ...draft, mjpegUrl: value };
   }
   if (mode === "flv") {
-    return fullscreen ? { ...draft, fullscreenFlvUrl: value } : { ...draft, flvUrl: value };
+    return { ...draft, flvUrl: value };
   }
-  return fullscreen ? { ...draft, fullscreenFmp4Url: value } : { ...draft, fmp4Url: value };
+  return { ...draft, fmp4Url: value };
 }
 
 function normalizeOptionalInput(value: string | undefined) {
