@@ -5,7 +5,6 @@ import { StateWriteFeedback } from "../hooks/useIoBrokerStates";
 import { IoBrokerClient } from "../services/iobroker";
 import { DashboardSettings, StateSnapshot, WidgetConfig, WidgetInteractionSounds, WidgetType } from "../types/dashboard";
 import { constrainToPrimarySections, GRID_SNAP, GRID_VERTICAL_SNAP } from "../utils/gridLayout";
-import { applyMobileOverridesToSettings } from "../utils/mobileWidget";
 import { playConfiguredUiSound } from "../utils/uiSounds";
 import { resolveThemeSettings } from "../utils/themeConfig";
 import { palette } from "../utils/theme";
@@ -50,31 +49,18 @@ export function GridCanvas({
   onCameraFullscreenVisibilityChange,
   onDragAcrossPageEdge,
 }: GridCanvasProps) {
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
-  const isCoarsePointerWeb =
-    Platform.OS === "web" &&
-    (((typeof navigator !== "undefined" && navigator.maxTouchPoints > 0) ||
-      (typeof window !== "undefined" &&
-        "matchMedia" in window &&
-        window.matchMedia("(pointer: coarse)").matches)));
-  const isPhoneLikeWeb = isCoarsePointerWeb && Math.max(windowWidth, windowHeight) < 1000;
-  const isCompactViewport = windowWidth < 700 || isPhoneLikeWeb;
-  const isCompactWeb = Platform.OS === "web" && isCompactViewport;
+  const isCompactWeb = Platform.OS === "web" && windowWidth < 700;
   const isTabletLikeWeb = Platform.OS === "web" && windowWidth >= 700 && windowWidth < 1100;
-  const displayColumns = isCompactViewport ? 3 : 9;
+  const displayColumns = isCompactWeb ? 1 : 9;
   const effectiveLayoutMode = isLayoutMode;
   const displayGap = Platform.OS === "web" && !isCompactWeb ? Math.max(config.grid.gap, 18) : config.grid.gap;
   const mainColumnExtraGap = Platform.OS === "web" && !isCompactWeb ? displayGap * 2 : 0;
-  const renderConfig = useMemo(
-    () => (isCompactViewport ? applyMobileOverridesToSettings(config) : config),
-    [config, isCompactViewport]
-  );
   const displayConfig = useMemo(
     () => {
-      const next = buildResponsiveAutoLayoutConfig(renderConfig, displayColumns, {
+      const next = buildResponsiveAutoLayoutConfig(config, displayColumns, {
         isTabletLikeWeb,
-        stackPrimarySections: isCompactViewport,
       });
       return {
         ...next,
@@ -84,7 +70,7 @@ export function GridCanvas({
         },
       };
     },
-    [displayColumns, displayGap, isCompactViewport, isTabletLikeWeb, renderConfig]
+    [config, displayColumns, displayGap, isTabletLikeWeb]
   );
   const useStructuredGridSizing = true;
   const canvasInset = Platform.OS === "web" ? 64 : 60;
@@ -95,9 +81,7 @@ export function GridCanvas({
     const totalMainExtraGap = mainColumnExtraGap * 2;
     return (canvasWidth - totalGap - totalMainExtraGap) / displayConfig.grid.columns;
   }, [canvasWidth, displayConfig.grid.columns, displayConfig.grid.gap, mainColumnExtraGap]);
-  const renderRowHeight = useStructuredGridSizing
-    ? (isCompactViewport ? cellWidth * 0.72 : cellWidth)
-    : displayConfig.grid.rowHeight;
+  const renderRowHeight = useStructuredGridSizing ? cellWidth : displayConfig.grid.rowHeight;
 
   const canvasHeight = useMemo(() => {
     const maxRow = displayConfig.widgets.reduce((largest, widget) => {
@@ -107,21 +91,6 @@ export function GridCanvas({
     return maxRow * (renderRowHeight + displayConfig.grid.gap) + 120;
   }, [displayConfig.grid.gap, displayConfig.widgets, renderRowHeight]);
 
-  useEffect(() => {
-    if (!isCompactViewport) {
-      return;
-    }
-
-    const sourceById = new Map(config.widgets.map((widget) => [widget.id, widget]));
-    for (const displayWidget of displayConfig.widgets) {
-      const sourceWidget = sourceById.get(displayWidget.id);
-      if (!sourceWidget || sourceWidget.mobilePosition) {
-        continue;
-      }
-      onUpdateWidget(displayWidget.id, { mobilePosition: displayWidget.position });
-    }
-  }, [config.widgets, displayConfig.widgets, isCompactViewport, onUpdateWidget]);
-
   const handleLayout = (event: LayoutChangeEvent) => {
     const nextWidth = event.nativeEvent.layout.width;
     setContainerWidth(nextWidth);
@@ -129,7 +98,7 @@ export function GridCanvas({
   };
 
   const content =
-    Platform.OS === "web" && !isCompactViewport ? (
+    Platform.OS === "web" && !isCompactWeb ? (
       <WebGridCanvas
         canvasHeight={canvasHeight}
         cellWidth={cellWidth}
@@ -156,7 +125,6 @@ export function GridCanvas({
             top: widget.position.y * (renderRowHeight + displayConfig.grid.gap),
             width: displaySpan(widget.position.x, widget.position.w, cellWidth, displayConfig.grid.gap, mainColumnExtraGap),
             height: widget.position.h * renderRowHeight + (widget.position.h - 1) * displayConfig.grid.gap,
-            zIndex: effectiveLayoutMode ? Math.max(1, 10000 - Math.round(widget.position.y * 10)) : 1,
           };
 
           return (
@@ -166,26 +134,12 @@ export function GridCanvas({
                 columns={displayConfig.grid.columns}
                 gap={displayConfig.grid.gap}
                 isLayoutMode={effectiveLayoutMode}
-                allowManualLayout={!isCompactViewport || Platform.OS === "web"}
-                allowResize={
-                  widget.type === "camera" ||
-                  widget.type === "solar" ||
-                  (Platform.OS === "web" && (widget.type === "weather" || widget.type === "grafana"))
-                }
+                allowManualLayout={!isCompactWeb}
+                allowResize={widget.type === "camera"}
                 onCommitPosition={(widgetId, position) =>
-                  onUpdateWidget(
-                    widgetId,
-                    isCompactViewport
-                      ? { mobilePosition: position }
-                      : {
-                          position: mapDisplayPositionToSourceHint(position, displayConfig.grid.columns, config.grid.columns, {
-                            stackPrimarySections: isCompactViewport,
-                            displayCurrent: widget.position,
-                            sourceCurrent: config.widgets.find((entry) => entry.id === widgetId)?.position,
-                            widgetType: widget.type,
-                          }),
-                        }
-                  )
+                  onUpdateWidget(widgetId, {
+                    position: mapDisplayPositionToSourceHint(position, displayConfig.grid.columns, config.grid.columns),
+                  })
                 }
                 onEdit={onEditWidget}
                 onRemove={onRemoveWidget}
@@ -234,15 +188,10 @@ function buildResponsiveAutoLayoutConfig(
   columns: number,
   options?: {
     isTabletLikeWeb?: boolean;
-    stackPrimarySections?: boolean;
   }
 ): DashboardSettings {
   if (columns === 9) {
     return buildDesktopAutoLayoutConfig(config, options);
-  }
-
-  if (columns === 3 && options?.stackPrimarySections) {
-    return buildCompactStackedLayoutConfig(config, options);
   }
 
   const sortedWidgets = [...config.widgets].sort((a, b) => {
@@ -286,121 +235,6 @@ function buildResponsiveAutoLayoutConfig(
       columns,
     },
     widgets,
-  };
-}
-
-function buildCompactStackedLayoutConfig(
-  config: DashboardSettings,
-  options?: {
-    isTabletLikeWeb?: boolean;
-  }
-): DashboardSettings {
-  const columns = 3;
-  const sourceColumns = Math.max(1, config.grid.columns);
-  const sectionCount = 3;
-  const sectionSpacing = 0.5;
-  const sortedWidgets = [...config.widgets].sort((a, b) => {
-    const aSeed = a.mobilePosition || a.position;
-    const bSeed = b.mobilePosition || b.position;
-    if (aSeed.y !== bSeed.y) {
-      return aSeed.y - bSeed.y;
-    }
-    if (aSeed.x !== bSeed.x) {
-      return aSeed.x - bSeed.x;
-    }
-    return a.id.localeCompare(b.id);
-  });
-
-  const sectionMinY = Array.from({ length: sectionCount }, () => Number.POSITIVE_INFINITY);
-  for (const widget of sortedWidgets) {
-    const seed = widget.mobilePosition || widget.position;
-    const sectionIndex = getPreferredDesktopSection(widget, sourceColumns);
-    sectionMinY[sectionIndex] = Math.min(sectionMinY[sectionIndex], Math.max(0, seed.y));
-  }
-  for (let index = 0; index < sectionCount; index += 1) {
-    if (!Number.isFinite(sectionMinY[index])) {
-      sectionMinY[index] = 0;
-    }
-  }
-
-  const sectionColumnHeights = Array.from({ length: sectionCount }, () =>
-    Array.from({ length: columns }, () => 0)
-  );
-  const sectionBottoms = Array.from({ length: sectionCount }, () => 0);
-  const widgetsWithSection = sortedWidgets.map((widget) => {
-    const seed = widget.mobilePosition || widget.position;
-    const mobileAwareWidget = widget.mobilePosition ? { ...widget, position: seed } : widget;
-    const spec = getAutoLayoutSpec(mobileAwareWidget, columns, options);
-    const sectionIndex = getPreferredDesktopSection(widget, sourceColumns);
-    const sourceSectionWidth = sourceColumns / sectionCount;
-    const sectionStart = sectionIndex * sourceSectionWidth;
-    const normalizedLocalX = widget.mobilePosition
-      ? (columns > 0 ? seed.x / columns : 0)
-      : sourceSectionWidth > 0
-        ? (seed.x - sectionStart) / sourceSectionWidth
-        : 0;
-    const desiredStart = spec.w >= columns
-      ? 0
-      : clamp(Math.round(normalizedLocalX * columns), 0, Math.max(0, columns - spec.w));
-    const desiredY = Math.max(0, seed.y - sectionMinY[sectionIndex]);
-    const sectionHeights = sectionColumnHeights[sectionIndex];
-    const maxStart = Math.max(0, columns - spec.w);
-    let bestStart = desiredStart;
-    let bestY = Math.max(desiredY, ...sectionHeights.slice(desiredStart, desiredStart + spec.w));
-
-    for (let start = 0; start <= maxStart; start += 1) {
-      const candidateY = Math.max(desiredY, ...sectionHeights.slice(start, start + spec.w));
-      if (
-        candidateY < bestY ||
-        (candidateY === bestY && Math.abs(start - desiredStart) < Math.abs(bestStart - desiredStart))
-      ) {
-        bestStart = start;
-        bestY = candidateY;
-      }
-    }
-
-    const snappedBottom = ceilGridUnitForWidget(bestY + spec.h, widget.type);
-
-    for (let index = bestStart; index < bestStart + spec.w; index += 1) {
-      sectionHeights[index] = snappedBottom;
-    }
-
-    sectionBottoms[sectionIndex] = Math.max(sectionBottoms[sectionIndex], snappedBottom);
-
-    return {
-      sectionIndex,
-      widget: {
-        ...widget,
-        position: {
-          x: bestStart,
-          y: bestY,
-          w: spec.w,
-          h: spec.h,
-        },
-      },
-    };
-  });
-
-  const sectionOffsets = Array.from({ length: sectionCount }, () => 0);
-  let runningOffset = 0;
-  for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex += 1) {
-    sectionOffsets[sectionIndex] = runningOffset;
-    runningOffset += sectionBottoms[sectionIndex] + (sectionIndex < sectionCount - 1 ? sectionSpacing : 0);
-  }
-
-  return {
-    ...config,
-    grid: {
-      ...config.grid,
-      columns,
-    },
-    widgets: widgetsWithSection.map(({ sectionIndex, widget }) => ({
-      ...widget,
-      position: {
-        ...widget.position,
-        y: widget.position.y + sectionOffsets[sectionIndex],
-      },
-    })),
   };
 }
 
@@ -498,7 +332,6 @@ function getAutoLayoutSpec(
   columns: number,
   options?: {
     isTabletLikeWeb?: boolean;
-    stackPrimarySections?: boolean;
   }
 ) {
   const fallbackHeight = widget.position.h;
@@ -515,19 +348,10 @@ function getAutoLayoutSpec(
         return { w: 1, h: Math.max(0.5, roundCameraGridUnit(1 / ratio)) };
       }
       case "solar":
-        if (widget.manualHeightOverride) {
-          return { w: 1, h: Math.max(2.5, roundGridUnit(fallbackHeight)) };
-        }
         return { w: 1, h: roundGridUnit(3.8) };
       case "grafana":
-        if (widget.manualHeightOverride) {
-          return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
-        }
         return { w: 1, h: roundGridUnit(2.8) };
       case "weather":
-        if (widget.manualHeightOverride) {
-          return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
-        }
         return { w: 1, h: roundGridUnit(1.8) };
       case "energy":
         return { w: 1, h: roundGridUnit(2) };
@@ -554,21 +378,10 @@ function getAutoLayoutSpec(
       return { w: mainColumnWidth, h: Math.max(0.5, roundCameraGridUnit(mainColumnWidth / ratio)) };
     }
     case "solar":
-      if (widget.manualHeightOverride) {
-        return { w: mainColumnWidth, h: Math.max(2.5, roundGridUnit(fallbackHeight)) };
-      }
-      // Keep solar height stable across breakpoints to avoid abrupt vertical jumps
-      // while still leaving enough room for in-scene stat cards.
-      return { w: mainColumnWidth, h: roundGridUnit(3.5) };
+      return { w: mainColumnWidth, h: roundGridUnit(options?.isTabletLikeWeb ? 5.5 : 3.2) };
     case "grafana":
-      if (options?.stackPrimarySections && widget.manualHeightOverride) {
-        return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(fallbackHeight)) };
-      }
       return { w: mainColumnWidth, h: roundGridUnit(2.2) };
     case "weather":
-      if (options?.stackPrimarySections && widget.manualHeightOverride) {
-        return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(fallbackHeight)) };
-      }
       return { w: mainColumnWidth, h: roundGridUnit(2.2) };
     case "energy":
       return { w: mainColumnWidth, h: roundGridUnit(2.4) };
@@ -607,39 +420,7 @@ function ceilGridUnitForWidget(value: number, widgetType: WidgetType) {
   return ceilGridUnit(value);
 }
 
-function mapDisplayPositionToSourceHint(
-  position: WidgetConfig["position"],
-  displayColumns: number,
-  sourceColumns: number,
-  options?: {
-    stackPrimarySections?: boolean;
-    displayCurrent?: WidgetConfig["position"];
-    sourceCurrent?: WidgetConfig["position"];
-    widgetType?: WidgetType;
-  }
-) {
-  if (options?.stackPrimarySections && options.displayCurrent && options.sourceCurrent) {
-    const sourceSectionWidth = sourceColumns / 3;
-    const sourceCurrent = options.sourceCurrent;
-    const displayCurrent = options.displayCurrent;
-    const sourceCenter = sourceCurrent.x + sourceCurrent.w / 2;
-    const sectionIndex = clamp(Math.floor(sourceCenter / Math.max(1, sourceSectionWidth)), 0, 2);
-    const localDisplayMax = Math.max(0, displayColumns - position.w);
-    const sourceLocalMax = Math.max(0, sourceSectionWidth - sourceCurrent.w);
-    const localRatio = localDisplayMax > 0 ? clamp(position.x / localDisplayMax, 0, 1) : 0;
-    const mappedX = sectionIndex * sourceSectionWidth + sourceLocalMax * localRatio;
-    const mappedY = Math.max(0, sourceCurrent.y + (position.y - displayCurrent.y));
-    const minHeight = options.widgetType === "camera" ? 0.5 : options.widgetType === "solar" ? 2.5 : 1;
-    const mappedH = Math.max(minHeight, sourceCurrent.h + (position.h - displayCurrent.h));
-
-    return {
-      ...sourceCurrent,
-      x: mappedX,
-      y: mappedY,
-      h: mappedH,
-    };
-  }
-
+function mapDisplayPositionToSourceHint(position: WidgetConfig["position"], displayColumns: number, sourceColumns: number) {
   if (displayColumns <= 1 || sourceColumns <= 1 || displayColumns === sourceColumns) {
     return position;
   }
@@ -751,7 +532,7 @@ function WebGridCanvas({
           onDragAcrossPageEdge={onDragAcrossPageEdge}
           stateWrites={stateWrites}
           allowManualLayout={true}
-          allowResize={widget.type === "camera" || widget.type === "solar"}
+          allowResize={widget.type === "camera"}
           mainColumnExtraGap={mainColumnExtraGap}
           sourceColumns={sourceColumns}
           states={states}
@@ -836,9 +617,7 @@ function WebWidgetShell({
       const dx = snapUnits((event.clientX - active.startX) / stepX);
       const dy = snapUnits(
         (event.clientY - active.startY) / stepY,
-        active.mode === "resize" && (widget.type === "camera" || widget.type === "solar")
-          ? CAMERA_GRID_SNAP
-          : GRID_VERTICAL_SNAP
+        active.mode === "resize" && widget.type === "camera" ? CAMERA_GRID_SNAP : GRID_VERTICAL_SNAP
       );
 
       if (!allowManualLayout) {
@@ -850,7 +629,7 @@ function WebWidgetShell({
           ...active.startPosition,
           x: clamp(active.startPosition.x + dx, 0, config.grid.columns - active.startPosition.w),
           y: Math.max(0, active.startPosition.y + dy),
-        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : undefined);
+        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : undefined);
         setPreview(nextPreview);
 
         if (isLayoutMode && onDragAcrossPageEdge) {
@@ -874,12 +653,12 @@ function WebWidgetShell({
           }
         }
       } else {
-        if (widget.type === "camera" || widget.type === "solar") {
+        if (widget.type === "camera") {
           setPreview(constrainToPrimarySections({
             ...active.startPosition,
             w: active.startPosition.w,
-            h: Math.max(widget.type === "camera" ? 0.5 : 2.5, active.startPosition.h + dy),
-          }, config.grid.columns, { minHeight: widget.type === "camera" ? 0.5 : 2.5, heightSnap: 0.1 }));
+            h: Math.max(0.5, active.startPosition.h + dy),
+          }, config.grid.columns, { minHeight: 0.5, heightSnap: 0.1 }));
         } else {
           setPreview(constrainToPrimarySections({
             ...active.startPosition,

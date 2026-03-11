@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { IoBrokerClient } from "../services/iobroker";
-import { StateSnapshot, WidgetConfig } from "../types/dashboard";
-import { resolveMobileWidget } from "../utils/mobileWidget";
+import { StateSnapshot } from "../types/dashboard";
 
 export type StateWriteFeedback = {
   expectedValue: unknown;
@@ -10,49 +9,41 @@ export type StateWriteFeedback = {
   updatedAt: number;
 };
 
-const collectWidgetStateIds = (widget: WidgetConfig) => {
-  if (widget.type === "state") {
-    return [widget.stateId];
-  }
-  if (widget.type === "energy") {
-    return [
-      widget.pvStateId,
-      widget.houseStateId,
-      widget.batteryStateId || "",
-      widget.gridStateId || "",
-    ];
-  }
-  if (widget.type === "solar") {
-    const prefix = widget.statePrefix;
-    const withPrefix = (key?: string) => (key ? `${prefix}.${key}` : "");
-    return [
-      withPrefix(widget.keys.pvNow),
-      withPrefix(widget.keys.homeNow),
-      withPrefix(widget.keys.gridIn),
-      withPrefix(widget.keys.gridOut),
-      withPrefix(widget.keys.soc),
-      withPrefix(widget.keys.battIn),
-      withPrefix(widget.keys.battOut),
-      withPrefix(widget.keys.dayConsumed),
-      withPrefix(widget.keys.daySelf),
-      withPrefix(widget.keys.pvTotal),
-      withPrefix(widget.keys.battTemp),
-      widget.stats?.first?.stateId || "",
-      widget.stats?.second?.stateId || "",
-      widget.stats?.third?.stateId || "",
-    ];
-  }
-  return [];
-};
-
 const pickStateIds = (widgets: ReturnType<typeof useDashboardConfig>["config"]["widgets"]) =>
   widgets.flatMap((widget) => {
-    const mobileVariant = resolveMobileWidget(widget);
-    return [...collectWidgetStateIds(widget), ...collectWidgetStateIds(mobileVariant)];
+    if (widget.type === "state") {
+      return [widget.stateId];
+    }
+    if (widget.type === "energy") {
+      return [
+        widget.pvStateId,
+        widget.houseStateId,
+        widget.batteryStateId || "",
+        widget.gridStateId || "",
+      ];
+    }
+    if (widget.type === "solar") {
+      const prefix = widget.statePrefix;
+      const withPrefix = (key?: string) => (key ? `${prefix}.${key}` : "");
+      return [
+        withPrefix(widget.keys.pvNow),
+        withPrefix(widget.keys.homeNow),
+        withPrefix(widget.keys.gridIn),
+        withPrefix(widget.keys.gridOut),
+        withPrefix(widget.keys.soc),
+        withPrefix(widget.keys.battIn),
+        withPrefix(widget.keys.battOut),
+        withPrefix(widget.keys.dayConsumed),
+        withPrefix(widget.keys.daySelf),
+        withPrefix(widget.keys.pvTotal),
+        withPrefix(widget.keys.battTemp),
+        widget.stats?.first?.stateId || "",
+        widget.stats?.second?.stateId || "",
+        widget.stats?.third?.stateId || "",
+      ];
+    }
+    return [];
   });
-
-const normalizeStateIds = (stateIds: string[]) =>
-  Array.from(new Set(stateIds.map((entry) => entry.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "de"));
 
 export function useIoBrokerStates() {
   const { config } = useDashboardConfig();
@@ -61,21 +52,13 @@ export function useIoBrokerStates() {
   const [error, setError] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(false);
   const client = useMemo(() => new IoBrokerClient(config), [config]);
-  const watchedStateIds = useMemo(() => normalizeStateIds(pickStateIds(config.widgets)), [config.widgets]);
 
   useEffect(() => {
     let active = true;
-    let syncInFlight = false;
-    let syncPending = false;
 
     const sync = async () => {
-      if (syncInFlight) {
-        syncPending = true;
-        return;
-      }
-      syncInFlight = true;
       try {
-        const next = await client.readStates(watchedStateIds);
+        const next = await client.readStates(pickStateIds(config.widgets));
         if (active) {
           setStates(next);
           setStateWrites((current) => resolveStateWriteFeedback(current, next));
@@ -87,26 +70,18 @@ export function useIoBrokerStates() {
           setError(syncError instanceof Error ? syncError.message : "State sync failed");
           setIsOnline(false);
         }
-      } finally {
-        syncInFlight = false;
-        if (active && syncPending) {
-          syncPending = false;
-          void sync();
-        }
       }
     };
 
-    void sync();
+    sync();
     client.primeObjectCache();
-    const timer = setInterval(() => {
-      void sync();
-    }, Math.max(250, config.pollingMs));
+    const timer = setInterval(sync, config.pollingMs);
 
     return () => {
       active = false;
       clearInterval(timer);
     };
-  }, [client, config.pollingMs, watchedStateIds]);
+  }, [client, config]);
 
   const writeStateTracked = async (stateId: string, value: unknown) => {
     const startedAt = Date.now();

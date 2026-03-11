@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { WidgetType } from "../types/dashboard";
 import { palette } from "../utils/theme";
 
@@ -82,7 +82,7 @@ export function WidgetLibraryModal({
               <Text style={styles.close}>Schliessen</Text>
             </Pressable>
           </View>
-          <ScrollView contentContainerStyle={styles.grid} showsVerticalScrollIndicator style={styles.optionScroll}>
+          <View style={styles.grid}>
             <Pressable
               onPress={() => {
                 onCreateDashboard();
@@ -112,7 +112,7 @@ export function WidgetLibraryModal({
                 <Text style={styles.optionText}>{option.description}</Text>
               </Pressable>
             ))}
-          </ScrollView>
+          </View>
         </View>
       </View>
     </Modal>
@@ -132,7 +132,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.border,
     padding: 18,
-    maxHeight: "90%",
   },
   header: {
     flexDirection: "row",
@@ -149,14 +148,10 @@ const styles = StyleSheet.create({
     color: palette.textMuted,
     fontWeight: "600",
   },
-  optionScroll: {
-    flexGrow: 0,
-  },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
-    paddingBottom: 2,
   },
   option: {
     flexBasis: "48%",

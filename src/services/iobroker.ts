@@ -1,4 +1,4 @@
-import { DashboardSettings, IoBrokerObjectEntry, StateSnapshot, WidgetImageEntry, WidgetSoundEntry } from "../types/dashboard";
+import { DashboardSettings, IoBrokerObjectEntry, StateSnapshot, WidgetImageEntry } from "../types/dashboard";
 
 type ObjectCacheEntry = {
   items: IoBrokerObjectEntry[];
@@ -146,48 +146,6 @@ export class IoBrokerClient {
     }
 
     return (await response.json()) as WidgetImageEntry[];
-  }
-
-  async listWidgetSounds(): Promise<WidgetSoundEntry[]> {
-    const response = await fetch(this.endpoint("/sounds"), {
-      method: "GET",
-      headers: {
-        ...buildAuthHeader(this.settings),
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Sound list failed (${response.status})`);
-    }
-
-    return (await response.json()) as WidgetSoundEntry[];
-  }
-
-  async uploadWidgetImage(name: string, dataUrl: string): Promise<WidgetImageEntry> {
-    return this.uploadWidgetFile<WidgetImageEntry>("/images/upload", name, dataUrl);
-  }
-
-  async uploadWidgetSound(name: string, dataUrl: string): Promise<WidgetSoundEntry> {
-    return this.uploadWidgetFile<WidgetSoundEntry>("/sounds/upload", name, dataUrl);
-  }
-
-  private async uploadWidgetFile<T>(path: string, name: string, dataUrl: string): Promise<T> {
-    const response = await fetch(this.endpoint(path), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildAuthHeader(this.settings),
-      },
-      body: JSON.stringify({ name, dataUrl }),
-    });
-
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-      const message = payload?.error || `Upload failed (${response.status})`;
-      throw new Error(message);
-    }
-
-    return (await response.json()) as T;
   }
 }
 

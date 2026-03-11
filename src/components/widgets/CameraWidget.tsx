@@ -25,11 +25,6 @@ const pinnedColor = "#f3c84a";
 const FLV_SCRIPT_SRC = "https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js";
 const FLV_SCRIPT_LOAD_TIMEOUT_MS = 8000;
 const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 12_000;
-const MJPEG_RECONNECT_BASE_DELAY_MS = 700;
-const MJPEG_RECONNECT_MAX_DELAY_MS = 8000;
-const FLV_RECONNECT_DELAY_MS = 1800;
-const WEB_FULLSCREEN_MIN_ZOOM = 1;
-const WEB_FULLSCREEN_MAX_ZOOM = 4;
 let flvLoaderPromise: Promise<boolean> | null = null;
 
 export function CameraWidget({
@@ -44,15 +39,8 @@ export function CameraWidget({
   const [activeLayer, setActiveLayer] = useState<0 | 1>(0);
   const [loadingLayer, setLoadingLayer] = useState<0 | 1 | null>(null);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
-  const [webDocumentFullscreenActive, setWebDocumentFullscreenActive] = useState(false);
-  const [webFullscreenZoom, setWebFullscreenZoom] = useState(1);
-  const [webFullscreenOffset, setWebFullscreenOffset] = useState({ x: 0, y: 0 });
-  const [webFullscreenViewport, setWebFullscreenViewport] = useState({ width: 0, height: 0 });
   const [pinned, setPinned] = useState(false);
   const [previewStreamDebug, setPreviewStreamDebug] = useState<string | null>(null);
-  const [previewMjpegSession, setPreviewMjpegSession] = useState(0);
-  const [fullscreenSession, setFullscreenSession] = useState(0);
-  const [previewFlvSession, setPreviewFlvSession] = useState(0);
   const [previewMjpegSourceIndex, setPreviewMjpegSourceIndex] = useState(0);
   const [fullscreenMjpegSourceIndex, setFullscreenMjpegSourceIndex] = useState(0);
   const [previewFlvSourceIndex, setPreviewFlvSourceIndex] = useState(0);
@@ -67,39 +55,28 @@ export function CameraWidget({
   const latestRequestedUrlRef = useRef<string | null>(null);
   const loadingJobRef = useRef<{ layer: 0 | 1; url: string } | null>(null);
   const fullscreenVisibilityCallbackRef = useRef(onFullscreenVisibilityChange);
-  const inPlaceFullscreenHostRef = useRef<any>(null);
-  const wasDocumentFullscreenRef = useRef(false);
-  const webPinchStartDistanceRef = useRef<number | null>(null);
-  const webPinchStartZoomRef = useRef(1);
-  const webFullscreenZoomRef = useRef(1);
-  const webFullscreenOffsetRef = useRef({ x: 0, y: 0 });
-  const webPanStartRef = useRef<{ touchX: number; touchY: number; offsetX: number; offsetY: number } | null>(null);
-  const webPinchingRef = useRef(false);
-  const previewMjpegReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const previewMjpegReconnectAttemptsRef = useRef(0);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const titleFontSize = Math.max(11, Math.min(28, Math.round(config.titleFontSize || 14)));
   const displayUrl = layerUrls[activeLayer];
-  const previewSnapshotBaseUrl = (config.snapshotUrl || config.fullscreenSnapshotUrl || "").trim() || null;
-  const fullscreenSnapshotBaseUrl = previewSnapshotBaseUrl;
-  const previewMjpegUrl = (config.mjpegUrl || config.fullscreenMjpegUrl || "").trim() || null;
-  const fullscreenMjpegUrl = previewMjpegUrl;
+
+  const previewSnapshotBaseUrl = (config.snapshotUrl || "").trim() || null;
+  const fullscreenSnapshotBaseUrl = (config.fullscreenSnapshotUrl || config.snapshotUrl || "").trim() || null;
+  const previewMjpegUrl = (config.mjpegUrl || "").trim() || null;
+  const fullscreenMjpegUrl = (config.fullscreenMjpegUrl || config.mjpegUrl || "").trim() || null;
   const previewFlvUrl = (config.flvUrl || config.fullscreenFlvUrl || "").trim() || null;
-  const fullscreenFlvUrl = previewFlvUrl;
+  const fullscreenFlvUrl = (config.fullscreenFlvUrl || config.flvUrl || "").trim() || null;
   const previewFmp4Url = (config.fmp4Url || config.fullscreenFmp4Url || "").trim() || null;
-  const fullscreenFmp4Url = previewFmp4Url;
-  const requestedPreviewSourceMode = config.previewSourceMode || config.fullscreenSourceMode;
-  const requestedFullscreenSourceMode = requestedPreviewSourceMode;
+  const fullscreenFmp4Url = (config.fullscreenFmp4Url || config.fmp4Url || "").trim() || null;
   const previewSourceMode = resolveSourceMode(
-    requestedPreviewSourceMode,
+    config.previewSourceMode,
     previewSnapshotBaseUrl,
     previewMjpegUrl,
     previewFlvUrl,
     previewFmp4Url
   );
   const fullscreenSourceMode = resolveSourceMode(
-    requestedFullscreenSourceMode,
+    config.fullscreenSourceMode,
     fullscreenSnapshotBaseUrl,
     fullscreenMjpegUrl,
     fullscreenFlvUrl,
@@ -121,12 +98,7 @@ export function CameraWidget({
     flvUrl: fullscreenFlvUrl,
     fmp4Url: fullscreenFmp4Url,
   });
-  const useInPlaceFullscreen = Platform.OS === "web";
-  const showInPlaceFullscreen = useInPlaceFullscreen && (fullscreenOpen || webDocumentFullscreenActive);
-  const showFixedFallbackFullscreen = showInPlaceFullscreen && !webDocumentFullscreenActive;
-  const showPreviewFeed = !fullscreenOpen || showInPlaceFullscreen;
-  const showNativeFullscreenModal = Platform.OS !== "web" && fullscreenOpen;
-  const activeFeed = previewFeed;
+  const activeFeed = fullscreenOpen ? fullscreenFeed : previewFeed;
   const activeSnapshotBaseUrl = activeFeed?.kind === "snapshot" ? activeFeed.url : null;
   const previewMjpegSources = useMemo(
     () =>
@@ -182,92 +154,20 @@ export function CameraWidget({
     previewFmp4Sources[Math.min(previewFmp4SourceIndex, Math.max(0, previewFmp4Sources.length - 1))] || null;
   const currentFullscreenFmp4Src =
     fullscreenFmp4Sources[Math.min(fullscreenFmp4SourceIndex, Math.max(0, fullscreenFmp4Sources.length - 1))] || null;
-  const activeRefreshMs = Math.max(100, config.refreshMs || 2000);
-  const fullscreenMjpegHasFallback = fullscreenMjpegSourceIndex + 1 < fullscreenMjpegSources.length;
-
-  const clearPreviewMjpegReconnectTimer = useCallback(() => {
-    if (previewMjpegReconnectTimerRef.current) {
-      clearTimeout(previewMjpegReconnectTimerRef.current);
-      previewMjpegReconnectTimerRef.current = null;
-    }
-  }, []);
-
-  const schedulePreviewMjpegReconnect = useCallback((message: string, allowSourceRotate = true) => {
-    if (previewFeed?.kind !== "mjpeg") {
-      return;
-    }
-
-    clearPreviewMjpegReconnectTimer();
-    const attempt = previewMjpegReconnectAttemptsRef.current;
-    const delay = Math.min(MJPEG_RECONNECT_MAX_DELAY_MS, MJPEG_RECONNECT_BASE_DELAY_MS * 2 ** attempt);
-    const shouldRotate = allowSourceRotate && previewMjpegSources.length > 1;
-
-    if (shouldRotate) {
-      setPreviewMjpegSourceIndex((current) => (current + 1) % previewMjpegSources.length);
-    }
-
-    setPreviewStreamDebug(`${message} (Retry in ${Math.round(delay / 100) / 10}s)`);
-    previewMjpegReconnectTimerRef.current = setTimeout(() => {
-      previewMjpegReconnectTimerRef.current = null;
-      previewMjpegReconnectAttemptsRef.current = Math.min(previewMjpegReconnectAttemptsRef.current + 1, 6);
-      setPreviewMjpegSession((current) => current + 1);
-    }, delay);
-  }, [clearPreviewMjpegReconnectTimer, previewFeed?.kind, previewMjpegSources.length]);
+  const activeRefreshMs = fullscreenOpen
+    ? Math.max(180, config.fullscreenRefreshMs || config.refreshMs || 2000)
+    : Math.max(100, config.refreshMs || 2000);
 
   const closeFullscreen = () => {
-    if (previewFeed?.kind === "mjpeg") {
-      setPreviewStreamDebug(null);
-    }
     fullscreenVisibilityCallbackRef.current?.(false);
     setFullscreenOpen(false);
     setPinned(false);
-    if (Platform.OS === "web" && typeof document !== "undefined") {
-      const webDocument = document as Document & {
-        webkitExitFullscreen?: () => Promise<void> | void;
-        webkitFullscreenElement?: Element | null;
-      };
-      const exitFullscreen = webDocument.exitFullscreen || webDocument.webkitExitFullscreen;
-      if (exitFullscreen && (webDocument.fullscreenElement || webDocument.webkitFullscreenElement)) {
-        void Promise.resolve(exitFullscreen.call(webDocument)).catch(() => {
-          // Ignore best-effort fullscreen exit errors.
-        });
-      }
-    }
   };
 
-  const moveFullscreenMjpegToNextSource = useCallback(() => {
-    if (!fullscreenMjpegHasFallback) {
-      return false;
-    }
-    setFullscreenMjpegLoaded(false);
-    setFullscreenMjpegSourceIndex((current) => Math.min(fullscreenMjpegSources.length - 1, current + 1));
-    return true;
-  }, [fullscreenMjpegHasFallback, fullscreenMjpegSources.length]);
-
   const openFullscreen = () => {
-    webPinchingRef.current = false;
-    webPinchStartDistanceRef.current = null;
-    webPinchStartZoomRef.current = 1;
-    webPanStartRef.current = null;
-    webFullscreenZoomRef.current = 1;
-    webFullscreenOffsetRef.current = { x: 0, y: 0 };
-    setWebFullscreenZoom(1);
-    setWebFullscreenOffset({ x: 0, y: 0 });
-    setFullscreenSession((current) => current + 1);
     fullscreenVisibilityCallbackRef.current?.(true);
     setPinned(false);
     setFullscreenOpen(true);
-    if (Platform.OS === "web") {
-      const host = inPlaceFullscreenHostRef.current as
-        | (Element & { webkitRequestFullscreen?: () => Promise<void> | void })
-        | null;
-      const requestFullscreen = host?.requestFullscreen || host?.webkitRequestFullscreen;
-      if (requestFullscreen) {
-        void Promise.resolve(requestFullscreen.call(host)).catch(() => {
-          // requestFullscreen may fail without user gesture (e.g. state-triggered maximize).
-        });
-      }
-    }
   };
 
   const fullscreenPanResponder = useMemo(
@@ -283,7 +183,7 @@ export function CameraWidget({
           }
         },
       }),
-    [closeFullscreen, config.id, config.interactionSounds?.scroll, onFullscreenSwipeClose]
+    [config.id, config.interactionSounds?.scroll, onFullscreenSwipeClose]
   );
 
   useEffect(() => {
@@ -295,18 +195,15 @@ export function CameraWidget({
   }, [activeRefreshMs, activeSnapshotBaseUrl]);
 
   useEffect(() => {
-    if ((!useInPlaceFullscreen && fullscreenOpen) || previewFeed?.kind !== "mjpeg") {
-      clearPreviewMjpegReconnectTimer();
+    if (fullscreenOpen || previewFeed?.kind !== "mjpeg") {
       setPreviewStreamDebug(null);
       setPreviewMjpegLoaded(false);
     }
-  }, [clearPreviewMjpegReconnectTimer, fullscreenOpen, previewFeed?.kind, useInPlaceFullscreen]);
+  }, [fullscreenOpen, previewFeed?.kind]);
 
   useEffect(() => {
     setPreviewMjpegSourceIndex(0);
     setPreviewMjpegLoaded(false);
-    previewMjpegReconnectAttemptsRef.current = 0;
-    clearPreviewMjpegReconnectTimer();
   }, [previewMjpegSources, previewFeed?.kind, previewFeed?.url]);
 
   useEffect(() => {
@@ -342,57 +239,63 @@ export function CameraWidget({
   }, [fullscreenFmp4Sources, fullscreenFeed?.kind, fullscreenFeed?.url]);
 
   useEffect(() => {
-    if (
-      Platform.OS !== "web" ||
-      ((!useInPlaceFullscreen && fullscreenOpen) || previewFeed?.kind !== "mjpeg") ||
-      !currentPreviewMjpegSrc
-    ) {
+    if (Platform.OS !== "web" || fullscreenOpen || previewFeed?.kind !== "mjpeg" || !currentPreviewMjpegSrc) {
       return;
     }
 
-    const watchdog = setTimeout(() => {
-      if (previewMjpegLoaded) {
-        return;
-      }
-      schedulePreviewMjpegReconnect("MJPEG Preview: Stream konnte nicht gestartet werden.");
+    if (previewMjpegLoaded) {
+      return;
+    }
+
+    if (previewMjpegSources.length < 2) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setPreviewMjpegSourceIndex((current) => {
+        const next = current + 1 < previewMjpegSources.length ? current + 1 : current;
+        if (next !== current) {
+          setPreviewStreamDebug("MJPEG Preview: Quelle reagiert nicht, wechsle zur naechsten URL...");
+        }
+        return next;
+      });
     }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
 
-    return () => clearTimeout(watchdog);
+    return () => clearTimeout(timer);
   }, [
     currentPreviewMjpegSrc,
     fullscreenOpen,
     previewFeed?.kind,
     previewMjpegLoaded,
-    schedulePreviewMjpegReconnect,
-    useInPlaceFullscreen,
+    previewMjpegSources.length,
   ]);
 
   useEffect(() => {
-    if (
-      Platform.OS !== "web" ||
-      useInPlaceFullscreen ||
-      !fullscreenOpen ||
-      fullscreenFeed?.kind !== "mjpeg" ||
-      !currentFullscreenMjpegSrc
-    ) {
+    if (Platform.OS !== "web" || !fullscreenOpen || fullscreenFeed?.kind !== "mjpeg" || !currentFullscreenMjpegSrc) {
       return;
     }
 
-    const watchdog = setTimeout(() => {
-      if (fullscreenMjpegLoaded) {
-        return;
-      }
-      moveFullscreenMjpegToNextSource();
+    if (fullscreenMjpegLoaded) {
+      return;
+    }
+
+    if (fullscreenMjpegSources.length < 2) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setFullscreenMjpegSourceIndex((current) =>
+        current + 1 < fullscreenMjpegSources.length ? current + 1 : current
+      );
     }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
 
-    return () => clearTimeout(watchdog);
+    return () => clearTimeout(timer);
   }, [
     currentFullscreenMjpegSrc,
     fullscreenFeed?.kind,
     fullscreenMjpegLoaded,
+    fullscreenMjpegSources.length,
     fullscreenOpen,
-    moveFullscreenMjpegToNextSource,
-    useInPlaceFullscreen,
   ]);
 
   useEffect(() => {
@@ -414,227 +317,6 @@ export function CameraWidget({
   useEffect(() => {
     fullscreenVisibilityCallbackRef.current?.(fullscreenOpen);
   }, [fullscreenOpen]);
-
-  useEffect(() => {
-    if (Platform.OS !== "web" || typeof document === "undefined") {
-      return;
-    }
-
-    const webDocument = document as Document & {
-      webkitFullscreenElement?: Element | null;
-    };
-    const syncDocumentFullscreen = () => {
-      const activeElement = webDocument.fullscreenElement || webDocument.webkitFullscreenElement || null;
-      const host = inPlaceFullscreenHostRef.current as Element | null;
-      const active = Boolean(activeElement && host && (activeElement === host || host.contains(activeElement)));
-      setWebDocumentFullscreenActive(active);
-      if (!active && wasDocumentFullscreenRef.current && fullscreenOpen && useInPlaceFullscreen) {
-        setFullscreenOpen(false);
-        setPinned(false);
-      }
-      wasDocumentFullscreenRef.current = active;
-    };
-
-    syncDocumentFullscreen();
-    webDocument.addEventListener("fullscreenchange", syncDocumentFullscreen);
-    webDocument.addEventListener("webkitfullscreenchange", syncDocumentFullscreen as EventListener);
-    return () => {
-      webDocument.removeEventListener("fullscreenchange", syncDocumentFullscreen);
-      webDocument.removeEventListener("webkitfullscreenchange", syncDocumentFullscreen as EventListener);
-    };
-  }, [fullscreenOpen, useInPlaceFullscreen]);
-
-  useEffect(() => {
-    return () => {
-      clearPreviewMjpegReconnectTimer();
-    };
-  }, [clearPreviewMjpegReconnectTimer]);
-
-  useEffect(() => {
-    if (showInPlaceFullscreen) {
-      return;
-    }
-    webPinchingRef.current = false;
-    webPinchStartDistanceRef.current = null;
-    webPinchStartZoomRef.current = 1;
-    webPanStartRef.current = null;
-    webFullscreenZoomRef.current = 1;
-    webFullscreenOffsetRef.current = { x: 0, y: 0 };
-    setWebFullscreenZoom(1);
-    setWebFullscreenOffset({ x: 0, y: 0 });
-  }, [showInPlaceFullscreen]);
-
-  useEffect(() => {
-    webFullscreenZoomRef.current = webFullscreenZoom;
-  }, [webFullscreenZoom]);
-
-  useEffect(() => {
-    webFullscreenOffsetRef.current = webFullscreenOffset;
-  }, [webFullscreenOffset]);
-
-  useEffect(() => {
-    if (!showInPlaceFullscreen) {
-      return;
-    }
-    const clamped = clampWebFullscreenOffset(
-      webFullscreenOffsetRef.current.x,
-      webFullscreenOffsetRef.current.y,
-      webFullscreenZoomRef.current,
-      webFullscreenViewport.width,
-      webFullscreenViewport.height
-    );
-    if (
-      Math.abs(clamped.x - webFullscreenOffsetRef.current.x) > 0.5 ||
-      Math.abs(clamped.y - webFullscreenOffsetRef.current.y) > 0.5
-    ) {
-      webFullscreenOffsetRef.current = clamped;
-      setWebFullscreenOffset(clamped);
-    }
-  }, [showInPlaceFullscreen, webFullscreenViewport.height, webFullscreenViewport.width]);
-
-  const updateWebFullscreenViewport = useCallback((width: number, height: number) => {
-    if (!width || !height) {
-      return;
-    }
-    setWebFullscreenViewport((current) => {
-      if (Math.abs(current.width - width) < 0.5 && Math.abs(current.height - height) < 0.5) {
-        return current;
-      }
-      return { width, height };
-    });
-  }, []);
-
-  const handleWebPinchStart = useCallback((event: any) => {
-    if (!showInPlaceFullscreen || Platform.OS !== "web") {
-      return;
-    }
-    const touches = event?.nativeEvent?.touches;
-    if (!touches || !touches.length) {
-      return;
-    }
-    if (touches.length === 2) {
-      const distance = getTouchDistance(touches);
-      if (!distance) {
-        return;
-      }
-      webPanStartRef.current = null;
-      webPinchStartDistanceRef.current = distance;
-      webPinchStartZoomRef.current = webFullscreenZoomRef.current;
-      webPinchingRef.current = true;
-      event?.preventDefault?.();
-      return;
-    }
-    if (touches.length === 1 && webFullscreenZoomRef.current > 1.001) {
-      const touch = touches[0];
-      webPanStartRef.current = {
-        touchX: Number(touch?.pageX ?? 0),
-        touchY: Number(touch?.pageY ?? 0),
-        offsetX: webFullscreenOffsetRef.current.x,
-        offsetY: webFullscreenOffsetRef.current.y,
-      };
-      webPinchingRef.current = true;
-      event?.preventDefault?.();
-    }
-  }, [showInPlaceFullscreen]);
-
-  const handleWebPinchMove = useCallback((event: any) => {
-    if (!showInPlaceFullscreen || Platform.OS !== "web") {
-      return;
-    }
-    const touches = event?.nativeEvent?.touches;
-    if (!touches || !touches.length) {
-      return;
-    }
-
-    if (touches.length === 2 && webPinchStartDistanceRef.current) {
-      const distance = getTouchDistance(touches);
-      if (!distance) {
-        return;
-      }
-      const nextZoom = clampZoom(webPinchStartZoomRef.current * (distance / webPinchStartDistanceRef.current));
-      const midpoint = getTouchMidpoint(touches);
-      const centerX = webFullscreenViewport.width / 2;
-      const centerY = webFullscreenViewport.height / 2;
-      const currentZoom = webFullscreenZoomRef.current;
-      const currentOffset = webFullscreenOffsetRef.current;
-      const ratio = currentZoom > 0 ? nextZoom / currentZoom : 1;
-      const focusX = midpoint ? midpoint.x - centerX : 0;
-      const focusY = midpoint ? midpoint.y - centerY : 0;
-      const rawOffsetX = focusX * (1 - ratio) + currentOffset.x * ratio;
-      const rawOffsetY = focusY * (1 - ratio) + currentOffset.y * ratio;
-      const nextOffset = clampWebFullscreenOffset(
-        rawOffsetX,
-        rawOffsetY,
-        nextZoom,
-        webFullscreenViewport.width,
-        webFullscreenViewport.height
-      );
-      if (Math.abs(nextZoom - webFullscreenZoomRef.current) > 0.01) {
-        webFullscreenZoomRef.current = nextZoom;
-        setWebFullscreenZoom(nextZoom);
-      }
-      if (
-        Math.abs(nextOffset.x - webFullscreenOffsetRef.current.x) > 0.5 ||
-        Math.abs(nextOffset.y - webFullscreenOffsetRef.current.y) > 0.5
-      ) {
-        webFullscreenOffsetRef.current = nextOffset;
-        setWebFullscreenOffset(nextOffset);
-      }
-      webPinchingRef.current = true;
-      event?.preventDefault?.();
-      return;
-    }
-
-    if (touches.length === 1 && webPanStartRef.current && webFullscreenZoomRef.current > 1.001) {
-      const touch = touches[0];
-      const dx = Number(touch?.pageX ?? 0) - webPanStartRef.current.touchX;
-      const dy = Number(touch?.pageY ?? 0) - webPanStartRef.current.touchY;
-      const rawOffsetX = webPanStartRef.current.offsetX + dx;
-      const rawOffsetY = webPanStartRef.current.offsetY + dy;
-      const nextOffset = clampWebFullscreenOffset(
-        rawOffsetX,
-        rawOffsetY,
-        webFullscreenZoomRef.current,
-        webFullscreenViewport.width,
-        webFullscreenViewport.height
-      );
-      if (
-        Math.abs(nextOffset.x - webFullscreenOffsetRef.current.x) > 0.5 ||
-        Math.abs(nextOffset.y - webFullscreenOffsetRef.current.y) > 0.5
-      ) {
-        webFullscreenOffsetRef.current = nextOffset;
-        setWebFullscreenOffset(nextOffset);
-      }
-      webPinchingRef.current = true;
-      event?.preventDefault?.();
-    }
-  }, [showInPlaceFullscreen, webFullscreenViewport.height, webFullscreenViewport.width]);
-
-  const handleWebPinchEnd = useCallback((event: any) => {
-    if (Platform.OS !== "web") {
-      return;
-    }
-    const touches = event?.nativeEvent?.touches;
-    if (touches && touches.length >= 2) {
-      return;
-    }
-    webPinchStartDistanceRef.current = null;
-    webPinchStartZoomRef.current = webFullscreenZoomRef.current;
-    if (touches && touches.length === 1 && showInPlaceFullscreen && webFullscreenZoomRef.current > 1.001) {
-      const touch = touches[0];
-      webPanStartRef.current = {
-        touchX: Number(touch?.pageX ?? 0),
-        touchY: Number(touch?.pageY ?? 0),
-        offsetX: webFullscreenOffsetRef.current.x,
-        offsetY: webFullscreenOffsetRef.current.y,
-      };
-      return;
-    }
-    webPanStartRef.current = null;
-    setTimeout(() => {
-      webPinchingRef.current = false;
-    }, 0);
-  }, [showInPlaceFullscreen]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined" || !fullscreenOpen) {
@@ -787,21 +469,10 @@ export function CameraWidget({
 
   return (
     <>
-      <View ref={inPlaceFullscreenHostRef} style={[styles.container, showFixedFallbackFullscreen ? webInPlaceFullscreenHostStyle : null]}>
+      <View style={styles.container}>
         <Pressable
           disabled={!previewFeed}
-          onLayout={(event) => {
-            const { width, height } = event.nativeEvent.layout;
-            updateWebFullscreenViewport(width, height);
-          }}
-          onTouchCancel={handleWebPinchEnd}
-          onTouchEnd={handleWebPinchEnd}
-          onTouchMove={handleWebPinchMove}
-          onTouchStart={handleWebPinchStart}
           onPress={() => {
-            if (fullscreenOpen || webPinchingRef.current) {
-              return;
-            }
             playConfiguredUiSound(config.interactionSounds?.open, "open", `${config.id}:open`);
             openFullscreen();
           }}
@@ -809,7 +480,7 @@ export function CameraWidget({
         >
         {previewFeed ? (
           <View style={styles.snapshotWrap}>
-            {showPreviewFeed && previewFeed.kind === "snapshot"
+            {!fullscreenOpen && previewFeed.kind === "snapshot"
               ? ([0, 1] as const).map((layer) => {
                   const url = layerUrls[layer];
                   if (!url) {
@@ -850,9 +521,7 @@ export function CameraWidget({
                           }
                         },
                         src: url,
-                        style: showInPlaceFullscreen
-                          ? getFullscreenWebLayerStyle(isVisible, webFullscreenZoom, webFullscreenOffset.x, webFullscreenOffset.y)
-                          : getWebLayerStyle(isVisible),
+                        style: getWebLayerStyle(isVisible),
                       })
                     : (
                         <Image
@@ -885,35 +554,43 @@ export function CameraWidget({
                       );
                 })
               : null}
-            {showPreviewFeed && previewFeed.kind === "mjpeg" && previewFeed.url
+            {!fullscreenOpen && previewFeed.kind === "mjpeg" && previewFeed.url
               ? Platform.OS === "web"
                 ? createElement("img", {
                     alt: config.title || "Camera MJPEG",
                     decoding: "sync",
                     draggable: false,
-                    key: `preview-mjpeg-${currentPreviewMjpegSrc || previewFeed.url}:${previewMjpegSession}`,
+                    key: `preview-mjpeg-${currentPreviewMjpegSrc || previewFeed.url}`,
                     loading: "eager",
                     onError: () => {
-                      schedulePreviewMjpegReconnect("MJPEG Preview: Quelle nicht erreichbar.");
+                      setPreviewMjpegLoaded(false);
+                      if (previewMjpegSourceIndex + 1 < previewMjpegSources.length) {
+                        setPreviewMjpegSourceIndex((current) => current + 1);
+                        setPreviewStreamDebug("MJPEG Preview: Quelle fehlgeschlagen, versuche naechste URL...");
+                        return;
+                      }
+                      setPreviewStreamDebug((current) => current || "MJPEG Preview: Bild konnte nicht geladen werden.");
                     },
                     onLoad: (event: Event) => {
                       const target = event.currentTarget as HTMLImageElement | null;
                       const width = target?.naturalWidth || 0;
                       const height = target?.naturalHeight || 0;
                       if (!width || !height) {
-                        schedulePreviewMjpegReconnect("MJPEG Preview: Ungueltige Bilddaten.");
+                        setPreviewMjpegLoaded(false);
+                        if (previewMjpegSourceIndex + 1 < previewMjpegSources.length) {
+                          setPreviewMjpegSourceIndex((current) => current + 1);
+                          setPreviewStreamDebug("MJPEG Preview: Ungueltige Bilddaten, wechsle zur naechsten URL...");
+                          return;
+                        }
+                        setPreviewStreamDebug("MJPEG Preview: Stream liefert keine gueltigen Bilddaten.");
                         return;
                       }
-                      clearPreviewMjpegReconnectTimer();
-                      previewMjpegReconnectAttemptsRef.current = 0;
                       setPreviewMjpegLoaded(true);
                       setPreviewStreamDebug(null);
                       reportAspectRatio(width, height);
                     },
-                    src: withReconnectNonce(currentPreviewMjpegSrc || previewFeed.url, previewMjpegSession),
-                    style: showInPlaceFullscreen
-                      ? getFullscreenWebMjpegStyle(webFullscreenZoom, webFullscreenOffset.x, webFullscreenOffset.y)
-                      : webMjpegStyle,
+                    src: currentPreviewMjpegSrc || previewFeed.url,
+                    style: webMjpegStyle,
                   })
                 : (
                     <Image
@@ -924,25 +601,21 @@ export function CameraWidget({
                         }
                       }}
                       resizeMode="contain"
-                      source={{ uri: withReconnectNonce(previewFeed.url, previewMjpegSession) }}
+                      source={{ uri: previewFeed.url }}
                       style={styles.mjpegImage}
                     />
                   )
               : null}
-            {showPreviewFeed && previewFeed.kind === "mjpeg" && previewStreamDebug ? (
+            {!fullscreenOpen && previewFeed.kind === "mjpeg" && previewStreamDebug ? (
               <View style={styles.streamDebugOverlay}>
                 <Text style={styles.streamDebugText}>{previewStreamDebug}</Text>
               </View>
             ) : null}
-            {showPreviewFeed && previewFeed.kind === "flv" && previewFeed.url
+            {!fullscreenOpen && previewFeed.kind === "flv" && previewFeed.url
               ? Platform.OS === "web"
                 ? (
                     <WebFlvPlayer
-                      key={`preview-flv-${previewFeedKey}:${previewFlvSession}`}
-                      fullScreen={showInPlaceFullscreen}
-                      zoomScale={webFullscreenZoom}
-                      offsetX={webFullscreenOffset.x}
-                      offsetY={webFullscreenOffset.y}
+                      key={`preview-flv-${previewFeedKey}`}
                       onAspectRatioDetected={reportAspectRatioValue}
                       onSourceIndexChange={setPreviewFlvSourceIndex}
                       preferredSourceIndex={previewFlvSourceIndex}
@@ -956,15 +629,11 @@ export function CameraWidget({
                     </View>
                   )
               : null}
-            {showPreviewFeed && previewFeed.kind === "fmp4" && previewFeed.url
+            {!fullscreenOpen && previewFeed.kind === "fmp4" && previewFeed.url
               ? Platform.OS === "web"
                 ? (
                     <WebFmp4Player
                       key={`preview-fmp4-${previewFeedKey}:${currentPreviewFmp4Src || "none"}`}
-                      fullScreen={showInPlaceFullscreen}
-                      zoomScale={webFullscreenZoom}
-                      offsetX={webFullscreenOffset.x}
-                      offsetY={webFullscreenOffset.y}
                       onAspectRatioDetected={reportAspectRatioValue}
                       onSourceIndexChange={setPreviewFmp4SourceIndex}
                       preferredSourceIndex={previewFmp4SourceIndex}
@@ -994,45 +663,11 @@ export function CameraWidget({
           </View>
         )}
         </Pressable>
-        {showInPlaceFullscreen ? (
-          <View pointerEvents="box-none" style={styles.inPlaceFullscreenHud}>
-            <View style={styles.fullscreenActions}>
-              <Pressable
-                onPress={() => setPinned((current) => !current)}
-                style={[styles.fullscreenActionButton, styles.fullscreenActionSpacing, pinned ? styles.fullscreenPinActive : null]}
-              >
-                <MaterialCommunityIcons
-                  color={pinned ? pinnedColor : palette.text}
-                  name={pinned ? "pin" : "pin-outline"}
-                  size={18}
-                />
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  playConfiguredUiSound(config.interactionSounds?.close, "close", `${config.id}:close`);
-                  closeFullscreen();
-                }}
-                style={styles.fullscreenActionButton}
-              >
-                <MaterialCommunityIcons color={palette.text} name="close" size={20} />
-              </Pressable>
-            </View>
-          </View>
-        ) : null}
         {!previewFeed && !previewSnapshotBaseUrl && !previewMjpegUrl && !previewFlvUrl && !previewFmp4Url ? (
           <Text style={[styles.hint, { color: mutedTextColor }]}>Widget ist noch nicht konfiguriert.</Text>
         ) : null}
       </View>
-      {showNativeFullscreenModal ? (
-        <Modal
-          animationType={
-            Platform.OS === "web"
-              ? "none"
-              : "none"
-          }
-          transparent
-          visible
-        >
+      <Modal animationType={Platform.OS === "web" ? "fade" : "none"} transparent visible={fullscreenOpen}>
         <View style={styles.fullscreenBackdrop}>
           <View style={styles.fullscreenActions}>
             <Pressable
@@ -1123,29 +758,29 @@ export function CameraWidget({
                     alt: config.title || "Camera MJPEG fullscreen",
                     decoding: "sync",
                     draggable: false,
-                    key: `fullscreen-mjpeg-${currentFullscreenMjpegSrc || fullscreenFeed.url}:${fullscreenSession}`,
+                    key: `fullscreen-mjpeg-${currentFullscreenMjpegSrc || fullscreenFeed.url}`,
                     loading: "eager",
                     onError: () => {
-                      if (moveFullscreenMjpegToNextSource()) {
-                        return;
-                      }
                       setFullscreenMjpegLoaded(false);
+                      if (fullscreenMjpegSourceIndex + 1 < fullscreenMjpegSources.length) {
+                        setFullscreenMjpegSourceIndex((current) => current + 1);
+                      }
                     },
                     onLoad: (event: Event) => {
                       const target = event.currentTarget as HTMLImageElement | null;
                       const width = target?.naturalWidth || 0;
                       const height = target?.naturalHeight || 0;
                       if (!width || !height) {
-                        if (moveFullscreenMjpegToNextSource()) {
-                          return;
-                        }
                         setFullscreenMjpegLoaded(false);
+                        if (fullscreenMjpegSourceIndex + 1 < fullscreenMjpegSources.length) {
+                          setFullscreenMjpegSourceIndex((current) => current + 1);
+                        }
                         return;
                       }
                       setFullscreenMjpegLoaded(true);
                       reportAspectRatio(width, height);
                     },
-                    src: withReconnectNonce(currentFullscreenMjpegSrc || fullscreenFeed.url, fullscreenSession),
+                    src: currentFullscreenMjpegSrc || fullscreenFeed.url,
                     style: fullscreenWebMjpegStyle,
                   })
                 : (
@@ -1166,7 +801,7 @@ export function CameraWidget({
               ? Platform.OS === "web"
                 ? (
                     <WebFlvPlayer
-                      key={`fullscreen-flv-${fullscreenFeedKey}:${fullscreenSession}`}
+                      key={`fullscreen-flv-${fullscreenFeedKey}`}
                       fullScreen
                       onAspectRatioDetected={reportAspectRatioValue}
                       onSourceIndexChange={setFullscreenFlvSourceIndex}
@@ -1207,8 +842,7 @@ export function CameraWidget({
             </View>
           ) : null}
         </View>
-        </Modal>
-      ) : null}
+      </Modal>
     </>
   );
 }
@@ -1358,35 +992,17 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv" | 
   }
 
   const encodedUrl = encodeURIComponent(targetUrl);
-  if (streamType === "mjpeg") {
-    return [
-      `${window.location.origin}/smarthome-dashboard/api/camera-stream?streamType=${streamType}&url=${encodedUrl}`,
-      `${window.location.origin}/smarthome-dashboard/api/camera-mjpeg?streamType=${streamType}&url=${encodedUrl}`,
-    ];
-  }
-
   return [`${window.location.origin}/smarthome-dashboard/api/camera-stream?streamType=${streamType}&url=${encodedUrl}`];
 }
 
 function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
   const includeDirect = shouldUseDirectWebStream(targetUrl, streamType);
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
-  const sources = [...proxySources, ...(includeDirect ? [targetUrl] : [])];
+  const sources =
+    streamType === "mjpeg"
+      ? [...(includeDirect ? [targetUrl] : []), ...proxySources]
+      : [...proxySources, ...(includeDirect ? [targetUrl] : [])];
   return Array.from(new Set(sources.filter(Boolean)));
-}
-
-function withReconnectNonce(url: string, nonce: number) {
-  if (!url) {
-    return url;
-  }
-  try {
-    const parsed = new URL(url);
-    parsed.searchParams.set("_r", String(nonce));
-    return parsed.toString();
-  } catch {
-    const separator = url.includes("?") ? "&" : "?";
-    return `${url}${separator}_r=${nonce}`;
-  }
 }
 
 function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
@@ -1441,9 +1057,6 @@ function WebFlvPlayer({
   sources,
   title,
   fullScreen = false,
-  zoomScale = 1,
-  offsetX = 0,
-  offsetY = 0,
   onAspectRatioDetected,
   preferredSourceIndex = 0,
   onSourceIndexChange,
@@ -1451,9 +1064,6 @@ function WebFlvPlayer({
   sources: string[];
   title: string;
   fullScreen?: boolean;
-  zoomScale?: number;
-  offsetX?: number;
-  offsetY?: number;
   onAspectRatioDetected?: (ratio: number) => void;
   preferredSourceIndex?: number;
   onSourceIndexChange?: (index: number) => void;
@@ -1471,10 +1081,8 @@ function WebFlvPlayer({
   );
   const maxSourceIndex = Math.max(0, normalizedSources.length - 1);
   const [sourceIndex, setSourceIndex] = useState(Math.min(preferredSourceIndex, maxSourceIndex));
-  const [restartNonce, setRestartNonce] = useState(0);
   const currentSource = normalizedSources[Math.min(sourceIndex, maxSourceIndex)] || "";
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [hasVideoFrame, setHasVideoFrame] = useState(false);
 
   useEffect(() => {
     aspectRatioCallbackRef.current = onAspectRatioDetected;
@@ -1491,7 +1099,6 @@ function WebFlvPlayer({
 
   useEffect(() => {
     setErrorMessage(null);
-    setHasVideoFrame(false);
   }, [currentSource]);
 
   useEffect(() => {
@@ -1502,27 +1109,12 @@ function WebFlvPlayer({
     let disposed = false;
     let player: any = null;
     let retryTimer: ReturnType<typeof setInterval> | null = null;
-    let watchdogTimer: ReturnType<typeof setTimeout> | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     const videoElement = videoRef.current;
 
     const safeSetError = (message: string) => {
       if (!disposed) {
         setErrorMessage(message);
       }
-    };
-
-    const scheduleReconnect = (message: string) => {
-      safeSetError(message);
-      if (reconnectTimer) {
-        clearTimeout(reconnectTimer);
-      }
-      reconnectTimer = setTimeout(() => {
-        if (disposed) {
-          return;
-        }
-        setRestartNonce((current) => current + 1);
-      }, FLV_RECONNECT_DELAY_MS);
     };
 
     const moveToNextSource = (message: string) => {
@@ -1560,7 +1152,7 @@ function WebFlvPlayer({
       const loaded = await ensureFlvJsLoaded();
       if (disposed || !loaded) {
         if (!moveToNextSource("FLV Quelle fehlgeschlagen, versuche alternative Quelle...")) {
-          scheduleReconnect("FLV Player konnte nicht geladen werden, Neuverbindung...");
+          safeSetError("FLV Player konnte nicht geladen werden.");
         }
         return;
       }
@@ -1594,11 +1186,7 @@ function WebFlvPlayer({
           if (moveToNextSource("FLV Quelle fehlgeschlagen, versuche alternative Quelle...")) {
             return;
           }
-          scheduleReconnect(
-            detail
-              ? `FLV Stream konnte nicht gestartet werden (${detail}), Neuverbindung...`
-              : "FLV Stream konnte nicht gestartet werden, Neuverbindung..."
-          );
+          safeSetError(detail ? `FLV Stream konnte nicht gestartet werden (${detail}).` : "FLV Stream konnte nicht gestartet werden.");
         });
       }
 
@@ -1621,29 +1209,10 @@ function WebFlvPlayer({
         callback(ratio);
       };
       videoElement.oncanplay = () => {
-        if (watchdogTimer) {
-          clearTimeout(watchdogTimer);
-          watchdogTimer = null;
-        }
-        setHasVideoFrame(true);
         tryPlay();
       };
       player.load();
       tryPlay();
-      watchdogTimer = setTimeout(() => {
-        if (disposed || switchedSource) {
-          return;
-        }
-        const hasData = Number(videoElement.readyState || 0) >= 2;
-        if (hasData) {
-          return;
-        }
-        switchedSource = true;
-        if (moveToNextSource("FLV Quelle fehlgeschlagen, versuche alternative Quelle...")) {
-          return;
-        }
-        scheduleReconnect("FLV Stream konnte nicht gestartet werden, Neuverbindung...");
-      }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
       retryTimer = setInterval(() => {
         if (!videoElement || disposed || !videoElement.paused) {
           return;
@@ -1654,7 +1223,7 @@ function WebFlvPlayer({
 
     attach().catch(() => {
       if (!moveToNextSource("FLV Quelle fehlgeschlagen, versuche alternative Quelle...")) {
-        scheduleReconnect("FLV Stream konnte nicht initialisiert werden, Neuverbindung...");
+        safeSetError("FLV Stream konnte nicht initialisiert werden.");
       }
     });
 
@@ -1678,15 +1247,9 @@ function WebFlvPlayer({
       if (retryTimer) {
         clearInterval(retryTimer);
       }
-      if (watchdogTimer) {
-        clearTimeout(watchdogTimer);
-      }
-      if (reconnectTimer) {
-        clearTimeout(reconnectTimer);
-      }
       playerRef.current = null;
     };
-  }, [currentSource, normalizedSources.length, restartNonce, sourceIndex]);
+  }, [currentSource, normalizedSources.length, sourceIndex]);
 
   return (
     <>
@@ -1696,10 +1259,9 @@ function WebFlvPlayer({
         muted: true,
         playsInline: true,
         ref: setVideoRef,
-        style: fullScreen ? getFullscreenWebFlvStyle(zoomScale, offsetX, offsetY) : webFlvStyle,
+        style: fullScreen ? fullscreenWebFlvStyle : webFlvStyle,
         title,
       })}
-      {!hasVideoFrame ? <View style={styles.flvLoadingOverlay} /> : null}
       {errorMessage ? (
         <View style={styles.flvErrorOverlay}>
           <Text style={styles.flvErrorText}>{errorMessage}</Text>
@@ -1713,9 +1275,6 @@ function WebFmp4Player({
   sources,
   title,
   fullScreen = false,
-  zoomScale = 1,
-  offsetX = 0,
-  offsetY = 0,
   onAspectRatioDetected,
   preferredSourceIndex = 0,
   onSourceIndexChange,
@@ -1723,9 +1282,6 @@ function WebFmp4Player({
   sources: string[];
   title: string;
   fullScreen?: boolean;
-  zoomScale?: number;
-  offsetX?: number;
-  offsetY?: number;
   onAspectRatioDetected?: (ratio: number) => void;
   preferredSourceIndex?: number;
   onSourceIndexChange?: (index: number) => void;
@@ -1851,7 +1407,7 @@ function WebFmp4Player({
         playsInline: true,
         ref: setVideoRef,
         src: currentSource || undefined,
-        style: fullScreen ? getFullscreenWebFmp4Style(zoomScale, offsetX, offsetY) : webFmp4Style,
+        style: fullScreen ? fullscreenWebFmp4Style : webFmp4Style,
         title,
       })}
       {errorMessage ? (
@@ -2039,16 +1595,11 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  inPlaceFullscreenHud: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 2600,
-    pointerEvents: "box-none",
-  },
   fullscreenActions: {
     position: "absolute",
     top: 24,
     right: 24,
-    zIndex: 30,
+    zIndex: 20,
     flexDirection: "row",
   },
   fullscreenActionButton: {
@@ -2084,14 +1635,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     backgroundColor: "rgba(160, 22, 40, 0.75)",
-  },
-  flvLoadingOverlay: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: "#000000",
   },
   flvErrorText: {
     color: "#ffffff",
@@ -2131,19 +1674,6 @@ const styles = StyleSheet.create({
   },
 });
 
-const webInPlaceFullscreenHostStyle =
-  Platform.OS === "web"
-    ? ({
-        position: "fixed",
-        left: 0,
-        top: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 2400,
-        backgroundColor: "rgba(0,0,0,0.96)",
-      } as any)
-    : null;
-
 function getWebLayerStyle(visible: boolean) {
   return {
     ...baseWebLayerStyle,
@@ -2153,111 +1683,13 @@ function getWebLayerStyle(visible: boolean) {
   } as const;
 }
 
-function getFullscreenWebLayerStyle(visible: boolean, zoomScale: number = 1, offsetX: number = 0, offsetY: number = 0) {
+function getFullscreenWebLayerStyle(visible: boolean) {
   return {
     ...baseFullscreenWebLayerStyle,
-    ...getZoomTransformStyle(zoomScale, offsetX, offsetY),
     opacity: visible ? 1 : 0,
     visibility: visible ? "visible" : "hidden",
     zIndex: visible ? 2 : 1,
   } as const;
-}
-
-function getFullscreenWebMjpegStyle(zoomScale: number = 1, offsetX: number = 0, offsetY: number = 0) {
-  return {
-    ...fullscreenWebMjpegStyle,
-    ...getZoomTransformStyle(zoomScale, offsetX, offsetY),
-  } as const;
-}
-
-function getFullscreenWebFlvStyle(zoomScale: number = 1, offsetX: number = 0, offsetY: number = 0) {
-  return {
-    ...fullscreenWebFlvStyle,
-    ...getZoomTransformStyle(zoomScale, offsetX, offsetY),
-  } as const;
-}
-
-function getFullscreenWebFmp4Style(zoomScale: number = 1, offsetX: number = 0, offsetY: number = 0) {
-  return {
-    ...fullscreenWebFmp4Style,
-    ...getZoomTransformStyle(zoomScale, offsetX, offsetY),
-  } as const;
-}
-
-function getZoomTransformStyle(zoomScale: number, offsetX: number = 0, offsetY: number = 0) {
-  const safeZoom = clampZoom(zoomScale);
-  const safeOffsetX = Number.isFinite(offsetX) ? offsetX : 0;
-  const safeOffsetY = Number.isFinite(offsetY) ? offsetY : 0;
-  if (safeZoom <= 1.001 && Math.abs(safeOffsetX) <= 0.5 && Math.abs(safeOffsetY) <= 0.5) {
-    return {};
-  }
-  return {
-    transform: `translate(${safeOffsetX}px, ${safeOffsetY}px) scale(${safeZoom})`,
-    transformOrigin: "center center",
-  } as const;
-}
-
-function clampZoom(value: number) {
-  if (!Number.isFinite(value)) {
-    return WEB_FULLSCREEN_MIN_ZOOM;
-  }
-  return Math.max(WEB_FULLSCREEN_MIN_ZOOM, Math.min(WEB_FULLSCREEN_MAX_ZOOM, value));
-}
-
-function clampWebFullscreenOffset(
-  offsetX: number,
-  offsetY: number,
-  zoomScale: number,
-  viewportWidth: number,
-  viewportHeight: number
-) {
-  const safeZoom = clampZoom(zoomScale);
-  const safeWidth = Number.isFinite(viewportWidth) ? Math.max(0, viewportWidth) : 0;
-  const safeHeight = Number.isFinite(viewportHeight) ? Math.max(0, viewportHeight) : 0;
-
-  if (safeZoom <= 1.001 || !safeWidth || !safeHeight) {
-    return { x: 0, y: 0 };
-  }
-
-  const maxX = ((safeZoom - 1) * safeWidth) / 2;
-  const maxY = ((safeZoom - 1) * safeHeight) / 2;
-  return {
-    x: clampNumber(offsetX, -maxX, maxX),
-    y: clampNumber(offsetY, -maxY, maxY),
-  };
-}
-
-function clampNumber(value: number, min: number, max: number) {
-  if (!Number.isFinite(value)) {
-    return min;
-  }
-  return Math.max(min, Math.min(max, value));
-}
-
-function getTouchDistance(touches: ArrayLike<{ pageX?: number; pageY?: number }>) {
-  if (!touches || touches.length < 2) {
-    return null;
-  }
-  const first = touches[0];
-  const second = touches[1];
-  const dx = Number((first?.pageX ?? 0) - (second?.pageX ?? 0));
-  const dy = Number((first?.pageY ?? 0) - (second?.pageY ?? 0));
-  const distance = Math.sqrt(dx * dx + dy * dy);
-  return Number.isFinite(distance) && distance > 0 ? distance : null;
-}
-
-function getTouchMidpoint(touches: ArrayLike<{ pageX?: number; pageY?: number }>) {
-  if (!touches || touches.length < 2) {
-    return null;
-  }
-  const first = touches[0];
-  const second = touches[1];
-  const x = (Number(first?.pageX ?? 0) + Number(second?.pageX ?? 0)) / 2;
-  const y = (Number(first?.pageY ?? 0) + Number(second?.pageY ?? 0)) / 2;
-  if (!Number.isFinite(x) || !Number.isFinite(y)) {
-    return null;
-  }
-  return { x, y };
 }
 
 const baseWebLayerStyle = {
@@ -2317,7 +1749,7 @@ const webFlvStyle = {
   height: "100%",
   objectFit: "contain",
   display: "block",
-  backgroundColor: "#000000",
+  backgroundColor: "transparent",
 } as const;
 
 const fullscreenWebFlvStyle = {

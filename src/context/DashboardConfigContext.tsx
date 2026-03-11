@@ -9,19 +9,14 @@ import {
 import { CameraWidgetConfig, DashboardPage, DashboardSettings, UiSoundSettings, WidgetConfig } from "../types/dashboard";
 import { defaultConfig } from "../utils/defaultConfig";
 import { normalizeSoundSelection } from "../utils/lcarsSounds";
-import { buildMobileOverrideFromWidget, resolveMobileWidget, stripMobileWidgetMeta } from "../utils/mobileWidget";
 
 type DashboardConfigContextValue = {
   config: DashboardSettings;
   rawJson: string;
-  rawDesktopJson: string;
-  rawMobileJson: string;
   dashboardPages: DashboardPage[];
   activePageId: string;
   savedDashboards: string[];
   updateConfigFromJson: (nextJson: string) => { ok: boolean; error?: string };
-  updateDesktopConfigFromJson: (nextJson: string) => { ok: boolean; error?: string };
-  updateMobileConfigFromJson: (nextJson: string) => { ok: boolean; error?: string };
   patchConfig: (partial: Partial<DashboardSettings>) => void;
   resetConfig: () => void;
   replaceWidgets: (widgets: WidgetConfig[]) => void;
@@ -227,14 +222,11 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
       console.warn("Remote config save failed", error);
     }
   };
-  const rawMobileJson = useMemo(() => buildMobileJsonSnapshot(config), [config]);
 
   const value = useMemo<DashboardConfigContextValue>(
     () => ({
       config,
       rawJson,
-      rawDesktopJson: rawJson,
-      rawMobileJson,
       dashboardPages: config.pages || [],
       activePageId: config.activePageId || (config.pages?.[0]?.id ?? "home"),
       savedDashboards,
@@ -242,25 +234,6 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
         try {
           const parsed = migrateConfig(JSON.parse(nextJson) as DashboardSettings);
           persist(parsed);
-          return { ok: true };
-        } catch (error) {
-          return { ok: false, error: error instanceof Error ? error.message : "Unknown JSON error" };
-        }
-      },
-      updateDesktopConfigFromJson(nextJson) {
-        try {
-          const parsed = migrateConfig(JSON.parse(nextJson) as DashboardSettings);
-          persist(parsed);
-          return { ok: true };
-        } catch (error) {
-          return { ok: false, error: error instanceof Error ? error.message : "Unknown JSON error" };
-        }
-      },
-      updateMobileConfigFromJson(nextJson) {
-        try {
-          const parsedMobile = migrateConfig(JSON.parse(nextJson) as DashboardSettings);
-          const merged = applyMobileLayoutConfig(config, parsedMobile);
-          persist(merged);
           return { ok: true };
         } catch (error) {
           return { ok: false, error: error instanceof Error ? error.message : "Unknown JSON error" };
@@ -420,7 +393,7 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
         }
       },
     }),
-    [config, rawJson, rawMobileJson, savedDashboards]
+    [config, rawJson, savedDashboards]
   );
 
   return <DashboardConfigContext.Provider value={value}>{children}</DashboardConfigContext.Provider>;
@@ -513,76 +486,6 @@ export function useDashboardConfig() {
     throw new Error("useDashboardConfig must be used inside DashboardConfigProvider");
   }
   return value;
-}
-
-function buildMobileJsonSnapshot(input: DashboardSettings) {
-  const normalized = normalizeDashboardPages(input);
-  const pages = (normalized.pages || []).map((page) => ({
-    ...page,
-    widgets: page.widgets.map((widget) => {
-      const mobileWidget = resolveMobileWidget(widget);
-      return stripMobileWidgetMeta(mobileWidget);
-    }),
-  }));
-  const activePage =
-    pages.find((page) => page.id === normalized.activePageId) ||
-    pages[0];
-
-  const mobileConfig: DashboardSettings = {
-    ...normalized,
-    pages,
-    activePageId: activePage?.id || normalized.activePageId,
-    widgets: activePage?.widgets || [],
-  };
-
-  return JSON.stringify(mobileConfig, null, 2);
-}
-
-function applyMobileLayoutConfig(
-  current: DashboardSettings,
-  mobileConfig: DashboardSettings
-): DashboardSettings {
-  const normalizedCurrent = normalizeDashboardPages(current);
-  const normalizedMobile = normalizeDashboardPages(mobileConfig);
-  const scoped = new Map<string, WidgetConfig>();
-  const global = new Map<string, WidgetConfig>();
-
-  for (const page of normalizedMobile.pages || []) {
-    for (const widget of page.widgets) {
-      scoped.set(`${page.id}::${widget.id}`, widget);
-      if (!global.has(widget.id)) {
-        global.set(widget.id, widget);
-      }
-    }
-  }
-
-  const nextPages = (normalizedCurrent.pages || []).map((page) => ({
-    ...page,
-    widgets: page.widgets.map((widget) => {
-      const source =
-        scoped.get(`${page.id}::${widget.id}`) ||
-        global.get(widget.id);
-      if (!source) {
-        return widget;
-      }
-
-      return {
-        ...widget,
-        mobilePosition: source.mobilePosition || source.position,
-        mobileOverride: buildMobileOverrideFromWidget(source),
-      };
-    }),
-  }));
-  const nextActivePage =
-    nextPages.find((page) => page.id === normalizedCurrent.activePageId) ||
-    nextPages[0];
-
-  return {
-    ...normalizedCurrent,
-    pages: nextPages,
-    activePageId: nextActivePage?.id || normalizedCurrent.activePageId,
-    widgets: nextActivePage?.widgets || [],
-  };
 }
 
 function normalizeDashboardPages(input: DashboardSettings): DashboardSettings {

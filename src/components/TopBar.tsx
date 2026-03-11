@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { playConfiguredUiSound } from "../utils/uiSounds";
 import { palette } from "../utils/theme";
 
@@ -36,42 +36,32 @@ export function TopBar({
 }: TopBarProps) {
   const { width } = useWindowDimensions();
   const isCompact = width < 700;
-  const pageTabButtons = pageTitles.map((page) => {
-    const activePage = page.id === activePageId;
-    return (
-      <Pressable
-        key={page.id}
-        onPress={() => {
-          playConfiguredUiSound(pageTabSounds, "page", `page-tab:${page.id}`);
-          onSelectPage(page.id);
-        }}
-        style={[styles.pageTab, activePage ? styles.pageTabActive : null]}
-      >
-        <Text numberOfLines={1} style={[styles.pageTabLabel, activePage ? styles.pageTabLabelActive : null]}>
-          {page.title}
-        </Text>
-      </Pressable>
-    );
-  });
 
   return (
     <View style={[styles.container, isCompact ? styles.containerCompact : null]}>
       <View>
-        <View style={[styles.titleRow, isCompact ? styles.titleRowCompact : null]}>
+        <View style={styles.titleRow}>
           <Text style={styles.kicker}>{homeLabel}</Text>
           <View style={[styles.statusDot, isOnline ? styles.statusOnline : styles.statusOffline]} />
-          {isCompact ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.pageTabsCompactContent}
-              style={styles.pageTabsCompactScroll}
-            >
-              {pageTabButtons}
-            </ScrollView>
-          ) : (
-            <View style={styles.pageTabs}>{pageTabButtons}</View>
-          )}
+          <View style={styles.pageTabs}>
+            {pageTitles.map((page) => {
+              const activePage = page.id === activePageId;
+              return (
+                <Pressable
+                  key={page.id}
+                  onPress={() => {
+                    playConfiguredUiSound(pageTabSounds, "page", `page-tab:${page.id}`);
+                    onSelectPage(page.id);
+                  }}
+                  style={[styles.pageTab, activePage ? styles.pageTabActive : null]}
+                >
+                  <Text numberOfLines={1} style={[styles.pageTabLabel, activePage ? styles.pageTabLabelActive : null]}>
+                    {page.title}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
       </View>
       <View style={[styles.actions, isCompact ? styles.actionsCompact : null]}>
@@ -136,9 +126,6 @@ const styles = StyleSheet.create({
     gap: 10,
     flexWrap: "wrap",
   },
-  titleRowCompact: {
-    flexWrap: "nowrap",
-  },
   kicker: {
     color: palette.text,
     fontSize: 22,
@@ -149,15 +136,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
     flexShrink: 1,
-  },
-  pageTabsCompactScroll: {
-    flex: 1,
-    minWidth: 0,
-  },
-  pageTabsCompactContent: {
-    flexDirection: "row",
-    gap: 8,
-    paddingRight: 4,
   },
   pageTab: {
     maxWidth: 168,
