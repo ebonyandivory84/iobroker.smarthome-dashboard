@@ -457,6 +457,10 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
   const transport = useHttps ? https : http;
   let upstreamResponseRef = null;
   let closed = false;
+  const forwardedRange = typeof req.headers.range === "string" ? req.headers.range : "";
+  const forwardedIfRange = typeof req.headers["if-range"] === "string" ? req.headers["if-range"] : "";
+  const forwardedUserAgent = typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : "";
+  const forwardedAccept = typeof req.headers.accept === "string" ? req.headers.accept : "";
   const upstreamRequest = transport.request(
     {
       protocol: parsed.protocol,
@@ -465,9 +469,10 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
       method: "GET",
       path: `${parsed.pathname}${parsed.search}`,
       headers: {
-        Accept: "*/*",
-        Connection: "close",
-        "User-Agent": "ioBroker-smart-dashboard-camera-proxy/1.0",
+        Accept: forwardedAccept || "*/*",
+        ...(forwardedRange ? { Range: forwardedRange } : {}),
+        ...(forwardedIfRange ? { "If-Range": forwardedIfRange } : {}),
+        "User-Agent": forwardedUserAgent || "ioBroker-smart-dashboard-camera-proxy/1.0",
         ...requestConfig.headers,
       },
       rejectUnauthorized: !(useHttps && isLikelyLocalHost(parsed.hostname)),
@@ -566,9 +571,21 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
             : "multipart/x-mixed-replace");
 
       res.status(statusCode);
-      res.setHeader("Content-Type", contentType);
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-      res.setHeader("Connection", "close");
+      for (const [header, value] of Object.entries(upstreamResponse.headers)) {
+        if (value === undefined) {
+          continue;
+        }
+        if (isHopByHopProxyHeader(header)) {
+          continue;
+        }
+        res.setHeader(header, value);
+      }
+      if (!res.hasHeader("Content-Type")) {
+        res.setHeader("Content-Type", contentType);
+      }
+      if (!res.hasHeader("Cache-Control")) {
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      }
       res.setHeader("X-Accel-Buffering", "no");
 
       upstreamResponse.on("error", () => {
@@ -624,6 +641,22 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
   });
 
   upstreamRequest.end();
+}
+
+function isHopByHopProxyHeader(headerName) {
+  const normalized = String(headerName || "")
+    .trim()
+    .toLowerCase();
+  return (
+    normalized === "connection" ||
+    normalized === "keep-alive" ||
+    normalized === "proxy-authenticate" ||
+    normalized === "proxy-authorization" ||
+    normalized === "te" ||
+    normalized === "trailer" ||
+    normalized === "transfer-encoding" ||
+    normalized === "upgrade"
+  );
 }
 
 function withCameraQueryCredentials(rawUrl, username, password, variant = "userPwd") {

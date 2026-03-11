@@ -1415,7 +1415,11 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv" | 
 function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
   const includeDirect = shouldUseDirectWebStream(targetUrl, streamType);
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
-  const sources = [...proxySources, ...(includeDirect ? [targetUrl] : [])];
+  const directSources = includeDirect ? [targetUrl] : [];
+  const sources =
+    streamType === "fmp4"
+      ? [...directSources, ...proxySources]
+      : [...proxySources, ...directSources];
   return Array.from(new Set(sources.filter(Boolean)));
 }
 
@@ -1809,6 +1813,7 @@ function WebFmp4Player({
   const [sourceIndex, setSourceIndex] = useState(Math.min(preferredSourceIndex, maxSourceIndex));
   const currentSource = normalizedSources[Math.min(sourceIndex, maxSourceIndex)] || "";
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [hasVideoFrame, setHasVideoFrame] = useState(false);
 
   useEffect(() => {
     aspectRatioCallbackRef.current = onAspectRatioDetected;
@@ -1826,6 +1831,7 @@ function WebFmp4Player({
   useEffect(() => {
     setErrorMessage(null);
     ratioReportedRef.current = false;
+    setHasVideoFrame(false);
   }, [currentSource]);
 
   useEffect(() => {
@@ -1873,6 +1879,14 @@ function WebFmp4Player({
       });
     };
 
+    const markPlayable = () => {
+      if (disposed) {
+        return;
+      }
+      setHasVideoFrame(true);
+      setErrorMessage(null);
+    };
+
     const handleMetadata = () => {
       const callback = aspectRatioCallbackRef.current;
       if (ratioReportedRef.current || !callback) {
@@ -1896,10 +1910,14 @@ function WebFmp4Player({
         return;
       }
       if (!moveToNextSource("fMP4 Quelle fehlgeschlagen, versuche alternative Quelle...")) {
-        setErrorMessage("fMP4 Stream konnte nicht gestartet werden.");
+        const mediaError = videoElement.error;
+        const detail = mediaError ? describeVideoError(mediaError) : "Unbekannter Video-Fehler";
+        setErrorMessage(`fMP4 Stream konnte nicht gestartet werden (${detail}).`);
       }
     };
 
+    videoElement.addEventListener("loadeddata", markPlayable);
+    videoElement.addEventListener("playing", markPlayable);
     videoElement.addEventListener("loadedmetadata", handleMetadata);
     videoElement.addEventListener("canplay", tryPlay);
     videoElement.addEventListener("error", handleError);
@@ -1909,15 +1927,17 @@ function WebFmp4Player({
       if (disposed) {
         return;
       }
-      const hasData = videoElement.readyState >= 2;
+      const hasData = videoElement.readyState >= 2 || videoElement.currentTime > 0;
       if (!hasData) {
         handleError();
       }
-    }, MJPEG_SOURCE_SWITCH_TIMEOUT_MS);
+    }, Math.max(MJPEG_SOURCE_SWITCH_TIMEOUT_MS, 25_000));
 
     return () => {
       disposed = true;
       clearTimeout(watchdog);
+      videoElement.removeEventListener("loadeddata", markPlayable);
+      videoElement.removeEventListener("playing", markPlayable);
       videoElement.removeEventListener("loadedmetadata", handleMetadata);
       videoElement.removeEventListener("canplay", tryPlay);
       videoElement.removeEventListener("error", handleError);
@@ -1931,11 +1951,13 @@ function WebFmp4Player({
         controls: false,
         muted,
         playsInline: true,
+        preload: "auto",
         ref: setVideoRef,
         src: currentSource || undefined,
         style: fullScreen ? getFullscreenWebFmp4Style(zoomScale, offsetX, offsetY) : webFmp4Style,
         title,
       })}
+      {!hasVideoFrame ? <View style={styles.flvLoadingOverlay} /> : null}
       {errorMessage ? (
         <View style={styles.flvErrorOverlay}>
           <Text style={styles.flvErrorText}>{errorMessage}</Text>
@@ -1943,6 +1965,25 @@ function WebFmp4Player({
       ) : null}
     </>
   );
+}
+
+function describeVideoError(error: MediaError) {
+  if (!error) {
+    return "kein Fehlercode";
+  }
+
+  switch (error.code) {
+    case 1:
+      return "MEDIA_ERR_ABORTED";
+    case 2:
+      return "MEDIA_ERR_NETWORK";
+    case 3:
+      return "MEDIA_ERR_DECODE";
+    case 4:
+      return "MEDIA_ERR_SRC_NOT_SUPPORTED";
+    default:
+      return `MEDIA_ERR_UNKNOWN_${error.code}`;
+  }
 }
 
 async function ensureFlvJsLoaded() {
