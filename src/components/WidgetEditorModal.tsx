@@ -120,6 +120,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         flvUrl: widget.flvUrl || widget.fullscreenFlvUrl || "",
         fmp4Url: widget.fmp4Url || widget.fullscreenFmp4Url || "",
         refreshMs: String(widget.refreshMs || widget.fullscreenRefreshMs || 2000),
+        audioEnabled: widget.audioEnabled === true ? "true" : "false",
         maximizeStateId: widget.maximizeStateId || "",
         maximizeTriggerFormat: widget.maximizeTriggerFormat || "boolean",
         maximizeTriggerValue: widget.maximizeTriggerValue || "",
@@ -405,6 +406,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         fullscreenFmp4Url: undefined,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 250),
         fullscreenRefreshMs: undefined,
+        audioEnabled: draft.audioEnabled === "true",
         manualHeightOverride: cameraSourceChanged ? false : widget.manualHeightOverride,
         snapshotAspectRatio: cameraSourceChanged ? undefined : widget.snapshotAspectRatio,
         maximizeStateId: draft.maximizeStateId || undefined,
@@ -958,6 +960,16 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   {cameraMode !== "snapshot" ? (
                     <Text style={styles.mappingHint}>Refresh gilt nur fuer Snapshot.</Text>
                   ) : null}
+                </Field>
+                <Field label="Ton standardmaessig aktiv">
+                  <ChoiceRow
+                    options={["true", "false"]}
+                    value={draft.audioEnabled || "false"}
+                    onSelect={(value) => setDraft((current) => ({ ...current, audioEnabled: value }))}
+                  />
+                  <Text style={styles.mappingHint}>
+                    Hinweis: Browser erlauben Autoplay mit Ton oft erst nach einer Nutzerinteraktion.
+                  </Text>
                 </Field>
                 <Field label="Maximieren per Datenpunkt">
                   <StateFieldInput

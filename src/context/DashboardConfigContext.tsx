@@ -109,6 +109,7 @@ function migrateConfig(input: DashboardSettings): DashboardSettings {
         snapshotUrl,
         previewSourceMode,
         fullscreenSourceMode,
+        audioEnabled: normalizeCameraAudioEnabled(widget.audioEnabled),
         interactionSounds: normalizedInteractionSounds,
       };
     }),
@@ -153,6 +154,16 @@ function inferCameraSourceMode(
     return "fmp4";
   }
   return fallback;
+}
+
+function normalizeCameraAudioEnabled(value: unknown) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  return ["true", "1", "on", "yes"].includes(normalized);
 }
 
 export function DashboardConfigProvider({ children }: PropsWithChildren) {

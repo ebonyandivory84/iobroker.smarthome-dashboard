@@ -45,6 +45,7 @@ const defaultWidgets: DashboardSettings["widgets"] = [
       flvUrl: "",
       fmp4Url: "",
       refreshMs: 2000,
+      audioEnabled: false,
       position: { x: 6, y: 0, w: 6, h: 4 },
     },
     {

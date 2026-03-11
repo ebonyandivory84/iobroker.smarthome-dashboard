@@ -59,6 +59,7 @@ export function CameraWidget({
   const [fullscreenFlvSourceIndex, setFullscreenFlvSourceIndex] = useState(0);
   const [previewFmp4SourceIndex, setPreviewFmp4SourceIndex] = useState(0);
   const [fullscreenFmp4SourceIndex, setFullscreenFmp4SourceIndex] = useState(0);
+  const [audioEnabled, setAudioEnabled] = useState(config.audioEnabled === true);
   const [previewMjpegLoaded, setPreviewMjpegLoaded] = useState(false);
   const [fullscreenMjpegLoaded, setFullscreenMjpegLoaded] = useState(false);
   const hasReportedAspectRatio = useRef(false);
@@ -184,6 +185,16 @@ export function CameraWidget({
     fullscreenFmp4Sources[Math.min(fullscreenFmp4SourceIndex, Math.max(0, fullscreenFmp4Sources.length - 1))] || null;
   const activeRefreshMs = Math.max(100, config.refreshMs || 2000);
   const fullscreenMjpegHasFallback = fullscreenMjpegSourceIndex + 1 < fullscreenMjpegSources.length;
+  const previewSupportsAudio = previewFeed?.kind === "flv" || previewFeed?.kind === "fmp4";
+  const fullscreenSupportsAudio = fullscreenFeed?.kind === "flv" || fullscreenFeed?.kind === "fmp4";
+  const showWebFullscreenAudioToggle = Platform.OS === "web" && showInPlaceFullscreen && previewSupportsAudio;
+  const showNativeFullscreenAudioToggle = showNativeFullscreenModal && fullscreenSupportsAudio;
+  const previewMuted = !(audioEnabled && showInPlaceFullscreen && previewSupportsAudio);
+  const fullscreenMuted = !(audioEnabled && showNativeFullscreenModal && fullscreenSupportsAudio);
+
+  useEffect(() => {
+    setAudioEnabled(config.audioEnabled === true);
+  }, [config.audioEnabled, config.id]);
 
   const clearPreviewMjpegReconnectTimer = useCallback(() => {
     if (previewMjpegReconnectTimerRef.current) {
@@ -269,6 +280,11 @@ export function CameraWidget({
       }
     }
   };
+
+  const toggleAudio = useCallback(() => {
+    playConfiguredUiSound(config.interactionSounds?.press, "toggle", `${config.id}:audio`);
+    setAudioEnabled((current) => !current);
+  }, [config.id, config.interactionSounds?.press]);
 
   const fullscreenPanResponder = useMemo(
     () =>
@@ -940,6 +956,7 @@ export function CameraWidget({
                     <WebFlvPlayer
                       key={`preview-flv-${previewFeedKey}:${previewFlvSession}`}
                       fullScreen={showInPlaceFullscreen}
+                      muted={previewMuted}
                       zoomScale={webFullscreenZoom}
                       offsetX={webFullscreenOffset.x}
                       offsetY={webFullscreenOffset.y}
@@ -962,6 +979,7 @@ export function CameraWidget({
                     <WebFmp4Player
                       key={`preview-fmp4-${previewFeedKey}:${currentPreviewFmp4Src || "none"}`}
                       fullScreen={showInPlaceFullscreen}
+                      muted={previewMuted}
                       zoomScale={webFullscreenZoom}
                       offsetX={webFullscreenOffset.x}
                       offsetY={webFullscreenOffset.y}
@@ -997,6 +1015,18 @@ export function CameraWidget({
         {showInPlaceFullscreen ? (
           <View pointerEvents="box-none" style={styles.inPlaceFullscreenHud}>
             <View style={styles.fullscreenActions}>
+              {showWebFullscreenAudioToggle ? (
+                <Pressable
+                  onPress={toggleAudio}
+                  style={[styles.fullscreenActionButton, styles.fullscreenActionSpacing, audioEnabled ? styles.fullscreenAudioActive : null]}
+                >
+                  <MaterialCommunityIcons
+                    color={audioEnabled ? pinnedColor : palette.text}
+                    name={audioEnabled ? "volume-high" : "volume-mute"}
+                    size={18}
+                  />
+                </Pressable>
+              ) : null}
               <Pressable
                 onPress={() => setPinned((current) => !current)}
                 style={[styles.fullscreenActionButton, styles.fullscreenActionSpacing, pinned ? styles.fullscreenPinActive : null]}
@@ -1035,6 +1065,18 @@ export function CameraWidget({
         >
         <View style={styles.fullscreenBackdrop}>
           <View style={styles.fullscreenActions}>
+            {showNativeFullscreenAudioToggle ? (
+              <Pressable
+                onPress={toggleAudio}
+                style={[styles.fullscreenActionButton, styles.fullscreenActionSpacing, audioEnabled ? styles.fullscreenAudioActive : null]}
+              >
+                <MaterialCommunityIcons
+                  color={audioEnabled ? pinnedColor : palette.text}
+                  name={audioEnabled ? "volume-high" : "volume-mute"}
+                  size={18}
+                />
+              </Pressable>
+            ) : null}
             <Pressable
               onPress={() => setPinned((current) => !current)}
               style={[styles.fullscreenActionButton, styles.fullscreenActionSpacing, pinned ? styles.fullscreenPinActive : null]}
@@ -1168,6 +1210,7 @@ export function CameraWidget({
                     <WebFlvPlayer
                       key={`fullscreen-flv-${fullscreenFeedKey}:${fullscreenSession}`}
                       fullScreen
+                      muted={fullscreenMuted}
                       onAspectRatioDetected={reportAspectRatioValue}
                       onSourceIndexChange={setFullscreenFlvSourceIndex}
                       preferredSourceIndex={fullscreenFlvSourceIndex}
@@ -1187,6 +1230,7 @@ export function CameraWidget({
                     <WebFmp4Player
                       key={`fullscreen-fmp4-${fullscreenFeedKey}:${currentFullscreenFmp4Src || "none"}`}
                       fullScreen
+                      muted={fullscreenMuted}
                       onAspectRatioDetected={reportAspectRatioValue}
                       onSourceIndexChange={setFullscreenFmp4SourceIndex}
                       preferredSourceIndex={fullscreenFmp4SourceIndex}
@@ -1441,6 +1485,7 @@ function WebFlvPlayer({
   sources,
   title,
   fullScreen = false,
+  muted = true,
   zoomScale = 1,
   offsetX = 0,
   offsetY = 0,
@@ -1451,6 +1496,7 @@ function WebFlvPlayer({
   sources: string[];
   title: string;
   fullScreen?: boolean;
+  muted?: boolean;
   zoomScale?: number;
   offsetX?: number;
   offsetY?: number;
@@ -1493,6 +1539,23 @@ function WebFlvPlayer({
     setErrorMessage(null);
     setHasVideoFrame(false);
   }, [currentSource]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") {
+      return;
+    }
+    const videoElement = videoRef.current as HTMLVideoElement | null;
+    if (!videoElement) {
+      return;
+    }
+    videoElement.defaultMuted = muted;
+    videoElement.muted = muted;
+    if (!muted) {
+      void videoElement.play().catch(() => {
+        // Browsers may still block autoplay with sound until interaction.
+      });
+    }
+  }, [muted]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") {
@@ -1693,7 +1756,7 @@ function WebFlvPlayer({
       {createElement("video", {
         autoPlay: true,
         controls: false,
-        muted: true,
+        muted,
         playsInline: true,
         ref: setVideoRef,
         style: fullScreen ? getFullscreenWebFlvStyle(zoomScale, offsetX, offsetY) : webFlvStyle,
@@ -1713,6 +1776,7 @@ function WebFmp4Player({
   sources,
   title,
   fullScreen = false,
+  muted = true,
   zoomScale = 1,
   offsetX = 0,
   offsetY = 0,
@@ -1723,6 +1787,7 @@ function WebFmp4Player({
   sources: string[];
   title: string;
   fullScreen?: boolean;
+  muted?: boolean;
   zoomScale?: number;
   offsetX?: number;
   offsetY?: number;
@@ -1762,6 +1827,23 @@ function WebFmp4Player({
     setErrorMessage(null);
     ratioReportedRef.current = false;
   }, [currentSource]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") {
+      return;
+    }
+    const videoElement = videoRef.current as HTMLVideoElement | null;
+    if (!videoElement) {
+      return;
+    }
+    videoElement.defaultMuted = muted;
+    videoElement.muted = muted;
+    if (!muted) {
+      void videoElement.play().catch(() => {
+        // Browsers may still block autoplay with sound until interaction.
+      });
+    }
+  }, [muted]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || !currentSource) {
@@ -1847,7 +1929,7 @@ function WebFmp4Player({
       {createElement("video", {
         autoPlay: true,
         controls: false,
-        muted: true,
+        muted,
         playsInline: true,
         ref: setVideoRef,
         src: currentSource || undefined,
@@ -2063,6 +2145,9 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   fullscreenPinActive: {
+    backgroundColor: "rgba(243, 200, 74, 0.18)",
+  },
+  fullscreenAudioActive: {
     backgroundColor: "rgba(243, 200, 74, 0.18)",
   },
   fullscreenTitle: {

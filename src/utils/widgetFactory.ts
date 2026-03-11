@@ -72,6 +72,7 @@ export function buildWidgetTemplate(
       flvUrl: "",
       fmp4Url: "",
       refreshMs: 2000,
+      audioEnabled: false,
       position: {
         ...basePosition,
         w: Math.min(6, grid.columns),
