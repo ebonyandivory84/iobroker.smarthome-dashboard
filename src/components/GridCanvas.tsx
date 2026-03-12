@@ -593,7 +593,10 @@ function getAutoLayoutSpec(
           return { w: 1, h: Math.max(0.5, roundCameraGridUnit(fallbackHeight)) };
         }
         const ratio = normalizeAspectRatio(widget.snapshotAspectRatio);
-        return { w: 1, h: Math.max(0.5, roundCameraGridUnit(1 / ratio)) };
+        // Keep camera height close to the former "one primary section" footprint
+        // so previews remain clearly visible in the iPhone single-column stack.
+        const referenceSectionWidthUnits = 3;
+        return { w: 1, h: Math.max(0.5, roundCameraGridUnit(referenceSectionWidthUnits / ratio)) };
       }
       case "solar":
         if (widget.manualHeightOverride) {
