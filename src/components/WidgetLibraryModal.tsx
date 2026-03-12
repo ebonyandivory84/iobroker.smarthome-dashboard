@@ -64,6 +64,12 @@ const OPTIONS: Array<{
     description: "Button, der eine Website im Dashboard-Overlay oeffnet.",
     icon: "link-variant",
   },
+  {
+    type: "log",
+    title: "Log",
+    description: "Zeigt Live-Logs aus ioBroker direkt im Dashboard an.",
+    icon: "text-box-search-outline",
+  },
 ];
 
 export function WidgetLibraryModal({

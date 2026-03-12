@@ -14,6 +14,7 @@ import { CameraWidget } from "./widgets/CameraWidget";
 import { EnergyWidget } from "./widgets/EnergyWidget";
 import { GrafanaWidget } from "./widgets/GrafanaWidget";
 import { LinkWidget } from "./widgets/LinkWidget";
+import { LogWidget } from "./widgets/LogWidget";
 import { NumpadWidget } from "./widgets/NumpadWidget";
 import { SolarWidget } from "./widgets/SolarWidget";
 import { resolveStateNextValue, StateWidget } from "./widgets/StateWidget";
@@ -619,6 +620,8 @@ function getAutoLayoutSpec(
         return { w: 1, h: roundGridUnit(3) };
       case "link":
         return { w: 1, h: 1 };
+      case "log":
+        return { w: 1, h: roundGridUnit(2.4) };
     }
 
     return { w: 1, h: Math.max(1.5, roundGridUnit(fallbackHeight)) };
@@ -660,6 +663,8 @@ function getAutoLayoutSpec(
       return { w: mainColumnWidth, h: roundGridUnit(3.2) };
     case "link":
       return { w: 1, h: 1 };
+    case "log":
+      return { w: mainColumnWidth, h: roundGridUnit(2.4) };
   }
 
   return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
@@ -1196,6 +1201,10 @@ function renderWidget(
     return <LinkWidget config={effectiveWidget} />;
   }
 
+  if (effectiveWidget.type === "log") {
+    return <LogWidget client={client} config={effectiveWidget} />;
+  }
+
   return null;
 }
 
@@ -1443,6 +1452,13 @@ function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThe
       background: "linear-gradient(135deg, rgba(16, 34, 66, 0.94), rgba(10, 20, 40, 0.96))",
       border: "1px solid rgba(126, 168, 255, 0.24)",
       boxShadow: "0 14px 24px rgba(6, 16, 32, 0.32)",
+    };
+  }
+  if (type === "log") {
+    return {
+      background: "linear-gradient(140deg, rgba(11, 22, 44, 0.95), rgba(6, 12, 25, 0.97))",
+      border: "1px solid rgba(130, 170, 255, 0.22)",
+      boxShadow: "0 14px 24px rgba(4, 10, 22, 0.34)",
     };
   }
   return {};

@@ -1,4 +1,4 @@
-export type WidgetType = "state" | "camera" | "energy" | "solar" | "grafana" | "weather" | "numpad" | "link";
+export type WidgetType = "state" | "camera" | "energy" | "solar" | "grafana" | "weather" | "numpad" | "link" | "log";
 
 export type IconPair = {
   active: string;
@@ -132,6 +132,17 @@ export type LinkWidgetConfig = WidgetBase & {
   iconImageBorderless?: boolean;
 };
 
+export type LogWidgetSeverity = "silly" | "debug" | "info" | "warn" | "error";
+
+export type LogWidgetConfig = WidgetBase & {
+  type: "log";
+  refreshMs?: number;
+  maxEntries?: number;
+  minSeverity?: LogWidgetSeverity;
+  sourceFilter?: string;
+  textFilter?: string;
+};
+
 export type SolarNodeLayout = {
   x: number;
   y: number;
@@ -212,7 +223,8 @@ export type WidgetConfig =
   | GrafanaWidgetConfig
   | WeatherWidgetConfig
   | NumpadWidgetConfig
-  | LinkWidgetConfig;
+  | LinkWidgetConfig
+  | LogWidgetConfig;
 
 export type BackgroundMode = "gradient" | "mesh" | "solid";
 
@@ -307,4 +319,12 @@ export type WidgetImageEntry = {
 export type WidgetSoundEntry = {
   name: string;
   url: string;
+};
+
+export type IoBrokerLogEntry = {
+  id: number;
+  from: string;
+  severity: LogWidgetSeverity;
+  ts: number;
+  message: string;
 };

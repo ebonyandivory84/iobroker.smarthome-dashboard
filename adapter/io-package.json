@@ -28,6 +28,7 @@
     "compact": true,
     "connectionType": "local",
     "dataSource": "poll",
+    "logTransporter": true,
     "adminUI": {
       "config": "json"
     },

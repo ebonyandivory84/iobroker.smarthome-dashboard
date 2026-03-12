@@ -20,6 +20,8 @@ export function buildWidgetTemplate(
           ? 8
           : type === "grafana"
             ? 6
+            : type === "log"
+              ? 6
               : type === "weather"
                 ? 4
                 : type === "numpad"
@@ -34,6 +36,8 @@ export function buildWidgetTemplate(
             ? 3
             : type === "grafana"
               ? 4
+              : type === "log"
+                ? 3
                 : type === "weather"
                   ? 3
                 : type === "numpad"
@@ -149,6 +153,23 @@ export function buildWidgetTemplate(
       url: "",
       position: {
         ...basePosition,
+      },
+    };
+  }
+
+  if (type === "log") {
+    return {
+      id: `log-${suffix}`,
+      type: "log",
+      title: `Log ${suffix}`,
+      refreshMs: 2000,
+      maxEntries: 80,
+      minSeverity: "info",
+      sourceFilter: "",
+      textFilter: "",
+      position: {
+        ...basePosition,
+        w: Math.min(6, grid.columns),
       },
     };
   }

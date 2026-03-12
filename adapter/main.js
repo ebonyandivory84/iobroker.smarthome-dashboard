@@ -22,14 +22,32 @@ let runningAdapter = null;
 const OBJECT_CACHE_TTL_MS = 5 * 60 * 1000;
 const CONFIG_STATE_ID = "dashboardConfig";
 const SAVED_DASHBOARDS_STATE_ID = "savedDashboards";
+const LOG_BUFFER_LIMIT = 2000;
 let webShellCache = null;
+let logEntriesBuffer = [];
+let logListenerRegistered = false;
+
+const LOG_LEVEL_ORDER = {
+  silly: 0,
+  debug: 1,
+  info: 2,
+  warn: 3,
+  error: 4,
+};
 
 function startAdapter(options) {
   const adapter = new utils.Adapter({
     ...options,
+    logTransporter: true,
     name: "smarthome-dashboard",
     ready: () => main(adapter),
-    unload: (callback) => callback(),
+    unload: (callback) => {
+      Promise.resolve(stopLogCapture(adapter))
+        .catch((error) => {
+          adapter.log.warn(`Log capture cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
+        })
+        .finally(() => callback());
+    },
   });
 
   return adapter;
@@ -73,6 +91,7 @@ async function main(adapter) {
   refreshObjectEntries(adapter).catch((error) => {
     adapter.log.warn(`Object cache warmup failed: ${error instanceof Error ? error.message : String(error)}`);
   });
+  startLogCapture(adapter);
 
   app.get("/smarthome-dashboard/api/config", async (_req, res) => {
     try {
@@ -228,6 +247,25 @@ async function main(adapter) {
     const limitedEntries = filteredEntries.slice(0, 60000);
 
     res.json(limitedEntries);
+  });
+
+  app.get("/smarthome-dashboard/api/logs", async (req, res) => {
+    try {
+      const limit = clampInt(req.query?.limit, 100, 1, 500);
+      const minSeverity = normalizeLogSeverity(req.query?.minSeverity);
+      const source = normalizeFilter(req.query?.source);
+      const contains = normalizeFilter(req.query?.contains);
+      const logs = readBufferedLogs({
+        limit,
+        minSeverity,
+        source,
+        contains,
+      });
+
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Log read failed" });
+    }
   });
 
   app.get("/smarthome-dashboard/api/images", async (_req, res) => {
@@ -745,6 +783,130 @@ function looksLikeFlvUrl(rawUrl) {
     return false;
   }
   return false;
+}
+
+function startLogCapture(adapter) {
+  if (!logListenerRegistered) {
+    adapter.on("log", handleAdapterLogMessage);
+    logListenerRegistered = true;
+  }
+
+  if (typeof adapter.requireLog === "function") {
+    Promise.resolve(adapter.requireLog(true)).catch((error) => {
+      adapter.log.warn(`Log subscription activation failed: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  } else {
+    adapter.log.warn("Log transporter is not available; Log-Widget may stay empty.");
+  }
+
+  appendLogEntry({
+    _id: Date.now(),
+    from: `system.adapter.${adapter.namespace}`,
+    severity: "info",
+    ts: Date.now(),
+    message: "SmartHome Dashboard log capture active",
+  });
+}
+
+function stopLogCapture(adapter) {
+  if (logListenerRegistered) {
+    adapter.removeListener("log", handleAdapterLogMessage);
+    logListenerRegistered = false;
+  }
+
+  if (typeof adapter.requireLog === "function") {
+    return adapter.requireLog(false);
+  }
+
+  return undefined;
+}
+
+function handleAdapterLogMessage(message) {
+  appendLogEntry(message);
+}
+
+function appendLogEntry(message) {
+  if (!message || typeof message !== "object") {
+    return;
+  }
+
+  const entry = {
+    id: Number.isFinite(message._id) ? message._id : Date.now(),
+    from: typeof message.from === "string" ? message.from : "",
+    severity: normalizeLogSeverity(message.severity),
+    ts: Number.isFinite(message.ts) ? Number(message.ts) : Date.now(),
+    message: normalizeLogText(message.message),
+  };
+
+  logEntriesBuffer.push(entry);
+  if (logEntriesBuffer.length > LOG_BUFFER_LIMIT) {
+    logEntriesBuffer = logEntriesBuffer.slice(-LOG_BUFFER_LIMIT);
+  }
+}
+
+function normalizeLogText(value) {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function normalizeLogSeverity(raw) {
+  const value = String(raw || "")
+    .trim()
+    .toLowerCase();
+  if (value in LOG_LEVEL_ORDER) {
+    return value;
+  }
+  return "info";
+}
+
+function severityRank(severity) {
+  const normalized = normalizeLogSeverity(severity);
+  return LOG_LEVEL_ORDER[normalized] ?? LOG_LEVEL_ORDER.info;
+}
+
+function normalizeFilter(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function clampInt(raw, fallback, min, max) {
+  const parsed = Number.parseInt(String(raw || ""), 10);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, parsed));
+}
+
+function readBufferedLogs({ limit, minSeverity, source, contains }) {
+  const minSeverityRank = severityRank(minSeverity);
+  const sourceFilter = String(source || "").toLowerCase();
+  const textFilter = String(contains || "").toLowerCase();
+
+  const filtered = logEntriesBuffer.filter((entry) => {
+    if (severityRank(entry.severity) < minSeverityRank) {
+      return false;
+    }
+    if (sourceFilter && !String(entry.from || "").toLowerCase().includes(sourceFilter)) {
+      return false;
+    }
+    if (textFilter && !String(entry.message || "").toLowerCase().includes(textFilter)) {
+      return false;
+    }
+    return true;
+  });
+
+  return filtered.slice(-limit).reverse();
 }
 
 async function readSavedDashboards(adapter) {

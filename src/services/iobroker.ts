@@ -1,4 +1,11 @@
-import { DashboardSettings, IoBrokerObjectEntry, StateSnapshot, WidgetImageEntry, WidgetSoundEntry } from "../types/dashboard";
+import {
+  DashboardSettings,
+  IoBrokerLogEntry,
+  IoBrokerObjectEntry,
+  StateSnapshot,
+  WidgetImageEntry,
+  WidgetSoundEntry,
+} from "../types/dashboard";
 
 type ObjectCacheEntry = {
   items: IoBrokerObjectEntry[];
@@ -169,6 +176,40 @@ export class IoBrokerClient {
 
   async uploadWidgetSound(name: string, dataUrl: string): Promise<WidgetSoundEntry> {
     return this.uploadWidgetFile<WidgetSoundEntry>("/sounds/upload", name, dataUrl);
+  }
+
+  async readLogs(options?: {
+    limit?: number;
+    minSeverity?: string;
+    source?: string;
+    contains?: string;
+  }): Promise<IoBrokerLogEntry[]> {
+    const limit = Math.max(1, Math.min(500, Math.round(options?.limit || 100)));
+    const params = new URLSearchParams({
+      limit: String(limit),
+    });
+    if (options?.minSeverity) {
+      params.set("minSeverity", options.minSeverity);
+    }
+    if (options?.source) {
+      params.set("source", options.source);
+    }
+    if (options?.contains) {
+      params.set("contains", options.contains);
+    }
+
+    const response = await fetch(this.endpoint(`/logs?${params.toString()}`), {
+      method: "GET",
+      headers: {
+        ...buildAuthHeader(this.settings),
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Log read failed (${response.status})`);
+    }
+
+    return (await response.json()) as IoBrokerLogEntry[];
   }
 
   private async uploadWidgetFile<T>(path: string, name: string, dataUrl: string): Promise<T> {

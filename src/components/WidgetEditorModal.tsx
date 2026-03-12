@@ -206,6 +206,23 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       return;
     }
 
+    if (widget.type === "log") {
+      setSoundDraft({});
+      setWeatherSuggestions([]);
+      setWeatherSearchBusy(false);
+      setDraft({
+        title: widget.title,
+        showTitle: widget.showTitle === false ? "false" : "true",
+        refreshMs: String(widget.refreshMs || 2000),
+        maxEntries: String(widget.maxEntries || 80),
+        minSeverity: widget.minSeverity || "info",
+        sourceFilter: widget.sourceFilter || "",
+        textFilter: widget.textFilter || "",
+        ...appearanceDraft,
+      });
+      return;
+    }
+
     if (widget.type === "weather") {
       setSoundDraft({});
       setDraft({
@@ -468,6 +485,17 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           soundDraft,
           config.uiSounds?.widgetTypeDefaults?.[widget.type]
         ),
+        appearance,
+      });
+    } else if (widget.type === "log") {
+      onSave(widget.id, {
+        title: draft.title,
+        showTitle: draft.showTitle !== "false",
+        refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 500),
+        maxEntries: clampInt(draft.maxEntries, widget.maxEntries || 80, 5),
+        minSeverity: normalizeLogSeverity(draft.minSeverity),
+        sourceFilter: draft.sourceFilter?.trim() || undefined,
+        textFilter: draft.textFilter?.trim() || undefined,
         appearance,
       });
     } else if (widget.type === "weather") {
@@ -1270,6 +1298,55 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 </Field>
               </>
             ) : null}
+            {widget.type === "log" ? (
+              <>
+                <View style={styles.splitRow}>
+                  <Field label="Refresh (ms)">
+                    <TextInput
+                      keyboardType="numeric"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, refreshMs: value }))}
+                      style={styles.input}
+                      value={draft.refreshMs || "2000"}
+                    />
+                  </Field>
+                  <Field label="Zeilen">
+                    <TextInput
+                      keyboardType="numeric"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, maxEntries: value }))}
+                      style={styles.input}
+                      value={draft.maxEntries || "80"}
+                    />
+                  </Field>
+                </View>
+                <Field label="Mindest-Level">
+                  <ChoiceRow
+                    options={["silly", "debug", "info", "warn", "error"]}
+                    value={draft.minSeverity || "info"}
+                    onSelect={(value) => setDraft((current) => ({ ...current, minSeverity: value }))}
+                  />
+                </Field>
+                <Field label="Quell-Filter (optional)">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) => setDraft((current) => ({ ...current, sourceFilter: value }))}
+                    placeholder="z. B. system.adapter.javascript.0"
+                    placeholderTextColor={palette.textMuted}
+                    style={styles.input}
+                    value={draft.sourceFilter || ""}
+                  />
+                </Field>
+                <Field label="Text-Filter (optional)">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) => setDraft((current) => ({ ...current, textFilter: value }))}
+                    placeholder="z. B. timeout, error, reconnect"
+                    placeholderTextColor={palette.textMuted}
+                    style={styles.input}
+                    value={draft.textFilter || ""}
+                  />
+                </Field>
+              </>
+            ) : null}
             {widget.type === "solar" ? (
               <>
                 <Field label="State Prefix">
@@ -1968,6 +2045,17 @@ function getWidgetAppearanceDefaults(
     };
   }
 
+  if (widget.type === "log") {
+    return {
+      widgetColor: "rgba(11, 22, 44, 0.95)",
+      widgetColor2: "rgba(6, 12, 25, 0.97)",
+      textColor: palette.text,
+      mutedTextColor: palette.textMuted,
+      cardColor: "rgba(5, 9, 17, 0.7)",
+      cardColor2: "rgba(16, 30, 56, 0.8)",
+    };
+  }
+
   return {
     widgetColor: theme.widgetTones.solarStart,
     widgetColor2: theme.widgetTones.solarEnd,
@@ -2118,6 +2206,13 @@ function normalizeStateFormat(raw: string | undefined) {
     return raw;
   }
   return "boolean";
+}
+
+function normalizeLogSeverity(raw: string | undefined) {
+  if (raw === "silly" || raw === "debug" || raw === "warn" || raw === "error") {
+    return raw;
+  }
+  return "info";
 }
 
 function normalizeCameraSourceMode(raw: string | undefined) {
