@@ -35,6 +35,7 @@ type GridCanvasProps = {
   onCameraFullscreenSwipeClose?: () => void;
   onCameraFullscreenVisibilityChange?: (widgetId: string, open: boolean) => void;
   onDragAcrossPageEdge?: (direction: "left" | "right", widgetId: string, position: WidgetConfig["position"]) => void;
+  onWidgetScrollFocusChange?: (widgetId: string, active: boolean) => void;
 };
 
 export function GridCanvas({
@@ -51,6 +52,7 @@ export function GridCanvas({
   onCameraFullscreenSwipeClose,
   onCameraFullscreenVisibilityChange,
   onDragAcrossPageEdge,
+  onWidgetScrollFocusChange,
 }: GridCanvasProps) {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(0);
@@ -157,6 +159,7 @@ export function GridCanvas({
         onUpdateWidget={onUpdateWidget}
         onWriteState={onWriteState}
         onDragAcrossPageEdge={onDragAcrossPageEdge}
+        onWidgetScrollFocusChange={onWidgetScrollFocusChange}
         stateWrites={stateWrites}
         states={states}
       />
@@ -216,7 +219,8 @@ export function GridCanvas({
                   stateWrites,
                   displayConfig.uiSounds?.widgetTypeDefaults,
                   onCameraFullscreenSwipeClose,
-                  onCameraFullscreenVisibilityChange
+                  onCameraFullscreenVisibilityChange,
+                  onWidgetScrollFocusChange
                 )}
               </WidgetFrame>
             </View>
@@ -819,6 +823,7 @@ function WebGridCanvas({
   onRemoveWidget,
   onWriteState,
   onDragAcrossPageEdge,
+  onWidgetScrollFocusChange,
   stateWrites,
 }: {
   config: DashboardSettings;
@@ -836,6 +841,7 @@ function WebGridCanvas({
   onRemoveWidget: (widgetId: string) => void;
   onWriteState: (stateId: string, value: unknown) => void | Promise<void>;
   onDragAcrossPageEdge?: (direction: "left" | "right", widgetId: string, position: WidgetConfig["position"]) => void;
+  onWidgetScrollFocusChange?: (widgetId: string, active: boolean) => void;
   stateWrites?: Record<string, StateWriteFeedback>;
 }) {
   const stepX = cellWidth + config.grid.gap;
@@ -857,6 +863,7 @@ function WebGridCanvas({
           onUpdateWidget={onUpdateWidget}
           onWriteState={onWriteState}
           onDragAcrossPageEdge={onDragAcrossPageEdge}
+          onWidgetScrollFocusChange={onWidgetScrollFocusChange}
           stateWrites={stateWrites}
           allowManualLayout={true}
           allowResize={widget.type === "camera" || widget.type === "solar" || widget.type === "log" || widget.type === "script"}
@@ -888,6 +895,7 @@ function WebWidgetShell({
   onRemoveWidget,
   onWriteState,
   onDragAcrossPageEdge,
+  onWidgetScrollFocusChange,
   stateWrites,
   allowManualLayout = true,
   allowResize = true,
@@ -909,6 +917,7 @@ function WebWidgetShell({
   onRemoveWidget: (widgetId: string) => void;
   onWriteState: (stateId: string, value: unknown) => void | Promise<void>;
   onDragAcrossPageEdge?: (direction: "left" | "right", widgetId: string, position: WidgetConfig["position"]) => void;
+  onWidgetScrollFocusChange?: (widgetId: string, active: boolean) => void;
   stateWrites?: Record<string, StateWriteFeedback>;
   allowManualLayout?: boolean;
   allowResize?: boolean;
@@ -1128,7 +1137,10 @@ function WebWidgetShell({
           onWriteState,
           config.theme,
           stateWrites,
-          config.uiSounds?.widgetTypeDefaults
+          config.uiSounds?.widgetTypeDefaults,
+          undefined,
+          undefined,
+          onWidgetScrollFocusChange
         )}
       </View>
       {isLayoutMode && allowManualLayout && allowResize ? (
@@ -1150,7 +1162,8 @@ function renderWidget(
   stateWrites?: Record<string, StateWriteFeedback>,
   widgetTypeDefaults?: Partial<Record<WidgetType, WidgetInteractionSounds>>,
   onCameraFullscreenSwipeClose?: () => void,
-  onCameraFullscreenVisibilityChange?: (widgetId: string, open: boolean) => void
+  onCameraFullscreenVisibilityChange?: (widgetId: string, open: boolean) => void,
+  onWidgetScrollFocusChange?: (widgetId: string, active: boolean) => void
 ) {
   const effectiveWidget = mergeWidgetInteractionSounds(widget, widgetTypeDefaults?.[widget.type]);
 
@@ -1222,11 +1235,23 @@ function renderWidget(
   }
 
   if (effectiveWidget.type === "log") {
-    return <LogWidget client={client} config={effectiveWidget} />;
+    return (
+      <LogWidget
+        client={client}
+        config={effectiveWidget}
+        onScrollModeChange={(active) => onWidgetScrollFocusChange?.(effectiveWidget.id, active)}
+      />
+    );
   }
 
   if (effectiveWidget.type === "script") {
-    return <ScriptWidget client={client} config={effectiveWidget} />;
+    return (
+      <ScriptWidget
+        client={client}
+        config={effectiveWidget}
+        onScrollModeChange={(active) => onWidgetScrollFocusChange?.(effectiveWidget.id, active)}
+      />
+    );
   }
 
   return null;

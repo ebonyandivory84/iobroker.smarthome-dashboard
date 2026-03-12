@@ -64,6 +64,7 @@ export function DashboardScreen() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
+  const [scrollFocusWidgetId, setScrollFocusWidgetId] = useState<string | null>(null);
   const [layoutMode, setLayoutMode] = useState(false);
   const [visiblePageId, setVisiblePageId] = useState(activePageId);
   const lastContentScrollAt = useRef(0);
@@ -151,6 +152,22 @@ export function DashboardScreen() {
     setVisiblePageId(activePageId);
     committedPageIdRef.current = activePageId;
   }, [activePageId]);
+
+  useEffect(() => {
+    if (!scrollFocusWidgetId) {
+      return;
+    }
+    const activePage = dashboardPages.find((page) => page.id === activePageId);
+    if (!activePage?.widgets.some((widget) => widget.id === scrollFocusWidgetId)) {
+      setScrollFocusWidgetId(null);
+    }
+  }, [activePageId, dashboardPages, scrollFocusWidgetId]);
+
+  useEffect(() => {
+    if (layoutMode && scrollFocusWidgetId) {
+      setScrollFocusWidgetId(null);
+    }
+  }, [layoutMode, scrollFocusWidgetId]);
 
   useEffect(() => {
     configureUiSounds(config.uiSounds);
@@ -641,6 +658,7 @@ export function DashboardScreen() {
               {shouldRenderContent ? (
                 <ScrollView
                   contentContainerStyle={styles.scrollContent}
+                  scrollEnabled={!scrollFocusWidgetId}
                   style={styles.pageScroll}
                   onScroll={handlePageContentScroll(pageConfig.activePageId)}
                   onMomentumScrollEnd={handleContentScrollEnd}
@@ -689,6 +707,14 @@ export function DashboardScreen() {
                     onDragAcrossPageEdge={(direction, widgetId, position) =>
                       handleDragAcrossPageEdge(pageConfig.activePageId, direction, widgetId, position)
                     }
+                    onWidgetScrollFocusChange={(widgetId, active) => {
+                      setScrollFocusWidgetId((current) => {
+                        if (active) {
+                          return widgetId;
+                        }
+                        return current === widgetId ? null : current;
+                      });
+                    }}
                     stateWrites={stateWrites}
                     states={states}
                   />

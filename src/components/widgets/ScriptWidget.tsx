@@ -9,6 +9,7 @@ import { playConfiguredUiSound } from "../../utils/uiSounds";
 type ScriptWidgetProps = {
   config: ScriptWidgetConfig;
   client: IoBrokerClient;
+  onScrollModeChange?: (active: boolean) => void;
 };
 
 type ExplorerEntry = IoBrokerScriptEntry & {
@@ -22,7 +23,7 @@ type ExplorerFolder = {
   count: number;
 };
 
-export function ScriptWidget({ config, client }: ScriptWidgetProps) {
+export function ScriptWidget({ config, client, onScrollModeChange }: ScriptWidgetProps) {
   const [entries, setEntries] = useState<IoBrokerScriptEntry[]>([]);
   const [pending, setPending] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +62,16 @@ export function ScriptWidget({ config, client }: ScriptWidgetProps) {
       document.removeEventListener("pointerdown", handlePointerDown, true);
     };
   }, [isScrollActive]);
+
+  useEffect(() => {
+    onScrollModeChange?.(isScrollActive);
+  }, [isScrollActive, onScrollModeChange]);
+
+  useEffect(() => {
+    return () => {
+      onScrollModeChange?.(false);
+    };
+  }, [onScrollModeChange]);
 
   useEffect(() => {
     let active = true;

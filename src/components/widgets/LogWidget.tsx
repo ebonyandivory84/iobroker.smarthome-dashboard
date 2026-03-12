@@ -9,6 +9,7 @@ import { playConfiguredUiSound } from "../../utils/uiSounds";
 type LogWidgetProps = {
   config: LogWidgetConfig;
   client: IoBrokerClient;
+  onScrollModeChange?: (active: boolean) => void;
 };
 
 const SEVERITY_ORDER: Record<NonNullable<LogWidgetConfig["minSeverity"]>, number> = {
@@ -24,7 +25,7 @@ const MONO_FONT = Platform.select({
   default: "monospace",
 });
 
-export function LogWidget({ config, client }: LogWidgetProps) {
+export function LogWidget({ config, client, onScrollModeChange }: LogWidgetProps) {
   const [entries, setEntries] = useState<IoBrokerLogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [quickSeverity, setQuickSeverity] = useState<"base" | "warn" | "error">("base");
@@ -65,6 +66,16 @@ export function LogWidget({ config, client }: LogWidgetProps) {
       document.removeEventListener("pointerdown", handlePointerDown, true);
     };
   }, [isScrollActive]);
+
+  useEffect(() => {
+    onScrollModeChange?.(isScrollActive);
+  }, [isScrollActive, onScrollModeChange]);
+
+  useEffect(() => {
+    return () => {
+      onScrollModeChange?.(false);
+    };
+  }, [onScrollModeChange]);
 
   useEffect(() => {
     let active = true;
