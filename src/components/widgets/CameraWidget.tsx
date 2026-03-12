@@ -1521,6 +1521,10 @@ function WebFlvPlayer({
   const [sourceIndex, setSourceIndex] = useState(Math.min(preferredSourceIndex, maxSourceIndex));
   const [restartNonce, setRestartNonce] = useState(0);
   const currentSource = normalizedSources[Math.min(sourceIndex, maxSourceIndex)] || "";
+  const currentSourceWithNonce = useMemo(
+    () => (currentSource ? withReconnectNonce(currentSource, restartNonce) : ""),
+    [currentSource, restartNonce]
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasVideoFrame, setHasVideoFrame] = useState(false);
 
@@ -1811,6 +1815,10 @@ function WebFmp4Player({
   const [sourceIndex, setSourceIndex] = useState(Math.min(preferredSourceIndex, maxSourceIndex));
   const [restartNonce, setRestartNonce] = useState(0);
   const currentSource = normalizedSources[Math.min(sourceIndex, maxSourceIndex)] || "";
+  const currentSourceWithNonce = useMemo(
+    () => (currentSource ? withReconnectNonce(currentSource, restartNonce) : ""),
+    [currentSource, restartNonce]
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasVideoFrame, setHasVideoFrame] = useState(false);
 
@@ -1851,7 +1859,7 @@ function WebFmp4Player({
   }, [muted]);
 
   useEffect(() => {
-    if (Platform.OS !== "web" || !currentSource) {
+    if (Platform.OS !== "web" || !currentSourceWithNonce) {
       return;
     }
 
@@ -1974,7 +1982,7 @@ function WebFmp4Player({
       videoElement.removeAttribute("src");
       videoElement.load();
     };
-  }, [currentSource, normalizedSources.length, restartNonce, sourceIndex]);
+  }, [currentSourceWithNonce, normalizedSources.length, sourceIndex]);
 
   return (
     <>
@@ -1985,7 +1993,7 @@ function WebFmp4Player({
         playsInline: true,
         preload: "auto",
         ref: setVideoRef,
-        src: currentSource || undefined,
+        src: currentSourceWithNonce || undefined,
         style: fullScreen ? getFullscreenWebFmp4Style(zoomScale, offsetX, offsetY) : webFmp4Style,
         title,
       })}
