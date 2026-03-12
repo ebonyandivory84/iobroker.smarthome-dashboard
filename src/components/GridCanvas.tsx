@@ -181,6 +181,7 @@ export function GridCanvas({
                 allowResize={
                   widget.type === "camera" ||
                   widget.type === "solar" ||
+                  widget.type === "log" ||
                   (Platform.OS === "web" && (widget.type === "weather" || widget.type === "grafana"))
                 }
                 onCommitPosition={(widgetId, position) =>
@@ -621,6 +622,9 @@ function getAutoLayoutSpec(
       case "link":
         return { w: 1, h: 1 };
       case "log":
+        if (widget.manualHeightOverride) {
+          return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
+        }
         return { w: 1, h: roundGridUnit(2.4) };
     }
 
@@ -664,6 +668,9 @@ function getAutoLayoutSpec(
     case "link":
       return { w: 1, h: 1 };
     case "log":
+      if (widget.manualHeightOverride) {
+        return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(fallbackHeight)) };
+      }
       return { w: mainColumnWidth, h: roundGridUnit(2.4) };
   }
 
@@ -840,7 +847,7 @@ function WebGridCanvas({
           onDragAcrossPageEdge={onDragAcrossPageEdge}
           stateWrites={stateWrites}
           allowManualLayout={true}
-          allowResize={widget.type === "camera" || widget.type === "solar"}
+          allowResize={widget.type === "camera" || widget.type === "solar" || widget.type === "log"}
           mainColumnExtraGap={mainColumnExtraGap}
           sourceColumns={sourceColumns}
           states={states}
@@ -925,7 +932,7 @@ function WebWidgetShell({
       const dx = snapUnits((event.clientX - active.startX) / stepX);
       const dy = snapUnits(
         (event.clientY - active.startY) / stepY,
-        active.mode === "resize" && (widget.type === "camera" || widget.type === "solar")
+        active.mode === "resize" && (widget.type === "camera" || widget.type === "solar" || widget.type === "log")
           ? CAMERA_GRID_SNAP
           : GRID_VERTICAL_SNAP
       );
@@ -939,7 +946,7 @@ function WebWidgetShell({
           ...active.startPosition,
           x: clamp(active.startPosition.x + dx, 0, config.grid.columns - active.startPosition.w),
           y: Math.max(0, active.startPosition.y + dy),
-        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : undefined);
+        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : widget.type === "log" ? { minHeight: 1, heightSnap: 0.1 } : undefined);
         setPreview(nextPreview);
 
         if (isLayoutMode && onDragAcrossPageEdge) {
@@ -963,12 +970,13 @@ function WebWidgetShell({
           }
         }
       } else {
-        if (widget.type === "camera" || widget.type === "solar") {
+        if (widget.type === "camera" || widget.type === "solar" || widget.type === "log") {
+          const minHeight = widget.type === "camera" ? 0.5 : widget.type === "solar" ? 2.5 : 1;
           setPreview(constrainToPrimarySections({
             ...active.startPosition,
             w: active.startPosition.w,
-            h: Math.max(widget.type === "camera" ? 0.5 : 2.5, active.startPosition.h + dy),
-          }, config.grid.columns, { minHeight: widget.type === "camera" ? 0.5 : 2.5, heightSnap: 0.1 }));
+            h: Math.max(minHeight, active.startPosition.h + dy),
+          }, config.grid.columns, { minHeight, heightSnap: 0.1 }));
         } else {
           setPreview(constrainToPrimarySections({
             ...active.startPosition,

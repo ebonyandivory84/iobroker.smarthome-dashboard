@@ -228,7 +228,8 @@ export function DashboardScreen() {
           ...(currentWidget.type === "camera" ||
           currentWidget.type === "solar" ||
           currentWidget.type === "weather" ||
-          currentWidget.type === "grafana"
+          currentWidget.type === "grafana" ||
+          currentWidget.type === "log"
             ? { manualHeightOverride: true }
             : null),
         };
@@ -243,7 +244,8 @@ export function DashboardScreen() {
         ...(currentWidget.type === "camera" ||
         currentWidget.type === "solar" ||
         currentWidget.type === "weather" ||
-        currentWidget.type === "grafana"
+        currentWidget.type === "grafana" ||
+        currentWidget.type === "log"
           ? { manualHeightOverride: true }
           : null),
       });
@@ -260,7 +262,8 @@ export function DashboardScreen() {
         ...(currentWidget.type === "camera" ||
         currentWidget.type === "solar" ||
         currentWidget.type === "weather" ||
-        currentWidget.type === "grafana"
+        currentWidget.type === "grafana" ||
+        currentWidget.type === "log"
           ? { manualHeightOverride: true }
           : null),
       };
@@ -275,7 +278,7 @@ export function DashboardScreen() {
           ? { minHeight: 0.5, heightSnap: 0.1 }
           : currentWidget.type === "solar"
             ? { minHeight: 2.5, heightSnap: 0.1 }
-            : currentWidget.type === "weather" || currentWidget.type === "grafana"
+            : currentWidget.type === "weather" || currentWidget.type === "grafana" || currentWidget.type === "log"
               ? { minHeight: 1, heightSnap: 0.1 }
             : undefined;
       updateWidget(widgetId, {
@@ -284,7 +287,8 @@ export function DashboardScreen() {
         ...(currentWidget.type === "camera" ||
         currentWidget.type === "solar" ||
         currentWidget.type === "weather" ||
-        currentWidget.type === "grafana"
+        currentWidget.type === "grafana" ||
+        currentWidget.type === "log"
           ? { manualHeightOverride: true }
           : null),
       });

@@ -136,6 +136,7 @@ export type LogWidgetSeverity = "silly" | "debug" | "info" | "warn" | "error";
 
 export type LogWidgetConfig = WidgetBase & {
   type: "log";
+  manualHeightOverride?: boolean;
   refreshMs?: number;
   maxEntries?: number;
   minSeverity?: LogWidgetSeverity;
