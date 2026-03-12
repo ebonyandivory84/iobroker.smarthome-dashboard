@@ -1298,6 +1298,7 @@ function mergeWidgetInteractionSounds(
       open: widget.interactionSounds?.open?.length ? widget.interactionSounds.open : defaults.open,
       close: widget.interactionSounds?.close?.length ? widget.interactionSounds.close : defaults.close,
       scroll: widget.interactionSounds?.scroll?.length ? widget.interactionSounds.scroll : defaults.scroll,
+      notify: widget.interactionSounds?.notify?.length ? widget.interactionSounds.notify : defaults.notify,
     },
   } as WidgetConfig;
 }

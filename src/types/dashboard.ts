@@ -53,6 +53,7 @@ export type WidgetInteractionSounds = {
   open?: string[];
   close?: string[];
   scroll?: string[];
+  notify?: string[];
 };
 
 export type StateWidgetConfig = WidgetBase & {

@@ -207,7 +207,20 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     }
 
     if (widget.type === "log") {
-      setSoundDraft({});
+      setSoundDraft({
+        press: resolveDraftSoundValue(
+          widget.interactionSounds?.press,
+          config.uiSounds?.widgetTypeDefaults?.log?.press
+        ),
+        scroll: resolveDraftSoundValue(
+          widget.interactionSounds?.scroll,
+          config.uiSounds?.widgetTypeDefaults?.log?.scroll
+        ),
+        notify: resolveDraftSoundValue(
+          widget.interactionSounds?.notify,
+          config.uiSounds?.widgetTypeDefaults?.log?.notify
+        ),
+      });
       setWeatherSuggestions([]);
       setWeatherSearchBusy(false);
       setDraft({
@@ -224,7 +237,16 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     }
 
     if (widget.type === "script") {
-      setSoundDraft({});
+      setSoundDraft({
+        press: resolveDraftSoundValue(
+          widget.interactionSounds?.press,
+          config.uiSounds?.widgetTypeDefaults?.script?.press
+        ),
+        scroll: resolveDraftSoundValue(
+          widget.interactionSounds?.scroll,
+          config.uiSounds?.widgetTypeDefaults?.script?.scroll
+        ),
+      });
       setWeatherSuggestions([]);
       setWeatherSearchBusy(false);
       setDraft({
@@ -512,6 +534,11 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         minSeverity: normalizeLogSeverity(draft.minSeverity),
         sourceFilter: draft.sourceFilter?.trim() || undefined,
         textFilter: draft.textFilter?.trim() || undefined,
+        interactionSounds: buildStoredInteractionSounds(
+          widget.type,
+          soundDraft,
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]
+        ),
         appearance,
       });
     } else if (widget.type === "script") {
@@ -522,6 +549,11 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         maxEntries: clampInt(draft.maxEntries, widget.maxEntries || 120, 1),
         instanceFilter: draft.instanceFilter?.trim() || undefined,
         textFilter: draft.textFilter?.trim() || undefined,
+        interactionSounds: buildStoredInteractionSounds(
+          widget.type,
+          soundDraft,
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]
+        ),
         appearance,
       });
     } else if (widget.type === "weather") {
@@ -587,7 +619,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       widget.type !== "camera" &&
       widget.type !== "grafana" &&
       widget.type !== "numpad" &&
-      widget.type !== "link"
+      widget.type !== "link" &&
+      widget.type !== "log" &&
+      widget.type !== "script"
     ) {
       return;
     }
@@ -598,6 +632,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       open: normalizeSoundSelection(soundDraft.open),
       close: normalizeSoundSelection(soundDraft.close),
       scroll: normalizeSoundSelection(soundDraft.scroll),
+      notify: normalizeSoundSelection(soundDraft.notify),
     };
 
     patchConfig({
@@ -1371,6 +1406,29 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={draft.textFilter || ""}
                   />
                 </Field>
+                <Field label="Sounds bei Interaktion">
+                  <Field label="Warn/Error Button">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, press: value }))}
+                      value={soundDraft.press}
+                    />
+                  </Field>
+                  <Field label="Scrollen im Widget">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, scroll: value }))}
+                      value={soundDraft.scroll}
+                    />
+                  </Field>
+                  <Field label="Neue Log-Meldung">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, notify: value }))}
+                      value={soundDraft.notify}
+                    />
+                  </Field>
+                  <EditorButtonPressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
+                    <Text style={styles.inlineActionLabel}>Als Default fuer alle Log-Widgets verwenden</Text>
+                  </EditorButtonPressable>
+                </Field>
               </>
             ) : null}
             {widget.type === "script" ? (
@@ -1412,6 +1470,23 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     style={styles.input}
                     value={draft.textFilter || ""}
                   />
+                </Field>
+                <Field label="Sounds bei Interaktion">
+                  <Field label="Play/Pause und Explorer">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, press: value }))}
+                      value={soundDraft.press}
+                    />
+                  </Field>
+                  <Field label="Scrollen im Widget">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, scroll: value }))}
+                      value={soundDraft.scroll}
+                    />
+                  </Field>
+                  <EditorButtonPressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
+                    <Text style={styles.inlineActionLabel}>Als Default fuer alle Script-Widgets verwenden</Text>
+                  </EditorButtonPressable>
                 </Field>
               </>
             ) : null}
@@ -2397,7 +2472,9 @@ function buildStoredInteractionSounds(
     widgetType !== "camera" &&
     widgetType !== "grafana" &&
     widgetType !== "numpad" &&
-    widgetType !== "link"
+    widgetType !== "link" &&
+    widgetType !== "log" &&
+    widgetType !== "script"
   ) {
     return undefined;
   }
@@ -2408,6 +2485,7 @@ function buildStoredInteractionSounds(
   const open = normalizeSoundSelection(draft.open);
   const close = normalizeSoundSelection(draft.close);
   const scroll = normalizeSoundSelection(draft.scroll);
+  const notify = normalizeSoundSelection(draft.notify);
 
   if (!areSoundSelectionsEqual(press, defaults?.press)) {
     next.press = press;
@@ -2423,6 +2501,9 @@ function buildStoredInteractionSounds(
   }
   if (!areSoundSelectionsEqual(scroll, defaults?.scroll)) {
     next.scroll = scroll;
+  }
+  if (!areSoundSelectionsEqual(notify, defaults?.notify)) {
+    next.notify = notify;
   }
 
   return Object.keys(next).length ? next : undefined;

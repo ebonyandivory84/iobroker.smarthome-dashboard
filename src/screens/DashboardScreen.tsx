@@ -170,6 +170,11 @@ export function DashboardScreen() {
       ...(config.uiSounds?.widgetTypeDefaults?.link?.press || []),
       ...(config.uiSounds?.widgetTypeDefaults?.link?.open || []),
       ...(config.uiSounds?.widgetTypeDefaults?.link?.close || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.log?.press || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.log?.scroll || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.log?.notify || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.script?.press || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.script?.scroll || []),
       ...(config.uiSounds?.pageSounds?.tabPress || []),
       ...(config.uiSounds?.pageSounds?.swipe || []),
       ...(config.uiSounds?.pageSounds?.contentScroll || []),
@@ -186,6 +191,7 @@ export function DashboardScreen() {
           ...(widget.interactionSounds?.open || []),
           ...(widget.interactionSounds?.close || []),
           ...(widget.interactionSounds?.scroll || []),
+          ...(widget.interactionSounds?.notify || []),
         ])
       ),
     ];

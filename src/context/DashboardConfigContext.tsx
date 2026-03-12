@@ -683,6 +683,7 @@ function normalizeWidgetInteractionSounds(
     open: normalizeSoundSelection(input.open),
     close: normalizeSoundSelection(input.close),
     scroll: normalizeSoundSelection(input.scroll),
+    notify: normalizeSoundSelection(input.notify),
   };
 }
 
@@ -702,6 +703,8 @@ function normalizeWidgetTypeSoundDefaults(
     weather: normalizeWidgetInteractionSounds(input.weather),
     numpad: normalizeWidgetInteractionSounds(input.numpad),
     link: normalizeWidgetInteractionSounds(input.link),
+    log: normalizeWidgetInteractionSounds(input.log),
+    script: normalizeWidgetInteractionSounds(input.script),
   };
 }
 

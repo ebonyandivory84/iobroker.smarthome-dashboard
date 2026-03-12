@@ -1,25 +1,66 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { IoBrokerClient } from "../../services/iobroker";
 import { IoBrokerScriptEntry, ScriptWidgetConfig } from "../../types/dashboard";
 import { palette } from "../../utils/theme";
+import { playConfiguredUiSound } from "../../utils/uiSounds";
 
 type ScriptWidgetProps = {
   config: ScriptWidgetConfig;
   client: IoBrokerClient;
 };
 
+type ExplorerEntry = IoBrokerScriptEntry & {
+  folderPath: string[];
+  displayName: string;
+};
+
+type ExplorerFolder = {
+  name: string;
+  path: string[];
+  count: number;
+};
+
 export function ScriptWidget({ config, client }: ScriptWidgetProps) {
   const [entries, setEntries] = useState<IoBrokerScriptEntry[]>([]);
   const [pending, setPending] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  const [isScrollActive, setIsScrollActive] = useState(false);
+  const [currentPath, setCurrentPath] = useState<string[]>([]);
+  const webRootRef = useRef<HTMLDivElement | null>(null);
+  const webListRef = useRef<HTMLDivElement | null>(null);
+  const lastScrollSoundAtRef = useRef(0);
+
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const refreshMs = clampInt(config.refreshMs, 3000, 500);
   const maxEntries = clampInt(config.maxEntries, 120, 1);
   const instanceFilter = (config.instanceFilter || "").trim();
   const textFilter = (config.textFilter || "").trim();
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined" || !isScrollActive) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const root = webRootRef.current;
+      const target = event.target;
+      if (!root || !(target instanceof Node)) {
+        return;
+      }
+      if (root.contains(target)) {
+        return;
+      }
+      setIsScrollActive(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+    };
+  }, [isScrollActive]);
 
   useEffect(() => {
     let active = true;
@@ -66,12 +107,58 @@ export function ScriptWidget({ config, client }: ScriptWidgetProps) {
     };
   }, [client, instanceFilter, maxEntries, refreshMs, textFilter]);
 
+  const includeInstanceRoot = useMemo(() => {
+    if (instanceFilter) {
+      return false;
+    }
+    const instances = new Set(entries.map((entry) => entry.instance));
+    return instances.size > 1;
+  }, [entries, instanceFilter]);
+
+  const explorerEntries = useMemo(
+    () => entries.map((entry) => toExplorerEntry(entry, includeInstanceRoot)),
+    [entries, includeInstanceRoot]
+  );
+
+  const explorerListing = useMemo(
+    () => buildExplorerListing(explorerEntries, currentPath),
+    [currentPath, explorerEntries]
+  );
+
+  useEffect(() => {
+    if (!currentPath.length) {
+      return;
+    }
+
+    let nextPath = currentPath;
+    while (nextPath.length > 0 && !hasPathPrefix(explorerEntries, nextPath)) {
+      nextPath = nextPath.slice(0, -1);
+    }
+
+    if (nextPath.length !== currentPath.length) {
+      setCurrentPath(nextPath);
+    }
+  }, [currentPath, explorerEntries]);
+
   const statusText = useMemo(() => {
     if (error) {
       return error;
     }
     return `${entries.length} Skripte`;
   }, [entries.length, error]);
+
+  const playPressSound = (key: string) => {
+    playConfiguredUiSound(config.interactionSounds?.press, "tap", `${config.id}:${key}`);
+  };
+
+  const playScrollSound = () => {
+    const now = Date.now();
+    if (now - lastScrollSoundAtRef.current < 190) {
+      return;
+    }
+    lastScrollSoundAtRef.current = now;
+    playConfiguredUiSound(config.interactionSounds?.scroll, "swipe", `${config.id}:scroll`);
+  };
 
   const toggleScript = async (entry: IoBrokerScriptEntry) => {
     if (pending[entry.stateId]) {
@@ -110,51 +197,184 @@ export function ScriptWidget({ config, client }: ScriptWidgetProps) {
     }
   };
 
-  return (
-    <View style={styles.container}>
+  const activateScrollMode = () => {
+    setIsScrollActive(true);
+  };
+
+  const goToPath = (path: string[]) => {
+    playPressSound(`explorer:${buildSoundKey(path.join("/"))}`);
+    setCurrentPath(path);
+  };
+
+  const folderRows = explorerListing.folders.map((folder) => (
+    <Pressable
+      key={`folder:${folder.path.join("/")}`}
+      onPress={() => {
+        setIsScrollActive(true);
+        goToPath(folder.path);
+      }}
+      style={[styles.row, styles.folderRow]}
+    >
+      <MaterialCommunityIcons color="#9ec3ff" name="folder-outline" size={18} />
+      <View style={styles.rowText}>
+        <Text numberOfLines={1} style={[styles.name, { color: textColor }]}>
+          {folder.name}
+        </Text>
+        <Text numberOfLines={1} style={[styles.instance, { color: mutedTextColor }]}>
+          {folder.count} Skripte
+        </Text>
+      </View>
+      <MaterialCommunityIcons color={mutedTextColor} name="chevron-right" size={18} />
+    </Pressable>
+  ));
+
+  const scriptRows = explorerListing.scripts.map((entry) => {
+    const isPending = Boolean(pending[entry.stateId]);
+    const icon = entry.enabled ? "pause-circle-outline" : "play-circle-outline";
+    const iconColor = entry.enabled ? "#f8c16f" : "#95e9b8";
+    return (
+      <View key={entry.stateId} style={styles.row}>
+        <View style={styles.rowText}>
+          <Text numberOfLines={1} style={[styles.name, { color: textColor }]}>
+            {entry.displayName}
+          </Text>
+          <Text numberOfLines={1} style={[styles.instance, { color: mutedTextColor }]}> 
+            {entry.instance}
+          </Text>
+        </View>
+        <Pressable
+          disabled={isPending}
+          onPress={() => {
+            setIsScrollActive(true);
+            playPressSound(`toggle:${buildSoundKey(entry.stateId)}`);
+            void toggleScript(entry);
+          }}
+          style={[
+            styles.actionButton,
+            isPending ? styles.actionButtonDisabled : null,
+          ]}
+        >
+          <MaterialCommunityIcons color={iconColor} name={icon} size={22} />
+        </Pressable>
+      </View>
+    );
+  });
+
+  const emptyText =
+    !entries.length
+      ? "Keine JavaScript-Skripte gefunden."
+      : explorerListing.scripts.length === 0 && explorerListing.folders.length === 0
+        ? "Keine Eintraege in diesem Ordner."
+        : null;
+
+  const breadcrumb = ["Root", ...currentPath];
+
+  const listContent = [
+    <View key="explorer-bar" style={styles.explorerBar}>
+      {breadcrumb.map((segment, index) => (
+        <Pressable
+          key={`crumb:${segment}:${index}`}
+          onPress={() => {
+            setIsScrollActive(true);
+            goToPath(index === 0 ? [] : currentPath.slice(0, index));
+          }}
+          style={styles.breadcrumbChip}
+        >
+          {index === 0 ? <MaterialCommunityIcons color={mutedTextColor} name="home-outline" size={13} /> : null}
+          <Text numberOfLines={1} style={[styles.breadcrumbLabel, { color: mutedTextColor }]}>
+            {segment}
+          </Text>
+        </Pressable>
+      ))}
+    </View>,
+    ...folderRows,
+    ...scriptRows,
+    emptyText ? (
+      <Text key="empty" style={[styles.empty, { color: mutedTextColor }]}>
+        {emptyText}
+      </Text>
+    ) : null,
+  ].filter(Boolean);
+
+  const scrollContainer =
+    Platform.OS === "web"
+      ? createElement(
+          "div",
+          {
+            onPointerDown: () => setIsScrollActive(true),
+            onScroll: () => {
+              if (isScrollActive) {
+                playScrollSound();
+              }
+            },
+            onWheel: (event: any) => {
+              if (!isScrollActive) {
+                return;
+              }
+              event.preventDefault();
+              event.stopPropagation();
+              const list = webListRef.current;
+              if (!list) {
+                return;
+              }
+              list.scrollTop += event.deltaY;
+              playScrollSound();
+            },
+            ref: webListRef,
+            style: {
+              ...webScrollStyle,
+              overflowY: isScrollActive ? "auto" : "hidden",
+              outline: isScrollActive ? "1px solid rgba(149, 233, 184, 0.4)" : "none",
+            },
+          },
+          createElement("div", { style: webScrollContentStyle }, ...listContent)
+        )
+      : (
+          <ScrollView
+            nestedScrollEnabled
+            onScrollBeginDrag={() => {
+              if (isScrollActive) {
+                playScrollSound();
+              }
+            }}
+            scrollEnabled={isScrollActive}
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {listContent}
+          </ScrollView>
+        );
+
+  const content = (
+    <View style={[styles.container, isScrollActive ? styles.containerActive : null]}>
       <View style={styles.metaRow}>
-        <Text numberOfLines={1} style={[styles.metaText, { color: mutedTextColor }]}>
+        <Text numberOfLines={1} style={[styles.metaText, { color: mutedTextColor }]}> 
           {instanceFilter || "Alle Instanzen"}
         </Text>
-        <Text numberOfLines={1} style={[styles.metaText, { color: error ? palette.danger : mutedTextColor }]}>
+        <Text numberOfLines={1} style={[styles.metaText, { color: error ? palette.danger : mutedTextColor, maxWidth: "58%" }]}> 
           {statusText}
         </Text>
       </View>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        {!entries.length ? (
-          <Text style={[styles.empty, { color: mutedTextColor }]}>Keine JavaScript-Skripte gefunden.</Text>
-        ) : null}
-        {entries.map((entry) => {
-          const isPending = Boolean(pending[entry.stateId]);
-          const icon = entry.enabled ? "pause-circle-outline" : "play-circle-outline";
-          const iconColor = entry.enabled ? "#f8c16f" : "#95e9b8";
-          return (
-            <View key={entry.stateId} style={styles.row}>
-              <View style={styles.rowText}>
-                <Text numberOfLines={1} style={[styles.name, { color: textColor }]}>
-                  {entry.name}
-                </Text>
-                <Text numberOfLines={1} style={[styles.instance, { color: mutedTextColor }]}>
-                  {entry.instance}
-                </Text>
-              </View>
-              <Pressable
-                disabled={isPending}
-                onPress={() => {
-                  void toggleScript(entry);
-                }}
-                style={[
-                  styles.actionButton,
-                  isPending ? styles.actionButtonDisabled : null,
-                ]}
-              >
-                <MaterialCommunityIcons color={iconColor} name={icon} size={22} />
-              </Pressable>
-            </View>
-          );
-        })}
-      </ScrollView>
+      {scrollContainer}
     </View>
+  );
+
+  if (Platform.OS === "web") {
+    return createElement(
+      "div",
+      {
+        ref: webRootRef,
+        onPointerDown: activateScrollMode,
+        style: webRootStyle,
+      },
+      content
+    );
+  }
+
+  return (
+    <Pressable onPressIn={activateScrollMode} style={styles.touchShell}>
+      {content}
+    </Pressable>
   );
 }
 
@@ -165,7 +385,107 @@ function clampInt(value: number | undefined, fallback: number, min: number) {
   return Math.max(min, Math.round(value));
 }
 
+function toExplorerEntry(entry: IoBrokerScriptEntry, includeInstanceRoot: boolean): ExplorerEntry {
+  const suffix = resolveScriptSuffix(entry.stateId);
+  const suffixSegments = suffix.split(".").map((part) => part.trim()).filter(Boolean);
+  const labelSegments = normalizeLabelSegments(entry.name);
+
+  let folderPath = suffixSegments.slice(0, Math.max(0, suffixSegments.length - 1));
+  let displayName = labelSegments.length ? labelSegments[labelSegments.length - 1] : "";
+
+  if (labelSegments.length > 1) {
+    folderPath = labelSegments.slice(0, -1);
+  }
+
+  if (!displayName) {
+    displayName = labelSegments[0] || suffixSegments[suffixSegments.length - 1] || entry.name || entry.stateId;
+  }
+
+  if (includeInstanceRoot) {
+    folderPath = [entry.instance, ...folderPath];
+  }
+
+  return {
+    ...entry,
+    folderPath,
+    displayName,
+  };
+}
+
+function resolveScriptSuffix(stateId: string) {
+  const marker = ".scriptEnabled.";
+  const markerIndex = stateId.indexOf(marker);
+  if (markerIndex < 0) {
+    return stateId;
+  }
+  return stateId.slice(markerIndex + marker.length);
+}
+
+function normalizeLabelSegments(value: string) {
+  return String(value || "")
+    .split(/[\\/]/)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+}
+
+function hasPathPrefix(entries: ExplorerEntry[], path: string[]) {
+  return entries.some((entry) => {
+    if (entry.folderPath.length < path.length) {
+      return false;
+    }
+    return path.every((segment, index) => entry.folderPath[index] === segment);
+  });
+}
+
+function buildExplorerListing(entries: ExplorerEntry[], currentPath: string[]) {
+  const folders = new Map<string, ExplorerFolder>();
+  const scripts: ExplorerEntry[] = [];
+
+  entries.forEach((entry) => {
+    if (!currentPath.every((segment, index) => entry.folderPath[index] === segment)) {
+      return;
+    }
+
+    const nextSegment = entry.folderPath[currentPath.length];
+    if (nextSegment) {
+      const nextPath = entry.folderPath.slice(0, currentPath.length + 1);
+      const key = nextPath.join("/");
+      const existing = folders.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        folders.set(key, {
+          name: nextSegment,
+          path: nextPath,
+          count: 1,
+        });
+      }
+      return;
+    }
+
+    scripts.push(entry);
+  });
+
+  return {
+    folders: [...folders.values()].sort((a, b) => a.name.localeCompare(b.name, "de")),
+    scripts: scripts.sort((a, b) => {
+      const byName = a.displayName.localeCompare(b.displayName, "de");
+      if (byName !== 0) {
+        return byName;
+      }
+      return a.stateId.localeCompare(b.stateId, "de");
+    }),
+  };
+}
+
+function buildSoundKey(value: string) {
+  return value.replace(/[^a-zA-Z0-9:_-]+/g, "_").slice(0, 72);
+}
+
 const styles = StyleSheet.create({
+  touchShell: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     borderRadius: 16,
@@ -173,6 +493,9 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.08)",
     backgroundColor: "rgba(6, 10, 18, 0.5)",
     overflow: "hidden",
+  },
+  containerActive: {
+    borderColor: "rgba(149, 233, 184, 0.42)",
   },
   metaRow: {
     flexDirection: "row",
@@ -183,11 +506,34 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
     backgroundColor: "rgba(5, 8, 14, 0.55)",
+    gap: 8,
   },
   metaText: {
     fontSize: 11,
     fontWeight: "700",
     maxWidth: "48%",
+  },
+  explorerBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 2,
+  },
+  breadcrumbChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  breadcrumbLabel: {
+    fontSize: 11,
+    fontWeight: "700",
   },
   scroll: {
     flex: 1,
@@ -212,6 +558,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  folderRow: {
+    backgroundColor: "rgba(120, 170, 255, 0.08)",
+    borderColor: "rgba(120, 170, 255, 0.2)",
   },
   rowText: {
     flex: 1,
@@ -240,3 +590,23 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
 });
+
+const webRootStyle = {
+  width: "100%",
+  height: "100%",
+};
+
+const webScrollStyle = {
+  flex: 1,
+  minHeight: 0,
+  width: "100%",
+  height: "100%",
+  overscrollBehaviorY: "contain" as const,
+};
+
+const webScrollContentStyle = {
+  padding: 10,
+  display: "flex",
+  flexDirection: "column" as const,
+  gap: 8,
+};
