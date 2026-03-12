@@ -62,19 +62,21 @@ export function GridCanvas({
   const isCompactViewport = windowWidth < 700 || isPhoneLikeWeb;
   const isCompactWeb = Platform.OS === "web" && isCompactViewport;
   const isTabletLikeWeb = Platform.OS === "web" && windowWidth >= 700 && windowWidth < 1100;
-  const displayColumns = isCompactViewport ? 3 : 9;
+  const isPhoneSingleColumn = Platform.OS === "web" && isPhoneLikeWeb && Math.min(windowWidth, windowHeight) <= 500;
+  const displayColumns = isPhoneSingleColumn ? 1 : isCompactViewport ? 3 : 9;
   const effectiveLayoutMode = isLayoutMode;
   const displayGap = Platform.OS === "web" && !isCompactWeb ? Math.max(config.grid.gap, 18) : config.grid.gap;
   const mainColumnExtraGap = Platform.OS === "web" && !isCompactWeb ? displayGap * 2 : 0;
   const renderConfig = useMemo(
-    () => (isCompactViewport ? applyMobileOverridesToSettings(config) : config),
-    [config, isCompactViewport]
+    () => (isCompactViewport && !isPhoneSingleColumn ? applyMobileOverridesToSettings(config) : config),
+    [config, isCompactViewport, isPhoneSingleColumn]
   );
   const displayConfig = useMemo(
     () => {
       const next = buildResponsiveAutoLayoutConfig(renderConfig, displayColumns, {
         isTabletLikeWeb,
         stackPrimarySections: isCompactViewport,
+        singleColumnSectionStack: isPhoneSingleColumn,
       });
       return {
         ...next,
@@ -84,10 +86,10 @@ export function GridCanvas({
         },
       };
     },
-    [displayColumns, displayGap, isCompactViewport, isTabletLikeWeb, renderConfig]
+    [displayColumns, displayGap, isCompactViewport, isPhoneSingleColumn, isTabletLikeWeb, renderConfig]
   );
   const useStructuredGridSizing = true;
-  const canvasInset = Platform.OS === "web" ? 64 : 60;
+  const canvasInset = Platform.OS === "web" ? (isPhoneSingleColumn ? 14 : 64) : 60;
   const availableWidth = containerWidth > 0 ? containerWidth : windowWidth;
   const canvasWidth = Math.max(320, availableWidth - canvasInset);
   const cellWidth = useMemo(() => {
@@ -95,8 +97,16 @@ export function GridCanvas({
     const totalMainExtraGap = mainColumnExtraGap * 2;
     return (canvasWidth - totalGap - totalMainExtraGap) / displayConfig.grid.columns;
   }, [canvasWidth, displayConfig.grid.columns, displayConfig.grid.gap, mainColumnExtraGap]);
+  const compactSizingCellWidth = useMemo(() => {
+    if (!isPhoneSingleColumn) {
+      return cellWidth;
+    }
+    const sizingColumns = 3;
+    const sizingGap = (sizingColumns - 1) * displayConfig.grid.gap;
+    return (canvasWidth - sizingGap) / sizingColumns;
+  }, [canvasWidth, cellWidth, displayConfig.grid.gap, isPhoneSingleColumn]);
   const renderRowHeight = useStructuredGridSizing
-    ? (isCompactViewport ? cellWidth * 0.72 : cellWidth)
+    ? (isCompactViewport ? compactSizingCellWidth * 0.72 : cellWidth)
     : displayConfig.grid.rowHeight;
 
   const canvasHeight = useMemo(() => {
@@ -108,7 +118,7 @@ export function GridCanvas({
   }, [displayConfig.grid.gap, displayConfig.widgets, renderRowHeight]);
 
   useEffect(() => {
-    if (!isCompactViewport) {
+    if (!isCompactViewport || isPhoneSingleColumn) {
       return;
     }
 
@@ -120,7 +130,7 @@ export function GridCanvas({
       }
       onUpdateWidget(displayWidget.id, { mobilePosition: displayWidget.position });
     }
-  }, [config.widgets, displayConfig.widgets, isCompactViewport, onUpdateWidget]);
+  }, [config.widgets, displayConfig.widgets, isCompactViewport, isPhoneSingleColumn, onUpdateWidget]);
 
   const handleLayout = (event: LayoutChangeEvent) => {
     const nextWidth = event.nativeEvent.layout.width;
@@ -235,10 +245,15 @@ function buildResponsiveAutoLayoutConfig(
   options?: {
     isTabletLikeWeb?: boolean;
     stackPrimarySections?: boolean;
+    singleColumnSectionStack?: boolean;
   }
 ): DashboardSettings {
   if (columns === 9) {
     return buildDesktopAutoLayoutConfig(config, options);
+  }
+
+  if (columns === 1 && options?.singleColumnSectionStack) {
+    return buildSingleColumnSectionStackLayoutConfig(config, options);
   }
 
   if (columns === 3 && options?.stackPrimarySections) {
@@ -278,6 +293,72 @@ function buildResponsiveAutoLayoutConfig(
       },
     };
   });
+
+  return {
+    ...config,
+    grid: {
+      ...config.grid,
+      columns,
+    },
+    widgets,
+  };
+}
+
+function buildSingleColumnSectionStackLayoutConfig(
+  config: DashboardSettings,
+  options?: {
+    isTabletLikeWeb?: boolean;
+  }
+): DashboardSettings {
+  const columns = 1;
+  const sourceColumns = Math.max(1, config.grid.columns);
+  const sectionCount = 3;
+  const sectionSpacing = 0.8;
+  const sortedWidgets = [...config.widgets].sort((a, b) => {
+    if (a.position.y !== b.position.y) {
+      return a.position.y - b.position.y;
+    }
+    if (a.position.x !== b.position.x) {
+      return a.position.x - b.position.x;
+    }
+    return a.id.localeCompare(b.id);
+  });
+  const sectionBuckets = Array.from({ length: sectionCount }, () => [] as WidgetConfig[]);
+
+  for (const widget of sortedWidgets) {
+    const sectionIndex = getPreferredDesktopSection(widget, sourceColumns);
+    sectionBuckets[sectionIndex].push(widget);
+  }
+
+  const widgets: WidgetConfig[] = [];
+  let cursorY = 0;
+
+  for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex += 1) {
+    const sectionWidgets = sectionBuckets[sectionIndex];
+    if (sectionWidgets.length === 0) {
+      continue;
+    }
+
+    if (widgets.length > 0) {
+      cursorY = ceilGridUnit(cursorY + sectionSpacing);
+    }
+
+    for (const widget of sectionWidgets) {
+      const spec = getAutoLayoutSpec(widget, columns, options);
+      const top = cursorY;
+      const bottom = ceilGridUnitForWidget(top + spec.h, widget.type);
+      widgets.push({
+        ...widget,
+        position: {
+          x: 0,
+          y: top,
+          w: 1,
+          h: spec.h,
+        },
+      });
+      cursorY = bottom;
+    }
+  }
 
   return {
     ...config,

@@ -15,10 +15,11 @@ import { buildWidgetTemplate } from "../utils/widgetFactory";
 import { palette } from "../utils/theme";
 
 export function DashboardScreen() {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const isCompact = width < 700;
   const activeLayoutTarget: "desktop" | "mobile" = isCompact ? "mobile" : "desktop";
   const [isTouchCapableWeb, setIsTouchCapableWeb] = useState(false);
+  const isPhoneWeb = Platform.OS === "web" && isTouchCapableWeb && Math.min(width, height) <= 500;
   const isTouchLayout = width < 1100 || isTouchCapableWeb;
   const horizontalPagerRef = useRef<ScrollView | null>(null);
   const horizontalOffsetRef = useRef(0);
@@ -92,6 +93,51 @@ export function DashboardScreen() {
 
     setIsTouchCapableWeb(Boolean(touchCapable));
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined" || typeof document === "undefined" || !isPhoneWeb) {
+      return;
+    }
+
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlHeight = html.style.height;
+    const prevBodyHeight = body.style.height;
+    const prevBodyMargin = body.style.margin;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyBackground = body.style.background;
+    const prevBodyOverscroll = body.style.getPropertyValue("overscroll-behavior");
+    const kickViewport = () => {
+      window.scrollTo(0, 1);
+    };
+
+    html.style.height = "100%";
+    body.style.height = "100%";
+    body.style.margin = "0";
+    body.style.overflow = "hidden";
+    body.style.background = "#000";
+    body.style.setProperty("overscroll-behavior", "none");
+
+    const timer = window.setTimeout(kickViewport, 60);
+    window.addEventListener("resize", kickViewport);
+    window.addEventListener("orientationchange", kickViewport);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("resize", kickViewport);
+      window.removeEventListener("orientationchange", kickViewport);
+      html.style.height = prevHtmlHeight;
+      body.style.height = prevBodyHeight;
+      body.style.margin = prevBodyMargin;
+      body.style.overflow = prevBodyOverflow;
+      body.style.background = prevBodyBackground;
+      if (prevBodyOverscroll) {
+        body.style.setProperty("overscroll-behavior", prevBodyOverscroll);
+      } else {
+        body.style.removeProperty("overscroll-behavior");
+      }
+    };
+  }, [isPhoneWeb]);
 
   useEffect(() => {
     if (!horizontalPagerRef.current) {
@@ -519,8 +565,19 @@ export function DashboardScreen() {
       };
     };
 
+  const phoneViewportStyle =
+    Platform.OS === "web" && isPhoneWeb
+      ? ({
+          minHeight: "100dvh",
+          paddingTop: "env(safe-area-inset-top)",
+          paddingBottom: "env(safe-area-inset-bottom)",
+          paddingLeft: "env(safe-area-inset-left)",
+          paddingRight: "env(safe-area-inset-right)",
+        } as any)
+      : null;
+
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, phoneViewportStyle]}>
       <BackgroundLayer
         accent={config.backgroundAccent}
         color={config.backgroundColor}
