@@ -60,6 +60,7 @@ export function CameraWidget({
   const [fullscreenFlvSourceIndex, setFullscreenFlvSourceIndex] = useState(0);
   const [previewFmp4SourceIndex, setPreviewFmp4SourceIndex] = useState(0);
   const [fullscreenFmp4SourceIndex, setFullscreenFmp4SourceIndex] = useState(0);
+  const [forcePreviewFlvFallback, setForcePreviewFlvFallback] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(config.audioEnabled === true);
   const [previewMjpegLoaded, setPreviewMjpegLoaded] = useState(false);
   const [fullscreenMjpegLoaded, setFullscreenMjpegLoaded] = useState(false);
@@ -109,13 +110,17 @@ export function CameraWidget({
     previewSourceMode
   );
 
-  const previewFeed = resolveCameraFeed({
+  const basePreviewFeed = resolveCameraFeed({
     sourceMode: previewSourceMode,
     snapshotUrl: previewSnapshotBaseUrl,
     mjpegUrl: previewMjpegUrl,
     flvUrl: previewFlvUrl,
     fmp4Url: previewFmp4Url,
   });
+  const previewFeed =
+    forcePreviewFlvFallback && basePreviewFeed?.kind === "fmp4" && previewFlvUrl
+      ? { kind: "flv" as const, url: previewFlvUrl }
+      : basePreviewFeed;
   const fullscreenFeed = resolveCameraFeed({
     sourceMode: fullscreenSourceMode,
     snapshotUrl: fullscreenSnapshotBaseUrl,
@@ -196,6 +201,10 @@ export function CameraWidget({
   useEffect(() => {
     setAudioEnabled(config.audioEnabled === true);
   }, [config.audioEnabled, config.id]);
+
+  useEffect(() => {
+    setForcePreviewFlvFallback(false);
+  }, [config.id, requestedPreviewSourceMode, previewFmp4Url, previewFlvUrl]);
 
   const clearPreviewMjpegReconnectTimer = useCallback(() => {
     if (previewMjpegReconnectTimerRef.current) {
@@ -988,6 +997,11 @@ export function CameraWidget({
                       onSourceIndexChange={setPreviewFmp4SourceIndex}
                       preferredSourceIndex={previewFmp4SourceIndex}
                       sources={previewFmp4Sources.length ? previewFmp4Sources : [previewFeed.url]}
+                      onCodecUnsupported={() => {
+                        if (previewFlvUrl) {
+                          setForcePreviewFlvFallback(true);
+                        }
+                      }}
                       title={config.title || "Camera fMP4"}
                     />
                   )
@@ -1236,6 +1250,11 @@ export function CameraWidget({
                       onSourceIndexChange={setFullscreenFmp4SourceIndex}
                       preferredSourceIndex={fullscreenFmp4SourceIndex}
                       sources={fullscreenFmp4Sources.length ? fullscreenFmp4Sources : [fullscreenFeed.url]}
+                      onCodecUnsupported={() => {
+                        if (fullscreenFlvUrl) {
+                          setForcePreviewFlvFallback(true);
+                        }
+                      }}
                       title={config.title || "Camera fMP4 fullscreen"}
                     />
                   )
@@ -1414,6 +1433,12 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv" | 
 }
 
 function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
+  if (streamType === "fmp4") {
+    const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
+    if (proxySources.length > 0) {
+      return Array.from(new Set(proxySources.filter(Boolean)));
+    }
+  }
   const includeDirect = shouldUseDirectWebStream(targetUrl, streamType);
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
   const directSources = includeDirect ? [targetUrl] : [];
@@ -1456,7 +1481,7 @@ function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv"
     }
 
     // For MJPEG we still allow a direct fallback after proxy (many cameras work only directly).
-    if ((streamType === "mjpeg" || streamType === "fmp4") && (hasEmbeddedCredentials || hasQueryCredentials)) {
+    if (streamType === "mjpeg" && (hasEmbeddedCredentials || hasQueryCredentials)) {
       return true;
     }
 
@@ -1789,6 +1814,7 @@ function WebFmp4Player({
   onAspectRatioDetected,
   preferredSourceIndex = 0,
   onSourceIndexChange,
+  onCodecUnsupported,
 }: {
   sources: string[];
   title: string;
@@ -1800,6 +1826,7 @@ function WebFmp4Player({
   onAspectRatioDetected?: (ratio: number) => void;
   preferredSourceIndex?: number;
   onSourceIndexChange?: (index: number) => void;
+  onCodecUnsupported?: () => void;
 }) {
   const videoRef = useRef<any>(null);
   const setVideoRef = useCallback((element: any) => {
@@ -1941,6 +1968,10 @@ function WebFmp4Player({
           mediaError && (mediaError.code === 3 || mediaError.code === 4)
             ? " Browser/Codec evtl. inkompatibel (z.B. HEVC/hvc1)."
             : "";
+        if (mediaError && (mediaError.code === 3 || mediaError.code === 4) && onCodecUnsupported) {
+          onCodecUnsupported();
+          return;
+        }
         if (!mediaError || mediaError.code === 1 || mediaError.code === 2) {
           scheduleReconnect(`fMP4 Streamfehler (${detail}), Neuverbindung...`);
           return;
@@ -1982,7 +2013,7 @@ function WebFmp4Player({
       videoElement.removeAttribute("src");
       videoElement.load();
     };
-  }, [currentSourceWithNonce, normalizedSources.length, sourceIndex]);
+  }, [currentSourceWithNonce, normalizedSources.length, onCodecUnsupported, sourceIndex]);
 
   return (
     <>
