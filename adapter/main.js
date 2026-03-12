@@ -461,6 +461,7 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
   const forwardedIfRange = typeof req.headers["if-range"] === "string" ? req.headers["if-range"] : "";
   const forwardedUserAgent = typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : "";
   const forwardedAccept = typeof req.headers.accept === "string" ? req.headers.accept : "";
+  const allowRangeForwarding = streamType !== "fmp4";
   const upstreamRequest = transport.request(
     {
       protocol: parsed.protocol,
@@ -470,8 +471,8 @@ function proxyCameraStream(requestConfig, req, res, streamType, redirects, authR
       path: `${parsed.pathname}${parsed.search}`,
       headers: {
         Accept: forwardedAccept || "*/*",
-        ...(forwardedRange ? { Range: forwardedRange } : {}),
-        ...(forwardedIfRange ? { "If-Range": forwardedIfRange } : {}),
+        ...(allowRangeForwarding && forwardedRange ? { Range: forwardedRange } : {}),
+        ...(allowRangeForwarding && forwardedIfRange ? { "If-Range": forwardedIfRange } : {}),
         "User-Agent": forwardedUserAgent || "ioBroker-smart-dashboard-camera-proxy/1.0",
         ...requestConfig.headers,
       },

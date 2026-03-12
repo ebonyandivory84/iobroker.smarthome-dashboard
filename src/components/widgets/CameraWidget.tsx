@@ -1414,6 +1414,10 @@ function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv" | 
 }
 
 function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
+  if (streamType === "fmp4") {
+    const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
+    return Array.from(new Set(proxySources.filter(Boolean)));
+  }
   const includeDirect = shouldUseDirectWebStream(targetUrl, streamType);
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
   const directSources = includeDirect ? [targetUrl] : [];
@@ -1456,7 +1460,7 @@ function shouldUseDirectWebStream(targetUrl: string, streamType: "mjpeg" | "flv"
     }
 
     // For MJPEG we still allow a direct fallback after proxy (many cameras work only directly).
-    if ((streamType === "mjpeg" || streamType === "fmp4") && (hasEmbeddedCredentials || hasQueryCredentials)) {
+    if (streamType === "mjpeg" && (hasEmbeddedCredentials || hasQueryCredentials)) {
       return true;
     }
 
@@ -1811,6 +1815,10 @@ function WebFmp4Player({
   const [sourceIndex, setSourceIndex] = useState(Math.min(preferredSourceIndex, maxSourceIndex));
   const [restartNonce, setRestartNonce] = useState(0);
   const currentSource = normalizedSources[Math.min(sourceIndex, maxSourceIndex)] || "";
+  const currentSourceWithNonce = useMemo(
+    () => (currentSource ? withReconnectNonce(currentSource, restartNonce) : ""),
+    [currentSource, restartNonce]
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasVideoFrame, setHasVideoFrame] = useState(false);
 
@@ -1851,7 +1859,7 @@ function WebFmp4Player({
   }, [muted]);
 
   useEffect(() => {
-    if (Platform.OS !== "web" || !currentSource) {
+    if (Platform.OS !== "web" || !currentSourceWithNonce) {
       return;
     }
 
@@ -1974,7 +1982,7 @@ function WebFmp4Player({
       videoElement.removeAttribute("src");
       videoElement.load();
     };
-  }, [currentSource, normalizedSources.length, restartNonce, sourceIndex]);
+  }, [currentSourceWithNonce, normalizedSources.length, sourceIndex]);
 
   return (
     <>
@@ -1985,7 +1993,7 @@ function WebFmp4Player({
         playsInline: true,
         preload: "auto",
         ref: setVideoRef,
-        src: currentSource || undefined,
+        src: currentSourceWithNonce || undefined,
         style: fullScreen ? getFullscreenWebFmp4Style(zoomScale, offsetX, offsetY) : webFmp4Style,
         title,
       })}
