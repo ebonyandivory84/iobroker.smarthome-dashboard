@@ -16,6 +16,7 @@ import { GrafanaWidget } from "./widgets/GrafanaWidget";
 import { LinkWidget } from "./widgets/LinkWidget";
 import { LogWidget } from "./widgets/LogWidget";
 import { NumpadWidget } from "./widgets/NumpadWidget";
+import { ScriptWidget } from "./widgets/ScriptWidget";
 import { SolarWidget } from "./widgets/SolarWidget";
 import { resolveStateNextValue, StateWidget } from "./widgets/StateWidget";
 import { WeatherWidget } from "./widgets/WeatherWidget";
@@ -182,6 +183,7 @@ export function GridCanvas({
                   widget.type === "camera" ||
                   widget.type === "solar" ||
                   widget.type === "log" ||
+                  widget.type === "script" ||
                   (Platform.OS === "web" && (widget.type === "weather" || widget.type === "grafana"))
                 }
                 onCommitPosition={(widgetId, position) =>
@@ -626,6 +628,11 @@ function getAutoLayoutSpec(
           return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
         }
         return { w: 1, h: roundGridUnit(2.4) };
+      case "script":
+        if (widget.manualHeightOverride) {
+          return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
+        }
+        return { w: 1, h: roundGridUnit(2.6) };
     }
 
     return { w: 1, h: Math.max(1.5, roundGridUnit(fallbackHeight)) };
@@ -672,6 +679,11 @@ function getAutoLayoutSpec(
         return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(fallbackHeight)) };
       }
       return { w: mainColumnWidth, h: roundGridUnit(2.4) };
+    case "script":
+      if (widget.manualHeightOverride) {
+        return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(fallbackHeight)) };
+      }
+      return { w: mainColumnWidth, h: roundGridUnit(2.6) };
   }
 
   return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
@@ -847,7 +859,7 @@ function WebGridCanvas({
           onDragAcrossPageEdge={onDragAcrossPageEdge}
           stateWrites={stateWrites}
           allowManualLayout={true}
-          allowResize={widget.type === "camera" || widget.type === "solar" || widget.type === "log"}
+          allowResize={widget.type === "camera" || widget.type === "solar" || widget.type === "log" || widget.type === "script"}
           mainColumnExtraGap={mainColumnExtraGap}
           sourceColumns={sourceColumns}
           states={states}
@@ -932,7 +944,7 @@ function WebWidgetShell({
       const dx = snapUnits((event.clientX - active.startX) / stepX);
       const dy = snapUnits(
         (event.clientY - active.startY) / stepY,
-        active.mode === "resize" && (widget.type === "camera" || widget.type === "solar" || widget.type === "log")
+        active.mode === "resize" && (widget.type === "camera" || widget.type === "solar" || widget.type === "log" || widget.type === "script")
           ? CAMERA_GRID_SNAP
           : GRID_VERTICAL_SNAP
       );
@@ -946,7 +958,7 @@ function WebWidgetShell({
           ...active.startPosition,
           x: clamp(active.startPosition.x + dx, 0, config.grid.columns - active.startPosition.w),
           y: Math.max(0, active.startPosition.y + dy),
-        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : widget.type === "log" ? { minHeight: 1, heightSnap: 0.1 } : undefined);
+        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : widget.type === "log" || widget.type === "script" ? { minHeight: 1, heightSnap: 0.1 } : undefined);
         setPreview(nextPreview);
 
         if (isLayoutMode && onDragAcrossPageEdge) {
@@ -970,7 +982,7 @@ function WebWidgetShell({
           }
         }
       } else {
-        if (widget.type === "camera" || widget.type === "solar" || widget.type === "log") {
+        if (widget.type === "camera" || widget.type === "solar" || widget.type === "log" || widget.type === "script") {
           const minHeight = widget.type === "camera" ? 0.5 : widget.type === "solar" ? 2.5 : 1;
           setPreview(constrainToPrimarySections({
             ...active.startPosition,
@@ -1211,6 +1223,10 @@ function renderWidget(
 
   if (effectiveWidget.type === "log") {
     return <LogWidget client={client} config={effectiveWidget} />;
+  }
+
+  if (effectiveWidget.type === "script") {
+    return <ScriptWidget client={client} config={effectiveWidget} />;
   }
 
   return null;
@@ -1467,6 +1483,13 @@ function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThe
       background: "linear-gradient(140deg, rgba(11, 22, 44, 0.95), rgba(6, 12, 25, 0.97))",
       border: "1px solid rgba(130, 170, 255, 0.22)",
       boxShadow: "0 14px 24px rgba(4, 10, 22, 0.34)",
+    };
+  }
+  if (type === "script") {
+    return {
+      background: "linear-gradient(140deg, rgba(20, 40, 76, 0.95), rgba(8, 18, 38, 0.98))",
+      border: "1px solid rgba(116, 171, 255, 0.24)",
+      boxShadow: "0 14px 24px rgba(6, 14, 28, 0.34)",
     };
   }
   return {};

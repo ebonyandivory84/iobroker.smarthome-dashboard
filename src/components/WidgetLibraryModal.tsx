@@ -70,6 +70,12 @@ const OPTIONS: Array<{
     description: "Zeigt Live-Logs aus ioBroker direkt im Dashboard an.",
     icon: "text-box-search-outline",
   },
+  {
+    type: "script",
+    title: "Scripts",
+    description: "Zeigt JavaScript-Skripte mit Start/Stopp direkt im Dashboard.",
+    icon: "script-text-play-outline",
+  },
 ];
 
 export function WidgetLibraryModal({

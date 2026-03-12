@@ -2,6 +2,7 @@ import {
   DashboardSettings,
   IoBrokerLogEntry,
   IoBrokerObjectEntry,
+  IoBrokerScriptEntry,
   StateSnapshot,
   WidgetImageEntry,
   WidgetSoundEntry,
@@ -210,6 +211,36 @@ export class IoBrokerClient {
     }
 
     return (await response.json()) as IoBrokerLogEntry[];
+  }
+
+  async listScripts(options?: {
+    limit?: number;
+    instance?: string;
+    contains?: string;
+  }): Promise<IoBrokerScriptEntry[]> {
+    const limit = Math.max(1, Math.min(1000, Math.round(options?.limit || 200)));
+    const params = new URLSearchParams({
+      limit: String(limit),
+    });
+    if (options?.instance) {
+      params.set("instance", options.instance);
+    }
+    if (options?.contains) {
+      params.set("contains", options.contains);
+    }
+
+    const response = await fetch(this.endpoint(`/scripts?${params.toString()}`), {
+      method: "GET",
+      headers: {
+        ...buildAuthHeader(this.settings),
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Script list failed (${response.status})`);
+    }
+
+    return (await response.json()) as IoBrokerScriptEntry[];
   }
 
   private async uploadWidgetFile<T>(path: string, name: string, dataUrl: string): Promise<T> {

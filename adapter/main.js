@@ -268,6 +268,23 @@ async function main(adapter) {
     }
   });
 
+  app.get("/smarthome-dashboard/api/scripts", async (req, res) => {
+    try {
+      const limit = clampInt(req.query?.limit, 200, 1, 1000);
+      const instance = normalizeFilter(req.query?.instance);
+      const contains = normalizeFilter(req.query?.contains);
+      const scripts = await listJavaScriptEntries(adapter, {
+        limit,
+        instance,
+        contains,
+      });
+
+      res.json(scripts);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Script list failed" });
+    }
+  });
+
   app.get("/smarthome-dashboard/api/images", async (_req, res) => {
     try {
       const files = await fs.promises.readdir(widgetAssetsRoot, { withFileTypes: true });
@@ -907,6 +924,102 @@ function readBufferedLogs({ limit, minSeverity, source, contains }) {
   });
 
   return filtered.slice(-limit).reverse();
+}
+
+async function listJavaScriptEntries(adapter, options) {
+  const limit = clampInt(options?.limit, 200, 1, 1000);
+  const containsFilter = String(options?.contains || "")
+    .trim()
+    .toLowerCase();
+  const instanceFilter = String(options?.instance || "")
+    .trim()
+    .toLowerCase();
+  const entries = await getCachedObjectEntries(adapter);
+  const candidates = entries.filter((entry) => {
+    if (!isScriptEnabledStateId(entry.id)) {
+      return false;
+    }
+
+    if (instanceFilter) {
+      const instance = resolveScriptInstance(entry.id).toLowerCase();
+      if (instance !== instanceFilter) {
+        return false;
+      }
+    }
+
+    if (!containsFilter) {
+      return true;
+    }
+
+    return (
+      String(entry.id || "").toLowerCase().includes(containsFilter) ||
+      String(entry.name || "").toLowerCase().includes(containsFilter)
+    );
+  });
+
+  const states = await adapter.getForeignStatesAsync("javascript.*.scriptEnabled.*");
+  const fetched = candidates.slice(0, 1500).map((entry) => ({
+    stateId: entry.id,
+    name: resolveScriptName(entry),
+    instance: resolveScriptInstance(entry.id),
+    enabled: normalizeScriptEnabledValue(states?.[entry.id]?.val),
+  }));
+
+  return fetched
+    .sort((a, b) => {
+      const byName = a.name.localeCompare(b.name, "de");
+      if (byName !== 0) {
+        return byName;
+      }
+      return a.stateId.localeCompare(b.stateId, "de");
+    })
+    .slice(0, limit);
+}
+
+function isScriptEnabledStateId(stateId) {
+  const id = String(stateId || "");
+  return id.startsWith("javascript.") && id.includes(".scriptEnabled.");
+}
+
+function resolveScriptInstance(stateId) {
+  const parts = String(stateId || "").split(".");
+  if (parts.length >= 2) {
+    return `${parts[0]}.${parts[1]}`;
+  }
+  return "javascript.0";
+}
+
+function resolveScriptName(entry) {
+  const friendlyName = typeof entry?.name === "string" ? entry.name.trim() : "";
+  if (friendlyName) {
+    return friendlyName;
+  }
+
+  const id = String(entry?.id || "");
+  const marker = ".scriptEnabled.";
+  const markerIndex = id.indexOf(marker);
+  if (markerIndex >= 0) {
+    const suffix = id.slice(markerIndex + marker.length);
+    if (suffix) {
+      return suffix;
+    }
+  }
+
+  return id;
+}
+
+function normalizeScriptEnabledValue(value) {
+  if (value === true || value === 1) {
+    return true;
+  }
+  if (value === false || value === 0) {
+    return false;
+  }
+
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "on" || normalized === "enabled";
 }
 
 async function readSavedDashboards(adapter) {

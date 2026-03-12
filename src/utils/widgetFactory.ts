@@ -22,6 +22,8 @@ export function buildWidgetTemplate(
             ? 6
             : type === "log"
               ? 6
+              : type === "script"
+                ? 6
               : type === "weather"
                 ? 4
                 : type === "numpad"
@@ -38,6 +40,8 @@ export function buildWidgetTemplate(
               ? 4
               : type === "log"
                 ? 3
+                : type === "script"
+                  ? 3
                 : type === "weather"
                   ? 3
                 : type === "numpad"
@@ -166,6 +170,22 @@ export function buildWidgetTemplate(
       maxEntries: 80,
       minSeverity: "info",
       sourceFilter: "",
+      textFilter: "",
+      position: {
+        ...basePosition,
+        w: Math.min(6, grid.columns),
+      },
+    };
+  }
+
+  if (type === "script") {
+    return {
+      id: `script-${suffix}`,
+      type: "script",
+      title: `Skripte ${suffix}`,
+      refreshMs: 3000,
+      maxEntries: 120,
+      instanceFilter: "",
       textFilter: "",
       position: {
         ...basePosition,

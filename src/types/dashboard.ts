@@ -1,4 +1,4 @@
-export type WidgetType = "state" | "camera" | "energy" | "solar" | "grafana" | "weather" | "numpad" | "link" | "log";
+export type WidgetType = "state" | "camera" | "energy" | "solar" | "grafana" | "weather" | "numpad" | "link" | "log" | "script";
 
 export type IconPair = {
   active: string;
@@ -144,6 +144,15 @@ export type LogWidgetConfig = WidgetBase & {
   textFilter?: string;
 };
 
+export type ScriptWidgetConfig = WidgetBase & {
+  type: "script";
+  manualHeightOverride?: boolean;
+  refreshMs?: number;
+  maxEntries?: number;
+  instanceFilter?: string;
+  textFilter?: string;
+};
+
 export type SolarNodeLayout = {
   x: number;
   y: number;
@@ -225,7 +234,8 @@ export type WidgetConfig =
   | WeatherWidgetConfig
   | NumpadWidgetConfig
   | LinkWidgetConfig
-  | LogWidgetConfig;
+  | LogWidgetConfig
+  | ScriptWidgetConfig;
 
 export type BackgroundMode = "gradient" | "mesh" | "solid";
 
@@ -328,4 +338,11 @@ export type IoBrokerLogEntry = {
   severity: LogWidgetSeverity;
   ts: number;
   message: string;
+};
+
+export type IoBrokerScriptEntry = {
+  stateId: string;
+  name: string;
+  instance: string;
+  enabled: boolean;
 };

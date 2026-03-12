@@ -229,7 +229,8 @@ export function DashboardScreen() {
           currentWidget.type === "solar" ||
           currentWidget.type === "weather" ||
           currentWidget.type === "grafana" ||
-          currentWidget.type === "log"
+          currentWidget.type === "log" ||
+          currentWidget.type === "script"
             ? { manualHeightOverride: true }
             : null),
         };
@@ -245,7 +246,8 @@ export function DashboardScreen() {
         currentWidget.type === "solar" ||
         currentWidget.type === "weather" ||
         currentWidget.type === "grafana" ||
-        currentWidget.type === "log"
+        currentWidget.type === "log" ||
+        currentWidget.type === "script"
           ? { manualHeightOverride: true }
           : null),
       });
@@ -263,7 +265,8 @@ export function DashboardScreen() {
         currentWidget.type === "solar" ||
         currentWidget.type === "weather" ||
         currentWidget.type === "grafana" ||
-        currentWidget.type === "log"
+        currentWidget.type === "log" ||
+        currentWidget.type === "script"
           ? { manualHeightOverride: true }
           : null),
       };
@@ -278,7 +281,7 @@ export function DashboardScreen() {
           ? { minHeight: 0.5, heightSnap: 0.1 }
           : currentWidget.type === "solar"
             ? { minHeight: 2.5, heightSnap: 0.1 }
-            : currentWidget.type === "weather" || currentWidget.type === "grafana" || currentWidget.type === "log"
+            : currentWidget.type === "weather" || currentWidget.type === "grafana" || currentWidget.type === "log" || currentWidget.type === "script"
               ? { minHeight: 1, heightSnap: 0.1 }
             : undefined;
       updateWidget(widgetId, {
@@ -288,7 +291,8 @@ export function DashboardScreen() {
         currentWidget.type === "solar" ||
         currentWidget.type === "weather" ||
         currentWidget.type === "grafana" ||
-        currentWidget.type === "log"
+        currentWidget.type === "log" ||
+        currentWidget.type === "script"
           ? { manualHeightOverride: true }
           : null),
       });

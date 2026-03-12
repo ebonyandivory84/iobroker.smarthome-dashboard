@@ -223,6 +223,22 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       return;
     }
 
+    if (widget.type === "script") {
+      setSoundDraft({});
+      setWeatherSuggestions([]);
+      setWeatherSearchBusy(false);
+      setDraft({
+        title: widget.title,
+        showTitle: widget.showTitle === false ? "false" : "true",
+        refreshMs: String(widget.refreshMs || 3000),
+        maxEntries: String(widget.maxEntries || 120),
+        instanceFilter: widget.instanceFilter || "",
+        textFilter: widget.textFilter || "",
+        ...appearanceDraft,
+      });
+      return;
+    }
+
     if (widget.type === "weather") {
       setSoundDraft({});
       setDraft({
@@ -495,6 +511,16 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         maxEntries: clampInt(draft.maxEntries, widget.maxEntries || 80, 5),
         minSeverity: normalizeLogSeverity(draft.minSeverity),
         sourceFilter: draft.sourceFilter?.trim() || undefined,
+        textFilter: draft.textFilter?.trim() || undefined,
+        appearance,
+      });
+    } else if (widget.type === "script") {
+      onSave(widget.id, {
+        title: draft.title,
+        showTitle: draft.showTitle !== "false",
+        refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 3000, 500),
+        maxEntries: clampInt(draft.maxEntries, widget.maxEntries || 120, 1),
+        instanceFilter: draft.instanceFilter?.trim() || undefined,
         textFilter: draft.textFilter?.trim() || undefined,
         appearance,
       });
@@ -1347,6 +1373,48 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 </Field>
               </>
             ) : null}
+            {widget.type === "script" ? (
+              <>
+                <View style={styles.splitRow}>
+                  <Field label="Refresh (ms)">
+                    <TextInput
+                      keyboardType="numeric"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, refreshMs: value }))}
+                      style={styles.input}
+                      value={draft.refreshMs || "3000"}
+                    />
+                  </Field>
+                  <Field label="Anzahl">
+                    <TextInput
+                      keyboardType="numeric"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, maxEntries: value }))}
+                      style={styles.input}
+                      value={draft.maxEntries || "120"}
+                    />
+                  </Field>
+                </View>
+                <Field label="Instanz-Filter (optional)">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) => setDraft((current) => ({ ...current, instanceFilter: value }))}
+                    placeholder="z. B. javascript.0"
+                    placeholderTextColor={palette.textMuted}
+                    style={styles.input}
+                    value={draft.instanceFilter || ""}
+                  />
+                </Field>
+                <Field label="Text-Filter (optional)">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) => setDraft((current) => ({ ...current, textFilter: value }))}
+                    placeholder="z. B. licht, alarm, heizung"
+                    placeholderTextColor={palette.textMuted}
+                    style={styles.input}
+                    value={draft.textFilter || ""}
+                  />
+                </Field>
+              </>
+            ) : null}
             {widget.type === "solar" ? (
               <>
                 <Field label="State Prefix">
@@ -2053,6 +2121,17 @@ function getWidgetAppearanceDefaults(
       mutedTextColor: palette.textMuted,
       cardColor: "rgba(5, 9, 17, 0.7)",
       cardColor2: "rgba(16, 30, 56, 0.8)",
+    };
+  }
+
+  if (widget.type === "script") {
+    return {
+      widgetColor: "rgba(20, 40, 76, 0.95)",
+      widgetColor2: "rgba(8, 18, 38, 0.98)",
+      textColor: palette.text,
+      mutedTextColor: palette.textMuted,
+      cardColor: "rgba(7, 14, 29, 0.72)",
+      cardColor2: "rgba(20, 42, 82, 0.82)",
     };
   }
 
