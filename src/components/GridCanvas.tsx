@@ -68,8 +68,8 @@ export function GridCanvas({
   const displayGap = Platform.OS === "web" && !isCompactWeb ? Math.max(config.grid.gap, 18) : config.grid.gap;
   const mainColumnExtraGap = Platform.OS === "web" && !isCompactWeb ? displayGap * 2 : 0;
   const renderConfig = useMemo(
-    () => (isCompactViewport && !isPhoneSingleColumn ? applyMobileOverridesToSettings(config) : config),
-    [config, isCompactViewport, isPhoneSingleColumn]
+    () => (isCompactViewport ? applyMobileOverridesToSettings(config) : config),
+    [config, isCompactViewport]
   );
   const displayConfig = useMemo(
     () => {
