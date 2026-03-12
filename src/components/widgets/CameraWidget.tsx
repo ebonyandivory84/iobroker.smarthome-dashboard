@@ -28,6 +28,7 @@ const MJPEG_SOURCE_SWITCH_TIMEOUT_MS = 12_000;
 const MJPEG_RECONNECT_BASE_DELAY_MS = 700;
 const MJPEG_RECONNECT_MAX_DELAY_MS = 8000;
 const FLV_RECONNECT_DELAY_MS = 1800;
+const FMP4_RECONNECT_DELAY_MS = 1800;
 const WEB_FULLSCREEN_MIN_ZOOM = 1;
 const WEB_FULLSCREEN_MAX_ZOOM = 4;
 let flvLoaderPromise: Promise<boolean> | null = null;
@@ -1416,10 +1417,7 @@ function buildWebStreamSources(targetUrl: string, streamType: "mjpeg" | "flv" | 
   const includeDirect = shouldUseDirectWebStream(targetUrl, streamType);
   const proxySources = getWebStreamProxyUrls(targetUrl, streamType);
   const directSources = includeDirect ? [targetUrl] : [];
-  const sources =
-    streamType === "fmp4"
-      ? [...directSources, ...proxySources]
-      : [...proxySources, ...directSources];
+  const sources = [...proxySources, ...directSources];
   return Array.from(new Set(sources.filter(Boolean)));
 }
 
@@ -1811,6 +1809,7 @@ function WebFmp4Player({
   );
   const maxSourceIndex = Math.max(0, normalizedSources.length - 1);
   const [sourceIndex, setSourceIndex] = useState(Math.min(preferredSourceIndex, maxSourceIndex));
+  const [restartNonce, setRestartNonce] = useState(0);
   const currentSource = normalizedSources[Math.min(sourceIndex, maxSourceIndex)] || "";
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasVideoFrame, setHasVideoFrame] = useState(false);
@@ -1857,17 +1856,35 @@ function WebFmp4Player({
     }
 
     let disposed = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     const videoElement = videoRef.current as HTMLVideoElement | null;
     if (!videoElement) {
       return;
     }
 
+    const safeSetError = (message: string) => {
+      if (!disposed) {
+        setErrorMessage(message);
+      }
+    };
+
+    const scheduleReconnect = (message: string) => {
+      safeSetError(message);
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
+      reconnectTimer = setTimeout(() => {
+        if (disposed) {
+          return;
+        }
+        setRestartNonce((current) => current + 1);
+      }, FMP4_RECONNECT_DELAY_MS);
+    };
+
     const moveToNextSource = (message: string) => {
       if (sourceIndex + 1 < normalizedSources.length) {
         setSourceIndex((current) => Math.min(normalizedSources.length - 1, current + 1));
-        if (!disposed) {
-          setErrorMessage(message);
-        }
+        safeSetError(message);
         return true;
       }
       return false;
@@ -1912,7 +1929,15 @@ function WebFmp4Player({
       if (!moveToNextSource("fMP4 Quelle fehlgeschlagen, versuche alternative Quelle...")) {
         const mediaError = videoElement.error;
         const detail = mediaError ? describeVideoError(mediaError) : "Unbekannter Video-Fehler";
-        setErrorMessage(`fMP4 Stream konnte nicht gestartet werden (${detail}).`);
+        const codecHint =
+          mediaError && (mediaError.code === 3 || mediaError.code === 4)
+            ? " Browser/Codec evtl. inkompatibel (z.B. HEVC/hvc1)."
+            : "";
+        if (!mediaError || mediaError.code === 1 || mediaError.code === 2) {
+          scheduleReconnect(`fMP4 Streamfehler (${detail}), Neuverbindung...`);
+          return;
+        }
+        safeSetError(`fMP4 Stream konnte nicht gestartet werden (${detail}).${codecHint}`);
       }
     };
 
@@ -1929,20 +1954,27 @@ function WebFmp4Player({
       }
       const hasData = videoElement.readyState >= 2 || videoElement.currentTime > 0;
       if (!hasData) {
-        handleError();
+        if (!moveToNextSource("fMP4 Quelle fehlgeschlagen, versuche alternative Quelle...")) {
+          scheduleReconnect("fMP4 Stream reagiert nicht, Neuverbindung...");
+        }
       }
     }, Math.max(MJPEG_SOURCE_SWITCH_TIMEOUT_MS, 25_000));
 
     return () => {
       disposed = true;
       clearTimeout(watchdog);
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
       videoElement.removeEventListener("loadeddata", markPlayable);
       videoElement.removeEventListener("playing", markPlayable);
       videoElement.removeEventListener("loadedmetadata", handleMetadata);
       videoElement.removeEventListener("canplay", tryPlay);
       videoElement.removeEventListener("error", handleError);
+      videoElement.removeAttribute("src");
+      videoElement.load();
     };
-  }, [currentSource, normalizedSources.length, sourceIndex]);
+  }, [currentSource, normalizedSources.length, restartNonce, sourceIndex]);
 
   return (
     <>
