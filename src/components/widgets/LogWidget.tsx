@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable } from "react-native";
 import { IoBrokerClient } from "../../services/iobroker";
 import { IoBrokerLogEntry, LogWidgetConfig } from "../../types/dashboard";
 import { palette } from "../../utils/theme";
@@ -25,11 +27,13 @@ const MONO_FONT = Platform.select({
 export function LogWidget({ config, client }: LogWidgetProps) {
   const [entries, setEntries] = useState<IoBrokerLogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [quickSeverity, setQuickSeverity] = useState<"base" | "warn" | "error">("base");
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const refreshMs = clampInt(config.refreshMs, 2000, 500);
   const maxEntries = clampInt(config.maxEntries, 80, 5);
-  const minSeverity = normalizeSeverity(config.minSeverity);
+  const configuredMinSeverity = normalizeSeverity(config.minSeverity);
+  const minSeverity = quickSeverity === "base" ? configuredMinSeverity : quickSeverity;
   const sourceFilter = (config.sourceFilter || "").trim();
   const textFilter = (config.textFilter || "").trim();
 
@@ -93,9 +97,37 @@ export function LogWidget({ config, client }: LogWidgetProps) {
   return (
     <View style={styles.container}>
       <View style={styles.metaRow}>
-        <Text style={[styles.metaText, { color: mutedTextColor }]}>
-          Level: {minSeverity.toUpperCase()}
-        </Text>
+        <View style={styles.metaLeft}>
+          <Text style={[styles.metaText, { color: mutedTextColor }]}>Level: {minSeverity.toUpperCase()}</Text>
+          <View style={styles.filterButtonRow}>
+            <Pressable
+              onPress={() => setQuickSeverity((current) => (current === "warn" ? "base" : "warn"))}
+              style={[
+                styles.filterButton,
+                quickSeverity === "warn" ? styles.filterButtonActive : null,
+              ]}
+            >
+              <MaterialCommunityIcons
+                color={quickSeverity === "warn" ? "#08111f" : "#f8c16f"}
+                name="alert-circle"
+                size={15}
+              />
+            </Pressable>
+            <Pressable
+              onPress={() => setQuickSeverity((current) => (current === "error" ? "base" : "error"))}
+              style={[
+                styles.filterButton,
+                quickSeverity === "error" ? styles.filterButtonActive : null,
+              ]}
+            >
+              <MaterialCommunityIcons
+                color={quickSeverity === "error" ? "#08111f" : "#ff7d7d"}
+                name="alert"
+                size={15}
+              />
+            </Pressable>
+          </View>
+        </View>
         <Text style={[styles.metaText, { color: error ? palette.danger : mutedTextColor }]}>
           {statusText}
         </Text>
@@ -181,9 +213,33 @@ const styles = StyleSheet.create({
     borderBottomColor: "rgba(255,255,255,0.08)",
     backgroundColor: "rgba(5, 8, 14, 0.55)",
   },
+  metaLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   metaText: {
     fontSize: 11,
     fontWeight: "700",
+  },
+  filterButtonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  filterButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  filterButtonActive: {
+    backgroundColor: palette.accent,
+    borderColor: "rgba(92,124,255,0.5)",
   },
   scroll: {
     flex: 1,
