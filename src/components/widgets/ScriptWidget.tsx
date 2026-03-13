@@ -417,6 +417,8 @@ function toExplorerEntry(entry: IoBrokerScriptEntry, includeInstanceRoot: boolea
     displayName = labelSegments[0] || suffixSegments[suffixSegments.length - 1] || entry.name || entry.stateId;
   }
 
+  displayName = resolveScriptDisplayName(displayName, suffixSegments);
+
   if (includeInstanceRoot) {
     folderPath = [entry.instance, ...folderPath];
   }
@@ -442,6 +444,30 @@ function normalizeLabelSegments(value: string) {
     .split(/[\\/]/)
     .map((segment) => segment.trim())
     .filter(Boolean);
+}
+
+function resolveScriptDisplayName(rawValue: string, suffixSegments: string[]) {
+  const cleaned = stripKnownScriptPrefixes(rawValue);
+  if (!cleaned) {
+    return suffixSegments[suffixSegments.length - 1] || "";
+  }
+
+  if (!cleaned.includes(" ") && cleaned.includes(".")) {
+    const dottedSegments = cleaned.split(".").map((segment) => segment.trim()).filter(Boolean);
+    if (dottedSegments.length > 0) {
+      return dottedSegments[dottedSegments.length - 1];
+    }
+  }
+
+  return cleaned;
+}
+
+function stripKnownScriptPrefixes(value: string) {
+  return String(value || "")
+    .trim()
+    .replace(/^javascript\.\d+\.scriptEnabled\./i, "")
+    .replace(/^scriptEnabled\./i, "")
+    .replace(/^script\.js\./i, "");
 }
 
 function hasPathPrefix(entries: ExplorerEntry[], path: string[]) {
