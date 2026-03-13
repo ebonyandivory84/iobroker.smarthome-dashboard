@@ -1,5 +1,6 @@
 import {
   DashboardSettings,
+  IoBrokerHostStats,
   IoBrokerLogEntry,
   IoBrokerObjectEntry,
   IoBrokerScriptEntry,
@@ -241,6 +242,21 @@ export class IoBrokerClient {
     }
 
     return (await response.json()) as IoBrokerScriptEntry[];
+  }
+
+  async readHostStats(): Promise<IoBrokerHostStats> {
+    const response = await fetch(this.endpoint("/host-stats"), {
+      method: "GET",
+      headers: {
+        ...buildAuthHeader(this.settings),
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Host stats read failed (${response.status})`);
+    }
+
+    return (await response.json()) as IoBrokerHostStats;
   }
 
   private async uploadWidgetFile<T>(path: string, name: string, dataUrl: string): Promise<T> {

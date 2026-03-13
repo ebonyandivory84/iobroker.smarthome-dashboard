@@ -253,7 +253,8 @@ export function DashboardScreen() {
           currentWidget.type === "weather" ||
           currentWidget.type === "grafana" ||
           currentWidget.type === "log" ||
-          currentWidget.type === "script"
+          currentWidget.type === "script" ||
+          currentWidget.type === "host"
             ? { manualHeightOverride: true }
             : null),
         };
@@ -270,7 +271,8 @@ export function DashboardScreen() {
         currentWidget.type === "weather" ||
         currentWidget.type === "grafana" ||
         currentWidget.type === "log" ||
-        currentWidget.type === "script"
+        currentWidget.type === "script" ||
+        currentWidget.type === "host"
           ? { manualHeightOverride: true }
           : null),
       });
@@ -289,7 +291,8 @@ export function DashboardScreen() {
         currentWidget.type === "weather" ||
         currentWidget.type === "grafana" ||
         currentWidget.type === "log" ||
-        currentWidget.type === "script"
+        currentWidget.type === "script" ||
+        currentWidget.type === "host"
           ? { manualHeightOverride: true }
           : null),
       };
@@ -304,7 +307,7 @@ export function DashboardScreen() {
           ? { minHeight: 0.5, heightSnap: 0.1 }
           : currentWidget.type === "solar"
             ? { minHeight: 2.5, heightSnap: 0.1 }
-            : currentWidget.type === "weather" || currentWidget.type === "grafana" || currentWidget.type === "log" || currentWidget.type === "script"
+            : currentWidget.type === "weather" || currentWidget.type === "grafana" || currentWidget.type === "log" || currentWidget.type === "script" || currentWidget.type === "host"
               ? { minHeight: 1, heightSnap: 0.1 }
             : undefined;
       updateWidget(widgetId, {
@@ -315,7 +318,8 @@ export function DashboardScreen() {
         currentWidget.type === "weather" ||
         currentWidget.type === "grafana" ||
         currentWidget.type === "log" ||
-        currentWidget.type === "script"
+        currentWidget.type === "script" ||
+        currentWidget.type === "host"
           ? { manualHeightOverride: true }
           : null),
       });

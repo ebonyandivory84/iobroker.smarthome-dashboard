@@ -18,14 +18,16 @@ export function buildWidgetTemplate(
         ? 6
         : type === "solar"
           ? 8
-          : type === "grafana"
-            ? 6
-            : type === "log"
+            : type === "grafana"
               ? 6
-              : type === "script"
+              : type === "log"
                 ? 6
-              : type === "weather"
-                ? 4
+                : type === "script"
+                  ? 6
+                : type === "host"
+                  ? 6
+                  : type === "weather"
+                    ? 4
                 : type === "numpad"
                   ? 6
                 : 3,
@@ -42,8 +44,10 @@ export function buildWidgetTemplate(
                 ? 3
                 : type === "script"
                   ? 3
-                : type === "weather"
-                  ? 3
+                  : type === "host"
+                    ? 3
+                    : type === "weather"
+                      ? 3
                 : type === "numpad"
                   ? 4
                 : 2,
@@ -187,6 +191,20 @@ export function buildWidgetTemplate(
       maxEntries: 120,
       instanceFilter: "",
       textFilter: "",
+      position: {
+        ...basePosition,
+        w: Math.min(6, grid.columns),
+      },
+    };
+  }
+
+  if (type === "host") {
+    return {
+      id: `host-${suffix}`,
+      type: "host",
+      title: `Host ${suffix}`,
+      refreshMs: 5000,
+      hostLabel: "",
       position: {
         ...basePosition,
         w: Math.min(6, grid.columns),

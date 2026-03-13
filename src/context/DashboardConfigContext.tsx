@@ -705,6 +705,7 @@ function normalizeWidgetTypeSoundDefaults(
     link: normalizeWidgetInteractionSounds(input.link),
     log: normalizeWidgetInteractionSounds(input.log),
     script: normalizeWidgetInteractionSounds(input.script),
+    host: normalizeWidgetInteractionSounds(input.host),
   };
 }
 

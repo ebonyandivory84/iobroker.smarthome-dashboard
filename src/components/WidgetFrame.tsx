@@ -60,7 +60,8 @@ export function WidgetFrame({
     widget.type === "weather" ||
     widget.type === "grafana" ||
     widget.type === "log" ||
-    widget.type === "script";
+    widget.type === "script" ||
+    widget.type === "host";
 
   useEffect(() => {
     if (Platform.OS !== "web") {

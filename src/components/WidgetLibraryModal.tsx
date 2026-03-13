@@ -76,6 +76,12 @@ const OPTIONS: Array<{
     description: "Zeigt JavaScript-Skripte mit Start/Stopp direkt im Dashboard.",
     icon: "script-text-play-outline",
   },
+  {
+    type: "host",
+    title: "Host",
+    description: "Zeigt Host-Stats wie Festplatte, RAM, CPU und Temperatur an.",
+    icon: "server-network",
+  },
 ];
 
 export function WidgetLibraryModal({

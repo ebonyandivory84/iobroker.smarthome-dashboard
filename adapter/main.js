@@ -2,6 +2,7 @@ const utils = require("@iobroker/adapter-core");
 const express = require("express");
 const { createProxyMiddleware } = require("http-proxy-middleware");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { Readable } = require("stream");
 const http = require("http");
@@ -282,6 +283,15 @@ async function main(adapter) {
       res.json(scripts);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Script list failed" });
+    }
+  });
+
+  app.get("/smarthome-dashboard/api/host-stats", async (_req, res) => {
+    try {
+      const stats = await readHostStats(adapter);
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Host stats read failed" });
     }
   });
 
@@ -1021,6 +1031,177 @@ function normalizeScriptEnabledValue(value) {
     .trim()
     .toLowerCase();
   return normalized === "true" || normalized === "1" || normalized === "on" || normalized === "enabled";
+}
+
+async function readHostStats(adapter) {
+  const hostName = String(adapter.host || os.hostname() || "host");
+  const disk = readDiskStats();
+  const ramTotalBytes = toFiniteNumber(os.totalmem());
+  const ramFreeBytes = toFiniteNumber(os.freemem());
+  const cpuUsagePercent = sampleCpuUsagePercent();
+  const cpuTemperatureC = await resolveCpuTemperature(adapter, hostName);
+  const processes = await resolveProcessCount(adapter);
+
+  return {
+    hostName,
+    ts: Date.now(),
+    diskTotalBytes: disk.totalBytes,
+    diskFreeBytes: disk.freeBytes,
+    ramTotalBytes,
+    ramFreeBytes,
+    cpuUsagePercent,
+    cpuTemperatureC,
+    processes,
+  };
+}
+
+let previousCpuSnapshot = null;
+
+function sampleCpuUsagePercent() {
+  const cpuList = os.cpus();
+  if (!Array.isArray(cpuList) || !cpuList.length) {
+    return null;
+  }
+
+  let total = 0;
+  let idle = 0;
+  for (const core of cpuList) {
+    const times = core?.times || {};
+    const user = toFiniteNumber(times.user);
+    const nice = toFiniteNumber(times.nice);
+    const sys = toFiniteNumber(times.sys);
+    const irq = toFiniteNumber(times.irq);
+    const currentIdle = toFiniteNumber(times.idle);
+    total += user + nice + sys + irq + currentIdle;
+    idle += currentIdle;
+  }
+
+  const now = Date.now();
+  if (!previousCpuSnapshot) {
+    previousCpuSnapshot = { total, idle, now };
+    return null;
+  }
+
+  const deltaTotal = total - previousCpuSnapshot.total;
+  const deltaIdle = idle - previousCpuSnapshot.idle;
+  previousCpuSnapshot = { total, idle, now };
+
+  if (!Number.isFinite(deltaTotal) || deltaTotal <= 0) {
+    return null;
+  }
+
+  const usage = ((deltaTotal - deltaIdle) / deltaTotal) * 100;
+  return clampNumber(usage, 0, 100);
+}
+
+function readDiskStats() {
+  const fallback = {
+    totalBytes: null,
+    freeBytes: null,
+  };
+
+  if (typeof fs.statfsSync !== "function") {
+    return fallback;
+  }
+
+  try {
+    const stats = fs.statfsSync("/");
+    const blockSize = toFiniteNumber(stats.bsize || stats.frsize);
+    const blocks = toFiniteNumber(stats.blocks);
+    const freeBlocks = toFiniteNumber(stats.bavail ?? stats.bfree);
+
+    if (!blockSize || !blocks || !Number.isFinite(freeBlocks)) {
+      return fallback;
+    }
+
+    return {
+      totalBytes: blockSize * blocks,
+      freeBytes: blockSize * freeBlocks,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+async function resolveCpuTemperature(adapter, hostName) {
+  const stateIds = [
+    `system.host.${hostName}.cpuTemperature`,
+    `system.host.${hostName}.temp`,
+  ];
+
+  for (const stateId of stateIds) {
+    try {
+      const state = await adapter.getForeignStateAsync(stateId);
+      const parsed = parseTemperatureValue(state?.val);
+      if (parsed !== null) {
+        return parsed;
+      }
+    } catch {
+      // continue
+    }
+  }
+
+  const files = [
+    "/sys/class/thermal/thermal_zone0/temp",
+    "/sys/devices/virtual/thermal/thermal_zone0/temp",
+    "/sys/class/hwmon/hwmon0/temp1_input",
+  ];
+
+  for (const file of files) {
+    try {
+      const content = fs.readFileSync(file, "utf8");
+      const parsed = parseTemperatureValue(content);
+      if (parsed !== null) {
+        return parsed;
+      }
+    } catch {
+      // continue
+    }
+  }
+
+  return null;
+}
+
+function parseTemperatureValue(value) {
+  const numeric = toFiniteNumber(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return null;
+  }
+  if (numeric > 1000) {
+    return clampNumber(numeric / 1000, 0, 150);
+  }
+  return clampNumber(numeric, 0, 150);
+}
+
+async function resolveProcessCount(adapter) {
+  try {
+    const view = await adapter.getObjectViewAsync("system", "instance", {
+      startkey: "system.adapter.",
+      endkey: "system.adapter.\u9999",
+    });
+    const count = Array.isArray(view?.rows) ? view.rows.length : null;
+    return Number.isFinite(count) ? count : null;
+  } catch {
+    return null;
+  }
+}
+
+function toFiniteNumber(value) {
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+  return parsed;
+}
+
+function clampNumber(value, min, max) {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.max(min, Math.min(max, value));
 }
 
 async function readSavedDashboards(adapter) {

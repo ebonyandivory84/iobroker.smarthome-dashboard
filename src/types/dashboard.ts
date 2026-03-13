@@ -1,4 +1,4 @@
-export type WidgetType = "state" | "camera" | "energy" | "solar" | "grafana" | "weather" | "numpad" | "link" | "log" | "script";
+export type WidgetType = "state" | "camera" | "energy" | "solar" | "grafana" | "weather" | "numpad" | "link" | "log" | "script" | "host";
 
 export type IconPair = {
   active: string;
@@ -154,6 +154,13 @@ export type ScriptWidgetConfig = WidgetBase & {
   textFilter?: string;
 };
 
+export type HostStatsWidgetConfig = WidgetBase & {
+  type: "host";
+  manualHeightOverride?: boolean;
+  refreshMs?: number;
+  hostLabel?: string;
+};
+
 export type SolarNodeLayout = {
   x: number;
   y: number;
@@ -236,7 +243,8 @@ export type WidgetConfig =
   | NumpadWidgetConfig
   | LinkWidgetConfig
   | LogWidgetConfig
-  | ScriptWidgetConfig;
+  | ScriptWidgetConfig
+  | HostStatsWidgetConfig;
 
 export type BackgroundMode = "gradient" | "mesh" | "solid";
 
@@ -346,4 +354,16 @@ export type IoBrokerScriptEntry = {
   name: string;
   instance: string;
   enabled: boolean;
+};
+
+export type IoBrokerHostStats = {
+  hostName: string;
+  ts: number;
+  diskTotalBytes: number | null;
+  diskFreeBytes: number | null;
+  ramTotalBytes: number | null;
+  ramFreeBytes: number | null;
+  cpuUsagePercent: number | null;
+  cpuTemperatureC: number | null;
+  processes: number | null;
 };

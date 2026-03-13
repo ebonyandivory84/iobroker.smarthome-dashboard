@@ -261,6 +261,20 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       return;
     }
 
+    if (widget.type === "host") {
+      setSoundDraft({});
+      setWeatherSuggestions([]);
+      setWeatherSearchBusy(false);
+      setDraft({
+        title: widget.title,
+        showTitle: widget.showTitle === false ? "false" : "true",
+        refreshMs: String(widget.refreshMs || 5000),
+        hostLabel: widget.hostLabel || "",
+        ...appearanceDraft,
+      });
+      return;
+    }
+
     if (widget.type === "weather") {
       setSoundDraft({});
       setDraft({
@@ -556,6 +570,14 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ),
         appearance,
       });
+    } else if (widget.type === "host") {
+      onSave(widget.id, {
+        title: draft.title,
+        showTitle: draft.showTitle !== "false",
+        refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 5000, 1500),
+        hostLabel: draft.hostLabel?.trim() || undefined,
+        appearance,
+      });
     } else if (widget.type === "weather") {
       onSave(widget.id, {
         title: draft.title,
@@ -785,6 +807,50 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       </>
                     ) : null}
                   </Field>
+                </>
+              ) : null}
+              {widget.type === "host" ? (
+                <>
+                  <ColorInputRow
+                    firstKey="cardColor"
+                    firstLabel="Pie Disk genutzt"
+                    secondKey="cardColor2"
+                    secondLabel="Pie Disk frei"
+                    values={draft}
+                    onChange={setDraft}
+                  />
+                  <ColorInputRow
+                    firstKey="pvCardColor"
+                    firstLabel="Pie RAM genutzt"
+                    secondKey="homeCardColor"
+                    secondLabel="Pie RAM frei"
+                    values={draft}
+                    onChange={setDraft}
+                  />
+                  <ColorInputRow
+                    firstKey="activeWidgetColor"
+                    firstLabel="CPU Balken Start"
+                    secondKey="activeWidgetColor2"
+                    secondLabel="CPU Balken Ende"
+                    values={draft}
+                    onChange={setDraft}
+                  />
+                  <ColorInputRow
+                    firstKey="inactiveWidgetColor"
+                    firstLabel="Temp Balken Start"
+                    secondKey="inactiveWidgetColor2"
+                    secondLabel="Temp Balken Ende"
+                    values={draft}
+                    onChange={setDraft}
+                  />
+                  <ColorInputRow
+                    firstKey="statColor"
+                    firstLabel="Prozess Badge Start"
+                    secondKey="statColor2"
+                    secondLabel="Prozess Badge Ende"
+                    values={draft}
+                    onChange={setDraft}
+                  />
                 </>
               ) : null}
             </Field>
@@ -1488,6 +1554,30 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     <Text style={styles.inlineActionLabel}>Als Default fuer alle Script-Widgets verwenden</Text>
                   </EditorButtonPressable>
                 </Field>
+              </>
+            ) : null}
+            {widget.type === "host" ? (
+              <>
+                <Field label="Refresh (ms)">
+                  <TextInput
+                    keyboardType="numeric"
+                    onChangeText={(value) => setDraft((current) => ({ ...current, refreshMs: value }))}
+                    style={styles.input}
+                    value={draft.refreshMs || "5000"}
+                  />
+                </Field>
+                <Field label="Host Label (optional)">
+                  <TextInput
+                    onChangeText={(value) => setDraft((current) => ({ ...current, hostLabel: value }))}
+                    placeholder="z. B. Proxmox-Host, Raspberry Pi"
+                    placeholderTextColor={palette.textMuted}
+                    style={styles.input}
+                    value={draft.hostLabel || ""}
+                  />
+                </Field>
+                <Text style={styles.mappingHint}>
+                  Zeigt Festplatte, RAM, CPU-Auslastung, Prozessanzahl und CPU-Temperatur des ioBroker-Hosts.
+                </Text>
               </>
             ) : null}
             {widget.type === "solar" ? (
@@ -2207,6 +2297,25 @@ function getWidgetAppearanceDefaults(
       mutedTextColor: palette.textMuted,
       cardColor: "rgba(7, 14, 29, 0.72)",
       cardColor2: "rgba(20, 42, 82, 0.82)",
+    };
+  }
+
+  if (widget.type === "host") {
+    return {
+      widgetColor: "rgba(15, 34, 66, 0.95)",
+      widgetColor2: "rgba(8, 18, 36, 0.98)",
+      textColor: palette.text,
+      mutedTextColor: palette.textMuted,
+      cardColor: "#6ce8b4",
+      cardColor2: "rgba(255,255,255,0.12)",
+      pvCardColor: "#73b9ff",
+      homeCardColor: "rgba(255,255,255,0.12)",
+      activeWidgetColor: "#65d6ff",
+      activeWidgetColor2: "#4d86ff",
+      inactiveWidgetColor: "#ffcb67",
+      inactiveWidgetColor2: "#ff7f66",
+      statColor: "rgba(130, 182, 255, 0.24)",
+      statColor2: "rgba(89, 132, 238, 0.18)",
     };
   }
 
