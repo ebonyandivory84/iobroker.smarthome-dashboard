@@ -14,6 +14,7 @@ type TopBarProps = {
   onAddWidget: () => void;
   onSelectPage: (pageId: string) => void;
   onMovePage?: (pageId: string, direction: "left" | "right") => void;
+  onRenamePage?: (pageId: string) => void;
   pageTabSounds?: string[];
   layoutToggleSounds?: string[];
   addWidgetSounds?: string[];
@@ -31,6 +32,7 @@ export function TopBar({
   onAddWidget,
   onSelectPage,
   onMovePage,
+  onRenamePage,
   pageTabSounds,
   layoutToggleSounds,
   addWidgetSounds,
@@ -67,6 +69,18 @@ export function TopBar({
             {page.title}
           </Text>
         </Pressable>
+        {isLayoutMode ? (
+          <Pressable
+            disabled={!onRenamePage}
+            onPress={() => {
+              playConfiguredUiSound(pageTabSounds, "panel", `page-tab:rename:${page.id}`);
+              onRenamePage?.(page.id);
+            }}
+            style={[styles.pageMoveButton, !onRenamePage ? styles.pageMoveButtonDisabled : null]}
+          >
+            <MaterialCommunityIcons color={onRenamePage ? palette.text : palette.textMuted} name="pencil" size={12} />
+          </Pressable>
+        ) : null}
         {isLayoutMode ? (
           <Pressable
             disabled={!canMoveRight || !onMovePage}
@@ -189,7 +203,7 @@ const styles = StyleSheet.create({
     paddingRight: 4,
   },
   pageTab: {
-    maxWidth: 260,
+    maxWidth: 320,
     borderRadius: 999,
     minHeight: 34,
     paddingHorizontal: 8,
@@ -205,8 +219,9 @@ const styles = StyleSheet.create({
     minHeight: 36,
   },
   pageTabMainButton: {
+    flex: 1,
     flexShrink: 1,
-    minWidth: 0,
+    minWidth: 72,
     paddingHorizontal: 8,
     paddingVertical: 2,
     alignItems: "center",

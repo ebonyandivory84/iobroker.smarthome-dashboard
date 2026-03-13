@@ -33,6 +33,7 @@ type DashboardConfigContextValue = {
   setActivePage: (pageId: string) => void;
   createDashboardPage: () => void;
   moveDashboardPage: (pageId: string, direction: "left" | "right") => void;
+  renameDashboardPage: (pageId: string, title: string) => void;
   refreshSavedDashboards: () => Promise<void>;
   saveNamedDashboard: (name: string) => Promise<{ ok: boolean; error?: string }>;
   loadNamedDashboard: (name: string) => Promise<{ ok: boolean; error?: string }>;
@@ -444,6 +445,49 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
           return;
         }
         nextPages.splice(targetIndex, 0, movedPage);
+
+        const activePage =
+          nextPages.find((page) => page.id === (config.activePageId || "")) ||
+          nextPages[0];
+        if (!activePage) {
+          return;
+        }
+
+        persist({
+          ...config,
+          pages: nextPages,
+          activePageId: activePage.id,
+          title: activePage.title,
+          widgets: activePage.widgets,
+        });
+      },
+      renameDashboardPage(pageId, title) {
+        const nextTitle = title.trim();
+        if (!nextTitle) {
+          return;
+        }
+
+        const pages = config.pages || [];
+        let changed = false;
+        const nextPages = pages.map((page) => {
+          if (page.id !== pageId) {
+            return page;
+          }
+
+          if (page.title === nextTitle) {
+            return page;
+          }
+
+          changed = true;
+          return {
+            ...page,
+            title: nextTitle,
+          };
+        });
+
+        if (!changed) {
+          return;
+        }
 
         const activePage =
           nextPages.find((page) => page.id === (config.activePageId || "")) ||

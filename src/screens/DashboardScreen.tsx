@@ -1,5 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { NativeScrollEvent, NativeSyntheticEvent, Platform, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import {
+  Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { GridCanvas } from "../components/GridCanvas";
 import { SettingsModal } from "../components/SettingsModal";
 import { TopBar } from "../components/TopBar";
@@ -54,6 +66,7 @@ export function DashboardScreen() {
     activePageId,
     createDashboardPage,
     moveDashboardPage,
+    renameDashboardPage,
     moveWidgetToPage,
     removeWidget,
     replaceWidgets,
@@ -68,6 +81,8 @@ export function DashboardScreen() {
   const [scrollFocusWidgetId, setScrollFocusWidgetId] = useState<string | null>(null);
   const [layoutMode, setLayoutMode] = useState(false);
   const [visiblePageId, setVisiblePageId] = useState(activePageId);
+  const [renamePageId, setRenamePageId] = useState<string | null>(null);
+  const [renamePageTitle, setRenamePageTitle] = useState("");
   const lastContentScrollAt = useRef(0);
   const activePageIndex = Math.max(0, dashboardPages.findIndex((page) => page.id === activePageId));
   const visiblePageIndex = Math.max(0, dashboardPages.findIndex((page) => page.id === visiblePageId));
@@ -81,6 +96,10 @@ export function DashboardScreen() {
         activePageId: page.id,
       })),
     [config, dashboardPages]
+  );
+  const renameTargetPage = useMemo(
+    () => dashboardPages.find((page) => page.id === renamePageId) || null,
+    [dashboardPages, renamePageId]
   );
 
   useEffect(() => {
@@ -345,6 +364,32 @@ export function DashboardScreen() {
     }
 
     updateWidget(widgetId, partial);
+  };
+
+  const closeRenameDialog = () => {
+    setRenamePageId(null);
+    setRenamePageTitle("");
+  };
+
+  const openRenameDialog = (pageId: string) => {
+    const page = dashboardPages.find((entry) => entry.id === pageId);
+    if (!page) {
+      return;
+    }
+    setRenamePageId(pageId);
+    setRenamePageTitle(page.title);
+  };
+
+  const submitRenameDialog = () => {
+    if (!renamePageId) {
+      return;
+    }
+    const nextTitle = renamePageTitle.trim();
+    if (!nextTitle) {
+      return;
+    }
+    renameDashboardPage(renamePageId, nextTitle);
+    closeRenameDialog();
   };
 
   const handleDragAcrossPageEdge = (
@@ -661,6 +706,9 @@ export function DashboardScreen() {
         onMovePage={(pageId, direction) => {
           moveDashboardPage(pageId, direction);
         }}
+        onRenamePage={(pageId) => {
+          openRenameDialog(pageId);
+        }}
       />
       <ScrollView
         style={[styles.scroll, isCompact ? styles.scrollCompact : null]}
@@ -766,6 +814,44 @@ export function DashboardScreen() {
         widget={editingWidget}
       />
       <SettingsModal onClose={() => setSettingsOpen(false)} visible={settingsOpen} />
+      <Modal
+        animationType="fade"
+        onRequestClose={closeRenameDialog}
+        transparent
+        visible={Boolean(renameTargetPage)}
+      >
+        <View style={styles.renameBackdrop}>
+          <View style={styles.renameCard}>
+            <Text style={styles.renameTitle}>Side-Page umbenennen</Text>
+            <Text style={styles.renameHint}>Titel fuer den Seiten-Button:</Text>
+            <TextInput
+              autoFocus
+              onChangeText={setRenamePageTitle}
+              onSubmitEditing={submitRenameDialog}
+              placeholder="z. B. Wallbox, Garten, Uebersicht"
+              placeholderTextColor={palette.textMuted}
+              style={styles.renameInput}
+              value={renamePageTitle}
+            />
+            <View style={styles.renameActions}>
+              <Pressable onPress={closeRenameDialog} style={[styles.renameButton, styles.renameButtonSecondary]}>
+                <Text style={styles.renameButtonSecondaryLabel}>Abbrechen</Text>
+              </Pressable>
+              <Pressable
+                disabled={!renamePageTitle.trim()}
+                onPress={submitRenameDialog}
+                style={[
+                  styles.renameButton,
+                  styles.renameButtonPrimary,
+                  !renamePageTitle.trim() ? styles.renameButtonDisabled : null,
+                ]}
+              >
+                <Text style={styles.renameButtonPrimaryLabel}>Speichern</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -897,5 +983,74 @@ const styles = StyleSheet.create({
           touchAction: "pan-y" as const,
         }
       : null),
+  },
+  renameBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  renameCard: {
+    width: "100%",
+    maxWidth: 420,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.panelStrong,
+    padding: 16,
+    gap: 10,
+  },
+  renameTitle: {
+    color: palette.text,
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  renameHint: {
+    color: palette.textMuted,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  renameInput: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: "rgba(6, 12, 20, 0.92)",
+    color: palette.text,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  renameActions: {
+    marginTop: 4,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+  },
+  renameButton: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+  },
+  renameButtonSecondary: {
+    borderColor: palette.border,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  renameButtonPrimary: {
+    borderColor: "rgba(77, 226, 177, 0.34)",
+    backgroundColor: palette.accent,
+  },
+  renameButtonDisabled: {
+    opacity: 0.5,
+  },
+  renameButtonSecondaryLabel: {
+    color: palette.text,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  renameButtonPrimaryLabel: {
+    color: "#041019",
+    fontSize: 12,
+    fontWeight: "800",
   },
 });
