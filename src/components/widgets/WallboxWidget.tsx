@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     minHeight: 0,
-    borderRadius: 18,
+    borderRadius: 0,
     borderWidth: 0,
     overflow: "hidden",
     paddingHorizontal: 14,

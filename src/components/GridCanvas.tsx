@@ -1149,6 +1149,7 @@ function WebWidgetShell({
     widget.type !== "camera" &&
     widget.type !== "solar" &&
     widget.type !== "state" &&
+    widget.type !== "wallbox" &&
     widget.type !== "numpad" &&
     widget.type !== "grafana" &&
     !linkBorderless

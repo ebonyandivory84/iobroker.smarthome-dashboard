@@ -210,6 +210,7 @@ export function WidgetFrame({
           widget.type !== "camera" &&
           widget.type !== "solar" &&
           widget.type !== "state" &&
+          widget.type !== "wallbox" &&
           widget.type !== "grafana" &&
           !linkBorderless
             ? styles.contentInset
