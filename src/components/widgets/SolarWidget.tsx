@@ -1180,6 +1180,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1,
     alignItems: "center",
+    justifyContent: "center",
   },
   miniCompact: {
     flexBasis: 110,
