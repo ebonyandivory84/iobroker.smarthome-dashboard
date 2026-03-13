@@ -220,6 +220,14 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           widget.interactionSounds?.notify,
           config.uiSounds?.widgetTypeDefaults?.log?.notify
         ),
+        notifyWarn: resolveDraftSoundValue(
+          widget.interactionSounds?.notifyWarn,
+          config.uiSounds?.widgetTypeDefaults?.log?.notifyWarn
+        ),
+        notifyError: resolveDraftSoundValue(
+          widget.interactionSounds?.notifyError,
+          config.uiSounds?.widgetTypeDefaults?.log?.notifyError
+        ),
       });
       setWeatherSuggestions([]);
       setWeatherSearchBusy(false);
@@ -293,6 +301,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         showTitle: widget.showTitle === false ? "false" : "true",
         showStatusSubtitle: widget.showStatusSubtitle === false ? "false" : "true",
         refreshMs: String(widget.refreshMs || 2000),
+        backgroundImage: widget.backgroundImage || "",
+        backgroundImageBlur: String(widget.backgroundImageBlur ?? 8),
         modeStateId: widget.modeStateId || "0_userdata.0.goe.mode",
         gridAmpereStateId: widget.gridAmpereStateId || "0_userdata.0.goe.gridAmpere",
         limit80StateId: widget.limit80StateId || "0_userdata.0.goe.limit80",
@@ -576,7 +586,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         title: draft.title,
         showTitle: draft.showTitle !== "false",
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 500),
-        maxEntries: clampInt(draft.maxEntries, widget.maxEntries || 80, 5),
+        maxEntries: clampIntMax(draft.maxEntries, widget.maxEntries || 80, 5, 200),
         minSeverity: normalizeLogSeverity(draft.minSeverity),
         sourceFilter: draft.sourceFilter?.trim() || undefined,
         textFilter: draft.textFilter?.trim() || undefined,
@@ -616,6 +626,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         showTitle: draft.showTitle !== "false",
         showStatusSubtitle: draft.showStatusSubtitle !== "false",
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 500),
+        backgroundImage: draft.backgroundImage?.trim() || undefined,
+        backgroundImageBlur: clampInt(draft.backgroundImageBlur, widget.backgroundImageBlur ?? 8, 0),
         modeStateId: draft.modeStateId?.trim() || widget.modeStateId,
         gridAmpereStateId: draft.gridAmpereStateId?.trim() || widget.gridAmpereStateId,
         limit80StateId: draft.limit80StateId?.trim() || widget.limit80StateId,
@@ -710,6 +722,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       close: normalizeSoundSelection(soundDraft.close),
       scroll: normalizeSoundSelection(soundDraft.scroll),
       notify: normalizeSoundSelection(soundDraft.notify),
+      notifyWarn: normalizeSoundSelection(soundDraft.notifyWarn),
+      notifyError: normalizeSoundSelection(soundDraft.notifyError),
     };
 
     patchConfig({
@@ -1542,6 +1556,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       style={styles.input}
                       value={draft.maxEntries || "80"}
                     />
+                    <Text style={styles.mappingHint}>Maximal 200 Eintraege.</Text>
                   </Field>
                 </View>
                 <Field label="Mindest-Level">
@@ -1588,6 +1603,18 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     <SoundPickerField
                       onChange={(value) => setSoundDraft((current) => ({ ...current, notify: value }))}
                       value={soundDraft.notify}
+                    />
+                  </Field>
+                  <Field label="Neue WARN-Meldung">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, notifyWarn: value }))}
+                      value={soundDraft.notifyWarn}
+                    />
+                  </Field>
+                  <Field label="Neue ERROR-Meldung">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, notifyError: value }))}
+                      value={soundDraft.notifyError}
                     />
                   </Field>
                   <EditorButtonPressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
@@ -1698,6 +1725,28 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     />
                   </Field>
                 </View>
+
+                <Field label="Widget-Hintergrundbild (optional)">
+                  <View style={styles.stateFieldRow}>
+                    <TextInput
+                      editable={false}
+                      style={[styles.input, styles.stateFieldInput]}
+                      value={draft.backgroundImage || ""}
+                    />
+                    <EditorButtonPressable
+                      onPress={() => setImagePickerField("backgroundImage")}
+                      style={styles.stateBrowseButton}
+                    >
+                      <Text style={styles.stateBrowseLabel}>Bild waehlen</Text>
+                    </EditorButtonPressable>
+                  </View>
+                  <Field label="Bild-Unschaerfe">
+                    <BlurControl
+                      value={draft.backgroundImageBlur || "8"}
+                      onChange={(value) => setDraft((current) => ({ ...current, backgroundImageBlur: value }))}
+                    />
+                  </Field>
+                </Field>
 
                 <Text style={styles.sectionTitle}>Steuerbare Datenpunkte</Text>
                 <Field label="Mode State ID">
@@ -2051,12 +2100,16 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
             ? widget?.type === "state"
               ? "State-Bild waehlen"
               : "Link-Icon waehlen"
-            : "Solar-Hintergrund waehlen"
+            : widget?.type === "wallbox"
+              ? "Wallbox-Hintergrund waehlen"
+              : "Solar-Hintergrund waehlen"
         }
         helperText={
           imagePickerField === "iconImage"
             ? "Waehle eine Bilddatei aus dem Ordner `assets/`."
-            : "Verwendet den festen Ordner `assets/` im Adapter-Paket."
+            : widget?.type === "wallbox"
+              ? "Waehle ein Hintergrundbild. Drag&Drop, Datei-Upload und Browser-Auswahl sind verfuegbar."
+              : "Verwendet den festen Ordner `assets/` im Adapter-Paket."
         }
         onClose={() => setImagePickerField(null)}
         onSelect={(entry) => {
@@ -2065,6 +2118,12 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
               return {
                 ...current,
                 iconImage: entry.name,
+              };
+            }
+            if (widget?.type === "wallbox") {
+              return {
+                ...current,
+                backgroundImage: entry.name,
               };
             }
             return {
@@ -2261,6 +2320,10 @@ function clampInt(raw: string | undefined, fallback: number, min: number) {
     return fallback;
   }
   return Math.max(min, parsed);
+}
+
+function clampIntMax(raw: string | undefined, fallback: number, min: number, max: number) {
+  return Math.min(max, clampInt(raw, fallback, min));
 }
 
 function clampFloat(raw: string | undefined, fallback: number) {
@@ -2828,6 +2891,8 @@ function buildStoredInteractionSounds(
   const close = normalizeSoundSelection(draft.close);
   const scroll = normalizeSoundSelection(draft.scroll);
   const notify = normalizeSoundSelection(draft.notify);
+  const notifyWarn = normalizeSoundSelection(draft.notifyWarn);
+  const notifyError = normalizeSoundSelection(draft.notifyError);
 
   if (!areSoundSelectionsEqual(press, defaults?.press)) {
     next.press = press;
@@ -2846,6 +2911,12 @@ function buildStoredInteractionSounds(
   }
   if (!areSoundSelectionsEqual(notify, defaults?.notify)) {
     next.notify = notify;
+  }
+  if (!areSoundSelectionsEqual(notifyWarn, defaults?.notifyWarn)) {
+    next.notifyWarn = notifyWarn;
+  }
+  if (!areSoundSelectionsEqual(notifyError, defaults?.notifyError)) {
+    next.notifyError = notifyError;
   }
 
   return Object.keys(next).length ? next : undefined;

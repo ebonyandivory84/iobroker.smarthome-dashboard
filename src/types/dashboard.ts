@@ -66,6 +66,8 @@ export type WidgetInteractionSounds = {
   close?: string[];
   scroll?: string[];
   notify?: string[];
+  notifyWarn?: string[];
+  notifyError?: string[];
 };
 
 export type StateWidgetConfig = WidgetBase & {
@@ -178,6 +180,8 @@ export type WallboxWidgetConfig = WidgetBase & {
   manualHeightOverride?: boolean;
   refreshMs?: number;
   showStatusSubtitle?: boolean;
+  backgroundImage?: string;
+  backgroundImageBlur?: number;
   modeStateId: string;
   gridAmpereStateId: string;
   limit80StateId: string;

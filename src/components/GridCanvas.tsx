@@ -27,6 +27,7 @@ type GridCanvasProps = {
   config: DashboardSettings;
   states: StateSnapshot;
   client: IoBrokerClient;
+  isActivePage?: boolean;
   isLayoutMode: boolean;
   onEditWidget: (widgetId: string) => void;
   onUpdateWidget: (widgetId: string, partial: Partial<WidgetConfig>) => void;
@@ -44,6 +45,7 @@ export function GridCanvas({
   config,
   states,
   client,
+  isActivePage = true,
   isLayoutMode,
   onEditWidget,
   onUpdateWidget,
@@ -151,6 +153,7 @@ export function GridCanvas({
         cellWidth={cellWidth}
         client={client}
         config={displayConfig}
+        isActivePage={isActivePage}
         mainColumnExtraGap={mainColumnExtraGap}
         sourceColumns={config.grid.columns}
         rowHeight={renderRowHeight}
@@ -224,7 +227,8 @@ export function GridCanvas({
                   displayConfig.uiSounds?.widgetTypeDefaults,
                   onCameraFullscreenSwipeClose,
                   onCameraFullscreenVisibilityChange,
-                  onWidgetScrollFocusChange
+                  onWidgetScrollFocusChange,
+                  isActivePage
                 )}
               </WidgetFrame>
             </View>
@@ -833,6 +837,7 @@ function displaySpan(x: number, w: number, cellWidth: number, gap: number, mainC
 
 function WebGridCanvas({
   config,
+  isActivePage,
   mainColumnExtraGap,
   sourceColumns,
   theme,
@@ -851,6 +856,7 @@ function WebGridCanvas({
   stateWrites,
 }: {
   config: DashboardSettings;
+  isActivePage: boolean;
   mainColumnExtraGap: number;
   sourceColumns: number;
   theme: ReturnType<typeof resolveThemeSettings>;
@@ -879,6 +885,7 @@ function WebGridCanvas({
           cellWidth={cellWidth}
           client={client}
           config={config}
+          isActivePage={isActivePage}
           rowHeight={rowHeight}
           theme={theme}
           isLayoutMode={isLayoutMode}
@@ -913,6 +920,7 @@ function WebGridCanvas({
 function WebWidgetShell({
   widget,
   config,
+  isActivePage,
   rowHeight,
   theme,
   states,
@@ -935,6 +943,7 @@ function WebWidgetShell({
 }: {
   widget: WidgetConfig;
   config: DashboardSettings;
+  isActivePage: boolean;
   rowHeight: number;
   theme: ReturnType<typeof resolveThemeSettings>;
   states: StateSnapshot;
@@ -1185,7 +1194,8 @@ function WebWidgetShell({
           config.uiSounds?.widgetTypeDefaults,
           undefined,
           undefined,
-          onWidgetScrollFocusChange
+          onWidgetScrollFocusChange,
+          isActivePage
         )}
       </View>
       {isLayoutMode && allowManualLayout && allowResize ? (
@@ -1208,7 +1218,8 @@ function renderWidget(
   widgetTypeDefaults?: Partial<Record<WidgetType, WidgetInteractionSounds>>,
   onCameraFullscreenSwipeClose?: () => void,
   onCameraFullscreenVisibilityChange?: (widgetId: string, open: boolean) => void,
-  onWidgetScrollFocusChange?: (widgetId: string, active: boolean) => void
+  onWidgetScrollFocusChange?: (widgetId: string, active: boolean) => void,
+  isActivePage: boolean = true
 ) {
   const effectiveWidget = mergeWidgetInteractionSounds(widget, widgetTypeDefaults?.[widget.type]);
 
@@ -1285,6 +1296,7 @@ function renderWidget(
         client={client}
         config={effectiveWidget}
         onScrollModeChange={(active) => onWidgetScrollFocusChange?.(effectiveWidget.id, active)}
+        notificationsEnabled={isActivePage}
       />
     );
   }
@@ -1377,6 +1389,8 @@ function mergeWidgetInteractionSounds(
       close: widget.interactionSounds?.close?.length ? widget.interactionSounds.close : defaults.close,
       scroll: widget.interactionSounds?.scroll?.length ? widget.interactionSounds.scroll : defaults.scroll,
       notify: widget.interactionSounds?.notify?.length ? widget.interactionSounds.notify : defaults.notify,
+      notifyWarn: widget.interactionSounds?.notifyWarn?.length ? widget.interactionSounds.notifyWarn : defaults.notifyWarn,
+      notifyError: widget.interactionSounds?.notifyError?.length ? widget.interactionSounds.notifyError : defaults.notifyError,
     },
   } as WidgetConfig;
 }

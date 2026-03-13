@@ -684,6 +684,8 @@ function normalizeWidgetInteractionSounds(
     close: normalizeSoundSelection(input.close),
     scroll: normalizeSoundSelection(input.scroll),
     notify: normalizeSoundSelection(input.notify),
+    notifyWarn: normalizeSoundSelection(input.notifyWarn),
+    notifyError: normalizeSoundSelection(input.notifyError),
   };
 }
 

@@ -10,6 +10,7 @@ type LogWidgetProps = {
   config: LogWidgetConfig;
   client: IoBrokerClient;
   onScrollModeChange?: (active: boolean) => void;
+  notificationsEnabled?: boolean;
 };
 
 const SEVERITY_ORDER: Record<NonNullable<LogWidgetConfig["minSeverity"]>, number> = {
@@ -25,7 +26,9 @@ const MONO_FONT = Platform.select({
   default: "monospace",
 });
 
-export function LogWidget({ config, client, onScrollModeChange }: LogWidgetProps) {
+const MAX_LOG_ENTRIES_HARD_LIMIT = 200;
+
+export function LogWidget({ config, client, onScrollModeChange, notificationsEnabled = true }: LogWidgetProps) {
   const [entries, setEntries] = useState<IoBrokerLogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [quickSeverity, setQuickSeverity] = useState<"base" | "warn" | "error">("base");
@@ -43,7 +46,7 @@ export function LogWidget({ config, client, onScrollModeChange }: LogWidgetProps
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const refreshMs = clampInt(config.refreshMs, 2000, 500);
-  const maxEntries = clampInt(config.maxEntries, 80, 5);
+  const maxEntries = clampIntMax(config.maxEntries, 80, 5, MAX_LOG_ENTRIES_HARD_LIMIT);
   const configuredMinSeverity = normalizeSeverity(config.minSeverity);
   const requestMinSeverity = quickSeverity === "base" ? configuredMinSeverity : quickSeverity;
   const sourceFilter = (config.sourceFilter || "").trim();
@@ -109,22 +112,46 @@ export function LogWidget({ config, client, onScrollModeChange }: LogWidgetProps
             : quickSeverity === "error"
               ? logs.filter((entry) => entry.severity === "error")
               : logs;
+        const cappedLogs = filteredLogs.slice(0, MAX_LOG_ENTRIES_HARD_LIMIT);
 
         if (active) {
-          setEntries(filteredLogs);
+          setEntries(cappedLogs);
           setError(null);
 
-          const nextLatestTimestamp = filteredLogs.reduce(
+          const nextLatestTimestamp = cappedLogs.reduce(
             (largest, entry) => Math.max(largest, Number.isFinite(entry.ts) ? entry.ts : 0),
             0
           );
 
-          if (skipIncomingSound) {
+          if (skipIncomingSound || !notificationsEnabled) {
             latestSeenTimestampRef.current = Math.max(latestSeenTimestampRef.current, nextLatestTimestamp);
             skipIncomingSound = false;
           } else if (nextLatestTimestamp > latestSeenTimestampRef.current) {
+            const incomingEntries = cappedLogs.filter(
+              (entry) => Number.isFinite(entry.ts) && entry.ts > latestSeenTimestampRef.current
+            );
             latestSeenTimestampRef.current = nextLatestTimestamp;
-            playConfiguredUiSound(config.interactionSounds?.notify, "page", `${config.id}:incoming-log`);
+            const hasError = incomingEntries.some((entry) => entry.severity === "error");
+            const hasWarn = incomingEntries.some((entry) => entry.severity === "warn");
+            if (hasError) {
+              playConfiguredUiSound(
+                config.interactionSounds?.notifyError?.length
+                  ? config.interactionSounds.notifyError
+                  : config.interactionSounds?.notify,
+                "page",
+                `${config.id}:incoming-log:error`
+              );
+            } else if (hasWarn) {
+              playConfiguredUiSound(
+                config.interactionSounds?.notifyWarn?.length
+                  ? config.interactionSounds.notifyWarn
+                  : config.interactionSounds?.notify,
+                "page",
+                `${config.id}:incoming-log:warn`
+              );
+            } else {
+              playConfiguredUiSound(config.interactionSounds?.notify, "page", `${config.id}:incoming-log`);
+            }
           }
         }
       } catch (syncError) {
@@ -149,7 +176,20 @@ export function LogWidget({ config, client, onScrollModeChange }: LogWidgetProps
       active = false;
       clearInterval(timer);
     };
-  }, [client, config.id, config.interactionSounds?.notify, maxEntries, quickSeverity, refreshMs, requestMinSeverity, sourceFilter, textFilter]);
+  }, [
+    client,
+    config.id,
+    config.interactionSounds?.notify,
+    config.interactionSounds?.notifyWarn,
+    config.interactionSounds?.notifyError,
+    maxEntries,
+    notificationsEnabled,
+    quickSeverity,
+    refreshMs,
+    requestMinSeverity,
+    sourceFilter,
+    textFilter,
+  ]);
 
   const levelLabel = quickSeverity === "base" ? configuredMinSeverity.toUpperCase() : `${quickSeverity.toUpperCase()} ONLY`;
 
@@ -157,11 +197,8 @@ export function LogWidget({ config, client, onScrollModeChange }: LogWidgetProps
     if (error) {
       return error;
     }
-    if (!entries.length) {
-      return "Keine Log-Eintraege gefunden";
-    }
-    return `${entries.length} Eintraege`;
-  }, [entries.length, error]);
+    return isScrollActive ? "Widget-Scroll aktiv" : "Widget-Scroll inaktiv";
+  }, [error, isScrollActive]);
 
   const playScrollSound = () => {
     const now = Date.now();
@@ -312,6 +349,10 @@ function clampInt(value: number | undefined, fallback: number, min: number) {
     return fallback;
   }
   return Math.max(min, Math.round(value));
+}
+
+function clampIntMax(value: number | undefined, fallback: number, min: number, max: number) {
+  return Math.min(max, clampInt(value, fallback, min));
 }
 
 function normalizeSeverity(value: LogWidgetConfig["minSeverity"]) {

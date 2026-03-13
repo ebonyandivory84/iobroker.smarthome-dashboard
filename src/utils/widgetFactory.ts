@@ -223,6 +223,8 @@ export function buildWidgetTemplate(
       title: `Wallbox ${suffix}`,
       refreshMs: 2000,
       showStatusSubtitle: true,
+      backgroundImage: "",
+      backgroundImageBlur: 8,
       modeStateId: "0_userdata.0.goe.mode",
       gridAmpereStateId: "0_userdata.0.goe.gridAmpere",
       limit80StateId: "0_userdata.0.goe.limit80",

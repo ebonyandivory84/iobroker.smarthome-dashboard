@@ -186,7 +186,7 @@ export class IoBrokerClient {
     source?: string;
     contains?: string;
   }): Promise<IoBrokerLogEntry[]> {
-    const limit = Math.max(1, Math.min(500, Math.round(options?.limit || 100)));
+    const limit = Math.max(1, Math.min(200, Math.round(options?.limit || 100)));
     const params = new URLSearchParams({
       limit: String(limit),
     });

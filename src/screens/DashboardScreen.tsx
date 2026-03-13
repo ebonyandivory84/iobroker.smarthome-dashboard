@@ -190,6 +190,8 @@ export function DashboardScreen() {
       ...(config.uiSounds?.widgetTypeDefaults?.log?.press || []),
       ...(config.uiSounds?.widgetTypeDefaults?.log?.scroll || []),
       ...(config.uiSounds?.widgetTypeDefaults?.log?.notify || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.log?.notifyWarn || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.log?.notifyError || []),
       ...(config.uiSounds?.widgetTypeDefaults?.script?.press || []),
       ...(config.uiSounds?.widgetTypeDefaults?.script?.scroll || []),
       ...(config.uiSounds?.widgetTypeDefaults?.wallbox?.press || []),
@@ -211,6 +213,8 @@ export function DashboardScreen() {
           ...(widget.interactionSounds?.close || []),
           ...(widget.interactionSounds?.scroll || []),
           ...(widget.interactionSounds?.notify || []),
+          ...(widget.interactionSounds?.notifyWarn || []),
+          ...(widget.interactionSounds?.notifyError || []),
         ])
       ),
     ];
@@ -685,6 +689,7 @@ export function DashboardScreen() {
                   <GridCanvas
                     client={client}
                     config={pageConfig}
+                    isActivePage={isActive}
                     isLayoutMode={layoutMode}
                     onCameraFullscreenSwipeClose={() => {
                       pullRefreshBlockedUntilRef.current = Date.now() + 2500;

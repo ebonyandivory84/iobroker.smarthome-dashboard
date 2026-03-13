@@ -1,5 +1,5 @@
 import { createElement, useCallback, useEffect, useMemo, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { ImageBackground, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { IoBrokerClient } from "../../services/iobroker";
 import { StateSnapshot, WallboxWidgetConfig } from "../../types/dashboard";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
@@ -165,6 +165,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const panelBorderColor = "rgba(191, 209, 245, 0.18)";
   const modePanelBackground = "rgba(255,255,255,0.025)";
   const disabledOpacity = 0.46;
+  const backgroundBlur = Math.min(24, clampInt(config.backgroundImageBlur, 8, 0));
 
   const playPressSound = useCallback(
     (key: string) => {
@@ -286,6 +287,25 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   return (
     <View style={styles.container}>
       <View style={[styles.card, { backgroundColor: cardStart, borderColor: panelBorderColor }]}>
+        {config.backgroundImage ? (
+          Platform.OS === "web" ? (
+            <>
+              {createElement("div", {
+                style: buildBlurredWidgetBackgroundStyle(config.backgroundImage, backgroundBlur),
+              })}
+              <View style={styles.widgetBackgroundOverlay} />
+            </>
+          ) : (
+            <ImageBackground
+              blurRadius={backgroundBlur}
+              imageStyle={styles.widgetBackgroundImage}
+              source={{ uri: `/smarthome-dashboard/widget-assets/${encodeURIComponent(config.backgroundImage)}` }}
+              style={styles.widgetBackground}
+            >
+              <View style={styles.widgetBackgroundOverlay} />
+            </ImageBackground>
+          )
+        ) : null}
         {Platform.OS === "web"
           ? createElement("div", {
               style: {
@@ -299,11 +319,6 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
           {config.showTitle !== false ? (
             <Text numberOfLines={1} style={[styles.title, { color: textColor }]}>
               {titleText}
-            </Text>
-          ) : null}
-          {config.showStatusSubtitle !== false ? (
-            <Text numberOfLines={2} style={[styles.subtitle, { color: mutedTextColor }]}>
-              {subtitleText}
             </Text>
           ) : null}
         </View>
@@ -378,6 +393,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
                       ...webSliderStyle,
                       opacity: isGridMode ? 1 : 0.45,
                       accentColor: sliderStart,
+                      backgroundImage: `linear-gradient(90deg, ${sliderStart} 0%, ${sliderEnd} 100%)`,
                     },
                   })
                 : (
@@ -473,6 +489,12 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
             </View>
           ))}
         </View>
+
+        {config.showStatusSubtitle !== false ? (
+          <Text numberOfLines={2} style={[styles.subtitleBottom, { color: mutedTextColor }]}>
+            {subtitleText}
+          </Text>
+        ) : null}
 
         <Text
           numberOfLines={1}
@@ -654,7 +676,8 @@ function buildStatusSubtitle({
   limit80Enabled: boolean;
 }) {
   const parts: string[] = [];
-  const liveCharging = (carCode === 2 || (typeof liveAmpere === "number" && liveAmpere > 0.25));
+  const hasCarSignal = carCode !== null;
+  const liveCharging = carCode === 2 || (!hasCarSignal && typeof liveAmpere === "number" && liveAmpere > 0.25);
   if (liveCharging) {
     parts.push("Fahrzeug laedt");
   } else if (carCode === 4) {
@@ -678,6 +701,14 @@ function formatBooleanDe(value: boolean | null) {
   return value ? "Ja" : "Nein";
 }
 
+function buildBlurredWidgetBackgroundStyle(imageName: string, blur: number) {
+  return {
+    ...webBackgroundLayerStyle,
+    backgroundImage: `url("/smarthome-dashboard/widget-assets/${encodeURIComponent(imageName)}")`,
+    filter: `blur(${blur}px)`,
+  };
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -695,6 +726,16 @@ const styles = StyleSheet.create({
     gap: 11,
     position: "relative",
   },
+  widgetBackground: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  widgetBackgroundImage: {
+    resizeMode: "cover",
+  },
+  widgetBackgroundOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(5, 10, 18, 0.36)",
+  },
   header: {
     gap: 3,
   },
@@ -703,7 +744,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0.2,
   },
-  subtitle: {
+  subtitleBottom: {
     fontSize: 12,
     lineHeight: 18,
     fontWeight: "600",
@@ -910,6 +951,17 @@ const webGradientLayerStyle = {
   inset: 0,
   zIndex: 1,
   pointerEvents: "none",
+} as const;
+
+const webBackgroundLayerStyle = {
+  position: "absolute",
+  inset: "-14px",
+  zIndex: 0,
+  pointerEvents: "none",
+  backgroundPosition: "center",
+  backgroundRepeat: "no-repeat",
+  backgroundSize: "cover",
+  transform: "scale(1.04)",
 } as const;
 
 const webSliderStyle = {

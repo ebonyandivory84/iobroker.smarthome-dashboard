@@ -252,7 +252,7 @@ async function main(adapter) {
 
   app.get("/smarthome-dashboard/api/logs", async (req, res) => {
     try {
-      const limit = clampInt(req.query?.limit, 100, 1, 500);
+      const limit = clampInt(req.query?.limit, 100, 1, 200);
       const minSeverity = normalizeLogSeverity(req.query?.minSeverity);
       const source = normalizeFilter(req.query?.source);
       const contains = normalizeFilter(req.query?.contains);
