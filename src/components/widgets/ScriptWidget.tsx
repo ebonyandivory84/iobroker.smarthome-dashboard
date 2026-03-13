@@ -504,6 +504,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+    minHeight: 0,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
@@ -608,15 +609,17 @@ const styles = StyleSheet.create({
 });
 
 const webRootStyle = {
+  display: "flex",
+  flexDirection: "column" as const,
   width: "100%",
   height: "100%",
+  minHeight: 0,
 };
 
 const webScrollStyle = {
   flex: 1,
   minHeight: 0,
   width: "100%",
-  height: "100%",
   overscrollBehaviorY: "contain" as const,
 };
 
