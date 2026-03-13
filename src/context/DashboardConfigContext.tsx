@@ -31,6 +31,7 @@ type DashboardConfigContextValue = {
   moveWidgetToPage: (widgetId: string, targetPageId: string, position?: WidgetConfig["position"]) => void;
   setActivePage: (pageId: string) => void;
   createDashboardPage: () => void;
+  moveDashboardPage: (pageId: string, direction: "left" | "right") => void;
   refreshSavedDashboards: () => Promise<void>;
   saveNamedDashboard: (name: string) => Promise<{ ok: boolean; error?: string }>;
   loadNamedDashboard: (name: string) => Promise<{ ok: boolean; error?: string }>;
@@ -378,6 +379,40 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
           activePageId: nextPage.id,
           title: nextPage.title,
           widgets: nextPage.widgets,
+        });
+      },
+      moveDashboardPage(pageId, direction) {
+        const pages = config.pages || [];
+        const currentIndex = pages.findIndex((page) => page.id === pageId);
+        if (currentIndex < 0) {
+          return;
+        }
+
+        const targetIndex = direction === "left" ? currentIndex - 1 : currentIndex + 1;
+        if (targetIndex < 0 || targetIndex >= pages.length) {
+          return;
+        }
+
+        const nextPages = [...pages];
+        const [movedPage] = nextPages.splice(currentIndex, 1);
+        if (!movedPage) {
+          return;
+        }
+        nextPages.splice(targetIndex, 0, movedPage);
+
+        const activePage =
+          nextPages.find((page) => page.id === (config.activePageId || "")) ||
+          nextPages[0];
+        if (!activePage) {
+          return;
+        }
+
+        persist({
+          ...config,
+          pages: nextPages,
+          activePageId: activePage.id,
+          title: activePage.title,
+          widgets: activePage.widgets,
         });
       },
       async refreshSavedDashboards() {

@@ -53,6 +53,7 @@ export function DashboardScreen() {
     dashboardPages,
     activePageId,
     createDashboardPage,
+    moveDashboardPage,
     moveWidgetToPage,
     removeWidget,
     replaceWidgets,
@@ -657,6 +658,9 @@ export function DashboardScreen() {
           setActivePage(pageId);
         }}
         onToggleLayoutMode={() => setLayoutMode((current) => !current)}
+        onMovePage={(pageId, direction) => {
+          moveDashboardPage(pageId, direction);
+        }}
       />
       <ScrollView
         style={[styles.scroll, isCompact ? styles.scrollCompact : null]}

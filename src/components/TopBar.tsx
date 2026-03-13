@@ -13,6 +13,7 @@ type TopBarProps = {
   onOpenSettings: () => void;
   onAddWidget: () => void;
   onSelectPage: (pageId: string) => void;
+  onMovePage?: (pageId: string, direction: "left" | "right") => void;
   pageTabSounds?: string[];
   layoutToggleSounds?: string[];
   addWidgetSounds?: string[];
@@ -29,6 +30,7 @@ export function TopBar({
   onOpenSettings,
   onAddWidget,
   onSelectPage,
+  onMovePage,
   pageTabSounds,
   layoutToggleSounds,
   addWidgetSounds,
@@ -36,21 +38,48 @@ export function TopBar({
 }: TopBarProps) {
   const { width } = useWindowDimensions();
   const isCompact = width < 700;
-  const pageTabButtons = pageTitles.map((page) => {
+  const pageTabButtons = pageTitles.map((page, index) => {
     const activePage = page.id === activePageId;
+    const canMoveLeft = index > 0;
+    const canMoveRight = index < pageTitles.length - 1;
     return (
-      <Pressable
-        key={page.id}
-        onPress={() => {
-          playConfiguredUiSound(pageTabSounds, "page", `page-tab:${page.id}`);
-          onSelectPage(page.id);
-        }}
-        style={[styles.pageTab, activePage ? styles.pageTabActive : null]}
-      >
-        <Text numberOfLines={1} style={[styles.pageTabLabel, activePage ? styles.pageTabLabelActive : null]}>
-          {page.title}
-        </Text>
-      </Pressable>
+      <View key={page.id} style={[styles.pageTab, activePage ? styles.pageTabActive : null, isLayoutMode ? styles.pageTabLayout : null]}>
+        {isLayoutMode ? (
+          <Pressable
+            disabled={!canMoveLeft || !onMovePage}
+            onPress={() => {
+              playConfiguredUiSound(pageTabSounds, "swipe", `page-tab:move-left:${page.id}`);
+              onMovePage?.(page.id, "left");
+            }}
+            style={[styles.pageMoveButton, !canMoveLeft || !onMovePage ? styles.pageMoveButtonDisabled : null]}
+          >
+            <MaterialCommunityIcons color={canMoveLeft && onMovePage ? palette.text : palette.textMuted} name="chevron-left" size={14} />
+          </Pressable>
+        ) : null}
+        <Pressable
+          onPress={() => {
+            playConfiguredUiSound(pageTabSounds, "page", `page-tab:${page.id}`);
+            onSelectPage(page.id);
+          }}
+          style={styles.pageTabMainButton}
+        >
+          <Text numberOfLines={1} style={[styles.pageTabLabel, activePage ? styles.pageTabLabelActive : null]}>
+            {page.title}
+          </Text>
+        </Pressable>
+        {isLayoutMode ? (
+          <Pressable
+            disabled={!canMoveRight || !onMovePage}
+            onPress={() => {
+              playConfiguredUiSound(pageTabSounds, "swipe", `page-tab:move-right:${page.id}`);
+              onMovePage?.(page.id, "right");
+            }}
+            style={[styles.pageMoveButton, !canMoveRight || !onMovePage ? styles.pageMoveButtonDisabled : null]}
+          >
+            <MaterialCommunityIcons color={canMoveRight && onMovePage ? palette.text : palette.textMuted} name="chevron-right" size={14} />
+          </Pressable>
+        ) : null}
+      </View>
     );
   });
 
@@ -160,20 +189,43 @@ const styles = StyleSheet.create({
     paddingRight: 4,
   },
   pageTab: {
-    maxWidth: 168,
+    maxWidth: 260,
     borderRadius: 999,
     minHeight: 34,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
     borderColor: palette.border,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pageTabLayout: {
+    minHeight: 36,
+  },
+  pageTabMainButton: {
+    flexShrink: 1,
+    minWidth: 0,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     alignItems: "center",
     justifyContent: "center",
   },
   pageTabActive: {
     backgroundColor: palette.accent,
     borderColor: "rgba(77, 226, 177, 0.55)",
+  },
+  pageMoveButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  pageMoveButtonDisabled: {
+    backgroundColor: "rgba(255,255,255,0.02)",
   },
   pageTabLabel: {
     color: palette.textMuted,
