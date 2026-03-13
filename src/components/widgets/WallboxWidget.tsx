@@ -28,6 +28,7 @@ const DEFAULT_IDS = {
   phaseSwitchMode: "go-e.0.phaseSwitchMode",
   ampere: "go-e.0.ampere",
   car: "go-e.0.car",
+  batterySoc: "go-e.0.carBatterySoc",
   stopAt80: "go-e.0.stopChargeingAtCarSoc80",
 } as const;
 
@@ -42,6 +43,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       phaseSwitchMode: resolveStateId(config.phaseSwitchModeStateId, DEFAULT_IDS.phaseSwitchMode),
       ampere: resolveStateId(config.ampereStateId, DEFAULT_IDS.ampere),
       car: resolveStateId(config.carStateId, DEFAULT_IDS.car),
+      batterySoc: resolveStateId(config.batterySocStateId, DEFAULT_IDS.batterySoc),
       stopAt80: resolveStateId(config.stopChargeingAtCarSoc80StateId, DEFAULT_IDS.stopAt80),
     }),
     [
@@ -53,6 +55,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       config.modeStateId,
       config.phaseSwitchModeStateId,
       config.solarLoadOnlyStateId,
+      config.batterySocStateId,
       config.stopChargeingAtCarSoc80StateId,
     ]
   );
@@ -126,6 +129,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const phaseMode = mapPhaseMode(readValue(stateIds.phaseSwitchMode));
   const liveAmpere = normalizeFloat(readValue(stateIds.ampere));
   const carCode = normalizeInteger(readValue(stateIds.car));
+  const batterySoc = normalizeFloat(readValue(stateIds.batterySoc));
   const carStatus = mapCarStatus(carCode);
   const writePending = Object.values(pendingWrites).some(Boolean);
   const sliderValue = sliderDraft ?? gridAmpere;
@@ -269,8 +273,12 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         label: "Fahrzeugstatus",
         value: carStatus,
       },
+      {
+        label: "Batterie",
+        value: batterySoc === null ? "-" : `${Math.max(0, Math.min(100, Math.round(batterySoc)))} %`,
+      },
     ],
-    [allowCharging, carStatus, liveAmpere, phaseMode, solarOnly]
+    [allowCharging, batterySoc, carStatus, liveAmpere, phaseMode, solarOnly]
   );
 
   const modeItems: Array<{

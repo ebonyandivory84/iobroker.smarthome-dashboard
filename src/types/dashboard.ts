@@ -190,6 +190,7 @@ export type WallboxWidgetConfig = WidgetBase & {
   phaseSwitchModeStateId?: string;
   ampereStateId?: string;
   carStateId?: string;
+  batterySocStateId?: string;
   stopChargeingAtCarSoc80StateId?: string;
 };
 

@@ -233,6 +233,7 @@ export function buildWidgetTemplate(
       phaseSwitchModeStateId: "go-e.0.phaseSwitchMode",
       ampereStateId: "go-e.0.ampere",
       carStateId: "go-e.0.car",
+      batterySocStateId: "go-e.0.carBatterySoc",
       stopChargeingAtCarSoc80StateId: "go-e.0.stopChargeingAtCarSoc80",
       position: {
         ...basePosition,

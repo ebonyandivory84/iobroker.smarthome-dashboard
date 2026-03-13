@@ -311,6 +311,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         phaseSwitchModeStateId: widget.phaseSwitchModeStateId || "go-e.0.phaseSwitchMode",
         ampereStateId: widget.ampereStateId || "go-e.0.ampere",
         carStateId: widget.carStateId || "go-e.0.car",
+        batterySocStateId: widget.batterySocStateId || "go-e.0.carBatterySoc",
         stopChargeingAtCarSoc80StateId: widget.stopChargeingAtCarSoc80StateId || "go-e.0.stopChargeingAtCarSoc80",
         ...appearanceDraft,
       });
@@ -636,6 +637,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         phaseSwitchModeStateId: draft.phaseSwitchModeStateId?.trim() || undefined,
         ampereStateId: draft.ampereStateId?.trim() || undefined,
         carStateId: draft.carStateId?.trim() || undefined,
+        batterySocStateId: draft.batterySocStateId?.trim() || undefined,
         stopChargeingAtCarSoc80StateId: draft.stopChargeingAtCarSoc80StateId?.trim() || undefined,
         interactionSounds: buildStoredInteractionSounds(
           widget.type,
@@ -1812,16 +1814,26 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       value={draft.carStateId || ""}
                     />
                   </Field>
-                  <Field label="stopChargeingAtCarSoc80">
+                  <Field label="carBatterySoc">
                     <StateFieldInput
-                      onBrowse={() => setPickerField("stopChargeingAtCarSoc80StateId")}
-                      onChangeText={(value) =>
-                        setDraft((current) => ({ ...current, stopChargeingAtCarSoc80StateId: value }))
-                      }
-                      value={draft.stopChargeingAtCarSoc80StateId || ""}
+                      onBrowse={() => setPickerField("batterySocStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, batterySocStateId: value }))}
+                      value={draft.batterySocStateId || ""}
                     />
                   </Field>
                 </View>
+                <Field label="stopChargeingAtCarSoc80">
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("stopChargeingAtCarSoc80StateId")}
+                    onChangeText={(value) =>
+                      setDraft((current) => ({ ...current, stopChargeingAtCarSoc80StateId: value }))
+                    }
+                    value={draft.stopChargeingAtCarSoc80StateId || ""}
+                  />
+                </Field>
+                <Text style={styles.mappingHint}>
+                  `carBatterySoc` sollte den aktuellen Fahrzeug-SoC in Prozent liefern.
+                </Text>
 
                 <Field label="Sounds bei Interaktion">
                   <Field label="Button Press">
