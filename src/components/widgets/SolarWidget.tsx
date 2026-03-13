@@ -30,6 +30,8 @@ type FlowDir = "toHome" | "fromHome" | "idle";
 const SOLAR_SCENE_BASE_WIDTH = 960;
 const SOLAR_SCENE_BASE_HEIGHT = 960;
 const SOLAR_MAX_STAT_CARDS = 6;
+const FLOW_ACTIVE_THRESHOLD_W = 20;
+const GRID_IMPORT_FLOW_THRESHOLD_W = 100;
 const SOLAR_DEFAULT_STAT_LABELS = [
   "Eigenverbrauch",
   "Verbraucht",
@@ -85,12 +87,26 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
   const missingCore = pvNow === null && homeNow === null && gridIn === null && gridOut === null;
 
   const battSigned =
-    battOut !== null && battOut > 20 ? Math.abs(battOut) : battIn !== null && battIn > 20 ? -Math.abs(battIn) : 0;
-  const gridSigned =
-    gridIn !== null && gridIn > 20 ? Math.abs(gridIn) : gridOut !== null && gridOut > 20 ? -Math.abs(gridOut) : 0;
-  const pvDir: FlowDir = pvNow !== null && pvNow > 20 ? "toHome" : "idle";
-  const battDir = dirFromSigned(battSigned);
-  const gridDir = dirFromSigned(gridSigned);
+    battOut !== null && battOut > FLOW_ACTIVE_THRESHOLD_W
+      ? Math.abs(battOut)
+      : battIn !== null && battIn > FLOW_ACTIVE_THRESHOLD_W
+        ? -Math.abs(battIn)
+        : 0;
+  const gridDisplaySigned =
+    gridIn !== null && gridIn > FLOW_ACTIVE_THRESHOLD_W
+      ? Math.abs(gridIn)
+      : gridOut !== null && gridOut > FLOW_ACTIVE_THRESHOLD_W
+        ? -Math.abs(gridOut)
+        : 0;
+  const gridFlowSigned =
+    gridIn !== null && gridIn >= GRID_IMPORT_FLOW_THRESHOLD_W
+      ? Math.abs(gridIn)
+      : gridOut !== null && gridOut > FLOW_ACTIVE_THRESHOLD_W
+        ? -Math.abs(gridOut)
+        : 0;
+  const pvDir: FlowDir = pvNow !== null && pvNow > FLOW_ACTIVE_THRESHOLD_W ? "toHome" : "idle";
+  const battDir = dirFromSigned(battSigned, FLOW_ACTIVE_THRESHOLD_W);
+  const gridDir = dirFromSigned(gridFlowSigned, FLOW_ACTIVE_THRESHOLD_W);
   const backgroundBlur = clamp(config.backgroundImageBlur ?? 8, 0, 24);
   const compactWidget = widgetLayout.width > 0 && (widgetLayout.width < 520 || widgetLayout.height < 420);
   const veryCompactWidget = widgetLayout.width > 0 && (widgetLayout.width < 420 || widgetLayout.height < 340);
@@ -161,7 +177,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
           battPower={Math.abs(battSigned)}
           battTemp={battTemp}
           gridDir={gridDir}
-          gridPower={Math.abs(gridSigned)}
+          gridPower={Math.abs(gridDisplaySigned)}
           homeNow={homeNow}
           mutedTextColor={mutedTextColor}
           textColor={textColor}
