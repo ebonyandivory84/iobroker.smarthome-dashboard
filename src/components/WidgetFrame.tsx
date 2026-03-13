@@ -44,7 +44,8 @@ export function WidgetFrame({
     Boolean(widget.iconImage) &&
     widget.iconImageSizeMode === "maximized" &&
     widget.iconImageBorderless === true;
-  const showHeaderTitle = widget.type !== "camera" && widget.showTitle !== false && Boolean(widget.title.trim());
+  const showHeaderTitle =
+    widget.type !== "camera" && widget.type !== "wallbox" && widget.showTitle !== false && Boolean(widget.title.trim());
   const interaction = useRef<{
     mode: "drag" | "resize";
     startX: number;
@@ -61,7 +62,8 @@ export function WidgetFrame({
     widget.type === "grafana" ||
     widget.type === "log" ||
     widget.type === "script" ||
-    widget.type === "host";
+    widget.type === "host" ||
+    widget.type === "wallbox";
 
   useEffect(() => {
     if (Platform.OS !== "web") {

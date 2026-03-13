@@ -1,4 +1,16 @@
-export type WidgetType = "state" | "camera" | "energy" | "solar" | "grafana" | "weather" | "numpad" | "link" | "log" | "script" | "host";
+export type WidgetType =
+  | "state"
+  | "camera"
+  | "energy"
+  | "solar"
+  | "grafana"
+  | "weather"
+  | "numpad"
+  | "link"
+  | "log"
+  | "script"
+  | "host"
+  | "wallbox";
 
 export type IconPair = {
   active: string;
@@ -161,6 +173,22 @@ export type HostStatsWidgetConfig = WidgetBase & {
   hostLabel?: string;
 };
 
+export type WallboxWidgetConfig = WidgetBase & {
+  type: "wallbox";
+  manualHeightOverride?: boolean;
+  refreshMs?: number;
+  showStatusSubtitle?: boolean;
+  modeStateId: string;
+  gridAmpereStateId: string;
+  limit80StateId: string;
+  allowChargingStateId?: string;
+  solarLoadOnlyStateId?: string;
+  phaseSwitchModeStateId?: string;
+  ampereStateId?: string;
+  carStateId?: string;
+  stopChargeingAtCarSoc80StateId?: string;
+};
+
 export type SolarNodeLayout = {
   x: number;
   y: number;
@@ -244,7 +272,8 @@ export type WidgetConfig =
   | LinkWidgetConfig
   | LogWidgetConfig
   | ScriptWidgetConfig
-  | HostStatsWidgetConfig;
+  | HostStatsWidgetConfig
+  | WallboxWidgetConfig;
 
 export type BackgroundMode = "gradient" | "mesh" | "solid";
 

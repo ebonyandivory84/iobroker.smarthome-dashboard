@@ -20,6 +20,7 @@ import { NumpadWidget } from "./widgets/NumpadWidget";
 import { ScriptWidget } from "./widgets/ScriptWidget";
 import { SolarWidget } from "./widgets/SolarWidget";
 import { resolveStateNextValue, StateWidget } from "./widgets/StateWidget";
+import { WallboxWidget } from "./widgets/WallboxWidget";
 import { WeatherWidget } from "./widgets/WeatherWidget";
 
 type GridCanvasProps = {
@@ -189,6 +190,7 @@ export function GridCanvas({
                   widget.type === "log" ||
                   widget.type === "script" ||
                   widget.type === "host" ||
+                  widget.type === "wallbox" ||
                   (Platform.OS === "web" && (widget.type === "weather" || widget.type === "grafana"))
                 }
                 onCommitPosition={(widgetId, position) =>
@@ -644,6 +646,11 @@ function getAutoLayoutSpec(
           return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
         }
         return { w: 1, h: roundGridUnit(2.8) };
+      case "wallbox":
+        if (widget.manualHeightOverride) {
+          return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
+        }
+        return { w: 1, h: roundGridUnit(3) };
     }
 
     return { w: 1, h: Math.max(1.5, roundGridUnit(fallbackHeight)) };
@@ -700,6 +707,11 @@ function getAutoLayoutSpec(
         return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(fallbackHeight)) };
       }
       return { w: mainColumnWidth, h: roundGridUnit(2.8) };
+    case "wallbox":
+      if (widget.manualHeightOverride) {
+        return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(fallbackHeight)) };
+      }
+      return { w: mainColumnWidth, h: roundGridUnit(3) };
   }
 
   return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
@@ -878,7 +890,14 @@ function WebGridCanvas({
           onWidgetScrollFocusChange={onWidgetScrollFocusChange}
           stateWrites={stateWrites}
           allowManualLayout={true}
-          allowResize={widget.type === "camera" || widget.type === "solar" || widget.type === "log" || widget.type === "script" || widget.type === "host"}
+          allowResize={
+            widget.type === "camera" ||
+            widget.type === "solar" ||
+            widget.type === "log" ||
+            widget.type === "script" ||
+            widget.type === "host" ||
+            widget.type === "wallbox"
+          }
           mainColumnExtraGap={mainColumnExtraGap}
           sourceColumns={sourceColumns}
           states={states}
@@ -942,7 +961,8 @@ function WebWidgetShell({
     Boolean(widget.iconImage) &&
     widget.iconImageSizeMode === "maximized" &&
     widget.iconImageBorderless === true;
-  const showHeaderTitle = widget.type !== "camera" && widget.showTitle !== false && Boolean(widget.title.trim());
+  const showHeaderTitle =
+    widget.type !== "camera" && widget.type !== "wallbox" && widget.showTitle !== false && Boolean(widget.title.trim());
   const interaction = useRef<{
     mode: "drag" | "resize";
     startX: number;
@@ -965,7 +985,13 @@ function WebWidgetShell({
       const dx = snapUnits((event.clientX - active.startX) / stepX);
       const dy = snapUnits(
         (event.clientY - active.startY) / stepY,
-        active.mode === "resize" && (widget.type === "camera" || widget.type === "solar" || widget.type === "log" || widget.type === "script" || widget.type === "host")
+        active.mode === "resize" &&
+        (widget.type === "camera" ||
+          widget.type === "solar" ||
+          widget.type === "log" ||
+          widget.type === "script" ||
+          widget.type === "host" ||
+          widget.type === "wallbox")
           ? CAMERA_GRID_SNAP
           : GRID_VERTICAL_SNAP
       );
@@ -979,7 +1005,7 @@ function WebWidgetShell({
           ...active.startPosition,
           x: clamp(active.startPosition.x + dx, 0, config.grid.columns - active.startPosition.w),
           y: Math.max(0, active.startPosition.y + dy),
-        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : widget.type === "log" || widget.type === "script" || widget.type === "host" ? { minHeight: 1, heightSnap: 0.1 } : undefined);
+        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : widget.type === "log" || widget.type === "script" || widget.type === "host" || widget.type === "wallbox" ? { minHeight: 1, heightSnap: 0.1 } : undefined);
         setPreview(nextPreview);
 
         if (isLayoutMode && onDragAcrossPageEdge) {
@@ -1003,7 +1029,14 @@ function WebWidgetShell({
           }
         }
       } else {
-        if (widget.type === "camera" || widget.type === "solar" || widget.type === "log" || widget.type === "script" || widget.type === "host") {
+        if (
+          widget.type === "camera" ||
+          widget.type === "solar" ||
+          widget.type === "log" ||
+          widget.type === "script" ||
+          widget.type === "host" ||
+          widget.type === "wallbox"
+        ) {
           const minHeight = widget.type === "camera" ? 0.5 : widget.type === "solar" ? 2.5 : 1;
           setPreview(constrainToPrimarySections({
             ...active.startPosition,
@@ -1268,6 +1301,10 @@ function renderWidget(
 
   if (effectiveWidget.type === "host") {
     return <HostStatsWidget client={client} config={effectiveWidget} />;
+  }
+
+  if (effectiveWidget.type === "wallbox") {
+    return <WallboxWidget client={client} config={effectiveWidget} />;
   }
 
   return null;
@@ -1539,6 +1576,13 @@ function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThe
       background: "linear-gradient(140deg, rgba(15, 34, 66, 0.95), rgba(8, 18, 36, 0.98))",
       border: "1px solid rgba(105, 182, 255, 0.24)",
       boxShadow: "0 14px 24px rgba(5, 12, 24, 0.34)",
+    };
+  }
+  if (type === "wallbox") {
+    return {
+      background: "linear-gradient(145deg, rgba(19, 31, 49, 0.96), rgba(10, 17, 31, 0.98))",
+      border: "1px solid rgba(110, 178, 255, 0.2)",
+      boxShadow: "0 16px 28px rgba(5, 10, 19, 0.36)",
     };
   }
   return {};

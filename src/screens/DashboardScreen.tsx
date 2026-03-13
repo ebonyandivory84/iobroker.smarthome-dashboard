@@ -192,6 +192,8 @@ export function DashboardScreen() {
       ...(config.uiSounds?.widgetTypeDefaults?.log?.notify || []),
       ...(config.uiSounds?.widgetTypeDefaults?.script?.press || []),
       ...(config.uiSounds?.widgetTypeDefaults?.script?.scroll || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.wallbox?.press || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.wallbox?.confirm || []),
       ...(config.uiSounds?.pageSounds?.tabPress || []),
       ...(config.uiSounds?.pageSounds?.swipe || []),
       ...(config.uiSounds?.pageSounds?.contentScroll || []),
@@ -254,7 +256,8 @@ export function DashboardScreen() {
           currentWidget.type === "grafana" ||
           currentWidget.type === "log" ||
           currentWidget.type === "script" ||
-          currentWidget.type === "host"
+          currentWidget.type === "host" ||
+          currentWidget.type === "wallbox"
             ? { manualHeightOverride: true }
             : null),
         };
@@ -272,7 +275,8 @@ export function DashboardScreen() {
         currentWidget.type === "grafana" ||
         currentWidget.type === "log" ||
         currentWidget.type === "script" ||
-        currentWidget.type === "host"
+        currentWidget.type === "host" ||
+        currentWidget.type === "wallbox"
           ? { manualHeightOverride: true }
           : null),
       });
@@ -292,7 +296,8 @@ export function DashboardScreen() {
         currentWidget.type === "grafana" ||
         currentWidget.type === "log" ||
         currentWidget.type === "script" ||
-        currentWidget.type === "host"
+        currentWidget.type === "host" ||
+        currentWidget.type === "wallbox"
           ? { manualHeightOverride: true }
           : null),
       };
@@ -307,7 +312,12 @@ export function DashboardScreen() {
           ? { minHeight: 0.5, heightSnap: 0.1 }
           : currentWidget.type === "solar"
             ? { minHeight: 2.5, heightSnap: 0.1 }
-            : currentWidget.type === "weather" || currentWidget.type === "grafana" || currentWidget.type === "log" || currentWidget.type === "script" || currentWidget.type === "host"
+            : currentWidget.type === "weather" ||
+                currentWidget.type === "grafana" ||
+                currentWidget.type === "log" ||
+                currentWidget.type === "script" ||
+                currentWidget.type === "host" ||
+                currentWidget.type === "wallbox"
               ? { minHeight: 1, heightSnap: 0.1 }
             : undefined;
       updateWidget(widgetId, {
@@ -319,7 +329,8 @@ export function DashboardScreen() {
         currentWidget.type === "grafana" ||
         currentWidget.type === "log" ||
         currentWidget.type === "script" ||
-        currentWidget.type === "host"
+        currentWidget.type === "host" ||
+        currentWidget.type === "wallbox"
           ? { manualHeightOverride: true }
           : null),
       });

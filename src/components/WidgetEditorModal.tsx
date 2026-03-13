@@ -275,6 +275,38 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       return;
     }
 
+    if (widget.type === "wallbox") {
+      setSoundDraft({
+        press: resolveDraftSoundValue(
+          widget.interactionSounds?.press,
+          config.uiSounds?.widgetTypeDefaults?.wallbox?.press
+        ),
+        confirm: resolveDraftSoundValue(
+          widget.interactionSounds?.confirm,
+          config.uiSounds?.widgetTypeDefaults?.wallbox?.confirm
+        ),
+      });
+      setWeatherSuggestions([]);
+      setWeatherSearchBusy(false);
+      setDraft({
+        title: widget.title,
+        showTitle: widget.showTitle === false ? "false" : "true",
+        showStatusSubtitle: widget.showStatusSubtitle === false ? "false" : "true",
+        refreshMs: String(widget.refreshMs || 2000),
+        modeStateId: widget.modeStateId || "0_userdata.0.goe.mode",
+        gridAmpereStateId: widget.gridAmpereStateId || "0_userdata.0.goe.gridAmpere",
+        limit80StateId: widget.limit80StateId || "0_userdata.0.goe.limit80",
+        allowChargingStateId: widget.allowChargingStateId || "go-e.0.allow_charging",
+        solarLoadOnlyStateId: widget.solarLoadOnlyStateId || "go-e.0.solarLoadOnly",
+        phaseSwitchModeStateId: widget.phaseSwitchModeStateId || "go-e.0.phaseSwitchMode",
+        ampereStateId: widget.ampereStateId || "go-e.0.ampere",
+        carStateId: widget.carStateId || "go-e.0.car",
+        stopChargeingAtCarSoc80StateId: widget.stopChargeingAtCarSoc80StateId || "go-e.0.stopChargeingAtCarSoc80",
+        ...appearanceDraft,
+      });
+      return;
+    }
+
     if (widget.type === "weather") {
       setSoundDraft({});
       setDraft({
@@ -578,6 +610,28 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         hostLabel: draft.hostLabel?.trim() || undefined,
         appearance,
       });
+    } else if (widget.type === "wallbox") {
+      onSave(widget.id, {
+        title: draft.title,
+        showTitle: draft.showTitle !== "false",
+        showStatusSubtitle: draft.showStatusSubtitle !== "false",
+        refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 500),
+        modeStateId: draft.modeStateId?.trim() || widget.modeStateId,
+        gridAmpereStateId: draft.gridAmpereStateId?.trim() || widget.gridAmpereStateId,
+        limit80StateId: draft.limit80StateId?.trim() || widget.limit80StateId,
+        allowChargingStateId: draft.allowChargingStateId?.trim() || undefined,
+        solarLoadOnlyStateId: draft.solarLoadOnlyStateId?.trim() || undefined,
+        phaseSwitchModeStateId: draft.phaseSwitchModeStateId?.trim() || undefined,
+        ampereStateId: draft.ampereStateId?.trim() || undefined,
+        carStateId: draft.carStateId?.trim() || undefined,
+        stopChargeingAtCarSoc80StateId: draft.stopChargeingAtCarSoc80StateId?.trim() || undefined,
+        interactionSounds: buildStoredInteractionSounds(
+          widget.type,
+          soundDraft,
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]
+        ),
+        appearance,
+      });
     } else if (widget.type === "weather") {
       onSave(widget.id, {
         title: draft.title,
@@ -643,7 +697,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       widget.type !== "numpad" &&
       widget.type !== "link" &&
       widget.type !== "log" &&
-      widget.type !== "script"
+      widget.type !== "script" &&
+      widget.type !== "wallbox"
     ) {
       return;
     }
@@ -848,6 +903,50 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     firstLabel="Prozess Badge Start"
                     secondKey="statColor2"
                     secondLabel="Prozess Badge Ende"
+                    values={draft}
+                    onChange={setDraft}
+                  />
+                </>
+              ) : null}
+              {widget.type === "wallbox" ? (
+                <>
+                  <ColorInputRow
+                    firstKey="cardColor"
+                    firstLabel="Modus Aus Start"
+                    secondKey="cardColor2"
+                    secondLabel="Modus Aus Ende"
+                    values={draft}
+                    onChange={setDraft}
+                  />
+                  <ColorInputRow
+                    firstKey="activeWidgetColor"
+                    firstLabel="Modus PV Start"
+                    secondKey="activeWidgetColor2"
+                    secondLabel="Modus PV Ende"
+                    values={draft}
+                    onChange={setDraft}
+                  />
+                  <ColorInputRow
+                    firstKey="statColor"
+                    firstLabel="Modus Netz Start"
+                    secondKey="statColor2"
+                    secondLabel="Modus Netz Ende"
+                    values={draft}
+                    onChange={setDraft}
+                  />
+                  <ColorInputRow
+                    firstKey="iconColor"
+                    firstLabel="Slider Start"
+                    secondKey="iconColor2"
+                    secondLabel="Slider Ende"
+                    values={draft}
+                    onChange={setDraft}
+                  />
+                  <ColorInputRow
+                    firstKey="inactiveWidgetColor"
+                    firstLabel="Toggle 80% Start"
+                    secondKey="inactiveWidgetColor2"
+                    secondLabel="Toggle 80% Ende"
                     values={draft}
                     onChange={setDraft}
                   />
@@ -1578,6 +1677,120 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 <Text style={styles.mappingHint}>
                   Zeigt Festplatte, RAM, CPU-Auslastung, Prozessanzahl und CPU-Temperatur des ioBroker-Hosts.
                 </Text>
+              </>
+            ) : null}
+            {widget.type === "wallbox" ? (
+              <>
+                <View style={styles.splitRow}>
+                  <Field label="Refresh (ms)">
+                    <TextInput
+                      keyboardType="numeric"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, refreshMs: value }))}
+                      style={styles.input}
+                      value={draft.refreshMs || "2000"}
+                    />
+                  </Field>
+                  <Field label="Status-Untertitel anzeigen">
+                    <ChoiceRow
+                      options={["true", "false"]}
+                      value={draft.showStatusSubtitle || "true"}
+                      onSelect={(value) => setDraft((current) => ({ ...current, showStatusSubtitle: value }))}
+                    />
+                  </Field>
+                </View>
+
+                <Text style={styles.sectionTitle}>Steuerbare Datenpunkte</Text>
+                <Field label="Mode State ID">
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("modeStateId")}
+                    onChangeText={(value) => setDraft((current) => ({ ...current, modeStateId: value }))}
+                    value={draft.modeStateId || ""}
+                  />
+                </Field>
+                <Field label="Grid Ampere State ID">
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("gridAmpereStateId")}
+                    onChangeText={(value) => setDraft((current) => ({ ...current, gridAmpereStateId: value }))}
+                    value={draft.gridAmpereStateId || ""}
+                  />
+                </Field>
+                <Field label="Limit 80 State ID">
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("limit80StateId")}
+                    onChangeText={(value) => setDraft((current) => ({ ...current, limit80StateId: value }))}
+                    value={draft.limit80StateId || ""}
+                  />
+                </Field>
+
+                <Text style={styles.sectionTitle}>Optionale Live-Infos</Text>
+                <View style={styles.splitRow}>
+                  <Field label="allow_charging">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("allowChargingStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, allowChargingStateId: value }))}
+                      value={draft.allowChargingStateId || ""}
+                    />
+                  </Field>
+                  <Field label="solarLoadOnly">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("solarLoadOnlyStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, solarLoadOnlyStateId: value }))}
+                      value={draft.solarLoadOnlyStateId || ""}
+                    />
+                  </Field>
+                </View>
+                <View style={styles.splitRow}>
+                  <Field label="phaseSwitchMode">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("phaseSwitchModeStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, phaseSwitchModeStateId: value }))}
+                      value={draft.phaseSwitchModeStateId || ""}
+                    />
+                  </Field>
+                  <Field label="ampere">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("ampereStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, ampereStateId: value }))}
+                      value={draft.ampereStateId || ""}
+                    />
+                  </Field>
+                </View>
+                <View style={styles.splitRow}>
+                  <Field label="car">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("carStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, carStateId: value }))}
+                      value={draft.carStateId || ""}
+                    />
+                  </Field>
+                  <Field label="stopChargeingAtCarSoc80">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("stopChargeingAtCarSoc80StateId")}
+                      onChangeText={(value) =>
+                        setDraft((current) => ({ ...current, stopChargeingAtCarSoc80StateId: value }))
+                      }
+                      value={draft.stopChargeingAtCarSoc80StateId || ""}
+                    />
+                  </Field>
+                </View>
+
+                <Field label="Sounds bei Interaktion">
+                  <Field label="Button Press">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, press: value }))}
+                      value={soundDraft.press}
+                    />
+                  </Field>
+                  <Field label="Bestaetigt / geschrieben">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, confirm: value }))}
+                      value={soundDraft.confirm}
+                    />
+                  </Field>
+                  <EditorButtonPressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
+                    <Text style={styles.inlineActionLabel}>Als Default fuer alle Wallbox-Widgets verwenden</Text>
+                  </EditorButtonPressable>
+                </Field>
               </>
             ) : null}
             {widget.type === "solar" ? (
@@ -2319,6 +2532,25 @@ function getWidgetAppearanceDefaults(
     };
   }
 
+  if (widget.type === "wallbox") {
+    return {
+      widgetColor: "rgba(20, 30, 44, 0.96)",
+      widgetColor2: "rgba(12, 18, 30, 0.98)",
+      textColor: "#f5f8ff",
+      mutedTextColor: "rgba(214, 224, 244, 0.75)",
+      cardColor: "rgba(166, 176, 194, 0.2)",
+      cardColor2: "rgba(123, 135, 158, 0.2)",
+      activeWidgetColor: "#3bbd83",
+      activeWidgetColor2: "#2f976c",
+      statColor: "#5f9eff",
+      statColor2: "#4578e6",
+      iconColor: "#7eb9ff",
+      iconColor2: "#5f8cf0",
+      inactiveWidgetColor: "#f5bd6c",
+      inactiveWidgetColor2: "#e69b56",
+    };
+  }
+
   return {
     widgetColor: theme.widgetTones.solarStart,
     widgetColor2: theme.widgetTones.solarEnd,
@@ -2583,7 +2815,8 @@ function buildStoredInteractionSounds(
     widgetType !== "numpad" &&
     widgetType !== "link" &&
     widgetType !== "log" &&
-    widgetType !== "script"
+    widgetType !== "script" &&
+    widgetType !== "wallbox"
   ) {
     return undefined;
   }

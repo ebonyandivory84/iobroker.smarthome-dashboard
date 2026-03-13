@@ -82,6 +82,12 @@ const OPTIONS: Array<{
     description: "Zeigt Host-Stats wie Festplatte, RAM, CPU und Temperatur an.",
     icon: "server-network",
   },
+  {
+    type: "wallbox",
+    title: "Wallbox",
+    description: "Steuert go-e Lademodus, Netzstrom und 80%-Begrenzung in einer kompakten Card.",
+    icon: "ev-station",
+  },
 ];
 
 export function WidgetLibraryModal({

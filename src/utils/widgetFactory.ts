@@ -26,6 +26,8 @@ export function buildWidgetTemplate(
                   ? 6
                 : type === "host"
                   ? 6
+                : type === "wallbox"
+                  ? 6
                   : type === "weather"
                     ? 4
                 : type === "numpad"
@@ -46,6 +48,8 @@ export function buildWidgetTemplate(
                   ? 3
                   : type === "host"
                     ? 3
+                    : type === "wallbox"
+                      ? 3
                     : type === "weather"
                       ? 3
                 : type === "numpad"
@@ -205,6 +209,29 @@ export function buildWidgetTemplate(
       title: `Host ${suffix}`,
       refreshMs: 5000,
       hostLabel: "",
+      position: {
+        ...basePosition,
+        w: Math.min(6, grid.columns),
+      },
+    };
+  }
+
+  if (type === "wallbox") {
+    return {
+      id: `wallbox-${suffix}`,
+      type: "wallbox",
+      title: `Wallbox ${suffix}`,
+      refreshMs: 2000,
+      showStatusSubtitle: true,
+      modeStateId: "0_userdata.0.goe.mode",
+      gridAmpereStateId: "0_userdata.0.goe.gridAmpere",
+      limit80StateId: "0_userdata.0.goe.limit80",
+      allowChargingStateId: "go-e.0.allow_charging",
+      solarLoadOnlyStateId: "go-e.0.solarLoadOnly",
+      phaseSwitchModeStateId: "go-e.0.phaseSwitchMode",
+      ampereStateId: "go-e.0.ampere",
+      carStateId: "go-e.0.car",
+      stopChargeingAtCarSoc80StateId: "go-e.0.stopChargeingAtCarSoc80",
       position: {
         ...basePosition,
         w: Math.min(6, grid.columns),
