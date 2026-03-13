@@ -34,6 +34,11 @@ export function LogWidget({ config, client, onScrollModeChange }: LogWidgetProps
   const webListRef = useRef<HTMLDivElement | null>(null);
   const lastScrollSoundAtRef = useRef(0);
   const latestSeenTimestampRef = useRef(0);
+  const scrollModeCallbackRef = useRef(onScrollModeChange);
+
+  useEffect(() => {
+    scrollModeCallbackRef.current = onScrollModeChange;
+  }, [onScrollModeChange]);
 
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
@@ -68,14 +73,14 @@ export function LogWidget({ config, client, onScrollModeChange }: LogWidgetProps
   }, [isScrollActive]);
 
   useEffect(() => {
-    onScrollModeChange?.(isScrollActive);
-  }, [isScrollActive, onScrollModeChange]);
+    scrollModeCallbackRef.current?.(isScrollActive);
+  }, [isScrollActive]);
 
   useEffect(() => {
     return () => {
-      onScrollModeChange?.(false);
+      scrollModeCallbackRef.current?.(false);
     };
-  }, [onScrollModeChange]);
+  }, []);
 
   useEffect(() => {
     let active = true;
