@@ -303,7 +303,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.card, { backgroundColor: cardStart, borderColor: panelBorderColor }]}>
+      <View style={[styles.card, { backgroundColor: cardStart }]}>
         {config.backgroundImage ? (
           Platform.OS === "web" ? (
             <>
@@ -735,7 +735,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 0,
     borderRadius: 18,
-    borderWidth: 1,
+    borderWidth: 0,
     overflow: "hidden",
     paddingHorizontal: 14,
     paddingTop: 14,

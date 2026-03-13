@@ -1513,6 +1513,12 @@ const webResizeHandleStyle: CSSProperties = {
 function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThemeSettings>): CSSProperties {
   const appearance = widget.appearance;
   if (appearance?.widgetColor) {
+    if (widget.type === "wallbox") {
+      return {
+        background: buildGradientBackground(appearance.widgetColor, appearance.widgetColor2),
+        border: "none",
+      };
+    }
     return {
       background: buildGradientBackground(appearance.widgetColor, appearance.widgetColor2),
       border: "1px solid rgba(255,255,255,0.1)",
@@ -1596,7 +1602,7 @@ function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThe
   if (type === "wallbox") {
     return {
       background: "linear-gradient(145deg, rgba(19, 31, 49, 0.96), rgba(10, 17, 31, 0.98))",
-      border: "1px solid rgba(110, 178, 255, 0.2)",
+      border: "none",
       boxShadow: "0 16px 28px rgba(5, 10, 19, 0.36)",
     };
   }
