@@ -957,7 +957,8 @@ async function listJavaScriptEntries(adapter, options) {
     );
   });
 
-  const states = await adapter.getForeignStatesAsync("javascript.*.scriptEnabled.*");
+  // Avoid wildcard-in-the-middle lookups because they trigger expensive fallback scans.
+  const states = await adapter.getForeignStatesAsync("javascript.*");
   const fetched = candidates.slice(0, 1500).map((entry) => ({
     stateId: entry.id,
     name: resolveScriptName(entry),
