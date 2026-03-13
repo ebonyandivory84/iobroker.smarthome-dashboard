@@ -1385,6 +1385,7 @@ function mergeWidgetInteractionSounds(
     interactionSounds: {
       press: widget.interactionSounds?.press?.length ? widget.interactionSounds.press : defaults.press,
       confirm: widget.interactionSounds?.confirm?.length ? widget.interactionSounds.confirm : defaults.confirm,
+      slider: widget.interactionSounds?.slider?.length ? widget.interactionSounds.slider : defaults.slider,
       open: widget.interactionSounds?.open?.length ? widget.interactionSounds.open : defaults.open,
       close: widget.interactionSounds?.close?.length ? widget.interactionSounds.close : defaults.close,
       scroll: widget.interactionSounds?.scroll?.length ? widget.interactionSounds.scroll : defaults.scroll,

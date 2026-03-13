@@ -196,6 +196,7 @@ export function DashboardScreen() {
       ...(config.uiSounds?.widgetTypeDefaults?.script?.scroll || []),
       ...(config.uiSounds?.widgetTypeDefaults?.wallbox?.press || []),
       ...(config.uiSounds?.widgetTypeDefaults?.wallbox?.confirm || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.wallbox?.slider || []),
       ...(config.uiSounds?.pageSounds?.tabPress || []),
       ...(config.uiSounds?.pageSounds?.swipe || []),
       ...(config.uiSounds?.pageSounds?.contentScroll || []),
@@ -209,6 +210,7 @@ export function DashboardScreen() {
         page.widgets.flatMap((widget) => [
           ...(widget.interactionSounds?.press || []),
           ...(widget.interactionSounds?.confirm || []),
+          ...(widget.interactionSounds?.slider || []),
           ...(widget.interactionSounds?.open || []),
           ...(widget.interactionSounds?.close || []),
           ...(widget.interactionSounds?.scroll || []),

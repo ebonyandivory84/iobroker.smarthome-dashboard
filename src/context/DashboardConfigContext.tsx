@@ -680,6 +680,7 @@ function normalizeWidgetInteractionSounds(
   return {
     press: normalizeSoundSelection(input.press),
     confirm: normalizeSoundSelection(input.confirm),
+    slider: normalizeSoundSelection(input.slider),
     open: normalizeSoundSelection(input.open),
     close: normalizeSoundSelection(input.close),
     scroll: normalizeSoundSelection(input.scroll),

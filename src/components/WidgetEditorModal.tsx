@@ -293,6 +293,10 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           widget.interactionSounds?.confirm,
           config.uiSounds?.widgetTypeDefaults?.wallbox?.confirm
         ),
+        slider: resolveDraftSoundValue(
+          widget.interactionSounds?.slider,
+          config.uiSounds?.widgetTypeDefaults?.wallbox?.slider
+        ),
       });
       setWeatherSuggestions([]);
       setWeatherSearchBusy(false);
@@ -720,6 +724,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     const nextDefault: WidgetInteractionSounds = {
       press: normalizeSoundSelection(soundDraft.press),
       confirm: normalizeSoundSelection(soundDraft.confirm),
+      slider: normalizeSoundSelection(soundDraft.slider),
       open: normalizeSoundSelection(soundDraft.open),
       close: normalizeSoundSelection(soundDraft.close),
       scroll: normalizeSoundSelection(soundDraft.scroll),
@@ -1842,6 +1847,12 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       value={soundDraft.press}
                     />
                   </Field>
+                  <Field label="Slider Bewegung">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, slider: value }))}
+                      value={soundDraft.slider}
+                    />
+                  </Field>
                   <Field label="Bestaetigt / geschrieben">
                     <SoundPickerField
                       onChange={(value) => setSoundDraft((current) => ({ ...current, confirm: value }))}
@@ -2899,6 +2910,7 @@ function buildStoredInteractionSounds(
   const next: WidgetInteractionSounds = {};
   const press = normalizeSoundSelection(draft.press);
   const confirm = normalizeSoundSelection(draft.confirm);
+  const slider = normalizeSoundSelection(draft.slider);
   const open = normalizeSoundSelection(draft.open);
   const close = normalizeSoundSelection(draft.close);
   const scroll = normalizeSoundSelection(draft.scroll);
@@ -2911,6 +2923,9 @@ function buildStoredInteractionSounds(
   }
   if (!areSoundSelectionsEqual(confirm, defaults?.confirm)) {
     next.confirm = confirm;
+  }
+  if (!areSoundSelectionsEqual(slider, defaults?.slider)) {
+    next.slider = slider;
   }
   if (!areSoundSelectionsEqual(open, defaults?.open)) {
     next.open = open;

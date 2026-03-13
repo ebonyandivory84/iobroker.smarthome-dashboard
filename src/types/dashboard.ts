@@ -62,6 +62,7 @@ export type WidgetBase = {
 export type WidgetInteractionSounds = {
   press?: string[];
   confirm?: string[];
+  slider?: string[];
   open?: string[];
   close?: string[];
   scroll?: string[];

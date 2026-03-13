@@ -185,6 +185,13 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     [config.id, config.interactionSounds?.confirm]
   );
 
+  const playSliderSound = useCallback(
+    (key: string) => {
+      playConfiguredUiSound(config.interactionSounds?.slider, "swipe", `${config.id}:slider:${key}`);
+    },
+    [config.id, config.interactionSounds?.slider]
+  );
+
   const writeState = useCallback(
     async (stateId: string, value: unknown, key: string) => {
       if (!stateId) {
@@ -230,10 +237,12 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       }
       if (source === "button") {
         playPressSound(`gridAmpere:${clamped}`);
+      } else {
+        playSliderSound(`gridAmpere:${clamped}`);
       }
       void writeState(stateIds.gridAmpere, clamped, `gridAmpere:${clamped}`);
     },
-    [gridAmpere, isGridMode, playPressSound, stateIds.gridAmpere, writeState]
+    [gridAmpere, isGridMode, playPressSound, playSliderSound, stateIds.gridAmpere, writeState]
   );
 
   const adjustGridAmpere = useCallback(
