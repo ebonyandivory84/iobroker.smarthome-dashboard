@@ -29,6 +29,7 @@ type DashboardConfigContextValue = {
   addWidget: (widget: WidgetConfig) => void;
   removeWidget: (widgetId: string) => void;
   moveWidgetToPage: (widgetId: string, targetPageId: string, position?: WidgetConfig["position"]) => void;
+  copyWidgetToPage: (widgetId: string, targetPageId: string) => void;
   setActivePage: (pageId: string) => void;
   createDashboardPage: () => void;
   moveDashboardPage: (pageId: string, direction: "left" | "right") => void;
@@ -346,6 +347,50 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
           activePageId: nextActive.id,
           title: nextActive.title,
           widgets: nextActive.widgets,
+        });
+      },
+      copyWidgetToPage(widgetId, targetPageId) {
+        const pages = config.pages || [];
+        const targetPage = pages.find((page) => page.id === targetPageId);
+        if (!targetPage) {
+          return;
+        }
+
+        const sourcePage = pages.find((page) => page.widgets.some((widget) => widget.id === widgetId));
+        if (!sourcePage) {
+          return;
+        }
+
+        const sourceWidget = sourcePage.widgets.find((widget) => widget.id === widgetId);
+        if (!sourceWidget) {
+          return;
+        }
+
+        const copiedWidget = cloneWidgetConfig(sourceWidget);
+        copiedWidget.id = buildUniqueWidgetId(sourceWidget.id, pages);
+
+        const nextPages = pages.map((page) =>
+          page.id === targetPage.id
+            ? {
+                ...page,
+                widgets: [...page.widgets, copiedWidget],
+              }
+            : page
+        );
+
+        const activePage =
+          nextPages.find((page) => page.id === (config.activePageId || "")) ||
+          nextPages[0];
+        if (!activePage) {
+          return;
+        }
+
+        persist({
+          ...config,
+          pages: nextPages,
+          activePageId: activePage.id,
+          title: activePage.title,
+          widgets: activePage.widgets,
         });
       },
       setActivePage(pageId) {
@@ -773,4 +818,32 @@ function normalizeWidgetConfigList(input: DashboardSettings["widgets"] | undefin
       interactionSounds: normalizeWidgetInteractionSounds(widget.interactionSounds),
     };
   });
+}
+
+function cloneWidgetConfig<T extends WidgetConfig>(widget: T): T {
+  return JSON.parse(JSON.stringify(widget)) as T;
+}
+
+function buildUniqueWidgetId(baseId: string, pages: DashboardPage[]) {
+  const normalizedBase = baseId.trim() || "widget";
+  const seed = `${normalizedBase}-copy`;
+  const usedIds = new Set<string>();
+
+  pages.forEach((page) => {
+    page.widgets.forEach((widget) => {
+      usedIds.add(widget.id);
+    });
+  });
+
+  if (!usedIds.has(seed)) {
+    return seed;
+  }
+
+  let suffix = 2;
+  let candidate = `${seed}-${suffix}`;
+  while (usedIds.has(candidate)) {
+    suffix += 1;
+    candidate = `${seed}-${suffix}`;
+  }
+  return candidate;
 }

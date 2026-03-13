@@ -22,7 +22,7 @@ type WidgetEditorModalProps = {
 };
 
 export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: WidgetEditorModalProps) {
-  const { config, patchConfig, dashboardPages } = useDashboardConfig();
+  const { config, patchConfig, dashboardPages, copyWidgetToPage } = useDashboardConfig();
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [soundDraft, setSoundDraft] = useState<Record<string, string[]>>({});
   const [weatherSuggestions, setWeatherSuggestions] = useState<Array<{
@@ -41,6 +41,17 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     return { active, inactive };
   }, [draft.iconActive, draft.iconInactive, widget?.iconPair?.active, widget?.iconPair?.inactive]);
   const editorTargetKey = visible && widget ? `${widget.type}:${widget.id}` : null;
+  const sourcePageId = useMemo(() => {
+    if (!widget) {
+      return null;
+    }
+    const sourcePage = dashboardPages.find((page) => page.widgets.some((entry) => entry.id === widget.id));
+    return sourcePage?.id || null;
+  }, [dashboardPages, widget]);
+  const copyTargetPages = useMemo(
+    () => (widget ? dashboardPages.filter((page) => page.id !== sourcePageId) : []),
+    [dashboardPages, sourcePageId, widget]
+  );
 
   useEffect(() => {
     if (!widget || !editorTargetKey) {
@@ -2096,6 +2107,31 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   Leer lassen, um den bisherigen Standardwert des Solar-Widgets zu nutzen. Wenn ein Datenpunkt gesetzt ist,
                   wird dessen aktueller Wert direkt angezeigt.
                 </Text>
+              </>
+            ) : null}
+            {widget ? (
+              <>
+                <Text style={styles.sectionTitle}>Widget kopieren</Text>
+                <Field label="Auf Side-Page kopieren">
+                  {copyTargetPages.length ? (
+                    <View style={styles.modeRow}>
+                      {copyTargetPages.map((page) => (
+                        <EditorButtonPressable
+                          key={`copy-target-${widget.id}-${page.id}`}
+                          onPress={() => copyWidgetToPage(widget.id, page.id)}
+                          style={styles.modeButton}
+                        >
+                          <Text style={styles.modeLabel}>{page.title}</Text>
+                        </EditorButtonPressable>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={styles.mappingHint}>Keine weitere Side-Page vorhanden.</Text>
+                  )}
+                  <Text style={styles.mappingHint}>
+                    Erstellt eine Kopie mit allen Widget-Einstellungen auf der gewaehlten Seite.
+                  </Text>
+                </Field>
               </>
             ) : null}
           </ScrollView>
