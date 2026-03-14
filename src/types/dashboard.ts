@@ -192,6 +192,8 @@ export type WallboxWidgetConfig = WidgetBase & {
   ampereStateId?: string;
   carStateId?: string;
   batterySocStateId?: string;
+  chargePowerStateId?: string;
+  chargedEnergyStateId?: string;
   stopChargeingAtCarSoc80StateId?: string;
 };
 
@@ -239,6 +241,11 @@ export type SolarWidgetConfig = WidgetBase & {
   backgroundMode?: "color" | "image";
   backgroundImage?: string;
   backgroundImageBlur?: number;
+  wallboxCarStateId?: string;
+  wallboxChargePowerStateId?: string;
+  wallboxAmpereStateId?: string;
+  wallboxPhaseModeStateId?: string;
+  wallboxCarSocStateId?: string;
   statTextScale?: number;
   statePrefix: string;
   keys: {

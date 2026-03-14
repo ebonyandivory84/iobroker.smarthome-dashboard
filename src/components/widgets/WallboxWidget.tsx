@@ -18,6 +18,10 @@ const AMPERE_MIN = 6;
 const AMPERE_MAX = 16;
 const AMPERE_STEP = 1;
 const DEFAULT_GRID_AMPERE = 10;
+const PHASE_VOLTAGE_V = 230;
+const CHARGING_ACTIVE_THRESHOLD_W = 100;
+const FAST_CHARGING_THRESHOLD_W = 5000;
+const CHARGING_INDICATOR_BLINK_MS = 720;
 
 const DEFAULT_IDS = {
   mode: "0_userdata.0.goe.mode",
@@ -29,6 +33,8 @@ const DEFAULT_IDS = {
   ampere: "go-e.0.ampere",
   car: "go-e.0.car",
   batterySoc: "go-e.0.carBatterySoc",
+  chargePower: "go-e.0.nrg.11",
+  chargedEnergy: "go-e.0.eto",
   stopAt80: "go-e.0.stopChargeingAtCarSoc80",
 } as const;
 
@@ -44,12 +50,16 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       ampere: resolveStateId(config.ampereStateId, DEFAULT_IDS.ampere),
       car: resolveStateId(config.carStateId, DEFAULT_IDS.car),
       batterySoc: resolveStateId(config.batterySocStateId, DEFAULT_IDS.batterySoc),
+      chargePower: resolveStateId(config.chargePowerStateId, DEFAULT_IDS.chargePower),
+      chargedEnergy: resolveStateId(config.chargedEnergyStateId, DEFAULT_IDS.chargedEnergy),
       stopAt80: resolveStateId(config.stopChargeingAtCarSoc80StateId, DEFAULT_IDS.stopAt80),
     }),
     [
       config.allowChargingStateId,
       config.ampereStateId,
       config.carStateId,
+      config.chargePowerStateId,
+      config.chargedEnergyStateId,
       config.gridAmpereStateId,
       config.limit80StateId,
       config.modeStateId,
@@ -63,6 +73,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const [pendingWrites, setPendingWrites] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [sliderDraft, setSliderDraft] = useState<number | null>(null);
+  const [chargingPulseOn, setChargingPulseOn] = useState(true);
   const refreshMs = clampInt(config.refreshMs, DEFAULT_REFRESH_MS, MIN_REFRESH_MS);
 
   useEffect(() => {
@@ -126,13 +137,40 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const limit80Enabled = limit80Explicit ?? stopAt80ByCharger ?? false;
   const allowCharging = normalizeBoolean(readValue(stateIds.allowCharging));
   const solarOnly = normalizeBoolean(readValue(stateIds.solarOnly));
-  const phaseMode = mapPhaseMode(readValue(stateIds.phaseSwitchMode));
+  const phaseModeRaw = readValue(stateIds.phaseSwitchMode);
+  const phaseMode = mapPhaseMode(phaseModeRaw);
   const liveAmpere = normalizeFloat(readValue(stateIds.ampere));
   const carCode = normalizeInteger(readValue(stateIds.car));
   const batterySoc = normalizeFloat(readValue(stateIds.batterySoc));
+  const chargedEnergyKWh = normalizeEnergyToKWh(readValue(stateIds.chargedEnergy));
   const carStatus = mapCarStatus(carCode);
+  const directChargingPowerW = normalizePowerToWatts(readValue(stateIds.chargePower));
+  const estimatedChargingPowerW = estimateChargingPowerW(liveAmpere, phaseModeRaw);
+  const chargingPowerW = directChargingPowerW ?? estimatedChargingPowerW;
+  const liveCharging =
+    carCode === 2 ||
+    (carCode === null && typeof liveAmpere === "number" && liveAmpere > 0.25) ||
+    chargingPowerW >= CHARGING_ACTIVE_THRESHOLD_W;
+  const chargeCompleted = carCode === 4 && !liveCharging;
   const writePending = Object.values(pendingWrites).some(Boolean);
   const sliderValue = sliderDraft ?? gridAmpere;
+  const chargePowerCardMode: "idle" | "slow" | "fast" =
+    chargingPowerW < CHARGING_ACTIVE_THRESHOLD_W
+      ? "idle"
+      : chargingPowerW < FAST_CHARGING_THRESHOLD_W
+        ? "slow"
+        : "fast";
+
+  useEffect(() => {
+    if (!liveCharging) {
+      setChargingPulseOn(true);
+      return;
+    }
+    const timer = setInterval(() => {
+      setChargingPulseOn((current) => !current);
+    }, CHARGING_INDICATOR_BLINK_MS);
+    return () => clearInterval(timer);
+  }, [liveCharging]);
 
   useEffect(() => {
     if (!pendingWrites[stateIds.gridAmpere]) {
@@ -275,20 +313,49 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         value: phaseMode,
       },
       {
-        label: "Aktueller Ladestrom",
+        label: "Wallbox-Strom (Ist)",
         value: liveAmpere === null ? "-" : `${liveAmpere.toFixed(1)} A`,
+      },
+      {
+        label: "Ladeleistung (Ist)",
+        value: formatPowerKW(chargingPowerW),
       },
       {
         label: "Fahrzeugstatus",
         value: carStatus,
       },
-      {
-        label: "Batterie",
-        value: batterySoc === null ? "-" : `${Math.max(0, Math.min(100, Math.round(batterySoc)))} %`,
-      },
     ],
-    [allowCharging, batterySoc, carStatus, liveAmpere, phaseMode, solarOnly]
+    [allowCharging, carStatus, chargingPowerW, liveAmpere, phaseMode, solarOnly]
   );
+
+  const chargingStatusText = liveCharging
+    ? `Laedt mit ${formatPowerKW(chargingPowerW)}`
+    : chargeCompleted
+      ? "Ladevorgang abgeschlossen"
+      : "Kein aktiver Ladevorgang";
+  const chargingIndicatorColor = liveCharging
+    ? chargingPulseOn
+      ? "#f8c24b"
+      : "rgba(248, 194, 75, 0.28)"
+    : chargeCompleted
+      ? "#35d19a"
+      : "rgba(197, 209, 231, 0.35)";
+  const chargePowerCardAccent =
+    chargePowerCardMode === "fast"
+      ? "rgba(59, 203, 141, 0.95)"
+      : chargePowerCardMode === "slow"
+        ? "rgba(245, 198, 104, 0.96)"
+        : "rgba(238, 97, 111, 0.92)";
+  const chargePowerCardBackground =
+    chargePowerCardMode === "idle"
+      ? "rgba(224, 83, 96, 0.08)"
+      : chargingPulseOn
+        ? chargePowerCardMode === "fast"
+          ? "rgba(53, 198, 137, 0.22)"
+          : "rgba(245, 198, 104, 0.2)"
+        : chargePowerCardMode === "fast"
+          ? "rgba(53, 198, 137, 0.12)"
+          : "rgba(245, 198, 104, 0.1)";
 
   const modeItems: Array<{
     mode: WallboxMode;
@@ -338,6 +405,13 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
               {titleText}
             </Text>
           ) : null}
+        </View>
+
+        <View style={[styles.chargeStatusStrip, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
+          <View style={[styles.chargeStatusDot, { backgroundColor: chargingIndicatorColor }]} />
+          <Text numberOfLines={1} style={[styles.chargeStatusText, { color: textColor }]}>
+            {chargingStatusText}
+          </Text>
         </View>
 
         <View style={styles.block}>
@@ -513,6 +587,42 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
           </Text>
         ) : null}
 
+        <View style={styles.metricsRow}>
+          <View
+            style={[
+              styles.metricCard,
+              styles.metricCardPower,
+              {
+                borderColor: chargePowerCardAccent,
+                backgroundColor: chargePowerCardBackground,
+              },
+            ]}
+          >
+            <Text numberOfLines={1} style={[styles.metricLabel, { color: mutedTextColor }]}>
+              Laden jetzt
+            </Text>
+            <Text numberOfLines={1} style={[styles.metricValue, { color: textColor }]}>
+              {formatPowerKW(chargingPowerW)}
+            </Text>
+          </View>
+          <View style={[styles.metricCard, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
+            <Text numberOfLines={1} style={[styles.metricLabel, { color: mutedTextColor }]}>
+              Gesamt geladen
+            </Text>
+            <Text numberOfLines={1} style={[styles.metricValue, { color: textColor }]}>
+              {formatEnergyKWh(chargedEnergyKWh)}
+            </Text>
+          </View>
+          <View style={[styles.metricCard, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
+            <Text numberOfLines={1} style={[styles.metricLabel, { color: mutedTextColor }]}>
+              Auto SoC
+            </Text>
+            <Text numberOfLines={1} style={[styles.metricValue, { color: textColor }]}>
+              {formatPercent(batterySoc)}
+            </Text>
+          </View>
+        </View>
+
         <Text
           numberOfLines={1}
           style={[
@@ -573,6 +683,77 @@ function normalizeAmpere(value: unknown) {
     return null;
   }
   return clampAmpere(numeric);
+}
+
+function normalizePowerToWatts(value: unknown) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.abs(value) > 80 ? value : value * 1000;
+  }
+
+  const normalized = String(value).trim().toLowerCase().replace(",", ".");
+  if (!normalized) {
+    return null;
+  }
+
+  const match = normalized.match(/-?\d+(\.\d+)?/);
+  if (!match) {
+    return null;
+  }
+
+  const numeric = Number(match[0]);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+
+  if (normalized.includes("kw")) {
+    return numeric * 1000;
+  }
+  if (normalized.includes("w")) {
+    return numeric;
+  }
+
+  return Math.abs(numeric) > 80 ? numeric : numeric * 1000;
+}
+
+function normalizeEnergyToKWh(value: unknown) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.abs(value) > 100 ? value / 1000 : value;
+  }
+
+  const normalized = String(value).trim().toLowerCase().replace(",", ".");
+  if (!normalized) {
+    return null;
+  }
+
+  const match = normalized.match(/-?\d+(\.\d+)?/);
+  if (!match) {
+    return null;
+  }
+
+  const numeric = Number(match[0]);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+
+  if (normalized.includes("mwh")) {
+    return numeric * 1000;
+  }
+  if (normalized.includes("kwh")) {
+    return numeric;
+  }
+  if (normalized.includes("wh")) {
+    return numeric / 1000;
+  }
+
+  return Math.abs(numeric) > 100 ? numeric / 1000 : numeric;
 }
 
 function normalizeFloat(value: unknown) {
@@ -671,6 +852,67 @@ function mapCarStatus(code: number | null) {
   return "-";
 }
 
+function resolvePhaseCount(raw: unknown) {
+  const normalized = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+  if (
+    normalized === "2" ||
+    normalized === "1p" ||
+    normalized === "single" ||
+    normalized === "single_phase" ||
+    normalized === "one_phase"
+  ) {
+    return 1;
+  }
+  if (
+    normalized === "3" ||
+    normalized === "3p" ||
+    normalized === "three" ||
+    normalized === "three_phase"
+  ) {
+    return 3;
+  }
+  return 1;
+}
+
+function estimateChargingPowerW(liveAmpere: number | null, phaseModeRaw: unknown) {
+  if (liveAmpere === null || !Number.isFinite(liveAmpere) || liveAmpere <= 0) {
+    return 0;
+  }
+  const phaseCount = resolvePhaseCount(phaseModeRaw);
+  const estimated = liveAmpere * PHASE_VOLTAGE_V * phaseCount;
+  if (!Number.isFinite(estimated) || estimated < 0) {
+    return 0;
+  }
+  return estimated;
+}
+
+function formatPowerKW(powerW: number) {
+  if (!Number.isFinite(powerW) || powerW <= 0) {
+    return "0.00 kW";
+  }
+  return `${(powerW / 1000).toFixed(2)} kW`;
+}
+
+function formatEnergyKWh(energyKWh: number | null) {
+  if (energyKWh === null || !Number.isFinite(energyKWh) || energyKWh < 0) {
+    return "-";
+  }
+  if (energyKWh >= 1000) {
+    return `${(energyKWh / 1000).toFixed(2)} MWh`;
+  }
+  return `${energyKWh.toFixed(1)} kWh`;
+}
+
+function formatPercent(value: number | null) {
+  if (value === null || !Number.isFinite(value)) {
+    return "-";
+  }
+  const normalized = Math.max(0, Math.min(100, value));
+  return `${Math.round(normalized)} %`;
+}
+
 function modeStatusLabel(mode: WallboxMode) {
   if (mode === "pv") {
     return "PV-Ueberschussladen aktiv";
@@ -756,6 +998,26 @@ const styles = StyleSheet.create({
   header: {
     gap: 3,
   },
+  chargeStatusStrip: {
+    borderRadius: 12,
+    borderWidth: 1,
+    minHeight: 36,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  chargeStatusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+  },
+  chargeStatusText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "700",
+  },
   title: {
     fontSize: 16,
     fontWeight: "800",
@@ -765,6 +1027,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     fontWeight: "600",
+  },
+  metricsRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 8,
+  },
+  metricCard: {
+    flex: 1,
+    minHeight: 70,
+    borderRadius: 11,
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    paddingVertical: 8,
+    justifyContent: "space-between",
+    gap: 4,
+  },
+  metricCardPower: {
+    borderWidth: 1.2,
+  },
+  metricLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.45,
+    textTransform: "uppercase",
+  },
+  metricValue: {
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: "800",
   },
   block: {
     gap: 7,

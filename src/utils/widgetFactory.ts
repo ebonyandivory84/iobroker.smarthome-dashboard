@@ -234,6 +234,8 @@ export function buildWidgetTemplate(
       ampereStateId: "go-e.0.ampere",
       carStateId: "go-e.0.car",
       batterySocStateId: "go-e.0.carBatterySoc",
+      chargePowerStateId: "go-e.0.nrg.11",
+      chargedEnergyStateId: "go-e.0.eto",
       stopChargeingAtCarSoc80StateId: "go-e.0.stopChargeingAtCarSoc80",
       position: {
         ...basePosition,
@@ -247,6 +249,11 @@ export function buildWidgetTemplate(
     type: "solar",
     title: `Solar ${suffix}`,
     statePrefix: `0_userdata.0.solar_${suffix}`,
+    wallboxCarStateId: "go-e.0.car",
+    wallboxChargePowerStateId: "go-e.0.nrg.11",
+    wallboxAmpereStateId: "go-e.0.ampere",
+    wallboxPhaseModeStateId: "go-e.0.phaseSwitchMode",
+    wallboxCarSocStateId: "go-e.0.carBatterySoc",
     keys: {
       pvNow: "pv_now",
       homeNow: "home_now",

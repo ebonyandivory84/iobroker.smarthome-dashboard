@@ -327,6 +327,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ampereStateId: widget.ampereStateId || "go-e.0.ampere",
         carStateId: widget.carStateId || "go-e.0.car",
         batterySocStateId: widget.batterySocStateId || "go-e.0.carBatterySoc",
+        chargePowerStateId: widget.chargePowerStateId || "go-e.0.nrg.11",
+        chargedEnergyStateId: widget.chargedEnergyStateId || "go-e.0.eto",
         stopChargeingAtCarSoc80StateId: widget.stopChargeingAtCarSoc80StateId || "go-e.0.stopChargeingAtCarSoc80",
         ...appearanceDraft,
       });
@@ -359,6 +361,11 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       backgroundMode: widget.backgroundMode || "color",
       backgroundImage: widget.backgroundImage || "",
       backgroundImageBlur: String(widget.backgroundImageBlur ?? 8),
+      wallboxCarStateId: widget.wallboxCarStateId || "go-e.0.car",
+      wallboxChargePowerStateId: widget.wallboxChargePowerStateId || "go-e.0.nrg.11",
+      wallboxAmpereStateId: widget.wallboxAmpereStateId || "go-e.0.ampere",
+      wallboxPhaseModeStateId: widget.wallboxPhaseModeStateId || "go-e.0.phaseSwitchMode",
+      wallboxCarSocStateId: widget.wallboxCarSocStateId || "go-e.0.carBatterySoc",
       statePrefix: widget.statePrefix,
       dailyEnergyUnit: widget.dailyEnergyUnit || "auto",
       statValueUnit: widget.statValueUnit || "none",
@@ -653,6 +660,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ampereStateId: draft.ampereStateId?.trim() || undefined,
         carStateId: draft.carStateId?.trim() || undefined,
         batterySocStateId: draft.batterySocStateId?.trim() || undefined,
+        chargePowerStateId: draft.chargePowerStateId?.trim() || undefined,
+        chargedEnergyStateId: draft.chargedEnergyStateId?.trim() || undefined,
         stopChargeingAtCarSoc80StateId: draft.stopChargeingAtCarSoc80StateId?.trim() || undefined,
         interactionSounds: buildStoredInteractionSounds(
           widget.type,
@@ -680,6 +689,11 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         backgroundMode: draft.backgroundMode === "image" ? "image" : "color",
         backgroundImage: draft.backgroundImage || undefined,
         backgroundImageBlur: clampInt(draft.backgroundImageBlur, widget.backgroundImageBlur ?? 8, 0),
+        wallboxCarStateId: draft.wallboxCarStateId?.trim() || undefined,
+        wallboxChargePowerStateId: draft.wallboxChargePowerStateId?.trim() || undefined,
+        wallboxAmpereStateId: draft.wallboxAmpereStateId?.trim() || undefined,
+        wallboxPhaseModeStateId: draft.wallboxPhaseModeStateId?.trim() || undefined,
+        wallboxCarSocStateId: draft.wallboxCarSocStateId?.trim() || undefined,
         statePrefix: draft.statePrefix || widget.statePrefix,
         dailyEnergyUnit:
           draft.dailyEnergyUnit === "Wh" || draft.dailyEnergyUnit === "kWh" ? draft.dailyEnergyUnit : "auto",
@@ -1838,6 +1852,22 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     />
                   </Field>
                 </View>
+                <View style={styles.splitRow}>
+                  <Field label="chargePower (kW/W)">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("chargePowerStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, chargePowerStateId: value }))}
+                      value={draft.chargePowerStateId || ""}
+                    />
+                  </Field>
+                  <Field label="chargedEnergy (kWh/Wh)">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("chargedEnergyStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, chargedEnergyStateId: value }))}
+                      value={draft.chargedEnergyStateId || ""}
+                    />
+                  </Field>
+                </View>
                 <Field label="stopChargeingAtCarSoc80">
                   <StateFieldInput
                     onBrowse={() => setPickerField("stopChargeingAtCarSoc80StateId")}
@@ -2017,6 +2047,56 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={draft.keyPvTotal || ""}
                   />
                 </Field>
+                <Text style={styles.sectionTitle}>Auto / Wallbox (optional)</Text>
+                <View style={styles.splitRow}>
+                  <Field label="Wallbox Car State ID">
+                    <StateFieldInput
+                      browseLabel="Objekt"
+                      onBrowse={() => setPickerField("wallboxCarStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, wallboxCarStateId: value }))}
+                      value={draft.wallboxCarStateId || ""}
+                    />
+                  </Field>
+                  <Field label="Wallbox SoC State ID">
+                    <StateFieldInput
+                      browseLabel="Objekt"
+                      onBrowse={() => setPickerField("wallboxCarSocStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, wallboxCarSocStateId: value }))}
+                      value={draft.wallboxCarSocStateId || ""}
+                    />
+                  </Field>
+                </View>
+                <View style={styles.splitRow}>
+                  <Field label="Wallbox Ladeleistung State ID">
+                    <StateFieldInput
+                      browseLabel="Objekt"
+                      onBrowse={() => setPickerField("wallboxChargePowerStateId")}
+                      onChangeText={(value) =>
+                        setDraft((current) => ({ ...current, wallboxChargePowerStateId: value }))
+                      }
+                      value={draft.wallboxChargePowerStateId || ""}
+                    />
+                  </Field>
+                  <Field label="Wallbox Strom State ID">
+                    <StateFieldInput
+                      browseLabel="Objekt"
+                      onBrowse={() => setPickerField("wallboxAmpereStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, wallboxAmpereStateId: value }))}
+                      value={draft.wallboxAmpereStateId || ""}
+                    />
+                  </Field>
+                </View>
+                <Field label="Wallbox Phasenmodus State ID">
+                  <StateFieldInput
+                    browseLabel="Objekt"
+                    onBrowse={() => setPickerField("wallboxPhaseModeStateId")}
+                    onChangeText={(value) => setDraft((current) => ({ ...current, wallboxPhaseModeStateId: value }))}
+                    value={draft.wallboxPhaseModeStateId || ""}
+                  />
+                </Field>
+                <Text style={styles.mappingHint}>
+                  Wird fuer Auto-Flow-Animation, Ladeleistung und SoC im Auto-Node genutzt.
+                </Text>
                 <Field label="Stat Textgroesse (%)">
                   <TextInput
                     keyboardType="numeric"
