@@ -45,7 +45,11 @@ export function WidgetFrame({
     widget.iconImageSizeMode === "maximized" &&
     widget.iconImageBorderless === true;
   const showHeaderTitle =
-    widget.type !== "camera" && widget.type !== "wallbox" && widget.showTitle !== false && Boolean(widget.title.trim());
+    widget.type !== "camera" &&
+    widget.type !== "wallbox" &&
+    widget.type !== "heating" &&
+    widget.showTitle !== false &&
+    Boolean(widget.title.trim());
   const interaction = useRef<{
     mode: "drag" | "resize";
     startX: number;
@@ -63,7 +67,8 @@ export function WidgetFrame({
     widget.type === "log" ||
     widget.type === "script" ||
     widget.type === "host" ||
-    widget.type === "wallbox";
+    widget.type === "wallbox" ||
+    widget.type === "heating";
 
   useEffect(() => {
     if (Platform.OS !== "web") {
@@ -211,6 +216,7 @@ export function WidgetFrame({
           widget.type !== "solar" &&
           widget.type !== "state" &&
           widget.type !== "wallbox" &&
+          widget.type !== "heating" &&
           widget.type !== "grafana" &&
           !linkBorderless
             ? styles.contentInset

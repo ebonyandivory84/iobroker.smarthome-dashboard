@@ -26,10 +26,12 @@ export function buildWidgetTemplate(
                   ? 6
                 : type === "host"
                   ? 6
-                : type === "wallbox"
-                  ? 6
-                  : type === "weather"
-                    ? 4
+                  : type === "wallbox"
+                    ? 6
+                    : type === "heating"
+                      ? 6
+                    : type === "weather"
+                      ? 4
                 : type === "numpad"
                   ? 6
                 : 3,
@@ -46,12 +48,14 @@ export function buildWidgetTemplate(
                 ? 3
                 : type === "script"
                   ? 3
-                  : type === "host"
-                    ? 3
-                    : type === "wallbox"
+                    : type === "host"
                       ? 3
-                    : type === "weather"
-                      ? 3
+                      : type === "wallbox"
+                        ? 3
+                        : type === "heating"
+                          ? 3
+                      : type === "weather"
+                        ? 3
                 : type === "numpad"
                   ? 4
                 : 2,
@@ -237,6 +241,47 @@ export function buildWidgetTemplate(
       chargePowerStateId: "go-e.0.nrg.11",
       chargedEnergyStateId: "go-e.0.eto",
       stopChargeingAtCarSoc80StateId: "go-e.0.stopChargeingAtCarSoc80",
+      position: {
+        ...basePosition,
+        w: Math.min(6, grid.columns),
+      },
+    };
+  }
+
+  if (type === "heating") {
+    return {
+      id: `heating-${suffix}`,
+      type: "heating",
+      title: `Heizung ${suffix}`,
+      refreshMs: 3000,
+      showStatusSubtitle: true,
+      backgroundImage: "",
+      backgroundImageBlur: 8,
+      modeSetStateId: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.modes.active.commands.setMode.setValue",
+      modeValueStateId: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.modes.active.properties.value.value",
+      activeProgramStateId: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.active.properties.value.value",
+      normalSetTempStateId: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.normal.commands.setTemperature.setValue",
+      reducedSetTempStateId: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.reduced.commands.setTemperature.setValue",
+      comfortSetTempStateId: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.comfort.commands.setTemperature.setValue",
+      dhwSetTempStateId: "viessmannapi.0.299550.0.features.heating.dhw.temperature.main.commands.setTargetTemperature.setValue",
+      comfortActivateStateId: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.comfort.commands.activate.setValue",
+      comfortDeactivateStateId: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.comfort.commands.deactivate.setValue",
+      ecoSetActiveStateId: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.eco.commands.setActive.setValue",
+      oneTimeChargeSetActiveStateId: "viessmannapi.0.299550.0.features.heating.dhw.oneTimeCharge.commands.setActive.setValue",
+      oneTimeChargeActiveStateId: "viessmannapi.0.299550.0.features.heating.dhw.oneTimeCharge.properties.active.value",
+      heatingTempStateId: "viessmannapi.0.299550.0.features.heating.circuits.1.temperature.properties.value.value",
+      supplyTempStateId: "viessmannapi.0.299550.0.features.heating.circuits.1.sensors.temperature.supply.properties.value.value",
+      outsideTempStateId: "viessmannapi.0.299550.0.features.heating.sensors.temperature.outside.properties.value.value",
+      returnTempStateId: "viessmannapi.0.299550.0.features.heating.sensors.temperature.return.properties.value.value",
+      dhwTempStateId: "viessmannapi.0.299550.0.features.heating.dhw.sensors.temperature.dhwCylinder.properties.value.value",
+      compressorPowerStateId: "viessmannapi.0.299550.0.features.heating.compressors.0.power.properties.value.value",
+      compressorSensorPowerStateId: "viessmannapi.0.299550.0.features.heating.compressors.0.sensors.power.properties.value.value",
+      standbyIcon: "power-standby",
+      dhwIcon: "water",
+      heatingIcon: "radiator",
+      comfortIcon: "white-balance-sunny",
+      ecoIcon: "leaf",
+      oneTimeChargeIcon: "flash",
       position: {
         ...basePosition,
         w: Math.min(6, grid.columns),

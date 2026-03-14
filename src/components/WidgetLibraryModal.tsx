@@ -88,6 +88,12 @@ const OPTIONS: Array<{
     description: "Steuert go-e Lademodus, Netzstrom und 80%-Begrenzung in einer kompakten Card.",
     icon: "ev-station",
   },
+  {
+    type: "heating",
+    title: "Heizung",
+    description: "Steuert Viessmann Heizmodus, Solltemperaturen und Warmwasser in einer kompakten Card.",
+    icon: "radiator",
+  },
 ];
 
 export function WidgetLibraryModal({

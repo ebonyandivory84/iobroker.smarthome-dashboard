@@ -283,7 +283,8 @@ export function DashboardScreen() {
           currentWidget.type === "log" ||
           currentWidget.type === "script" ||
           currentWidget.type === "host" ||
-          currentWidget.type === "wallbox"
+          currentWidget.type === "wallbox" ||
+          currentWidget.type === "heating"
             ? { manualHeightOverride: true }
             : null),
         };
@@ -302,7 +303,8 @@ export function DashboardScreen() {
         currentWidget.type === "log" ||
         currentWidget.type === "script" ||
         currentWidget.type === "host" ||
-        currentWidget.type === "wallbox"
+        currentWidget.type === "wallbox" ||
+        currentWidget.type === "heating"
           ? { manualHeightOverride: true }
           : null),
       });
@@ -323,7 +325,8 @@ export function DashboardScreen() {
         currentWidget.type === "log" ||
         currentWidget.type === "script" ||
         currentWidget.type === "host" ||
-        currentWidget.type === "wallbox"
+        currentWidget.type === "wallbox" ||
+        currentWidget.type === "heating"
           ? { manualHeightOverride: true }
           : null),
       };
@@ -343,7 +346,8 @@ export function DashboardScreen() {
                 currentWidget.type === "log" ||
                 currentWidget.type === "script" ||
                 currentWidget.type === "host" ||
-                currentWidget.type === "wallbox"
+                currentWidget.type === "wallbox" ||
+                currentWidget.type === "heating"
               ? { minHeight: 1, heightSnap: 0.1 }
             : undefined;
       updateWidget(widgetId, {
@@ -356,7 +360,8 @@ export function DashboardScreen() {
         currentWidget.type === "log" ||
         currentWidget.type === "script" ||
         currentWidget.type === "host" ||
-        currentWidget.type === "wallbox"
+        currentWidget.type === "wallbox" ||
+        currentWidget.type === "heating"
           ? { manualHeightOverride: true }
           : null),
       });

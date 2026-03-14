@@ -335,6 +335,60 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       return;
     }
 
+    if (widget.type === "heating") {
+      setSoundDraft({
+        press: resolveDraftSoundValue(
+          widget.interactionSounds?.press,
+          config.uiSounds?.widgetTypeDefaults?.heating?.press
+        ),
+        confirm: resolveDraftSoundValue(
+          widget.interactionSounds?.confirm,
+          config.uiSounds?.widgetTypeDefaults?.heating?.confirm
+        ),
+        slider: resolveDraftSoundValue(
+          widget.interactionSounds?.slider,
+          config.uiSounds?.widgetTypeDefaults?.heating?.slider
+        ),
+      });
+      setWeatherSuggestions([]);
+      setWeatherSearchBusy(false);
+      setDraft({
+        title: widget.title,
+        showTitle: widget.showTitle === false ? "false" : "true",
+        showStatusSubtitle: widget.showStatusSubtitle === false ? "false" : "true",
+        refreshMs: String(widget.refreshMs || 3000),
+        backgroundImage: widget.backgroundImage || "",
+        backgroundImageBlur: String(widget.backgroundImageBlur ?? 8),
+        modeSetStateId: widget.modeSetStateId,
+        modeValueStateId: widget.modeValueStateId || "",
+        activeProgramStateId: widget.activeProgramStateId || "",
+        normalSetTempStateId: widget.normalSetTempStateId,
+        reducedSetTempStateId: widget.reducedSetTempStateId || "",
+        comfortSetTempStateId: widget.comfortSetTempStateId || "",
+        dhwSetTempStateId: widget.dhwSetTempStateId,
+        comfortActivateStateId: widget.comfortActivateStateId || "",
+        comfortDeactivateStateId: widget.comfortDeactivateStateId || "",
+        ecoSetActiveStateId: widget.ecoSetActiveStateId || "",
+        oneTimeChargeSetActiveStateId: widget.oneTimeChargeSetActiveStateId || "",
+        oneTimeChargeActiveStateId: widget.oneTimeChargeActiveStateId || "",
+        heatingTempStateId: widget.heatingTempStateId || "",
+        supplyTempStateId: widget.supplyTempStateId || "",
+        outsideTempStateId: widget.outsideTempStateId || "",
+        returnTempStateId: widget.returnTempStateId || "",
+        dhwTempStateId: widget.dhwTempStateId || "",
+        compressorPowerStateId: widget.compressorPowerStateId || "",
+        compressorSensorPowerStateId: widget.compressorSensorPowerStateId || "",
+        standbyIcon: widget.standbyIcon || "power-standby",
+        dhwIcon: widget.dhwIcon || "water",
+        heatingIcon: widget.heatingIcon || "radiator",
+        comfortIcon: widget.comfortIcon || "white-balance-sunny",
+        ecoIcon: widget.ecoIcon || "leaf",
+        oneTimeChargeIcon: widget.oneTimeChargeIcon || "flash",
+        ...appearanceDraft,
+      });
+      return;
+    }
+
     if (widget.type === "weather") {
       setSoundDraft({});
       setDraft({
@@ -670,6 +724,46 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ),
         appearance,
       });
+    } else if (widget.type === "heating") {
+      onSave(widget.id, {
+        title: draft.title,
+        showTitle: draft.showTitle !== "false",
+        showStatusSubtitle: draft.showStatusSubtitle !== "false",
+        refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 3000, 500),
+        backgroundImage: draft.backgroundImage?.trim() || undefined,
+        backgroundImageBlur: clampInt(draft.backgroundImageBlur, widget.backgroundImageBlur ?? 8, 0),
+        modeSetStateId: draft.modeSetStateId?.trim() || widget.modeSetStateId,
+        modeValueStateId: draft.modeValueStateId?.trim() || undefined,
+        activeProgramStateId: draft.activeProgramStateId?.trim() || undefined,
+        normalSetTempStateId: draft.normalSetTempStateId?.trim() || widget.normalSetTempStateId,
+        reducedSetTempStateId: draft.reducedSetTempStateId?.trim() || undefined,
+        comfortSetTempStateId: draft.comfortSetTempStateId?.trim() || undefined,
+        dhwSetTempStateId: draft.dhwSetTempStateId?.trim() || widget.dhwSetTempStateId,
+        comfortActivateStateId: draft.comfortActivateStateId?.trim() || undefined,
+        comfortDeactivateStateId: draft.comfortDeactivateStateId?.trim() || undefined,
+        ecoSetActiveStateId: draft.ecoSetActiveStateId?.trim() || undefined,
+        oneTimeChargeSetActiveStateId: draft.oneTimeChargeSetActiveStateId?.trim() || undefined,
+        oneTimeChargeActiveStateId: draft.oneTimeChargeActiveStateId?.trim() || undefined,
+        heatingTempStateId: draft.heatingTempStateId?.trim() || undefined,
+        supplyTempStateId: draft.supplyTempStateId?.trim() || undefined,
+        outsideTempStateId: draft.outsideTempStateId?.trim() || undefined,
+        returnTempStateId: draft.returnTempStateId?.trim() || undefined,
+        dhwTempStateId: draft.dhwTempStateId?.trim() || undefined,
+        compressorPowerStateId: draft.compressorPowerStateId?.trim() || undefined,
+        compressorSensorPowerStateId: draft.compressorSensorPowerStateId?.trim() || undefined,
+        standbyIcon: draft.standbyIcon?.trim() || undefined,
+        dhwIcon: draft.dhwIcon?.trim() || undefined,
+        heatingIcon: draft.heatingIcon?.trim() || undefined,
+        comfortIcon: draft.comfortIcon?.trim() || undefined,
+        ecoIcon: draft.ecoIcon?.trim() || undefined,
+        oneTimeChargeIcon: draft.oneTimeChargeIcon?.trim() || undefined,
+        interactionSounds: buildStoredInteractionSounds(
+          widget.type,
+          soundDraft,
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]
+        ),
+        appearance,
+      });
     } else if (widget.type === "weather") {
       onSave(widget.id, {
         title: draft.title,
@@ -741,7 +835,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       widget.type !== "link" &&
       widget.type !== "log" &&
       widget.type !== "script" &&
-      widget.type !== "wallbox"
+      widget.type !== "wallbox" &&
+      widget.type !== "heating"
     ) {
       return;
     }
@@ -993,6 +1088,34 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     firstLabel="Toggle 80% Start"
                     secondKey="inactiveWidgetColor2"
                     secondLabel="Toggle 80% Ende"
+                    values={draft}
+                    onChange={setDraft}
+                  />
+                </>
+              ) : null}
+              {widget.type === "heating" ? (
+                <>
+                  <ColorInputRow
+                    firstKey="cardColor"
+                    firstLabel="Panel Hintergrund"
+                    secondKey="iconColor"
+                    secondLabel="Slider Start"
+                    values={draft}
+                    onChange={setDraft}
+                  />
+                  <ColorInputRow
+                    firstKey="iconColor2"
+                    firstLabel="Slider Ende"
+                    secondKey="activeWidgetColor"
+                    secondLabel="Komfort Akzent"
+                    values={draft}
+                    onChange={setDraft}
+                  />
+                  <ColorInputRow
+                    firstKey="activeWidgetColor2"
+                    firstLabel="Eco Akzent"
+                    secondKey="statColor"
+                    secondLabel="Einmalladung Akzent"
                     values={draft}
                     onChange={setDraft}
                   />
@@ -1906,6 +2029,282 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 </Field>
               </>
             ) : null}
+            {widget.type === "heating" ? (
+              <>
+                <View style={styles.splitRow}>
+                  <Field label="Refresh (ms)">
+                    <TextInput
+                      keyboardType="numeric"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, refreshMs: value }))}
+                      style={styles.input}
+                      value={draft.refreshMs || "3000"}
+                    />
+                  </Field>
+                  <Field label="Status-Untertitel anzeigen">
+                    <ChoiceRow
+                      options={["true", "false"]}
+                      value={draft.showStatusSubtitle || "true"}
+                      onSelect={(value) => setDraft((current) => ({ ...current, showStatusSubtitle: value }))}
+                    />
+                  </Field>
+                </View>
+
+                <Field label="Widget-Hintergrundbild (optional)">
+                  <View style={styles.stateFieldRow}>
+                    <TextInput
+                      editable={false}
+                      style={[styles.input, styles.stateFieldInput]}
+                      value={draft.backgroundImage || ""}
+                    />
+                    <EditorButtonPressable
+                      onPress={() => setImagePickerField("backgroundImage")}
+                      style={styles.stateBrowseButton}
+                    >
+                      <Text style={styles.stateBrowseLabel}>Bild waehlen</Text>
+                    </EditorButtonPressable>
+                  </View>
+                  <Field label="Bild-Unschaerfe">
+                    <BlurControl
+                      value={draft.backgroundImageBlur || "8"}
+                      onChange={(value) => setDraft((current) => ({ ...current, backgroundImageBlur: value }))}
+                    />
+                  </Field>
+                </Field>
+
+                <Text style={styles.sectionTitle}>Steuerung</Text>
+                <Field label="Mode setzen (setMode.setValue)">
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("modeSetStateId")}
+                    onChangeText={(value) => setDraft((current) => ({ ...current, modeSetStateId: value }))}
+                    value={draft.modeSetStateId || ""}
+                  />
+                </Field>
+                <Field label="Normal Solltemperatur setzen">
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("normalSetTempStateId")}
+                    onChangeText={(value) => setDraft((current) => ({ ...current, normalSetTempStateId: value }))}
+                    value={draft.normalSetTempStateId || ""}
+                  />
+                </Field>
+                <View style={styles.splitRow}>
+                  <Field label="Reduziert Solltemperatur">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("reducedSetTempStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, reducedSetTempStateId: value }))}
+                      value={draft.reducedSetTempStateId || ""}
+                    />
+                  </Field>
+                  <Field label="Komfort Solltemperatur">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("comfortSetTempStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, comfortSetTempStateId: value }))}
+                      value={draft.comfortSetTempStateId || ""}
+                    />
+                  </Field>
+                </View>
+                <Field label="Warmwasser Solltemperatur setzen">
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("dhwSetTempStateId")}
+                    onChangeText={(value) => setDraft((current) => ({ ...current, dhwSetTempStateId: value }))}
+                    value={draft.dhwSetTempStateId || ""}
+                  />
+                </Field>
+                <View style={styles.splitRow}>
+                  <Field label="Komfort aktivieren">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("comfortActivateStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, comfortActivateStateId: value }))}
+                      value={draft.comfortActivateStateId || ""}
+                    />
+                  </Field>
+                  <Field label="Komfort deaktivieren">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("comfortDeactivateStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, comfortDeactivateStateId: value }))}
+                      value={draft.comfortDeactivateStateId || ""}
+                    />
+                  </Field>
+                </View>
+                <View style={styles.splitRow}>
+                  <Field label="Eco setActive">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("ecoSetActiveStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, ecoSetActiveStateId: value }))}
+                      value={draft.ecoSetActiveStateId || ""}
+                    />
+                  </Field>
+                  <Field label="WW Einmalladung setActive">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("oneTimeChargeSetActiveStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, oneTimeChargeSetActiveStateId: value }))}
+                      value={draft.oneTimeChargeSetActiveStateId || ""}
+                    />
+                  </Field>
+                </View>
+
+                <Text style={styles.sectionTitle}>Live-States (optional)</Text>
+                <View style={styles.splitRow}>
+                  <Field label="Aktueller Modus">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("modeValueStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, modeValueStateId: value }))}
+                      value={draft.modeValueStateId || ""}
+                    />
+                  </Field>
+                  <Field label="Aktives Programm">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("activeProgramStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, activeProgramStateId: value }))}
+                      value={draft.activeProgramStateId || ""}
+                    />
+                  </Field>
+                </View>
+                <View style={styles.splitRow}>
+                  <Field label="Heizkreis Temp">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("heatingTempStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, heatingTempStateId: value }))}
+                      value={draft.heatingTempStateId || ""}
+                    />
+                  </Field>
+                  <Field label="Vorlauf Temp">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("supplyTempStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, supplyTempStateId: value }))}
+                      value={draft.supplyTempStateId || ""}
+                    />
+                  </Field>
+                </View>
+                <View style={styles.splitRow}>
+                  <Field label="Aussentemperatur">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("outsideTempStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, outsideTempStateId: value }))}
+                      value={draft.outsideTempStateId || ""}
+                    />
+                  </Field>
+                  <Field label="Ruecklauf Temp">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("returnTempStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, returnTempStateId: value }))}
+                      value={draft.returnTempStateId || ""}
+                    />
+                  </Field>
+                </View>
+                <View style={styles.splitRow}>
+                  <Field label="Warmwasser Ist">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("dhwTempStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, dhwTempStateId: value }))}
+                      value={draft.dhwTempStateId || ""}
+                    />
+                  </Field>
+                  <Field label="Einmalladung Aktiv">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("oneTimeChargeActiveStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, oneTimeChargeActiveStateId: value }))}
+                      value={draft.oneTimeChargeActiveStateId || ""}
+                    />
+                  </Field>
+                </View>
+                <View style={styles.splitRow}>
+                  <Field label="Verdichter Leistung">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("compressorPowerStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, compressorPowerStateId: value }))}
+                      value={draft.compressorPowerStateId || ""}
+                    />
+                  </Field>
+                  <Field label="Verdichter Sensor Leistung">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("compressorSensorPowerStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, compressorSensorPowerStateId: value }))}
+                      value={draft.compressorSensorPowerStateId || ""}
+                    />
+                  </Field>
+                </View>
+
+                <Text style={styles.sectionTitle}>Button-Icons (MaterialCommunityIcons)</Text>
+                <View style={styles.splitRow}>
+                  <Field label="Standby Icon">
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, standbyIcon: value }))}
+                      style={styles.input}
+                      value={draft.standbyIcon || ""}
+                    />
+                  </Field>
+                  <Field label="Nur WW Icon">
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, dhwIcon: value }))}
+                      style={styles.input}
+                      value={draft.dhwIcon || ""}
+                    />
+                  </Field>
+                </View>
+                <View style={styles.splitRow}>
+                  <Field label="Heizen+WW Icon">
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, heatingIcon: value }))}
+                      style={styles.input}
+                      value={draft.heatingIcon || ""}
+                    />
+                  </Field>
+                  <Field label="Komfort Icon">
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, comfortIcon: value }))}
+                      style={styles.input}
+                      value={draft.comfortIcon || ""}
+                    />
+                  </Field>
+                </View>
+                <View style={styles.splitRow}>
+                  <Field label="Eco Icon">
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, ecoIcon: value }))}
+                      style={styles.input}
+                      value={draft.ecoIcon || ""}
+                    />
+                  </Field>
+                  <Field label="Einmalladung Icon">
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, oneTimeChargeIcon: value }))}
+                      style={styles.input}
+                      value={draft.oneTimeChargeIcon || ""}
+                    />
+                  </Field>
+                </View>
+
+                <Field label="Sounds bei Interaktion">
+                  <Field label="Button Press">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, press: value }))}
+                      value={soundDraft.press}
+                    />
+                  </Field>
+                  <Field label="Slider Bewegung">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, slider: value }))}
+                      value={soundDraft.slider}
+                    />
+                  </Field>
+                  <Field label="Bestaetigt / geschrieben">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, confirm: value }))}
+                      value={soundDraft.confirm}
+                    />
+                  </Field>
+                  <EditorButtonPressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
+                    <Text style={styles.inlineActionLabel}>Als Default fuer alle Heating-Widgets verwenden</Text>
+                  </EditorButtonPressable>
+                </Field>
+              </>
+            ) : null}
             {widget.type === "solar" ? (
               <>
                 <Field label="State Prefix">
@@ -2241,6 +2640,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
               : "Link-Icon waehlen"
             : widget?.type === "wallbox"
               ? "Wallbox-Hintergrund waehlen"
+              : widget?.type === "heating"
+                ? "Heizung-Hintergrund waehlen"
               : "Solar-Hintergrund waehlen"
         }
         helperText={
@@ -2248,6 +2649,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
             ? "Waehle eine Bilddatei aus dem Ordner `assets/`."
             : widget?.type === "wallbox"
               ? "Waehle ein Hintergrundbild. Drag&Drop, Datei-Upload und Browser-Auswahl sind verfuegbar."
+              : widget?.type === "heating"
+                ? "Waehle ein Hintergrundbild fuer das Heizungs-Widget. Drag&Drop und Datei-Upload sind verfuegbar."
               : "Verwendet den festen Ordner `assets/` im Adapter-Paket."
         }
         onClose={() => setImagePickerField(null)}
@@ -2260,6 +2663,12 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
               };
             }
             if (widget?.type === "wallbox") {
+              return {
+                ...current,
+                backgroundImage: entry.name,
+              };
+            }
+            if (widget?.type === "heating") {
               return {
                 ...current,
                 backgroundImage: entry.name,
@@ -2753,6 +3162,21 @@ function getWidgetAppearanceDefaults(
     };
   }
 
+  if (widget.type === "heating") {
+    return {
+      widgetColor: "rgba(18, 28, 42, 0.96)",
+      widgetColor2: "rgba(10, 16, 27, 0.98)",
+      textColor: "#f5f8ff",
+      mutedTextColor: "rgba(214, 224, 244, 0.78)",
+      cardColor: "rgba(255,255,255,0.035)",
+      iconColor: "#79b5ff",
+      iconColor2: "#5a85ef",
+      activeWidgetColor: "#f6c869",
+      activeWidgetColor2: "#4ed09a",
+      statColor: "#7fb9ff",
+    };
+  }
+
   return {
     widgetColor: theme.widgetTones.solarStart,
     widgetColor2: theme.widgetTones.solarEnd,
@@ -3018,7 +3442,8 @@ function buildStoredInteractionSounds(
     widgetType !== "link" &&
     widgetType !== "log" &&
     widgetType !== "script" &&
-    widgetType !== "wallbox"
+    widgetType !== "wallbox" &&
+    widgetType !== "heating"
   ) {
     return undefined;
   }

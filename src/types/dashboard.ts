@@ -10,7 +10,8 @@ export type WidgetType =
   | "log"
   | "script"
   | "host"
-  | "wallbox";
+  | "wallbox"
+  | "heating";
 
 export type IconPair = {
   active: string;
@@ -197,6 +198,40 @@ export type WallboxWidgetConfig = WidgetBase & {
   stopChargeingAtCarSoc80StateId?: string;
 };
 
+export type HeatingWidgetConfig = WidgetBase & {
+  type: "heating";
+  manualHeightOverride?: boolean;
+  refreshMs?: number;
+  showStatusSubtitle?: boolean;
+  backgroundImage?: string;
+  backgroundImageBlur?: number;
+  modeSetStateId: string;
+  modeValueStateId?: string;
+  activeProgramStateId?: string;
+  normalSetTempStateId: string;
+  reducedSetTempStateId?: string;
+  comfortSetTempStateId?: string;
+  dhwSetTempStateId: string;
+  comfortActivateStateId?: string;
+  comfortDeactivateStateId?: string;
+  ecoSetActiveStateId?: string;
+  oneTimeChargeSetActiveStateId?: string;
+  oneTimeChargeActiveStateId?: string;
+  heatingTempStateId?: string;
+  supplyTempStateId?: string;
+  outsideTempStateId?: string;
+  returnTempStateId?: string;
+  dhwTempStateId?: string;
+  compressorPowerStateId?: string;
+  compressorSensorPowerStateId?: string;
+  standbyIcon?: string;
+  dhwIcon?: string;
+  heatingIcon?: string;
+  comfortIcon?: string;
+  ecoIcon?: string;
+  oneTimeChargeIcon?: string;
+};
+
 export type SolarNodeLayout = {
   x: number;
   y: number;
@@ -286,7 +321,8 @@ export type WidgetConfig =
   | LogWidgetConfig
   | ScriptWidgetConfig
   | HostStatsWidgetConfig
-  | WallboxWidgetConfig;
+  | WallboxWidgetConfig
+  | HeatingWidgetConfig;
 
 export type BackgroundMode = "gradient" | "mesh" | "solid";
 

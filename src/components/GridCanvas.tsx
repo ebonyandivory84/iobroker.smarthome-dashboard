@@ -14,6 +14,7 @@ import { CameraWidget } from "./widgets/CameraWidget";
 import { EnergyWidget } from "./widgets/EnergyWidget";
 import { GrafanaWidget } from "./widgets/GrafanaWidget";
 import { HostStatsWidget } from "./widgets/HostStatsWidget";
+import { HeatingWidget } from "./widgets/HeatingWidget";
 import { LinkWidget } from "./widgets/LinkWidget";
 import { LogWidget } from "./widgets/LogWidget";
 import { NumpadWidget } from "./widgets/NumpadWidget";
@@ -194,6 +195,7 @@ export function GridCanvas({
                   widget.type === "script" ||
                   widget.type === "host" ||
                   widget.type === "wallbox" ||
+                  widget.type === "heating" ||
                   (Platform.OS === "web" && (widget.type === "weather" || widget.type === "grafana"))
                 }
                 onCommitPosition={(widgetId, position) =>
@@ -655,6 +657,11 @@ function getAutoLayoutSpec(
           return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
         }
         return { w: 1, h: roundGridUnit(3) };
+      case "heating":
+        if (widget.manualHeightOverride) {
+          return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
+        }
+        return { w: 1, h: roundGridUnit(3.2) };
     }
 
     return { w: 1, h: Math.max(1.5, roundGridUnit(fallbackHeight)) };
@@ -716,6 +723,11 @@ function getAutoLayoutSpec(
         return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(fallbackHeight)) };
       }
       return { w: mainColumnWidth, h: roundGridUnit(3) };
+    case "heating":
+      if (widget.manualHeightOverride) {
+        return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(fallbackHeight)) };
+      }
+      return { w: mainColumnWidth, h: roundGridUnit(3.2) };
   }
 
   return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
@@ -903,7 +915,8 @@ function WebGridCanvas({
             widget.type === "log" ||
             widget.type === "script" ||
             widget.type === "host" ||
-            widget.type === "wallbox"
+            widget.type === "wallbox" ||
+            widget.type === "heating"
           }
           mainColumnExtraGap={mainColumnExtraGap}
           sourceColumns={sourceColumns}
@@ -971,7 +984,11 @@ function WebWidgetShell({
     widget.iconImageSizeMode === "maximized" &&
     widget.iconImageBorderless === true;
   const showHeaderTitle =
-    widget.type !== "camera" && widget.type !== "wallbox" && widget.showTitle !== false && Boolean(widget.title.trim());
+    widget.type !== "camera" &&
+    widget.type !== "wallbox" &&
+    widget.type !== "heating" &&
+    widget.showTitle !== false &&
+    Boolean(widget.title.trim());
   const interaction = useRef<{
     mode: "drag" | "resize";
     startX: number;
@@ -1000,7 +1017,8 @@ function WebWidgetShell({
           widget.type === "log" ||
           widget.type === "script" ||
           widget.type === "host" ||
-          widget.type === "wallbox")
+          widget.type === "wallbox" ||
+          widget.type === "heating")
           ? CAMERA_GRID_SNAP
           : GRID_VERTICAL_SNAP
       );
@@ -1014,7 +1032,7 @@ function WebWidgetShell({
           ...active.startPosition,
           x: clamp(active.startPosition.x + dx, 0, config.grid.columns - active.startPosition.w),
           y: Math.max(0, active.startPosition.y + dy),
-        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : widget.type === "log" || widget.type === "script" || widget.type === "host" || widget.type === "wallbox" ? { minHeight: 1, heightSnap: 0.1 } : undefined);
+        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : widget.type === "log" || widget.type === "script" || widget.type === "host" || widget.type === "wallbox" || widget.type === "heating" ? { minHeight: 1, heightSnap: 0.1 } : undefined);
         setPreview(nextPreview);
 
         if (isLayoutMode && onDragAcrossPageEdge) {
@@ -1044,7 +1062,8 @@ function WebWidgetShell({
           widget.type === "log" ||
           widget.type === "script" ||
           widget.type === "host" ||
-          widget.type === "wallbox"
+          widget.type === "wallbox" ||
+          widget.type === "heating"
         ) {
           const minHeight = widget.type === "camera" ? 0.5 : widget.type === "solar" ? 2.5 : 1;
           setPreview(constrainToPrimarySections({
@@ -1150,6 +1169,7 @@ function WebWidgetShell({
     widget.type !== "solar" &&
     widget.type !== "state" &&
     widget.type !== "wallbox" &&
+    widget.type !== "heating" &&
     widget.type !== "numpad" &&
     widget.type !== "grafana" &&
     !linkBorderless
@@ -1318,6 +1338,10 @@ function renderWidget(
 
   if (effectiveWidget.type === "wallbox") {
     return <WallboxWidget client={client} config={effectiveWidget} />;
+  }
+
+  if (effectiveWidget.type === "heating") {
+    return <HeatingWidget client={client} config={effectiveWidget} />;
   }
 
   return null;
@@ -1514,7 +1538,7 @@ const webResizeHandleStyle: CSSProperties = {
 function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThemeSettings>): CSSProperties {
   const appearance = widget.appearance;
   if (appearance?.widgetColor) {
-    if (widget.type === "wallbox") {
+    if (widget.type === "wallbox" || widget.type === "heating") {
       return {
         background: buildGradientBackground(appearance.widgetColor, appearance.widgetColor2),
         border: "none",
@@ -1605,6 +1629,13 @@ function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThe
       background: "linear-gradient(145deg, rgba(19, 31, 49, 0.96), rgba(10, 17, 31, 0.98))",
       border: "none",
       boxShadow: "0 16px 28px rgba(5, 10, 19, 0.36)",
+    };
+  }
+  if (type === "heating") {
+    return {
+      background: "linear-gradient(145deg, rgba(18, 28, 42, 0.96), rgba(10, 16, 27, 0.98))",
+      border: "none",
+      boxShadow: "0 16px 28px rgba(5, 10, 19, 0.34)",
     };
   }
   return {};
