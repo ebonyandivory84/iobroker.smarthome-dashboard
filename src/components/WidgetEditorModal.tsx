@@ -314,7 +314,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       setDraft({
         title: widget.title,
         showTitle: widget.showTitle === false ? "false" : "true",
-        showStatusSubtitle: widget.showStatusSubtitle === false ? "false" : "true",
+        showStatusSubtitle: widget.showStatusSubtitle === true ? "true" : "false",
         refreshMs: String(widget.refreshMs || 2000),
         backgroundImage: widget.backgroundImage || "",
         backgroundImageBlur: String(widget.backgroundImageBlur ?? 8),
@@ -647,7 +647,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       onSave(widget.id, {
         title: draft.title,
         showTitle: draft.showTitle !== "false",
-        showStatusSubtitle: draft.showStatusSubtitle !== "false",
+        showStatusSubtitle: draft.showStatusSubtitle === "true",
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 500),
         backgroundImage: draft.backgroundImage?.trim() || undefined,
         backgroundImageBlur: clampInt(draft.backgroundImageBlur, widget.backgroundImageBlur ?? 8, 0),
@@ -1752,7 +1752,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   <Field label="Status-Untertitel anzeigen">
                     <ChoiceRow
                       options={["true", "false"]}
-                      value={draft.showStatusSubtitle || "true"}
+                      value={draft.showStatusSubtitle || "false"}
                       onSelect={(value) => setDraft((current) => ({ ...current, showStatusSubtitle: value }))}
                     />
                   </Field>

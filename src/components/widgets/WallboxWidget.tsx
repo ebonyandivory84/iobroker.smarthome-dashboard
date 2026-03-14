@@ -581,7 +581,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
           ))}
         </View>
 
-        {config.showStatusSubtitle !== false ? (
+        {config.showStatusSubtitle === true ? (
           <Text numberOfLines={2} style={[styles.subtitleBottom, { color: mutedTextColor }]}>
             {subtitleText}
           </Text>
