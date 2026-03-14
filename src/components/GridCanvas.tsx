@@ -912,6 +912,7 @@ function WebGridCanvas({
           allowResize={
             widget.type === "camera" ||
             widget.type === "solar" ||
+            widget.type === "grafana" ||
             widget.type === "log" ||
             widget.type === "script" ||
             widget.type === "host" ||
@@ -1014,6 +1015,7 @@ function WebWidgetShell({
         active.mode === "resize" &&
         (widget.type === "camera" ||
           widget.type === "solar" ||
+          widget.type === "grafana" ||
           widget.type === "log" ||
           widget.type === "script" ||
           widget.type === "host" ||
@@ -1032,7 +1034,7 @@ function WebWidgetShell({
           ...active.startPosition,
           x: clamp(active.startPosition.x + dx, 0, config.grid.columns - active.startPosition.w),
           y: Math.max(0, active.startPosition.y + dy),
-        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : widget.type === "log" || widget.type === "script" || widget.type === "host" || widget.type === "wallbox" || widget.type === "heating" ? { minHeight: 1, heightSnap: 0.1 } : undefined);
+        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : widget.type === "grafana" || widget.type === "log" || widget.type === "script" || widget.type === "host" || widget.type === "wallbox" || widget.type === "heating" ? { minHeight: 1, heightSnap: 0.1 } : undefined);
         setPreview(nextPreview);
 
         if (isLayoutMode && onDragAcrossPageEdge) {
@@ -1059,6 +1061,7 @@ function WebWidgetShell({
         if (
           widget.type === "camera" ||
           widget.type === "solar" ||
+          widget.type === "grafana" ||
           widget.type === "log" ||
           widget.type === "script" ||
           widget.type === "host" ||
