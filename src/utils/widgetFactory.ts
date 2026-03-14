@@ -299,6 +299,7 @@ export function buildWidgetTemplate(
     wallboxAmpereStateId: "go-e.0.ampere",
     wallboxPhaseModeStateId: "go-e.0.phaseSwitchMode",
     wallboxCarSocStateId: "go-e.0.carBatterySoc",
+    wallboxCarRangeStateId: "",
     keys: {
       pvNow: "pv_now",
       homeNow: "home_now",

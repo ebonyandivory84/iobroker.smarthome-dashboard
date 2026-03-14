@@ -420,6 +420,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       wallboxAmpereStateId: widget.wallboxAmpereStateId || "go-e.0.ampere",
       wallboxPhaseModeStateId: widget.wallboxPhaseModeStateId || "go-e.0.phaseSwitchMode",
       wallboxCarSocStateId: widget.wallboxCarSocStateId || "go-e.0.carBatterySoc",
+      wallboxCarRangeStateId: widget.wallboxCarRangeStateId || "",
       statePrefix: widget.statePrefix,
       dailyEnergyUnit: widget.dailyEnergyUnit || "auto",
       statValueUnit: widget.statValueUnit || "none",
@@ -788,6 +789,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         wallboxAmpereStateId: draft.wallboxAmpereStateId?.trim() || undefined,
         wallboxPhaseModeStateId: draft.wallboxPhaseModeStateId?.trim() || undefined,
         wallboxCarSocStateId: draft.wallboxCarSocStateId?.trim() || undefined,
+        wallboxCarRangeStateId: draft.wallboxCarRangeStateId?.trim() || undefined,
         statePrefix: draft.statePrefix || widget.statePrefix,
         dailyEnergyUnit:
           draft.dailyEnergyUnit === "Wh" || draft.dailyEnergyUnit === "kWh" ? draft.dailyEnergyUnit : "auto",
@@ -2465,6 +2467,14 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     />
                   </Field>
                 </View>
+                <Field label="Auto Reichweite State ID (km)">
+                  <StateFieldInput
+                    browseLabel="Objekt"
+                    onBrowse={() => setPickerField("wallboxCarRangeStateId")}
+                    onChangeText={(value) => setDraft((current) => ({ ...current, wallboxCarRangeStateId: value }))}
+                    value={draft.wallboxCarRangeStateId || ""}
+                  />
+                </Field>
                 <View style={styles.splitRow}>
                   <Field label="Wallbox Ladeleistung State ID">
                     <StateFieldInput
@@ -2494,7 +2504,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   />
                 </Field>
                 <Text style={styles.mappingHint}>
-                  Wird fuer Auto-Flow-Animation, Ladeleistung und SoC im Auto-Node genutzt.
+                  Wird fuer Auto-Flow-Animation, Ladeleistung, SoC und Reichweite im Auto-Node genutzt.
                 </Text>
                 <Field label="Stat Textgroesse (%)">
                   <TextInput

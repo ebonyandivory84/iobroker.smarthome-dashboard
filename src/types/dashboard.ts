@@ -281,6 +281,7 @@ export type SolarWidgetConfig = WidgetBase & {
   wallboxAmpereStateId?: string;
   wallboxPhaseModeStateId?: string;
   wallboxCarSocStateId?: string;
+  wallboxCarRangeStateId?: string;
   statTextScale?: number;
   statePrefix: string;
   keys: {

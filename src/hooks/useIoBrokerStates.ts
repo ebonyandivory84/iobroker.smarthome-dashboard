@@ -26,6 +26,12 @@ const collectWidgetStateIds = (widget: WidgetConfig) => {
     const prefix = widget.statePrefix;
     const withPrefix = (key?: string) => (key ? `${prefix}.${key}` : "");
     return [
+      widget.wallboxCarStateId || "",
+      widget.wallboxChargePowerStateId || "",
+      widget.wallboxAmpereStateId || "",
+      widget.wallboxPhaseModeStateId || "",
+      widget.wallboxCarSocStateId || "",
+      widget.wallboxCarRangeStateId || "",
       withPrefix(widget.keys.pvNow),
       withPrefix(widget.keys.homeNow),
       withPrefix(widget.keys.gridIn),

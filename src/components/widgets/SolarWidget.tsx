@@ -39,6 +39,7 @@ const DEFAULT_WALLBOX_STATE_IDS = {
   ampere: "go-e.0.ampere",
   phaseMode: "go-e.0.phaseSwitchMode",
   carSoc: "go-e.0.carBatterySoc",
+  carRange: "",
 } as const;
 const SOLAR_DEFAULT_STAT_LABELS = [
   "Eigenverbrauch",
@@ -63,9 +64,11 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
       ampere: resolveOptionalStateId(config.wallboxAmpereStateId, DEFAULT_WALLBOX_STATE_IDS.ampere),
       phaseMode: resolveOptionalStateId(config.wallboxPhaseModeStateId, DEFAULT_WALLBOX_STATE_IDS.phaseMode),
       carSoc: resolveOptionalStateId(config.wallboxCarSocStateId, DEFAULT_WALLBOX_STATE_IDS.carSoc),
+      carRange: resolveOptionalStateId(config.wallboxCarRangeStateId, DEFAULT_WALLBOX_STATE_IDS.carRange),
     }),
     [
       config.wallboxAmpereStateId,
+      config.wallboxCarRangeStateId,
       config.wallboxCarSocStateId,
       config.wallboxCarStateId,
       config.wallboxChargePowerStateId,
@@ -97,6 +100,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
       wallboxAmpere: asNumber(states[wallboxStateIds.ampere]),
       wallboxPhaseModeRaw: states[wallboxStateIds.phaseMode],
       wallboxCarSocRaw: asNumber(states[wallboxStateIds.carSoc]),
+      wallboxCarRangeRaw: asNumber(states[wallboxStateIds.carRange]),
     }),
     [config.dailyEnergyUnit, config.keys, config.statePrefix, states, wallboxStateIds]
   );
@@ -127,6 +131,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
     wallboxAmpere,
     wallboxPhaseModeRaw,
     wallboxCarSocRaw,
+    wallboxCarRangeRaw,
   } =
     displaySnapshot;
   const missingCore = pvNow === null && homeNow === null && gridIn === null && gridOut === null;
@@ -165,6 +170,8 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
   const carDir = dirFromSigned(carFlowSigned, CAR_FLOW_THRESHOLD_W);
   const carSocPercent =
     wallboxCarSocRaw === null ? null : Math.max(0, Math.min(100, Math.round(wallboxCarSocRaw)));
+  const carRangeKm =
+    wallboxCarRangeRaw === null ? null : Math.max(0, Math.round(wallboxCarRangeRaw));
   const carPowerDisplayW =
     wallboxChargePowerW === null ? null : Math.max(0, wallboxChargePowerW);
   const backgroundBlur = clamp(config.backgroundImageBlur ?? 8, 0, 24);
@@ -241,6 +248,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
           carDir={carDir}
           carPower={carPowerDisplayW}
           carSoc={carSocPercent}
+          carRange={carRangeKm}
           homeNow={homeNow}
           mutedTextColor={mutedTextColor}
           textColor={textColor}
@@ -281,6 +289,7 @@ function SolarFlowScene({
   carDir,
   carPower,
   carSoc,
+  carRange,
   theme,
   textColor,
   mutedTextColor,
@@ -303,6 +312,7 @@ function SolarFlowScene({
   carDir: FlowDir;
   carPower: number | null;
   carSoc: number | null;
+  carRange: number | null;
   theme: ThemeSettings;
   textColor: string;
   mutedTextColor: string;
@@ -407,6 +417,9 @@ function SolarFlowScene({
   const carInfoLines = [
     {
       value: carSoc === null ? "-" : `${Math.round(clamp(carSoc, 0, 100))} %`,
+    },
+    {
+      value: carRange === null ? "-" : `${Math.max(0, Math.round(carRange))} km`,
     },
   ];
 
