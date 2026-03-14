@@ -1,5 +1,5 @@
-import { createElement, useCallback, useEffect, useMemo, useState } from "react";
-import { ImageBackground, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Easing, ImageBackground, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { IoBrokerClient } from "../../services/iobroker";
 import { StateSnapshot, WallboxWidgetConfig } from "../../types/dashboard";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
@@ -22,6 +22,8 @@ const PHASE_VOLTAGE_V = 230;
 const CHARGING_ACTIVE_THRESHOLD_W = 100;
 const FAST_CHARGING_THRESHOLD_W = 5000;
 const CHARGING_INDICATOR_BLINK_MS = 720;
+const CHARGING_BAR_MAX_POWER_W = 11000;
+const CHARGING_BAR_GLOW_CYCLE_MS = 2000;
 
 const DEFAULT_IDS = {
   mode: "0_userdata.0.goe.mode",
@@ -74,6 +76,8 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const [error, setError] = useState<string | null>(null);
   const [sliderDraft, setSliderDraft] = useState<number | null>(null);
   const [chargingPulseOn, setChargingPulseOn] = useState(true);
+  const [powerBarTrackWidth, setPowerBarTrackWidth] = useState(0);
+  const barGlowAnim = useRef(new Animated.Value(0)).current;
   const refreshMs = clampInt(config.refreshMs, DEFAULT_REFRESH_MS, MIN_REFRESH_MS);
 
   useEffect(() => {
@@ -177,6 +181,22 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       setSliderDraft(null);
     }
   }, [gridAmpere, pendingWrites, stateIds.gridAmpere]);
+
+  useEffect(() => {
+    barGlowAnim.setValue(0);
+    const glowLoop = Animated.loop(
+      Animated.timing(barGlowAnim, {
+        toValue: 1,
+        duration: CHARGING_BAR_GLOW_CYCLE_MS,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    glowLoop.start();
+    return () => {
+      glowLoop.stop();
+    };
+  }, [barGlowAnim]);
 
   const titleText = (config.title || "Wallbox").trim() || "Wallbox";
   const subtitleText = useMemo(
@@ -356,6 +376,16 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         : chargePowerCardMode === "fast"
           ? "rgba(53, 198, 137, 0.12)"
           : "rgba(245, 198, 104, 0.1)";
+  const normalizedChargingPowerW = Math.max(0, Math.min(CHARGING_BAR_MAX_POWER_W, chargingPowerW));
+  const chargingPowerRatio = normalizedChargingPowerW / CHARGING_BAR_MAX_POWER_W;
+  const chargingPowerPercent = chargingPowerRatio * 100;
+  const barFillWidthPx = powerBarTrackWidth * chargingPowerRatio;
+  const barGlowWidthPx = Math.max(32, Math.min(74, barFillWidthPx * 0.42));
+  const barGlowTranslateX = barGlowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-barGlowWidthPx, Math.max(0, barFillWidthPx)],
+  });
+  const nativeBarColor = chargingPowerRatio < 0.45 ? "#ef5d6b" : chargingPowerRatio < 0.75 ? "#f0c35f" : "#42cf8c";
 
   const modeItems: Array<{
     mode: WallboxMode;
@@ -620,6 +650,61 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
             <Text numberOfLines={1} style={[styles.metricValue, { color: textColor }]}>
               {formatPercent(batterySoc)}
             </Text>
+          </View>
+        </View>
+
+        <View style={styles.powerBarBlock}>
+          <View style={styles.powerBarHeader}>
+            <Text numberOfLines={1} style={[styles.powerBarLabel, { color: mutedTextColor }]}>
+              Ladeleistung 0-11 kW
+            </Text>
+            <Text numberOfLines={1} style={[styles.powerBarValue, { color: textColor }]}>
+              {formatPowerKW(chargingPowerW)}
+            </Text>
+          </View>
+          <View
+            onLayout={(event) => {
+              const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
+              setPowerBarTrackWidth((current) => (current === nextWidth ? current : nextWidth));
+            }}
+            style={styles.powerBarTrack}
+          >
+            <View style={[styles.powerBarFillClip, { width: `${chargingPowerPercent.toFixed(2)}%` }]}>
+              {Platform.OS === "web"
+                ? createElement("div", {
+                    style: {
+                      ...webGradientLayerStyle,
+                      borderRadius: 999,
+                      background: "linear-gradient(90deg, #ef4f62 0%, #f3c35d 52%, #35cf84 100%)",
+                    },
+                  })
+                : (
+                    <View
+                      style={[
+                        StyleSheet.absoluteFillObject,
+                        {
+                          borderRadius: 999,
+                          backgroundColor: nativeBarColor,
+                        },
+                      ]}
+                    />
+                  )}
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.powerBarGlow,
+                  {
+                    width: barGlowWidthPx,
+                    transform: [{ translateX: barGlowTranslateX }],
+                    opacity: chargingPowerRatio > 0.01 ? 1 : 0,
+                  },
+                ]}
+              />
+            </View>
+          </View>
+          <View style={styles.powerBarScaleRow}>
+            <Text style={[styles.powerBarScaleLabel, { color: mutedTextColor }]}>0 kW</Text>
+            <Text style={[styles.powerBarScaleLabel, { color: mutedTextColor }]}>11 kW</Text>
           </View>
         </View>
 
@@ -1056,6 +1141,61 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 20,
     fontWeight: "800",
+  },
+  powerBarBlock: {
+    gap: 6,
+    marginTop: 1,
+  },
+  powerBarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  powerBarLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.45,
+    textTransform: "uppercase",
+  },
+  powerBarValue: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  powerBarTrack: {
+    height: 13,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(191, 209, 245, 0.24)",
+    backgroundColor: "rgba(20, 27, 38, 0.72)",
+    overflow: "hidden",
+  },
+  powerBarFillClip: {
+    height: "100%",
+    minWidth: 0,
+    borderRadius: 999,
+    overflow: "hidden",
+    position: "relative",
+  },
+  powerBarGlow: {
+    position: "absolute",
+    left: 0,
+    top: -5,
+    bottom: -5,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.5)",
+    shadowColor: "#fff",
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  powerBarScaleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  powerBarScaleLabel: {
+    fontSize: 10,
+    fontWeight: "600",
   },
   block: {
     gap: 7,
