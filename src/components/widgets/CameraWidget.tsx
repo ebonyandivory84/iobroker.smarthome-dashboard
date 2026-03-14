@@ -29,6 +29,8 @@ const MJPEG_RECONNECT_BASE_DELAY_MS = 700;
 const MJPEG_RECONNECT_MAX_DELAY_MS = 8000;
 const FLV_RECONNECT_DELAY_MS = 1800;
 const FMP4_RECONNECT_DELAY_MS = 1800;
+const STREAM_ERROR_GRACE_MS = 2500;
+const STREAM_ERROR_AUTO_HIDE_MS = 5000;
 const WEB_FULLSCREEN_MIN_ZOOM = 1;
 const WEB_FULLSCREEN_MAX_ZOOM = 4;
 let flvLoaderPromise: Promise<boolean> | null = null;
@@ -1525,7 +1527,7 @@ function WebFlvPlayer({
   const [sourceIndex, setSourceIndex] = useState(Math.min(preferredSourceIndex, maxSourceIndex));
   const [restartNonce, setRestartNonce] = useState(0);
   const currentSource = normalizedSources[Math.min(sourceIndex, maxSourceIndex)] || "";
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { errorMessage, queueError: queueStreamError, clearError: clearStreamError } = useTransientStreamError();
   const [hasVideoFrame, setHasVideoFrame] = useState(false);
 
   useEffect(() => {
@@ -1542,9 +1544,9 @@ function WebFlvPlayer({
   }, [onSourceIndexChange, sourceIndex]);
 
   useEffect(() => {
-    setErrorMessage(null);
+    clearStreamError();
     setHasVideoFrame(false);
-  }, [currentSource]);
+  }, [clearStreamError, currentSource]);
 
   useEffect(() => {
     if (Platform.OS !== "web") {
@@ -1575,14 +1577,14 @@ function WebFlvPlayer({
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     const videoElement = videoRef.current;
 
-    const safeSetError = (message: string) => {
+    const safeQueueError = (message: string) => {
       if (!disposed) {
-        setErrorMessage(message);
+        queueStreamError(message);
       }
     };
 
     const scheduleReconnect = (message: string) => {
-      safeSetError(message);
+      safeQueueError(message);
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
       }
@@ -1597,7 +1599,7 @@ function WebFlvPlayer({
     const moveToNextSource = (message: string) => {
       if (sourceIndex + 1 < normalizedSources.length) {
         setSourceIndex((current) => Math.min(normalizedSources.length - 1, current + 1));
-        safeSetError(message);
+        safeQueueError(message);
         return true;
       }
       return false;
@@ -1621,7 +1623,7 @@ function WebFlvPlayer({
 
     const attach = async () => {
       if (!videoElement || !currentSource) {
-        safeSetError("FLV Stream URL fehlt.");
+        safeQueueError("FLV Stream URL fehlt.");
         return;
       }
 
@@ -1635,7 +1637,7 @@ function WebFlvPlayer({
       }
 
       if (!window.flvjs?.isSupported?.()) {
-        safeSetError("FLV wird von diesem Browser nicht unterstuetzt.");
+        safeQueueError("FLV wird von diesem Browser nicht unterstuetzt.");
         return;
       }
 
@@ -1695,6 +1697,7 @@ function WebFlvPlayer({
           watchdogTimer = null;
         }
         setHasVideoFrame(true);
+        clearStreamError();
         tryPlay();
       };
       player.load();
@@ -1755,7 +1758,7 @@ function WebFlvPlayer({
       }
       playerRef.current = null;
     };
-  }, [currentSource, normalizedSources.length, restartNonce, sourceIndex]);
+  }, [clearStreamError, currentSource, normalizedSources.length, queueStreamError, restartNonce, sourceIndex]);
 
   return (
     <>
@@ -1819,7 +1822,7 @@ function WebFmp4Player({
     () => (currentSource ? withReconnectNonce(currentSource, restartNonce) : ""),
     [currentSource, restartNonce]
   );
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { errorMessage, queueError: queueStreamError, clearError: clearStreamError } = useTransientStreamError();
   const [hasVideoFrame, setHasVideoFrame] = useState(false);
 
   useEffect(() => {
@@ -1836,10 +1839,10 @@ function WebFmp4Player({
   }, [onSourceIndexChange, sourceIndex]);
 
   useEffect(() => {
-    setErrorMessage(null);
+    clearStreamError();
     ratioReportedRef.current = false;
     setHasVideoFrame(false);
-  }, [currentSource]);
+  }, [clearStreamError, currentSource]);
 
   useEffect(() => {
     if (Platform.OS !== "web") {
@@ -1870,14 +1873,14 @@ function WebFmp4Player({
       return;
     }
 
-    const safeSetError = (message: string) => {
+    const safeQueueError = (message: string) => {
       if (!disposed) {
-        setErrorMessage(message);
+        queueStreamError(message);
       }
     };
 
     const scheduleReconnect = (message: string) => {
-      safeSetError(message);
+      safeQueueError(message);
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
       }
@@ -1892,7 +1895,7 @@ function WebFmp4Player({
     const moveToNextSource = (message: string) => {
       if (sourceIndex + 1 < normalizedSources.length) {
         setSourceIndex((current) => Math.min(normalizedSources.length - 1, current + 1));
-        safeSetError(message);
+        safeQueueError(message);
         return true;
       }
       return false;
@@ -1909,7 +1912,7 @@ function WebFmp4Player({
         return;
       }
       setHasVideoFrame(true);
-      setErrorMessage(null);
+      clearStreamError();
     };
 
     const handleMetadata = () => {
@@ -1945,7 +1948,7 @@ function WebFmp4Player({
           scheduleReconnect(`fMP4 Streamfehler (${detail}), Neuverbindung...`);
           return;
         }
-        safeSetError(`fMP4 Stream konnte nicht gestartet werden (${detail}).${codecHint}`);
+        safeQueueError(`fMP4 Stream konnte nicht gestartet werden (${detail}).${codecHint}`);
       }
     };
 
@@ -1982,7 +1985,7 @@ function WebFmp4Player({
       videoElement.removeAttribute("src");
       videoElement.load();
     };
-  }, [currentSourceWithNonce, normalizedSources.length, sourceIndex]);
+  }, [clearStreamError, currentSourceWithNonce, normalizedSources.length, queueStreamError, sourceIndex]);
 
   return (
     <>
@@ -2024,6 +2027,68 @@ function describeVideoError(error: MediaError) {
     default:
       return `MEDIA_ERR_UNKNOWN_${error.code}`;
   }
+}
+
+function useTransientStreamError() {
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const pendingMessageRef = useRef<string | null>(null);
+  const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTimers = useCallback(() => {
+    if (showTimerRef.current) {
+      clearTimeout(showTimerRef.current);
+      showTimerRef.current = null;
+    }
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
+
+  const clearError = useCallback(() => {
+    pendingMessageRef.current = null;
+    clearTimers();
+    setErrorMessage(null);
+  }, [clearTimers]);
+
+  const queueError = useCallback(
+    (message: string) => {
+      const normalized = message.trim();
+      if (!normalized) {
+        clearError();
+        return;
+      }
+
+      pendingMessageRef.current = normalized;
+      clearTimers();
+      showTimerRef.current = setTimeout(() => {
+        if (pendingMessageRef.current !== normalized) {
+          return;
+        }
+        setErrorMessage(normalized);
+        hideTimerRef.current = setTimeout(() => {
+          if (pendingMessageRef.current === normalized) {
+            pendingMessageRef.current = null;
+            setErrorMessage(null);
+          }
+        }, STREAM_ERROR_AUTO_HIDE_MS);
+      }, STREAM_ERROR_GRACE_MS);
+    },
+    [clearError, clearTimers]
+  );
+
+  useEffect(() => {
+    return () => {
+      clearTimers();
+    };
+  }, [clearTimers]);
+
+  return {
+    errorMessage,
+    queueError,
+    clearError,
+  };
 }
 
 async function ensureFlvJsLoaded() {

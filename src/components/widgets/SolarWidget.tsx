@@ -32,6 +32,14 @@ const SOLAR_SCENE_BASE_HEIGHT = 960;
 const SOLAR_MAX_STAT_CARDS = 6;
 const FLOW_ACTIVE_THRESHOLD_W = 20;
 const GRID_IMPORT_FLOW_THRESHOLD_W = 100;
+const CAR_FLOW_THRESHOLD_W = 100;
+const DEFAULT_WALLBOX_STATE_IDS = {
+  carState: "go-e.0.car",
+  chargePower: "go-e.0.nrg.11",
+  ampere: "go-e.0.ampere",
+  phaseMode: "go-e.0.phaseSwitchMode",
+  carSoc: "go-e.0.carBatterySoc",
+} as const;
 const SOLAR_DEFAULT_STAT_LABELS = [
   "Eigenverbrauch",
   "Verbraucht",
@@ -48,6 +56,22 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
   const textColor = widgetAppearance?.textColor || palette.text;
   const mutedTextColor = widgetAppearance?.mutedTextColor || palette.textMuted;
   const [widgetLayout, setWidgetLayout] = useState({ width: 0, height: 0 });
+  const wallboxStateIds = useMemo(
+    () => ({
+      carState: resolveOptionalStateId(config.wallboxCarStateId, DEFAULT_WALLBOX_STATE_IDS.carState),
+      chargePower: resolveOptionalStateId(config.wallboxChargePowerStateId, DEFAULT_WALLBOX_STATE_IDS.chargePower),
+      ampere: resolveOptionalStateId(config.wallboxAmpereStateId, DEFAULT_WALLBOX_STATE_IDS.ampere),
+      phaseMode: resolveOptionalStateId(config.wallboxPhaseModeStateId, DEFAULT_WALLBOX_STATE_IDS.phaseMode),
+      carSoc: resolveOptionalStateId(config.wallboxCarSocStateId, DEFAULT_WALLBOX_STATE_IDS.carSoc),
+    }),
+    [
+      config.wallboxAmpereStateId,
+      config.wallboxCarSocStateId,
+      config.wallboxCarStateId,
+      config.wallboxChargePowerStateId,
+      config.wallboxPhaseModeStateId,
+    ]
+  );
   const getValue = (snapshot: StateSnapshot, key?: string) => {
     if (!key) {
       return null;
@@ -68,8 +92,13 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
       pvTotalKWh: normalizeEnergyToKWh(getValue(states, config.keys.pvTotal), config.dailyEnergyUnit),
       dayConsumedKWh: normalizeEnergyToKWh(getValue(states, config.keys.dayConsumed), config.dailyEnergyUnit),
       daySelfKWh: normalizeEnergyToKWh(getValue(states, config.keys.daySelf), config.dailyEnergyUnit),
+      wallboxCarCodeRaw: asNumber(states[wallboxStateIds.carState]),
+      wallboxChargePowerRaw: states[wallboxStateIds.chargePower],
+      wallboxAmpere: asNumber(states[wallboxStateIds.ampere]),
+      wallboxPhaseModeRaw: states[wallboxStateIds.phaseMode],
+      wallboxCarSocRaw: asNumber(states[wallboxStateIds.carSoc]),
     }),
-    [config.dailyEnergyUnit, config.keys, config.statePrefix, states]
+    [config.dailyEnergyUnit, config.keys, config.statePrefix, states, wallboxStateIds]
   );
 
   const [displaySnapshot, setDisplaySnapshot] = useState(incomingSnapshot);
@@ -82,7 +111,23 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
     return () => clearTimeout(timer);
   }, [incomingSnapshot]);
 
-  const { pvNow, homeNow, gridIn, gridOut, soc, battIn, battOut, battTemp, dayConsumedKWh, daySelfKWh } =
+  const {
+    pvNow,
+    homeNow,
+    gridIn,
+    gridOut,
+    soc,
+    battIn,
+    battOut,
+    battTemp,
+    dayConsumedKWh,
+    daySelfKWh,
+    wallboxCarCodeRaw,
+    wallboxChargePowerRaw,
+    wallboxAmpere,
+    wallboxPhaseModeRaw,
+    wallboxCarSocRaw,
+  } =
     displaySnapshot;
   const missingCore = pvNow === null && homeNow === null && gridIn === null && gridOut === null;
 
@@ -104,9 +149,24 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
       : gridOut !== null && gridOut > FLOW_ACTIVE_THRESHOLD_W
         ? -Math.abs(gridOut)
         : 0;
+  const wallboxCarCode = wallboxCarCodeRaw === null ? null : Math.round(wallboxCarCodeRaw);
+  const wallboxChargePowerW = resolveWallboxChargePowerW({
+    chargePowerRaw: wallboxChargePowerRaw,
+    ampere: wallboxAmpere,
+    phaseModeRaw: wallboxPhaseModeRaw,
+  });
+  const carFlowSigned =
+    wallboxCarCode === 2 && wallboxChargePowerW !== null
+      ? Math.max(0, wallboxChargePowerW)
+      : wallboxChargePowerW || 0;
   const pvDir: FlowDir = pvNow !== null && pvNow > FLOW_ACTIVE_THRESHOLD_W ? "toHome" : "idle";
   const battDir = dirFromSigned(battSigned, FLOW_ACTIVE_THRESHOLD_W);
   const gridDir = dirFromSigned(gridFlowSigned, FLOW_ACTIVE_THRESHOLD_W);
+  const carDir = dirFromSigned(carFlowSigned, CAR_FLOW_THRESHOLD_W);
+  const carSocPercent =
+    wallboxCarSocRaw === null ? null : Math.max(0, Math.min(100, Math.round(wallboxCarSocRaw)));
+  const carPowerDisplayW =
+    wallboxChargePowerW === null ? null : Math.max(0, wallboxChargePowerW);
   const backgroundBlur = clamp(config.backgroundImageBlur ?? 8, 0, 24);
   const compactWidget = widgetLayout.width > 0 && (widgetLayout.width < 520 || widgetLayout.height < 420);
   const veryCompactWidget = widgetLayout.width > 0 && (widgetLayout.width < 420 || widgetLayout.height < 340);
@@ -178,6 +238,9 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
           battTemp={battTemp}
           gridDir={gridDir}
           gridPower={Math.abs(gridDisplaySigned)}
+          carDir={carDir}
+          carPower={carPowerDisplayW}
+          carSoc={carSocPercent}
           homeNow={homeNow}
           mutedTextColor={mutedTextColor}
           textColor={textColor}
@@ -215,6 +278,9 @@ function SolarFlowScene({
   battTemp,
   gridDir,
   gridPower,
+  carDir,
+  carPower,
+  carSoc,
   theme,
   textColor,
   mutedTextColor,
@@ -234,6 +300,9 @@ function SolarFlowScene({
   battTemp: number | null;
   gridDir: FlowDir;
   gridPower: number;
+  carDir: FlowDir;
+  carPower: number | null;
+  carSoc: number | null;
   theme: ThemeSettings;
   textColor: string;
   mutedTextColor: string;
@@ -319,6 +388,29 @@ function SolarFlowScene({
   const bottomLineStart = homeBox.y + homeBox.h + verticalGap;
   const bottomLineEnd = carBox.y - verticalGap;
   const bottomLineHeight = Math.max(12, bottomLineEnd - bottomLineStart);
+  const infoGap = Math.round(clamp(10 * sceneScale, 4, 12));
+  const infoBoxWidth = Math.round(clamp(fittedScene.width * 0.22, 112, 220));
+  const infoMaxBottom = Math.max(0, fittedScene.height - Math.round(clamp(72 * sceneScale, 44, 72)));
+  const batteryInfoLeft = clamp(batteryBox.x + batteryBox.w / 2 - infoBoxWidth / 2, 0, Math.max(0, fittedScene.width - infoBoxWidth));
+  const carInfoLeft = clamp(carBox.x + carBox.w / 2 - infoBoxWidth / 2, 0, Math.max(0, fittedScene.width - infoBoxWidth));
+  const batteryInfoTop = clamp(batteryBox.y + batteryBox.h + infoGap, 0, infoMaxBottom);
+  const carInfoTop = clamp(carBox.y + carBox.h + infoGap, 0, infoMaxBottom);
+  const batteryInfoLines = [
+    {
+      label: "Ladung",
+      value: soc === null ? "-" : `${Math.round(clamp(soc, 0, 100))} %`,
+    },
+    {
+      label: "Temp",
+      value: battTemp === null ? "-" : `${battTemp.toFixed(1)} °C`,
+    },
+  ];
+  const carInfoLines = [
+    {
+      label: "Auto SoC",
+      value: carSoc === null ? "-" : `${Math.round(clamp(carSoc, 0, 100))} %`,
+    },
+  ];
 
   return (
     <View
@@ -357,6 +449,19 @@ function SolarFlowScene({
         size={flowDotSize}
         strength={clamp(gridPower / 12000, 0.2, 1)}
       />
+      <AnimatedFlowDot
+        active={carDir !== "idle"}
+        axis="y"
+        progress={progress}
+        range={
+          carDir === "toHome"
+            ? [0, Math.max(0, bottomLineHeight - flowDotSize)]
+            : [Math.max(0, bottomLineHeight - flowDotSize), 0]
+        }
+        baseStyle={{ top: bottomLineStart, left: bottomLineLeft - (flowDotSize - 4) / 2 }}
+        size={flowDotSize}
+        strength={clamp((carPower || 0) / 12000, 0.2, 1)}
+      />
 
       <NodeCard
         icon="white-balance-sunny"
@@ -394,7 +499,7 @@ function SolarFlowScene({
       />
       <NodeCard
         icon={resolveBatteryIcon(soc)}
-        label={soc !== null ? `Akku ${Math.round(soc)}%` : "Akku"}
+        label="Akku"
         iconColor="#8b8dff"
         iconSurface="rgba(58, 48, 110, 0.34)"
         nodeColor={widgetAppearance?.batteryCardColor}
@@ -407,15 +512,6 @@ function SolarFlowScene({
         sceneScale={sceneScale}
         style={{ ...styles.nodePosition, top: batteryBox.y, left: batteryBox.x, width: batteryBox.w, minHeight: batteryBox.h }}
         value={fmtW(battPower || null)}
-        meta={
-          soc !== null && battTemp !== null
-            ? `${Math.round(soc)} % · ${battTemp.toFixed(1)} °C`
-            : soc !== null
-              ? `${Math.round(soc)} %`
-              : battTemp !== null
-                ? `${battTemp.toFixed(1)} °C`
-                : undefined
-        }
         highlight={battDir !== "idle"}
       />
       <NodeCard
@@ -449,7 +545,40 @@ function SolarFlowScene({
         veryCompact={veryCompactMode}
         sceneScale={sceneScale}
         style={{ ...styles.nodePosition, top: carBox.y, left: carBox.x, width: carBox.w, minHeight: carBox.h }}
-        value="—"
+        value={carPower === null ? "—" : fmtW(carPower)}
+        highlight={carDir !== "idle"}
+      />
+      <ExternalNodeInfo
+        lines={batteryInfoLines}
+        style={{
+          ...styles.nodePosition,
+          top: batteryInfoTop,
+          left: batteryInfoLeft,
+          width: infoBoxWidth,
+        }}
+        theme={theme}
+        textColor={textColor}
+        mutedTextColor={mutedTextColor}
+        appearance={widgetAppearance}
+        compact={compactMode}
+        veryCompact={veryCompactMode}
+        sceneScale={sceneScale}
+      />
+      <ExternalNodeInfo
+        lines={carInfoLines}
+        style={{
+          ...styles.nodePosition,
+          top: carInfoTop,
+          left: carInfoLeft,
+          width: infoBoxWidth,
+        }}
+        theme={theme}
+        textColor={textColor}
+        mutedTextColor={mutedTextColor}
+        appearance={widgetAppearance}
+        compact={compactMode}
+        veryCompact={veryCompactMode}
+        sceneScale={sceneScale}
       />
 
       {leftStats.map((card, index) => (
@@ -671,6 +800,70 @@ function NodeCard({
   );
 }
 
+type ExternalNodeInfoLine = {
+  label: string;
+  value: string;
+};
+
+function ExternalNodeInfo({
+  lines,
+  style,
+  theme,
+  textColor,
+  mutedTextColor,
+  appearance,
+  compact,
+  veryCompact,
+  sceneScale,
+}: {
+  lines: ExternalNodeInfoLine[];
+  style?: StyleProp<ViewStyle>;
+  theme: ThemeSettings;
+  textColor: string;
+  mutedTextColor: string;
+  appearance?: SolarWidgetConfig["appearance"];
+  compact?: boolean;
+  veryCompact?: boolean;
+  sceneScale?: number;
+}) {
+  const baseScale = clamp(sceneScale ?? 1, 0.52, 1);
+  const compactFactor = veryCompact ? 0.84 : compact ? 0.92 : 1;
+  const scale = clamp(baseScale * compactFactor, 0.5, 1);
+  const paddingH = Math.round(clamp(10 * scale, 6, 10));
+  const paddingV = Math.round(clamp(8 * scale, 5, 8));
+  const radius = Math.round(clamp(12 * scale, 8, 12));
+  const labelSize = Math.round(clamp(11 * scale, 8, 11));
+  const valueSize = Math.round(clamp(16 * scale, 11, 16));
+  const rowGap = Math.round(clamp(6 * scale, 3, 6));
+
+  return (
+    <View
+      style={[
+        styles.externalInfo,
+        {
+          backgroundColor: appearance?.cardColor || theme.solar.nodeCardBackground,
+          borderColor: theme.solar.nodeCardBorder,
+          paddingHorizontal: paddingH,
+          paddingVertical: paddingV,
+          borderRadius: radius,
+        },
+        style,
+      ]}
+    >
+      {lines.map((line, index) => (
+        <View key={`${line.label}-${line.value}`} style={[styles.externalInfoRow, index > 0 ? { marginTop: rowGap } : null]}>
+          <Text numberOfLines={1} style={[styles.externalInfoLabel, { color: mutedTextColor, fontSize: labelSize }]}>
+            {line.label}
+          </Text>
+          <Text numberOfLines={1} style={[styles.externalInfoValue, { color: textColor, fontSize: valueSize }]}>
+            {line.value}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function MiniStat({
   appearance,
   label,
@@ -756,6 +949,92 @@ function asNumber(v: unknown): number | null {
   }
   const parsed = Number(match[0]);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function resolveOptionalStateId(candidate: string | undefined, fallback: string) {
+  const trimmed = String(candidate || "").trim();
+  return trimmed || fallback;
+}
+
+function resolveWallboxChargePowerW({
+  chargePowerRaw,
+  ampere,
+  phaseModeRaw,
+}: {
+  chargePowerRaw: unknown;
+  ampere: number | null;
+  phaseModeRaw: unknown;
+}) {
+  const normalizedDirect = normalizePowerToWatts(chargePowerRaw);
+  if (normalizedDirect !== null) {
+    return normalizedDirect;
+  }
+
+  if (ampere === null) {
+    return null;
+  }
+
+  const phaseCount = inferPhaseCountFromMode(phaseModeRaw);
+  const estimated = ampere * 230 * phaseCount;
+  return Number.isFinite(estimated) ? estimated : null;
+}
+
+function normalizePowerToWatts(value: unknown) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.abs(value) > 80 ? value : value * 1000;
+  }
+
+  const normalized = String(value).trim().toLowerCase().replace(",", ".");
+  if (!normalized) {
+    return null;
+  }
+
+  const match = normalized.match(/-?\d+(\.\d+)?/);
+  if (!match) {
+    return null;
+  }
+
+  const numeric = Number(match[0]);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+
+  if (normalized.includes("kw")) {
+    return numeric * 1000;
+  }
+  if (normalized.includes("w")) {
+    return numeric;
+  }
+
+  return Math.abs(numeric) > 80 ? numeric : numeric * 1000;
+}
+
+function inferPhaseCountFromMode(value: unknown) {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (
+    normalized === "2" ||
+    normalized === "1p" ||
+    normalized === "single" ||
+    normalized === "single_phase" ||
+    normalized === "one_phase"
+  ) {
+    return 1;
+  }
+  if (
+    normalized === "3" ||
+    normalized === "3p" ||
+    normalized === "three" ||
+    normalized === "three_phase"
+  ) {
+    return 3;
+  }
+  return 1;
 }
 
 function normalizeEnergyToKWh(
@@ -1175,6 +1454,35 @@ const styles = StyleSheet.create({
   nodeMetaVeryCompact: {
     marginTop: 2,
     fontSize: 7,
+  },
+  externalInfo: {
+    position: "absolute",
+    borderWidth: 1,
+    zIndex: 7,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    gap: 2,
+  },
+  externalInfoRow: {
+    flexDirection: "column",
+    alignItems: "center",
+    marginTop: 0,
+  },
+  externalInfoLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 14,
+    textAlign: "center",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+  externalInfoValue: {
+    fontSize: 16,
+    fontWeight: "800",
+    lineHeight: 19,
+    textAlign: "center",
   },
   sceneStat: {
     position: "absolute",

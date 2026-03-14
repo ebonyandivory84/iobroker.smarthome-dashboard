@@ -2057,7 +2057,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       value={draft.wallboxCarStateId || ""}
                     />
                   </Field>
-                  <Field label="Wallbox SoC State ID">
+                  <Field label="Auto Akku SoC State ID">
                     <StateFieldInput
                       browseLabel="Objekt"
                       onBrowse={() => setPickerField("wallboxCarSocStateId")}
