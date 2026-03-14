@@ -389,32 +389,24 @@ function SolarFlowScene({
   const bottomLineEnd = carBox.y - verticalGap;
   const bottomLineHeight = Math.max(12, bottomLineEnd - bottomLineStart);
   const infoGap = Math.round(clamp(14 * sceneScale, 8, 18));
-  const batteryInfoWidth = Math.round(clamp(batteryBox.w * 1.16, 116, 250));
-  const carInfoWidth = Math.round(clamp(carBox.w * 0.92, 110, 220));
+  const batteryInfoWidth = Math.round(batteryBox.w);
+  const carInfoWidth = Math.round(carBox.w);
   const infoMaxBottom = Math.max(0, fittedScene.height - Math.round(clamp(78 * sceneScale, 52, 90)));
-  const batteryInfoLeft = clamp(
-    batteryBox.x + batteryBox.w / 2 - batteryInfoWidth / 2,
-    0,
-    Math.max(0, fittedScene.width - batteryInfoWidth)
-  );
-  const carInfoLeft = clamp(
-    carBox.x + carBox.w / 2 - carInfoWidth / 2,
-    0,
-    Math.max(0, fittedScene.width - carInfoWidth)
-  );
+  const batteryInfoLeft = batteryBox.x;
+  const carInfoLeft = carBox.x;
   const batteryInfoTop = clamp(batteryBox.y + batteryBox.h + infoGap, 0, infoMaxBottom);
   const carInfoTop = clamp(carBox.y + carBox.h + infoGap, 0, infoMaxBottom);
   const batteryInfoLines = [
     {
-      value: soc === null ? "Ladung -" : `Ladung ${Math.round(clamp(soc, 0, 100))} %`,
+      value: soc === null ? "-" : `${Math.round(clamp(soc, 0, 100))} %`,
     },
     {
-      value: battTemp === null ? "Temp -" : `Temp ${battTemp.toFixed(1)} °C`,
+      value: battTemp === null ? "-" : `${battTemp.toFixed(1)} °C`,
     },
   ];
   const carInfoLines = [
     {
-      value: carSoc === null ? "Auto SoC -" : `Auto SoC ${Math.round(clamp(carSoc, 0, 100))} %`,
+      value: carSoc === null ? "-" : `${Math.round(clamp(carSoc, 0, 100))} %`,
     },
   ];
 
@@ -570,7 +562,7 @@ function SolarFlowScene({
         veryCompact={veryCompactMode}
         sceneScale={sceneScale}
         showPanel={false}
-        valueSizeBoost={1.06}
+        valueSizeBoost={0.95}
         valueWeight="500"
         valueColor="#f5f8ff"
       />
@@ -590,7 +582,7 @@ function SolarFlowScene({
         veryCompact={veryCompactMode}
         sceneScale={sceneScale}
         showPanel={false}
-        valueSizeBoost={1.08}
+        valueSizeBoost={0.95}
         valueWeight="500"
         valueColor="#ffffff"
       />
@@ -858,7 +850,7 @@ function ExternalNodeInfo({
   const paddingV = panelEnabled ? Math.round(clamp(8 * scale, 5, 8)) : 0;
   const radius = Math.round(clamp(12 * scale, 8, 12));
   const labelSize = Math.round(clamp(11 * scale, 8, 12));
-  const valueScale = clamp(valueSizeBoost ?? 1, 1, 1.8);
+  const valueScale = clamp(valueSizeBoost ?? 1, 0.82, 1.8);
   const valueSize = Math.round(clamp(17 * scale * valueScale, 12, 34));
   const rowGap = Math.round(clamp(6 * scale, 3, 6));
 
