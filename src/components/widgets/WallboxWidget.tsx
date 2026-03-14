@@ -376,6 +376,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         : chargePowerCardMode === "fast"
           ? "rgba(53, 198, 137, 0.12)"
           : "rgba(245, 198, 104, 0.1)";
+  const footerStatusText = error ? error : writePending ? "Synchronisiere..." : "";
   const normalizedChargingPowerW = Math.max(0, Math.min(CHARGING_BAR_MAX_POWER_W, chargingPowerW));
   const chargingPowerRatio = normalizedChargingPowerW / CHARGING_BAR_MAX_POWER_W;
   const chargingPowerPercent = chargingPowerRatio * 100;
@@ -708,17 +709,19 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
           </View>
         </View>
 
-        <Text
-          numberOfLines={1}
-          style={[
-            styles.footer,
-            {
-              color: error ? palette.danger : writePending ? mutedTextColor : "rgba(180, 199, 236, 0.78)",
-            },
-          ]}
-        >
-          {error ? error : writePending ? "Synchronisiere..." : "Live"}
-        </Text>
+        {footerStatusText ? (
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.footer,
+              {
+                color: error ? palette.danger : mutedTextColor,
+              },
+            ]}
+          >
+            {footerStatusText}
+          </Text>
+        ) : null}
       </View>
     </View>
   );

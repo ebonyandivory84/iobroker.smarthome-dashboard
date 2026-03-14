@@ -374,6 +374,7 @@ export function HeatingWidget({ config, client }: HeatingWidgetProps) {
     { label: "Warmwasser", value: formatTemperature(dhwTemp) },
     { label: "Verdichter", value: formatPower(compressorPowerW) },
   ];
+  const liveBadgeText = error ? "Fehler" : writePending ? "Sync" : "";
 
   return (
     <View style={styles.container}>
@@ -413,11 +414,13 @@ export function HeatingWidget({ config, client }: HeatingWidgetProps) {
               {(config.title || "Heizung").trim() || "Heizung"}
             </Text>
           ) : null}
-          <View style={[styles.liveBadge, { borderColor: panelBorder, backgroundColor: panelColor }]}> 
-            <Text style={[styles.liveBadgeText, { color: error ? palette.danger : mutedTextColor }]}> 
-              {error ? "Fehler" : writePending ? "Sync" : "Live"}
-            </Text>
-          </View>
+          {liveBadgeText ? (
+            <View style={[styles.liveBadge, { borderColor: panelBorder, backgroundColor: panelColor }]}>
+              <Text style={[styles.liveBadgeText, { color: error ? palette.danger : mutedTextColor }]}>
+                {liveBadgeText}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         {config.showStatusSubtitle !== false ? (
