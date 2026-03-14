@@ -388,27 +388,21 @@ function SolarFlowScene({
   const bottomLineStart = homeBox.y + homeBox.h + verticalGap;
   const bottomLineEnd = carBox.y - verticalGap;
   const bottomLineHeight = Math.max(12, bottomLineEnd - bottomLineStart);
-  const infoGap = Math.round(clamp(10 * sceneScale, 4, 12));
-  const infoBoxWidth = Math.round(clamp(fittedScene.width * 0.22, 112, 220));
-  const infoMaxBottom = Math.max(0, fittedScene.height - Math.round(clamp(72 * sceneScale, 44, 72)));
-  const batteryInfoLeft = clamp(batteryBox.x + batteryBox.w / 2 - infoBoxWidth / 2, 0, Math.max(0, fittedScene.width - infoBoxWidth));
-  const carInfoLeft = clamp(carBox.x + carBox.w / 2 - infoBoxWidth / 2, 0, Math.max(0, fittedScene.width - infoBoxWidth));
+  const infoGap = Math.round(clamp(14 * sceneScale, 8, 18));
+  const batteryInfoWidth = Math.round(clamp(batteryBox.w * 1.16, 116, 250));
+  const infoMaxBottom = Math.max(0, fittedScene.height - Math.round(clamp(78 * sceneScale, 52, 90)));
+  const batteryInfoLeft = clamp(
+    batteryBox.x + batteryBox.w / 2 - batteryInfoWidth / 2,
+    0,
+    Math.max(0, fittedScene.width - batteryInfoWidth)
+  );
   const batteryInfoTop = clamp(batteryBox.y + batteryBox.h + infoGap, 0, infoMaxBottom);
-  const carInfoTop = clamp(carBox.y + carBox.h + infoGap, 0, infoMaxBottom);
   const batteryInfoLines = [
     {
-      label: "Ladung",
-      value: soc === null ? "-" : `${Math.round(clamp(soc, 0, 100))} %`,
+      value: soc === null ? "Ladung -" : `Ladung ${Math.round(clamp(soc, 0, 100))} %`,
     },
     {
-      label: "Temp",
-      value: battTemp === null ? "-" : `${battTemp.toFixed(1)} °C`,
-    },
-  ];
-  const carInfoLines = [
-    {
-      label: "Auto SoC",
-      value: carSoc === null ? "-" : `${Math.round(clamp(carSoc, 0, 100))} %`,
+      value: battTemp === null ? "Temp -" : `Temp ${battTemp.toFixed(1)} °C`,
     },
   ];
 
@@ -545,7 +539,9 @@ function SolarFlowScene({
         veryCompact={veryCompactMode}
         sceneScale={sceneScale}
         style={{ ...styles.nodePosition, top: carBox.y, left: carBox.x, width: carBox.w, minHeight: carBox.h }}
-        value={carPower === null ? "—" : fmtW(carPower)}
+        value={carSoc === null ? "-" : `${Math.round(clamp(carSoc, 0, 100))} %`}
+        valueColor="#ffffff"
+        meta={carPower === null ? undefined : `Laden ${fmtW(carPower)}`}
         highlight={carDir !== "idle"}
       />
       <ExternalNodeInfo
@@ -554,7 +550,7 @@ function SolarFlowScene({
           ...styles.nodePosition,
           top: batteryInfoTop,
           left: batteryInfoLeft,
-          width: infoBoxWidth,
+          width: batteryInfoWidth,
         }}
         theme={theme}
         textColor={textColor}
@@ -563,22 +559,9 @@ function SolarFlowScene({
         compact={compactMode}
         veryCompact={veryCompactMode}
         sceneScale={sceneScale}
-      />
-      <ExternalNodeInfo
-        lines={carInfoLines}
-        style={{
-          ...styles.nodePosition,
-          top: carInfoTop,
-          left: carInfoLeft,
-          width: infoBoxWidth,
-        }}
-        theme={theme}
-        textColor={textColor}
-        mutedTextColor={mutedTextColor}
-        appearance={widgetAppearance}
-        compact={compactMode}
-        veryCompact={veryCompactMode}
-        sceneScale={sceneScale}
+        showPanel={false}
+        valueSizeBoost={1.22}
+        valueColor="#f5f8ff"
       />
 
       {leftStats.map((card, index) => (
@@ -688,6 +671,7 @@ function NodeCard({
   nodeColor,
   iconColor,
   iconSurface,
+  valueColor,
   compact,
   veryCompact,
   sceneScale,
@@ -705,6 +689,7 @@ function NodeCard({
   nodeColor?: string;
   iconColor?: string;
   iconSurface?: string;
+  valueColor?: string;
   compact?: boolean;
   veryCompact?: boolean;
   sceneScale?: number;
@@ -772,7 +757,7 @@ function NodeCard({
         style={[
           styles.nodeValue,
           {
-            color: textColor,
+            color: valueColor || textColor,
             marginTop: valueMarginTop,
             fontSize: valueFontSize,
           },
@@ -801,7 +786,7 @@ function NodeCard({
 }
 
 type ExternalNodeInfoLine = {
-  label: string;
+  label?: string;
   value: string;
 };
 
@@ -815,6 +800,9 @@ function ExternalNodeInfo({
   compact,
   veryCompact,
   sceneScale,
+  showPanel,
+  valueColor,
+  valueSizeBoost,
 }: {
   lines: ExternalNodeInfoLine[];
   style?: StyleProp<ViewStyle>;
@@ -825,37 +813,46 @@ function ExternalNodeInfo({
   compact?: boolean;
   veryCompact?: boolean;
   sceneScale?: number;
+  showPanel?: boolean;
+  valueColor?: string;
+  valueSizeBoost?: number;
 }) {
   const baseScale = clamp(sceneScale ?? 1, 0.52, 1);
   const compactFactor = veryCompact ? 0.84 : compact ? 0.92 : 1;
   const scale = clamp(baseScale * compactFactor, 0.5, 1);
-  const paddingH = Math.round(clamp(10 * scale, 6, 10));
-  const paddingV = Math.round(clamp(8 * scale, 5, 8));
+  const panelEnabled = showPanel !== false;
+  const paddingH = panelEnabled ? Math.round(clamp(10 * scale, 6, 10)) : 0;
+  const paddingV = panelEnabled ? Math.round(clamp(8 * scale, 5, 8)) : 0;
   const radius = Math.round(clamp(12 * scale, 8, 12));
-  const labelSize = Math.round(clamp(11 * scale, 8, 11));
-  const valueSize = Math.round(clamp(16 * scale, 11, 16));
+  const labelSize = Math.round(clamp(11 * scale, 8, 12));
+  const valueScale = clamp(valueSizeBoost ?? 1, 1, 1.8);
+  const valueSize = Math.round(clamp(17 * scale * valueScale, 12, 34));
   const rowGap = Math.round(clamp(6 * scale, 3, 6));
 
   return (
     <View
       style={[
-        styles.externalInfo,
-        {
-          backgroundColor: appearance?.cardColor || theme.solar.nodeCardBackground,
-          borderColor: theme.solar.nodeCardBorder,
-          paddingHorizontal: paddingH,
-          paddingVertical: paddingV,
-          borderRadius: radius,
-        },
+        panelEnabled ? styles.externalInfo : styles.externalInfoPlain,
+        panelEnabled
+          ? {
+              backgroundColor: appearance?.cardColor || theme.solar.nodeCardBackground,
+              borderColor: theme.solar.nodeCardBorder,
+              paddingHorizontal: paddingH,
+              paddingVertical: paddingV,
+              borderRadius: radius,
+            }
+          : null,
         style,
       ]}
     >
       {lines.map((line, index) => (
         <View key={`${line.label}-${line.value}`} style={[styles.externalInfoRow, index > 0 ? { marginTop: rowGap } : null]}>
-          <Text numberOfLines={1} style={[styles.externalInfoLabel, { color: mutedTextColor, fontSize: labelSize }]}>
-            {line.label}
-          </Text>
-          <Text numberOfLines={1} style={[styles.externalInfoValue, { color: textColor, fontSize: valueSize }]}>
+          {line.label ? (
+            <Text numberOfLines={1} style={[styles.externalInfoLabel, { color: mutedTextColor, fontSize: labelSize }]}>
+              {line.label}
+            </Text>
+          ) : null}
+          <Text numberOfLines={1} style={[styles.externalInfoValue, { color: valueColor || textColor, fontSize: valueSize }]}>
             {line.value}
           </Text>
         </View>
@@ -1463,6 +1460,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
+    gap: 2,
+  },
+  externalInfoPlain: {
+    position: "absolute",
+    zIndex: 7,
     gap: 2,
   },
   externalInfoRow: {
