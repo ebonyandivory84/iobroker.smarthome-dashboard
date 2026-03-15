@@ -884,7 +884,10 @@ function ExternalNodeInfo({
       ]}
     >
       {lines.map((line, index) => (
-        <View key={`${line.label}-${line.value}`} style={[styles.externalInfoRow, index > 0 ? { marginTop: rowGap } : null]}>
+        <View
+          key={`${index}-${line.label || "value"}-${line.value}`}
+          style={[styles.externalInfoRow, index > 0 ? { marginTop: rowGap } : null]}
+        >
           {line.label ? (
             <Text numberOfLines={1} style={[styles.externalInfoLabel, { color: mutedTextColor, fontSize: labelSize }]}>
               {line.label}
