@@ -359,6 +359,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         showTitle: widget.showTitle === false ? "false" : "true",
         showStatusSubtitle: widget.showStatusSubtitle === false ? "false" : "true",
         refreshMs: String(widget.refreshMs || 3000),
+        detailsTickerSpeedPxPerS: String(widget.detailsTickerSpeedPxPerS ?? 46),
         backgroundImage: widget.backgroundImage || "",
         backgroundImageBlur: String(widget.backgroundImageBlur ?? 8),
         modeSetStateId: widget.modeSetStateId,
@@ -747,6 +748,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         showTitle: draft.showTitle !== "false",
         showStatusSubtitle: draft.showStatusSubtitle !== "false",
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 3000, 500),
+        detailsTickerSpeedPxPerS: clampInt(draft.detailsTickerSpeedPxPerS, widget.detailsTickerSpeedPxPerS ?? 46, 16),
         backgroundImage: draft.backgroundImage?.trim() || undefined,
         backgroundImageBlur: clampInt(draft.backgroundImageBlur, widget.backgroundImageBlur ?? 8, 0),
         modeSetStateId: draft.modeSetStateId?.trim() || widget.modeSetStateId,
@@ -2097,6 +2099,16 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     />
                   </Field>
                 </View>
+                {widget.type === "heatingV2" ? (
+                  <Field label="Laufschrift Geschwindigkeit (px/s)">
+                    <TextInput
+                      keyboardType="numeric"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, detailsTickerSpeedPxPerS: value }))}
+                      style={styles.input}
+                      value={draft.detailsTickerSpeedPxPerS || "46"}
+                    />
+                  </Field>
+                ) : null}
 
                 <Field label="Widget-Hintergrundbild (optional)">
                   <View style={styles.stateFieldRow}>

@@ -258,6 +258,7 @@ export function buildWidgetTemplate(
       title: isV2 ? `Heizung V2 ${suffix}` : `Heizung ${suffix}`,
       refreshMs: 3000,
       showStatusSubtitle: true,
+      detailsTickerSpeedPxPerS: 46,
       backgroundImage: "",
       backgroundImageBlur: 8,
       modeSetStateId: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.modes.active.commands.setMode.setValue",

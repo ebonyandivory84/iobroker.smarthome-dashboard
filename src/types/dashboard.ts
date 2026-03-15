@@ -206,6 +206,7 @@ export type HeatingWidgetConfig = WidgetBase & {
   manualHeightOverride?: boolean;
   refreshMs?: number;
   showStatusSubtitle?: boolean;
+  detailsTickerSpeedPxPerS?: number;
   backgroundImage?: string;
   backgroundImageBlur?: number;
   modeSetStateId: string;

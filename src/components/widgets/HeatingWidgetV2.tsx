@@ -28,7 +28,9 @@ const VENTILATION_LEVEL_STEP = 1;
 const DHW_TEMP_MIN = 10;
 const DHW_TEMP_MAX = 60;
 const DHW_TEMP_STEP = 1;
-const DETAILS_TICKER_SPEED_PX_PER_S = 46;
+const DEFAULT_DETAILS_TICKER_SPEED_PX_PER_S = 46;
+const MIN_DETAILS_TICKER_SPEED_PX_PER_S = 16;
+const MAX_DETAILS_TICKER_SPEED_PX_PER_S = 160;
 const DETAILS_TICKER_ENTRY_OFFSET_PX = 18;
 const DETAILS_TICKER_RESTART_DELAY_MS = 1200;
 const DETAILS_TICKER_SEPARATOR = "\u00a0\u00a0\u00a0\u00a0•\u00a0\u00a0\u00a0\u00a0";
@@ -159,6 +161,7 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
   const detailsTickerAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
 
   const refreshMs = clampInt(config.refreshMs, DEFAULT_REFRESH_MS, MIN_REFRESH_MS);
+  const detailsTickerSpeedPxPerS = clampTickerSpeed(config.detailsTickerSpeedPxPerS);
 
   useEffect(() => {
     let active = true;
@@ -504,6 +507,7 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
   const detailsTickerText = showDetailsTicker
     ? `${detailsSegments.join(DETAILS_TICKER_SEPARATOR)}${DETAILS_TICKER_END_GAP}`
     : "";
+  const detailsTickerRenderText = detailsTickerText.replace(/ /g, "\u00a0");
 
   const liveBadgeText = error ? "Fehler" : writePending ? "Sync" : "";
   const footerStatusText = error ? error : writePending ? "Synchronisiere..." : "";
@@ -522,7 +526,7 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
     const travelDistance = startOffset + detailsContentWidth;
     const durationMs = Math.max(
       8000,
-      Math.round((travelDistance / DETAILS_TICKER_SPEED_PX_PER_S) * 1000)
+      Math.round((travelDistance / detailsTickerSpeedPxPerS) * 1000)
     );
 
     detailsTickerOffset.setValue(startOffset);
@@ -548,7 +552,7 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
     return () => {
       tickerLoop.stop();
     };
-  }, [detailsContentWidth, detailsTickerOffset, detailsTrackWidth, showDetailsTicker]);
+  }, [detailsContentWidth, detailsTickerOffset, detailsTrackWidth, detailsTickerSpeedPxPerS, showDetailsTicker]);
 
   return (
     <View style={styles.container}>
@@ -918,22 +922,24 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
               }}
               style={[styles.detailsTickerTrack, { borderColor: panelBorder, backgroundColor: panelColor }]}
             >
-              <Animated.Text
-                numberOfLines={1}
-                onLayout={(event) => {
-                  const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
-                  setDetailsContentWidth((current) => (current === nextWidth ? current : nextWidth));
-                }}
+              <Animated.View
                 style={[
-                  styles.detailsTickerText,
+                  styles.detailsTickerMover,
                   {
-                    color: textColor,
                     transform: [{ translateX: detailsTickerOffset }],
                   },
                 ]}
               >
-                {detailsTickerText}
-              </Animated.Text>
+                <Text
+                  onLayout={(event) => {
+                    const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
+                    setDetailsContentWidth((current) => (current === nextWidth ? current : nextWidth));
+                  }}
+                  style={[styles.detailsTickerText, { color: textColor }]}
+                >
+                  {detailsTickerRenderText}
+                </Text>
+              </Animated.View>
             </View>
           </View>
         ) : null}
@@ -991,6 +997,16 @@ function clampInt(value: number | undefined, fallback: number, min: number) {
     return fallback;
   }
   return Math.max(min, Math.round(value));
+}
+
+function clampTickerSpeed(value: number | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_DETAILS_TICKER_SPEED_PX_PER_S;
+  }
+  return Math.max(
+    MIN_DETAILS_TICKER_SPEED_PX_PER_S,
+    Math.min(MAX_DETAILS_TICKER_SPEED_PX_PER_S, Math.round(value))
+  );
 }
 
 function normalizeMode(value: unknown): HeatingMode | null {
@@ -1510,11 +1526,19 @@ const styles = StyleSheet.create({
     position: "relative",
     justifyContent: "center",
   },
+  detailsTickerMover: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+  },
   detailsTickerText: {
     fontSize: 12,
     fontWeight: "700",
-    paddingHorizontal: 12,
+    paddingHorizontal: 0,
     alignSelf: "flex-start",
+    flexShrink: 0,
   },
   footer: {
     position: "relative",
