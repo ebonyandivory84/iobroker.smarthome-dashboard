@@ -15,6 +15,7 @@ import { EnergyWidget } from "./widgets/EnergyWidget";
 import { GrafanaWidget } from "./widgets/GrafanaWidget";
 import { HostStatsWidget } from "./widgets/HostStatsWidget";
 import { HeatingWidget } from "./widgets/HeatingWidget";
+import { HeatingWidgetV2 } from "./widgets/HeatingWidgetV2";
 import { LinkWidget } from "./widgets/LinkWidget";
 import { LogWidget } from "./widgets/LogWidget";
 import { NumpadWidget } from "./widgets/NumpadWidget";
@@ -196,6 +197,7 @@ export function GridCanvas({
                   widget.type === "host" ||
                   widget.type === "wallbox" ||
                   widget.type === "heating" ||
+                  widget.type === "heatingV2" ||
                   (Platform.OS === "web" && (widget.type === "weather" || widget.type === "grafana"))
                 }
                 onCommitPosition={(widgetId, position) =>
@@ -658,6 +660,7 @@ function getAutoLayoutSpec(
         }
         return { w: 1, h: roundGridUnit(3) };
       case "heating":
+      case "heatingV2":
         if (widget.manualHeightOverride) {
           return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
         }
@@ -724,6 +727,7 @@ function getAutoLayoutSpec(
       }
       return { w: mainColumnWidth, h: roundGridUnit(3) };
     case "heating":
+    case "heatingV2":
       if (widget.manualHeightOverride) {
         return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(fallbackHeight)) };
       }
@@ -917,7 +921,8 @@ function WebGridCanvas({
             widget.type === "script" ||
             widget.type === "host" ||
             widget.type === "wallbox" ||
-            widget.type === "heating"
+            widget.type === "heating" ||
+            widget.type === "heatingV2"
           }
           mainColumnExtraGap={mainColumnExtraGap}
           sourceColumns={sourceColumns}
@@ -988,6 +993,7 @@ function WebWidgetShell({
     widget.type !== "camera" &&
     widget.type !== "wallbox" &&
     widget.type !== "heating" &&
+    widget.type !== "heatingV2" &&
     widget.showTitle !== false &&
     Boolean(widget.title.trim());
   const interaction = useRef<{
@@ -1020,7 +1026,8 @@ function WebWidgetShell({
           widget.type === "script" ||
           widget.type === "host" ||
           widget.type === "wallbox" ||
-          widget.type === "heating")
+          widget.type === "heating" ||
+          widget.type === "heatingV2")
           ? CAMERA_GRID_SNAP
           : GRID_VERTICAL_SNAP
       );
@@ -1034,7 +1041,7 @@ function WebWidgetShell({
           ...active.startPosition,
           x: clamp(active.startPosition.x + dx, 0, config.grid.columns - active.startPosition.w),
           y: Math.max(0, active.startPosition.y + dy),
-        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : widget.type === "grafana" || widget.type === "log" || widget.type === "script" || widget.type === "host" || widget.type === "wallbox" || widget.type === "heating" ? { minHeight: 1, heightSnap: 0.1 } : undefined);
+        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : widget.type === "grafana" || widget.type === "log" || widget.type === "script" || widget.type === "host" || widget.type === "wallbox" || widget.type === "heating" || widget.type === "heatingV2" ? { minHeight: 1, heightSnap: 0.1 } : undefined);
         setPreview(nextPreview);
 
         if (isLayoutMode && onDragAcrossPageEdge) {
@@ -1066,7 +1073,8 @@ function WebWidgetShell({
           widget.type === "script" ||
           widget.type === "host" ||
           widget.type === "wallbox" ||
-          widget.type === "heating"
+          widget.type === "heating" ||
+          widget.type === "heatingV2"
         ) {
           const minHeight = widget.type === "camera" ? 0.5 : widget.type === "solar" ? 2.5 : 1;
           setPreview(constrainToPrimarySections({
@@ -1173,6 +1181,7 @@ function WebWidgetShell({
     widget.type !== "state" &&
     widget.type !== "wallbox" &&
     widget.type !== "heating" &&
+    widget.type !== "heatingV2" &&
     widget.type !== "numpad" &&
     widget.type !== "grafana" &&
     !linkBorderless
@@ -1345,6 +1354,10 @@ function renderWidget(
 
   if (effectiveWidget.type === "heating") {
     return <HeatingWidget client={client} config={effectiveWidget} />;
+  }
+
+  if (effectiveWidget.type === "heatingV2") {
+    return <HeatingWidgetV2 client={client} config={effectiveWidget} />;
   }
 
   return null;
@@ -1541,7 +1554,7 @@ const webResizeHandleStyle: CSSProperties = {
 function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThemeSettings>): CSSProperties {
   const appearance = widget.appearance;
   if (appearance?.widgetColor) {
-    if (widget.type === "wallbox" || widget.type === "heating") {
+    if (widget.type === "wallbox" || widget.type === "heating" || widget.type === "heatingV2") {
       return {
         background: buildGradientBackground(appearance.widgetColor, appearance.widgetColor2),
         border: "none",
@@ -1634,7 +1647,7 @@ function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThe
       boxShadow: "0 16px 28px rgba(5, 10, 19, 0.36)",
     };
   }
-  if (type === "heating") {
+  if (type === "heating" || type === "heatingV2") {
     return {
       background: "linear-gradient(145deg, rgba(18, 28, 42, 0.96), rgba(10, 16, 27, 0.98))",
       border: "none",

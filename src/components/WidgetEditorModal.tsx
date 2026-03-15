@@ -336,19 +336,19 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       return;
     }
 
-    if (widget.type === "heating") {
+    if (widget.type === "heating" || widget.type === "heatingV2") {
       setSoundDraft({
         press: resolveDraftSoundValue(
           widget.interactionSounds?.press,
-          config.uiSounds?.widgetTypeDefaults?.heating?.press
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]?.press
         ),
         confirm: resolveDraftSoundValue(
           widget.interactionSounds?.confirm,
-          config.uiSounds?.widgetTypeDefaults?.heating?.confirm
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]?.confirm
         ),
         slider: resolveDraftSoundValue(
           widget.interactionSounds?.slider,
-          config.uiSounds?.widgetTypeDefaults?.heating?.slider
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]?.slider
         ),
       });
       setWeatherSuggestions([]);
@@ -735,7 +735,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ),
         appearance,
       });
-    } else if (widget.type === "heating") {
+    } else if (widget.type === "heating" || widget.type === "heatingV2") {
       onSave(widget.id, {
         title: draft.title,
         showTitle: draft.showTitle !== "false",
@@ -856,7 +856,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       widget.type !== "log" &&
       widget.type !== "script" &&
       widget.type !== "wallbox" &&
-      widget.type !== "heating"
+      widget.type !== "heating" &&
+      widget.type !== "heatingV2"
     ) {
       return;
     }
@@ -1113,7 +1114,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   />
                 </>
               ) : null}
-              {widget.type === "heating" ? (
+              {widget.type === "heating" || widget.type === "heatingV2" ? (
                 <>
                   <ColorInputRow
                     firstKey="cardColor"
@@ -2056,7 +2057,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 </Field>
               </>
             ) : null}
-            {widget.type === "heating" ? (
+            {widget.type === "heating" || widget.type === "heatingV2" ? (
               <>
                 <View style={styles.splitRow}>
                   <Field label="Refresh (ms)">
@@ -2686,7 +2687,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
               : "Link-Icon waehlen"
             : widget?.type === "wallbox"
               ? "Wallbox-Hintergrund waehlen"
-              : widget?.type === "heating"
+              : (widget?.type === "heating" || widget?.type === "heatingV2")
                 ? "Heizung-Hintergrund waehlen"
               : "Solar-Hintergrund waehlen"
         }
@@ -2695,7 +2696,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
             ? "Waehle eine Bilddatei aus dem Ordner `assets/`."
             : widget?.type === "wallbox"
               ? "Waehle ein Hintergrundbild. Drag&Drop, Datei-Upload und Browser-Auswahl sind verfuegbar."
-              : widget?.type === "heating"
+              : (widget?.type === "heating" || widget?.type === "heatingV2")
                 ? "Waehle ein Hintergrundbild fuer das Heizungs-Widget. Drag&Drop und Datei-Upload sind verfuegbar."
               : "Verwendet den festen Ordner `assets/` im Adapter-Paket."
         }
@@ -2714,7 +2715,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 backgroundImage: entry.name,
               };
             }
-            if (widget?.type === "heating") {
+            if (widget?.type === "heating" || widget?.type === "heatingV2") {
               return {
                 ...current,
                 backgroundImage: entry.name,
@@ -3234,7 +3235,7 @@ function getWidgetAppearanceDefaults(
     };
   }
 
-  if (widget.type === "heating") {
+  if (widget.type === "heating" || widget.type === "heatingV2") {
     return {
       widgetColor: "rgba(18, 28, 42, 0.96)",
       widgetColor2: "rgba(10, 16, 27, 0.98)",
@@ -3526,7 +3527,8 @@ function buildStoredInteractionSounds(
     widgetType !== "log" &&
     widgetType !== "script" &&
     widgetType !== "wallbox" &&
-    widgetType !== "heating"
+    widgetType !== "heating" &&
+    widgetType !== "heatingV2"
   ) {
     return undefined;
   }

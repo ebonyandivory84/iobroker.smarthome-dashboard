@@ -48,6 +48,7 @@ export function WidgetFrame({
     widget.type !== "camera" &&
     widget.type !== "wallbox" &&
     widget.type !== "heating" &&
+    widget.type !== "heatingV2" &&
     widget.showTitle !== false &&
     Boolean(widget.title.trim());
   const interaction = useRef<{
@@ -68,7 +69,8 @@ export function WidgetFrame({
     widget.type === "script" ||
     widget.type === "host" ||
     widget.type === "wallbox" ||
-    widget.type === "heating";
+    widget.type === "heating" ||
+    widget.type === "heatingV2";
 
   useEffect(() => {
     if (Platform.OS !== "web") {
@@ -217,6 +219,7 @@ export function WidgetFrame({
           widget.type !== "state" &&
           widget.type !== "wallbox" &&
           widget.type !== "heating" &&
+          widget.type !== "heatingV2" &&
           widget.type !== "grafana" &&
           !linkBorderless
             ? styles.contentInset

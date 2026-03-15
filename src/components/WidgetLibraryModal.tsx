@@ -94,6 +94,12 @@ const OPTIONS: Array<{
     description: "Steuert Viessmann Heizmodus, Solltemperaturen und Warmwasser in einer kompakten Card.",
     icon: "radiator",
   },
+  {
+    type: "heatingV2",
+    title: "Heizung V2",
+    description: "Uebersichtlichere Heizungsansicht mit Fokus auf Schnellsteuerung und kompakten Details.",
+    icon: "radiator-disabled",
+  },
 ];
 
 export function WidgetLibraryModal({

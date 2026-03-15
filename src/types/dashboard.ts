@@ -11,7 +11,8 @@ export type WidgetType =
   | "script"
   | "host"
   | "wallbox"
-  | "heating";
+  | "heating"
+  | "heatingV2";
 
 export type IconPair = {
   active: string;
@@ -241,6 +242,10 @@ export type HeatingWidgetConfig = WidgetBase & {
   oneTimeChargeIcon?: string;
 };
 
+export type HeatingWidgetV2Config = Omit<HeatingWidgetConfig, "type"> & {
+  type: "heatingV2";
+};
+
 export type SolarNodeLayout = {
   x: number;
   y: number;
@@ -332,7 +337,8 @@ export type WidgetConfig =
   | ScriptWidgetConfig
   | HostStatsWidgetConfig
   | WallboxWidgetConfig
-  | HeatingWidgetConfig;
+  | HeatingWidgetConfig
+  | HeatingWidgetV2Config;
 
 export type BackgroundMode = "gradient" | "mesh" | "solid";
 

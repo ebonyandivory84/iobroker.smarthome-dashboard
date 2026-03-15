@@ -24,11 +24,11 @@ export function buildWidgetTemplate(
                 ? 6
                 : type === "script"
                   ? 6
-                : type === "host"
-                  ? 6
-                  : type === "wallbox"
+                  : type === "host"
                     ? 6
-                    : type === "heating"
+                    : type === "wallbox"
+                      ? 6
+                    : type === "heating" || type === "heatingV2"
                       ? 6
                     : type === "weather"
                       ? 4
@@ -52,7 +52,7 @@ export function buildWidgetTemplate(
                       ? 3
                       : type === "wallbox"
                         ? 3
-                        : type === "heating"
+                        : type === "heating" || type === "heatingV2"
                           ? 3
                       : type === "weather"
                         ? 3
@@ -249,11 +249,12 @@ export function buildWidgetTemplate(
     };
   }
 
-  if (type === "heating") {
+  if (type === "heating" || type === "heatingV2") {
+    const isV2 = type === "heatingV2";
     return {
-      id: `heating-${suffix}`,
-      type: "heating",
-      title: `Heizung ${suffix}`,
+      id: isV2 ? `heating-v2-${suffix}` : `heating-${suffix}`,
+      type,
+      title: isV2 ? `Heizung V2 ${suffix}` : `Heizung ${suffix}`,
       refreshMs: 3000,
       showStatusSubtitle: true,
       backgroundImage: "",
