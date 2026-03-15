@@ -182,6 +182,7 @@ export type WallboxWidgetConfig = WidgetBase & {
   manualHeightOverride?: boolean;
   refreshMs?: number;
   showStatusSubtitle?: boolean;
+  showGridAmpereControl?: boolean;
   backgroundImage?: string;
   backgroundImageBlur?: number;
   modeStateId: string;

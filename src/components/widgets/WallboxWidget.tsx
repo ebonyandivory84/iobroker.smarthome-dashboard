@@ -158,6 +158,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const chargeCompleted = carCode === 4 && !liveCharging;
   const writePending = Object.values(pendingWrites).some(Boolean);
   const sliderValue = sliderDraft ?? gridAmpere;
+  const showGridAmpereControl = config.showGridAmpereControl !== false;
   const chargePowerCardMode: "idle" | "slow" | "fast" =
     chargingPowerW < CHARGING_ACTIVE_THRESHOLD_W
       ? "idle"
@@ -480,87 +481,89 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
           </View>
         </View>
 
-        <View style={[styles.block, !isGridMode ? { opacity: disabledOpacity } : null]}>
-          <View style={styles.blockHeaderInline}>
-            <Text style={[styles.blockLabel, { color: mutedTextColor }]}>Netzladen-Strom</Text>
-            <Text style={[styles.ampereValue, { color: textColor }]}>{Math.round(sliderValue)} A</Text>
-          </View>
-          <View style={[styles.ampereControls, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
-            <Pressable
-              disabled={!isGridMode}
-              onPress={() => adjustGridAmpere(-AMPERE_STEP)}
-              style={({ pressed }) => [styles.stepButton, pressed ? styles.pressScale : null, !isGridMode ? styles.disabledControl : null]}
-            >
-              <Text style={[styles.stepButtonLabel, { color: textColor }]}>-</Text>
-            </Pressable>
-
-            <View style={styles.sliderWrap}>
-              {Platform.OS === "web"
-                ? createElement("input", {
-                    type: "range",
-                    min: AMPERE_MIN,
-                    max: AMPERE_MAX,
-                    step: AMPERE_STEP,
-                    disabled: !isGridMode,
-                    value: sliderValue,
-                    onInput: (event: { target: { value: string } }) => {
-                      setSliderDraft(clampAmpere(Number.parseInt(event.target.value, 10) || DEFAULT_GRID_AMPERE));
-                    },
-                    onChange: (event: { target: { value: string } }) => {
-                      const next = clampAmpere(Number.parseInt(event.target.value, 10) || DEFAULT_GRID_AMPERE);
-                      setSliderDraft(next);
-                      void setGridAmpere(next, "slider");
-                    },
-                    style: {
-                      ...webSliderStyle,
-                      opacity: isGridMode ? 1 : 0.45,
-                      accentColor: sliderStart,
-                      backgroundImage: `linear-gradient(90deg, ${sliderStart} 0%, ${sliderEnd} 100%)`,
-                    },
-                  })
-                : (
-                    <View style={[styles.nativeTickRow, !isGridMode ? styles.disabledControl : null]}>
-                      {Array.from({ length: AMPERE_MAX - AMPERE_MIN + 1 }, (_, index) => {
-                        const value = AMPERE_MIN + index;
-                        const active = value <= sliderValue;
-                        return (
-                          <Pressable
-                            key={`amp-tick-${value}`}
-                            disabled={!isGridMode}
-                            onPress={() => {
-                              setSliderDraft(value);
-                              void setGridAmpere(value, "slider");
-                            }}
-                            style={({ pressed }) => [styles.nativeTickButton, pressed ? styles.pressScale : null]}
-                          >
-                            <View
-                              style={[
-                                styles.nativeTickBar,
-                                {
-                                  backgroundColor: active ? sliderStart : "rgba(255,255,255,0.16)",
-                                },
-                              ]}
-                            />
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  )}
-              <View style={styles.sliderScaleRow}>
-                <Text style={[styles.sliderScaleLabel, { color: mutedTextColor }]}>{AMPERE_MIN} A</Text>
-                <Text style={[styles.sliderScaleLabel, { color: mutedTextColor }]}>{AMPERE_MAX} A</Text>
-              </View>
+        {showGridAmpereControl ? (
+          <View style={[styles.block, !isGridMode ? { opacity: disabledOpacity } : null]}>
+            <View style={styles.blockHeaderInline}>
+              <Text style={[styles.blockLabel, { color: mutedTextColor }]}>Netzladen-Strom</Text>
+              <Text style={[styles.ampereValue, { color: textColor }]}>{Math.round(sliderValue)} A</Text>
             </View>
+            <View style={[styles.ampereControls, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
+              <Pressable
+                disabled={!isGridMode}
+                onPress={() => adjustGridAmpere(-AMPERE_STEP)}
+                style={({ pressed }) => [styles.stepButton, pressed ? styles.pressScale : null, !isGridMode ? styles.disabledControl : null]}
+              >
+                <Text style={[styles.stepButtonLabel, { color: textColor }]}>-</Text>
+              </Pressable>
 
-            <Pressable
-              disabled={!isGridMode}
-              onPress={() => adjustGridAmpere(AMPERE_STEP)}
-              style={({ pressed }) => [styles.stepButton, pressed ? styles.pressScale : null, !isGridMode ? styles.disabledControl : null]}
-            >
-              <Text style={[styles.stepButtonLabel, { color: textColor }]}>+</Text>
-            </Pressable>
+              <View style={styles.sliderWrap}>
+                {Platform.OS === "web"
+                  ? createElement("input", {
+                      type: "range",
+                      min: AMPERE_MIN,
+                      max: AMPERE_MAX,
+                      step: AMPERE_STEP,
+                      disabled: !isGridMode,
+                      value: sliderValue,
+                      onInput: (event: { target: { value: string } }) => {
+                        setSliderDraft(clampAmpere(Number.parseInt(event.target.value, 10) || DEFAULT_GRID_AMPERE));
+                      },
+                      onChange: (event: { target: { value: string } }) => {
+                        const next = clampAmpere(Number.parseInt(event.target.value, 10) || DEFAULT_GRID_AMPERE);
+                        setSliderDraft(next);
+                        void setGridAmpere(next, "slider");
+                      },
+                      style: {
+                        ...webSliderStyle,
+                        opacity: isGridMode ? 1 : 0.45,
+                        accentColor: sliderStart,
+                        backgroundImage: `linear-gradient(90deg, ${sliderStart} 0%, ${sliderEnd} 100%)`,
+                      },
+                    })
+                  : (
+                      <View style={[styles.nativeTickRow, !isGridMode ? styles.disabledControl : null]}>
+                        {Array.from({ length: AMPERE_MAX - AMPERE_MIN + 1 }, (_, index) => {
+                          const value = AMPERE_MIN + index;
+                          const active = value <= sliderValue;
+                          return (
+                            <Pressable
+                              key={`amp-tick-${value}`}
+                              disabled={!isGridMode}
+                              onPress={() => {
+                                setSliderDraft(value);
+                                void setGridAmpere(value, "slider");
+                              }}
+                              style={({ pressed }) => [styles.nativeTickButton, pressed ? styles.pressScale : null]}
+                            >
+                              <View
+                                style={[
+                                  styles.nativeTickBar,
+                                  {
+                                    backgroundColor: active ? sliderStart : "rgba(255,255,255,0.16)",
+                                  },
+                                ]}
+                              />
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    )}
+                <View style={styles.sliderScaleRow}>
+                  <Text style={[styles.sliderScaleLabel, { color: mutedTextColor }]}>{AMPERE_MIN} A</Text>
+                  <Text style={[styles.sliderScaleLabel, { color: mutedTextColor }]}>{AMPERE_MAX} A</Text>
+                </View>
+              </View>
+
+              <Pressable
+                disabled={!isGridMode}
+                onPress={() => adjustGridAmpere(AMPERE_STEP)}
+                style={({ pressed }) => [styles.stepButton, pressed ? styles.pressScale : null, !isGridMode ? styles.disabledControl : null]}
+              >
+                <Text style={[styles.stepButtonLabel, { color: textColor }]}>+</Text>
+              </Pressable>
+            </View>
           </View>
-        </View>
+        ) : null}
 
         <View style={[styles.block, styles.toggleBlock, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
           <View style={styles.toggleTextWrap}>

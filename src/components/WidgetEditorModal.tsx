@@ -315,6 +315,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         title: widget.title,
         showTitle: widget.showTitle === false ? "false" : "true",
         showStatusSubtitle: widget.showStatusSubtitle === true ? "true" : "false",
+        showGridAmpereControl: widget.showGridAmpereControl === false ? "false" : "true",
         refreshMs: String(widget.refreshMs || 2000),
         backgroundImage: widget.backgroundImage || "",
         backgroundImageBlur: String(widget.backgroundImageBlur ?? 8),
@@ -711,6 +712,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         title: draft.title,
         showTitle: draft.showTitle !== "false",
         showStatusSubtitle: draft.showStatusSubtitle === "true",
+        showGridAmpereControl: draft.showGridAmpereControl !== "false",
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 500),
         backgroundImage: draft.backgroundImage?.trim() || undefined,
         backgroundImageBlur: clampInt(draft.backgroundImageBlur, widget.backgroundImageBlur ?? 8, 0),
@@ -1898,6 +1900,13 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     />
                   </Field>
                 </View>
+                <Field label="Netzladen-Strom anzeigen">
+                  <ChoiceRow
+                    options={["true", "false"]}
+                    value={draft.showGridAmpereControl || "true"}
+                    onSelect={(value) => setDraft((current) => ({ ...current, showGridAmpereControl: value }))}
+                  />
+                </Field>
 
                 <Field label="Widget-Hintergrundbild (optional)">
                   <View style={styles.stateFieldRow}>
