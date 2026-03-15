@@ -371,6 +371,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ecoSetActiveStateId: widget.ecoSetActiveStateId || "",
         oneTimeChargeSetActiveStateId: widget.oneTimeChargeSetActiveStateId || "",
         oneTimeChargeActiveStateId: widget.oneTimeChargeActiveStateId || "",
+        roomTempStateId: widget.roomTempStateId || "",
         heatingTempStateId: widget.heatingTempStateId || "",
         supplyTempStateId: widget.supplyTempStateId || "",
         outsideTempStateId: widget.outsideTempStateId || "",
@@ -378,12 +379,19 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         dhwTempStateId: widget.dhwTempStateId || "",
         compressorPowerStateId: widget.compressorPowerStateId || "",
         compressorSensorPowerStateId: widget.compressorSensorPowerStateId || "",
+        showInfoProgram: widget.showInfoProgram === false ? "false" : "true",
+        showInfoTargets: widget.showInfoTargets === false ? "false" : "true",
+        showInfoOutsideTemp: widget.showInfoOutsideTemp === false ? "false" : "true",
+        showInfoSupplyTemp: widget.showInfoSupplyTemp === false ? "false" : "true",
+        showInfoReturnTemp: widget.showInfoReturnTemp === false ? "false" : "true",
+        showInfoHeatingTemp: widget.showInfoHeatingTemp === false ? "false" : "true",
+        showInfoCompressorPower: widget.showInfoCompressorPower === false ? "false" : "true",
         standbyIcon: widget.standbyIcon || "power-standby",
         dhwIcon: widget.dhwIcon || "water",
         heatingIcon: widget.heatingIcon || "radiator",
         comfortIcon: widget.comfortIcon || "white-balance-sunny",
         ecoIcon: widget.ecoIcon || "leaf",
-        oneTimeChargeIcon: widget.oneTimeChargeIcon || "flash",
+        oneTimeChargeIcon: widget.oneTimeChargeIcon || "shower-head",
         ...appearanceDraft,
       });
       return;
@@ -745,6 +753,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ecoSetActiveStateId: draft.ecoSetActiveStateId?.trim() || undefined,
         oneTimeChargeSetActiveStateId: draft.oneTimeChargeSetActiveStateId?.trim() || undefined,
         oneTimeChargeActiveStateId: draft.oneTimeChargeActiveStateId?.trim() || undefined,
+        roomTempStateId: draft.roomTempStateId?.trim() || undefined,
         heatingTempStateId: draft.heatingTempStateId?.trim() || undefined,
         supplyTempStateId: draft.supplyTempStateId?.trim() || undefined,
         outsideTempStateId: draft.outsideTempStateId?.trim() || undefined,
@@ -752,6 +761,13 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         dhwTempStateId: draft.dhwTempStateId?.trim() || undefined,
         compressorPowerStateId: draft.compressorPowerStateId?.trim() || undefined,
         compressorSensorPowerStateId: draft.compressorSensorPowerStateId?.trim() || undefined,
+        showInfoProgram: draft.showInfoProgram !== "false",
+        showInfoTargets: draft.showInfoTargets !== "false",
+        showInfoOutsideTemp: draft.showInfoOutsideTemp !== "false",
+        showInfoSupplyTemp: draft.showInfoSupplyTemp !== "false",
+        showInfoReturnTemp: draft.showInfoReturnTemp !== "false",
+        showInfoHeatingTemp: draft.showInfoHeatingTemp !== "false",
+        showInfoCompressorPower: draft.showInfoCompressorPower !== "false",
         standbyIcon: draft.standbyIcon?.trim() || undefined,
         dhwIcon: draft.dhwIcon?.trim() || undefined,
         heatingIcon: draft.heatingIcon?.trim() || undefined,
@@ -2081,7 +2097,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={draft.modeSetStateId || ""}
                   />
                 </Field>
-                <Field label="Normal Solltemperatur setzen">
+                <Field label="Innentemperatur Soll setzen">
                   <StateFieldInput
                     onBrowse={() => setPickerField("normalSetTempStateId")}
                     onChangeText={(value) => setDraft((current) => ({ ...current, normalSetTempStateId: value }))}
@@ -2112,29 +2128,6 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   />
                 </Field>
                 <View style={styles.splitRow}>
-                  <Field label="Komfort aktivieren">
-                    <StateFieldInput
-                      onBrowse={() => setPickerField("comfortActivateStateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, comfortActivateStateId: value }))}
-                      value={draft.comfortActivateStateId || ""}
-                    />
-                  </Field>
-                  <Field label="Komfort deaktivieren">
-                    <StateFieldInput
-                      onBrowse={() => setPickerField("comfortDeactivateStateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, comfortDeactivateStateId: value }))}
-                      value={draft.comfortDeactivateStateId || ""}
-                    />
-                  </Field>
-                </View>
-                <View style={styles.splitRow}>
-                  <Field label="Eco setActive">
-                    <StateFieldInput
-                      onBrowse={() => setPickerField("ecoSetActiveStateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, ecoSetActiveStateId: value }))}
-                      value={draft.ecoSetActiveStateId || ""}
-                    />
-                  </Field>
                   <Field label="WW Einmalladung setActive">
                     <StateFieldInput
                       onBrowse={() => setPickerField("oneTimeChargeSetActiveStateId")}
@@ -2162,6 +2155,13 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   </Field>
                 </View>
                 <View style={styles.splitRow}>
+                  <Field label="Innentemperatur Ist">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("roomTempStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, roomTempStateId: value }))}
+                      value={draft.roomTempStateId || ""}
+                    />
+                  </Field>
                   <Field label="Heizkreis Temp">
                     <StateFieldInput
                       onBrowse={() => setPickerField("heatingTempStateId")}
@@ -2254,24 +2254,6 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       value={draft.heatingIcon || ""}
                     />
                   </Field>
-                  <Field label="Komfort Icon">
-                    <TextInput
-                      autoCapitalize="none"
-                      onChangeText={(value) => setDraft((current) => ({ ...current, comfortIcon: value }))}
-                      style={styles.input}
-                      value={draft.comfortIcon || ""}
-                    />
-                  </Field>
-                </View>
-                <View style={styles.splitRow}>
-                  <Field label="Eco Icon">
-                    <TextInput
-                      autoCapitalize="none"
-                      onChangeText={(value) => setDraft((current) => ({ ...current, ecoIcon: value }))}
-                      style={styles.input}
-                      value={draft.ecoIcon || ""}
-                    />
-                  </Field>
                   <Field label="Einmalladung Icon">
                     <TextInput
                       autoCapitalize="none"
@@ -2280,6 +2262,51 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       value={draft.oneTimeChargeIcon || ""}
                     />
                   </Field>
+                </View>
+
+                <Text style={styles.sectionTitle}>Infobox-Textzeilen</Text>
+                <View style={styles.splitRow}>
+                  <CheckboxChoice
+                    label="Programm"
+                    value={draft.showInfoProgram || "true"}
+                    onChange={(value) => setDraft((current) => ({ ...current, showInfoProgram: value }))}
+                  />
+                  <CheckboxChoice
+                    label="Zielwerte"
+                    value={draft.showInfoTargets || "true"}
+                    onChange={(value) => setDraft((current) => ({ ...current, showInfoTargets: value }))}
+                  />
+                </View>
+                <View style={styles.splitRow}>
+                  <CheckboxChoice
+                    label="Aussen"
+                    value={draft.showInfoOutsideTemp || "true"}
+                    onChange={(value) => setDraft((current) => ({ ...current, showInfoOutsideTemp: value }))}
+                  />
+                  <CheckboxChoice
+                    label="Vorlauf"
+                    value={draft.showInfoSupplyTemp || "true"}
+                    onChange={(value) => setDraft((current) => ({ ...current, showInfoSupplyTemp: value }))}
+                  />
+                </View>
+                <View style={styles.splitRow}>
+                  <CheckboxChoice
+                    label="Ruecklauf"
+                    value={draft.showInfoReturnTemp || "true"}
+                    onChange={(value) => setDraft((current) => ({ ...current, showInfoReturnTemp: value }))}
+                  />
+                  <CheckboxChoice
+                    label="Heizkreis"
+                    value={draft.showInfoHeatingTemp || "true"}
+                    onChange={(value) => setDraft((current) => ({ ...current, showInfoHeatingTemp: value }))}
+                  />
+                </View>
+                <View style={styles.splitRow}>
+                  <CheckboxChoice
+                    label="Verdichter"
+                    value={draft.showInfoCompressorPower || "true"}
+                    onChange={(value) => setDraft((current) => ({ ...current, showInfoCompressorPower: value }))}
+                  />
                 </View>
 
                 <Field label="Sounds bei Interaktion">
@@ -2753,6 +2780,32 @@ function ChoiceRow({
         </EditorButtonPressable>
       ))}
     </View>
+  );
+}
+
+function CheckboxChoice({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const active = value !== "false";
+
+  return (
+    <EditorButtonPressable
+      onPress={() => onChange(active ? "false" : "true")}
+      style={[styles.checkboxChoice, active ? styles.checkboxChoiceActive : null]}
+    >
+      <MaterialCommunityIcons
+        color={active ? palette.accent : palette.textMuted}
+        name={active ? "checkbox-marked-outline" : "checkbox-blank-outline"}
+        size={18}
+      />
+      <Text style={styles.checkboxChoiceLabel}>{label}</Text>
+    </EditorButtonPressable>
   );
 }
 
@@ -3800,6 +3853,28 @@ const styles = StyleSheet.create({
   modeLabel: {
     color: palette.text,
     fontWeight: "700",
+  },
+  checkboxChoice: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: palette.border,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  checkboxChoiceActive: {
+    borderColor: "rgba(92,124,255,0.38)",
+    backgroundColor: "rgba(92,124,255,0.12)",
+  },
+  checkboxChoiceLabel: {
+    color: palette.text,
+    fontWeight: "700",
+    fontSize: 12,
   },
   footer: {
     marginTop: 8,

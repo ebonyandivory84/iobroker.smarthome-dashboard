@@ -217,6 +217,7 @@ export type HeatingWidgetConfig = WidgetBase & {
   ecoSetActiveStateId?: string;
   oneTimeChargeSetActiveStateId?: string;
   oneTimeChargeActiveStateId?: string;
+  roomTempStateId?: string;
   heatingTempStateId?: string;
   supplyTempStateId?: string;
   outsideTempStateId?: string;
@@ -224,6 +225,13 @@ export type HeatingWidgetConfig = WidgetBase & {
   dhwTempStateId?: string;
   compressorPowerStateId?: string;
   compressorSensorPowerStateId?: string;
+  showInfoProgram?: boolean;
+  showInfoTargets?: boolean;
+  showInfoOutsideTemp?: boolean;
+  showInfoSupplyTemp?: boolean;
+  showInfoReturnTemp?: boolean;
+  showInfoHeatingTemp?: boolean;
+  showInfoCompressorPower?: boolean;
   standbyIcon?: string;
   dhwIcon?: string;
   heatingIcon?: string;
