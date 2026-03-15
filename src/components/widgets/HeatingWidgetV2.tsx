@@ -13,6 +13,7 @@ type HeatingWidgetProps = {
 
 type HeatingMode = "standby" | "dhw" | "dhwAndHeating";
 type ProgramMode = "normal" | "reduced" | "comfort" | "eco";
+type TemperatureColorStop = { temp: number; color: string };
 
 const DEFAULT_REFRESH_MS = 3000;
 const MIN_REFRESH_MS = 800;
@@ -20,16 +21,33 @@ const MIN_REFRESH_MS = 800;
 const ROOM_TEMP_MIN = 10;
 const ROOM_TEMP_MAX = 30;
 const ROOM_TEMP_STEP = 0.5;
-const ROOM_TEMP_BAR_MIN = 15;
-const ROOM_TEMP_BAR_MAX = 40;
+const VENTILATION_LEVEL_MIN = 1;
+const VENTILATION_LEVEL_MAX = 4;
+const VENTILATION_LEVEL_STEP = 1;
 
 const DHW_TEMP_MIN = 10;
 const DHW_TEMP_MAX = 60;
 const DHW_TEMP_STEP = 1;
-const DHW_TEMP_BAR_MIN = 15;
-const DHW_TEMP_BAR_MAX = 60;
-const TEMP_BAR_GLOW_CYCLE_MS = 2000;
-const TEMP_BAR_ACTIVE_POWER_THRESHOLD_W = 400;
+const DETAILS_TICKER_SPEED_PX_PER_S = 46;
+
+const ROOM_TEMP_COLOR_STOPS: TemperatureColorStop[] = [
+  { temp: 16, color: "#1f49a5" },
+  { temp: 19, color: "#2263d4" },
+  { temp: 20, color: "#4a9ef0" },
+  { temp: 22, color: "#3ec96c" },
+  { temp: 24, color: "#f2b23c" },
+  { temp: 25, color: "#de6940" },
+  { temp: 28, color: "#a51c2e" },
+];
+
+const DHW_TEMP_COLOR_STOPS: TemperatureColorStop[] = [
+  { temp: 10, color: "#1f429a" },
+  { temp: 20, color: "#256edc" },
+  { temp: 30, color: "#4caef2" },
+  { temp: 38, color: "#eea43a" },
+  { temp: 50, color: "#d45035" },
+  { temp: 60, color: "#911125" },
+];
 
 const DEFAULT_IDS = {
   modeSet: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.modes.active.commands.setMode.setValue",
@@ -49,6 +67,10 @@ const DEFAULT_IDS = {
   ecoSetActive: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.eco.commands.setActive.setValue",
   oneTimeChargeSetActive: "viessmannapi.0.299550.0.features.heating.dhw.oneTimeCharge.commands.setActive.setValue",
   oneTimeChargeActive: "viessmannapi.0.299550.0.features.heating.dhw.oneTimeCharge.properties.active.value",
+  ventilationAutoSetActive: "",
+  ventilationAutoActive: "",
+  ventilationLevelSet: "",
+  ventilationLevel: "",
   roomTemp: "viessmannapi.0.299550.0.features.heating.circuits.1.temperature.properties.value.value",
   heatingTemp: "viessmannapi.0.299550.0.features.heating.circuits.1.temperature.properties.value.value",
   supplyTemp: "viessmannapi.0.299550.0.features.heating.circuits.1.sensors.temperature.supply.properties.value.value",
@@ -74,6 +96,16 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
       ecoSetActive: resolveOptionalStateId(config.ecoSetActiveStateId, DEFAULT_IDS.ecoSetActive),
       oneTimeChargeSetActive: resolveOptionalStateId(config.oneTimeChargeSetActiveStateId, DEFAULT_IDS.oneTimeChargeSetActive),
       oneTimeChargeActive: resolveOptionalStateId(config.oneTimeChargeActiveStateId, DEFAULT_IDS.oneTimeChargeActive),
+      ventilationAutoSetActive: resolveOptionalStateId(
+        config.ventilationAutoSetActiveStateId,
+        DEFAULT_IDS.ventilationAutoSetActive
+      ),
+      ventilationAutoActive: resolveOptionalStateId(
+        config.ventilationAutoActiveStateId,
+        DEFAULT_IDS.ventilationAutoActive
+      ),
+      ventilationLevelSet: resolveOptionalStateId(config.ventilationLevelSetStateId, DEFAULT_IDS.ventilationLevelSet),
+      ventilationLevel: resolveOptionalStateId(config.ventilationLevelStateId, DEFAULT_IDS.ventilationLevel),
       roomTemp: resolveOptionalStateId(config.roomTempStateId, DEFAULT_IDS.roomTemp),
       heatingTemp: resolveOptionalStateId(config.heatingTempStateId, DEFAULT_IDS.heatingTemp),
       supplyTemp: resolveOptionalStateId(config.supplyTempStateId, DEFAULT_IDS.supplyTemp),
@@ -96,6 +128,10 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
       config.ecoSetActiveStateId,
       config.oneTimeChargeSetActiveStateId,
       config.oneTimeChargeActiveStateId,
+      config.ventilationAutoSetActiveStateId,
+      config.ventilationAutoActiveStateId,
+      config.ventilationLevelSetStateId,
+      config.ventilationLevelStateId,
       config.roomTempStateId,
       config.heatingTempStateId,
       config.supplyTempStateId,
@@ -112,9 +148,11 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
   const [error, setError] = useState<string | null>(null);
   const [normalDraft, setNormalDraft] = useState<number | null>(null);
   const [dhwDraft, setDhwDraft] = useState<number | null>(null);
-  const [detailsExpanded, setDetailsExpanded] = useState(false);
-  const [dhwBarTrackWidth, setDhwBarTrackWidth] = useState(0);
-  const tempBarGlowAnim = useRef(new Animated.Value(0)).current;
+  const [ventilationLevelDraft, setVentilationLevelDraft] = useState<number | null>(null);
+  const [detailsTrackWidth, setDetailsTrackWidth] = useState(0);
+  const [detailsContentWidth, setDetailsContentWidth] = useState(0);
+  const detailsTickerOffset = useRef(new Animated.Value(0)).current;
+  const detailsTickerAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
 
   const refreshMs = clampInt(config.refreshMs, DEFAULT_REFRESH_MS, MIN_REFRESH_MS);
 
@@ -191,6 +229,15 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
     DHW_TEMP_STEP
   );
   const oneTimeChargeActive = normalizeBoolean(readValue(stateIds.oneTimeChargeActive)) ?? false;
+  const ventilationAutoActive =
+    normalizeBoolean(readValue(stateIds.ventilationAutoActive)) ??
+    normalizeBoolean(readValue(stateIds.ventilationAutoSetActive)) ??
+    false;
+  const ventilationLevelCurrent = clampVentilationLevel(
+    normalizeFloat(readValue(stateIds.ventilationLevel)) ??
+      normalizeFloat(readValue(stateIds.ventilationLevelSet)) ??
+      VENTILATION_LEVEL_MIN
+  );
 
   const roomTemp = normalizeFloat(readValue(stateIds.roomTemp));
   const outsideTemp = normalizeFloat(readValue(stateIds.outsideTemp));
@@ -204,17 +251,13 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
 
   const normalSliderValue = normalDraft ?? normalTarget;
   const dhwSliderValue = dhwDraft ?? dhwTarget;
+  const ventilationSliderValue = clampVentilationLevel(ventilationLevelDraft ?? ventilationLevelCurrent);
+  const ventilationAutoToggleAvailable = Boolean(stateIds.ventilationAutoSetActive);
+  const ventilationSliderWritable = Boolean(stateIds.ventilationLevelSet);
+  const ventilationManualControlEnabled = !ventilationAutoActive && ventilationSliderWritable;
   const writePending = Object.values(pendingWrites).some(Boolean);
-  const roomTempPercent = mapValueToPercent(roomTemp, ROOM_TEMP_BAR_MIN, ROOM_TEMP_BAR_MAX);
-  const dhwTempPercent = mapValueToPercent(dhwTemp, DHW_TEMP_BAR_MIN, DHW_TEMP_BAR_MAX);
   const roomTempDisplay = formatTemperature(roomTemp);
   const dhwTempDisplay = formatTemperature(dhwTemp);
-  const dhwHeatingActive =
-    oneTimeChargeActive ||
-    mode === "dhw" ||
-    (dhwTemp !== null &&
-      dhwTemp + 0.5 < dhwTarget &&
-      (compressorPowerW ?? 0) > TEMP_BAR_ACTIVE_POWER_THRESHOLD_W);
 
   useEffect(() => {
     if (!pendingWrites[stateIds.normalSetTemp]) {
@@ -229,20 +272,10 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
   }, [dhwTarget, pendingWrites, stateIds.dhwSetTemp]);
 
   useEffect(() => {
-    tempBarGlowAnim.setValue(0);
-    const glowLoop = Animated.loop(
-      Animated.timing(tempBarGlowAnim, {
-        toValue: 1,
-        duration: TEMP_BAR_GLOW_CYCLE_MS,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    );
-    glowLoop.start();
-    return () => {
-      glowLoop.stop();
-    };
-  }, [tempBarGlowAnim]);
+    if (!pendingWrites[stateIds.ventilationLevelSet]) {
+      setVentilationLevelDraft(null);
+    }
+  }, [pendingWrites, stateIds.ventilationLevelSet, ventilationLevelCurrent]);
 
   const playPressSound = useCallback(
     (key: string) => {
@@ -340,6 +373,45 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
     void writeState(stateIds.oneTimeChargeSetActive, nextActive, `oneTimeCharge:${nextActive ? "on" : "off"}`);
   }, [oneTimeChargeActive, playPressSound, stateIds.oneTimeChargeSetActive, writeState]);
 
+  const toggleVentilationAuto = useCallback(() => {
+    if (!stateIds.ventilationAutoSetActive) {
+      return;
+    }
+    const nextActive = !ventilationAutoActive;
+    playPressSound("ventilationAuto");
+    void writeState(
+      stateIds.ventilationAutoSetActive,
+      nextActive,
+      `ventilationAuto:${nextActive ? "on" : "off"}`
+    );
+  }, [playPressSound, stateIds.ventilationAutoSetActive, ventilationAutoActive, writeState]);
+
+  const setVentilationLevel = useCallback(
+    (nextValue: number, source: "slider" | "button") => {
+      if (!stateIds.ventilationLevelSet || ventilationAutoActive) {
+        return;
+      }
+      const clamped = clampVentilationLevel(nextValue);
+      if (Math.abs(clamped - ventilationLevelCurrent) < 0.001) {
+        return;
+      }
+      if (source === "slider") {
+        playSliderSound(`ventilation:${clamped}`);
+      } else {
+        playPressSound(`ventilation:${clamped}`);
+      }
+      void writeState(stateIds.ventilationLevelSet, clamped, `ventilation:${clamped}`);
+    },
+    [
+      playPressSound,
+      playSliderSound,
+      stateIds.ventilationLevelSet,
+      ventilationAutoActive,
+      ventilationLevelCurrent,
+      writeState,
+    ]
+  );
+
   const textColor = config.appearance?.textColor || "#f5f8ff";
   const mutedTextColor = config.appearance?.mutedTextColor || "rgba(214, 224, 244, 0.78)";
   const cardStart = config.appearance?.widgetColor || "rgba(18, 28, 42, 0.96)";
@@ -394,23 +466,77 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
     config.showInfoHeatingTemp !== false ? { label: "Heizkreis", value: formatTemperature(heatingTemp) } : null,
     config.showInfoCompressorPower !== false ? { label: "Verdichter", value: formatPower(compressorPowerW) } : null,
   ].filter(Boolean) as Array<{ label: string; value: string }>;
+
+  const roomCardTone = resolveTemperatureColor(roomTemp, ROOM_TEMP_COLOR_STOPS, "#587197");
+  const dhwCardTone = resolveTemperatureColor(dhwTemp, DHW_TEMP_COLOR_STOPS, "#587197");
+  const roomCardBackgroundColor = mixColorWith(roomCardTone, "#0b1625", 0.44);
+  const dhwCardBackgroundColor = mixColorWith(dhwCardTone, "#0b1625", 0.44);
+  const roomCardBorderColor = withAlpha(roomCardTone, 0.68);
+  const dhwCardBorderColor = withAlpha(dhwCardTone, 0.68);
+  const roomCardTextColor = resolveReadableTextColor(roomCardBackgroundColor);
+  const dhwCardTextColor = resolveReadableTextColor(dhwCardBackgroundColor);
+  const roomCardMutedTextColor = withAlpha(roomCardTextColor, 0.82);
+  const dhwCardMutedTextColor = withAlpha(dhwCardTextColor, 0.82);
+
+  const targetValues = [`N ${formatTemperature(normalTarget)}`];
+  if (reducedTarget !== null) {
+    targetValues.push(`R ${formatTemperature(reducedTarget)}`);
+  }
+  if (comfortTarget !== null) {
+    targetValues.push(`K ${formatTemperature(comfortTarget)}`);
+  }
+  const detailsSegments = [
+    showInfoProgram ? `Programm ${formatProgramLabel(activeProgram)}` : null,
+    showInfoTargets ? `Zielwerte ${targetValues.join(" | ")}` : null,
+    ventilationAutoToggleAvailable ? `Lueftungsautomatik ${ventilationAutoActive ? "ein" : "aus"}` : null,
+    ventilationSliderWritable ? `Lueftungsstufe ${formatVentilationLevel(ventilationSliderValue)}` : null,
+    ...infoRows.filter((row) => row.value !== "-").map((row) => `${row.label} ${row.value}`),
+  ].filter(Boolean) as string[];
+  const detailsTickerText = detailsSegments.join("   •   ");
+  const showDetailsTicker = detailsTickerText.length > 0;
+
   const liveBadgeText = error ? "Fehler" : writePending ? "Sync" : "";
   const footerStatusText = error ? error : writePending ? "Synchronisiere..." : "";
-  const roomFillRatio = (roomTempPercent ?? 0) / 100;
-  const dhwFillRatio = (dhwTempPercent ?? 0) / 100;
-  const dhwFillWidthPx = dhwBarTrackWidth * dhwFillRatio;
-  const dhwGlowWidthPx = Math.max(34, Math.min(80, dhwFillWidthPx * 0.44));
-  const dhwGlowTranslateX = tempBarGlowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-dhwGlowWidthPx, Math.max(0, dhwFillWidthPx)],
-  });
-  const roomBarTintColor = interpolateTriColor(roomFillRatio, "#1a4c9f", "#33c786", "#cc4c4c", 0.24);
-  const dhwBarTintColor = interpolateBiColor(dhwFillRatio, "#1049a2", "#7d1212");
-  const roomScaleTicks = buildTemperatureTicks(ROOM_TEMP_BAR_MIN, ROOM_TEMP_BAR_MAX, ROOM_TEMP_BAR_MAX - ROOM_TEMP_BAR_MIN);
-  const dhwScaleTicks = buildTemperatureTicks(DHW_TEMP_BAR_MIN, DHW_TEMP_BAR_MAX, DHW_TEMP_BAR_MAX - DHW_TEMP_BAR_MIN);
-  const roomFillWidth = `${Number((roomTempPercent ?? 0).toFixed(2))}%` as `${number}%`;
-  const dhwFillWidth = `${Number((dhwTempPercent ?? 0).toFixed(2))}%` as `${number}%`;
-  const showInfoPanel = showInfoProgram || showInfoTargets || infoRows.length > 0;
+
+  useEffect(() => {
+    detailsTickerAnimationRef.current?.stop();
+    detailsTickerAnimationRef.current = null;
+
+    if (!showDetailsTicker || detailsTrackWidth <= 0 || detailsContentWidth <= 0) {
+      detailsTickerOffset.setValue(detailsTrackWidth > 0 ? detailsTrackWidth : 0);
+      return;
+    }
+
+    const travelDistance = detailsTrackWidth + detailsContentWidth;
+    const durationMs = Math.max(
+      8000,
+      Math.round((travelDistance / DETAILS_TICKER_SPEED_PX_PER_S) * 1000)
+    );
+
+    detailsTickerOffset.setValue(detailsTrackWidth);
+    const tickerLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(detailsTickerOffset, {
+          toValue: -detailsContentWidth,
+          duration: durationMs,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+        Animated.timing(detailsTickerOffset, {
+          toValue: detailsTrackWidth,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+        Animated.delay(700),
+      ])
+    );
+    detailsTickerAnimationRef.current = tickerLoop;
+    tickerLoop.start();
+
+    return () => {
+      tickerLoop.stop();
+    };
+  }, [detailsContentWidth, detailsTickerOffset, detailsTrackWidth, showDetailsTicker]);
 
   return (
     <View style={styles.container}>
@@ -471,15 +597,15 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
         ) : null}
 
         <View style={styles.kpiRow}>
-          <View style={[styles.kpiCard, { borderColor: panelBorder, backgroundColor: panelColor }]}>
-            <Text style={[styles.kpiLabel, { color: mutedTextColor }]}>Raum</Text>
-            <Text style={[styles.kpiPrimary, { color: textColor }]}>{roomTempDisplay}</Text>
-            <Text style={[styles.kpiSecondary, { color: mutedTextColor }]}>Soll {formatTemperature(normalTarget)}</Text>
+          <View style={[styles.kpiCard, { borderColor: roomCardBorderColor, backgroundColor: roomCardBackgroundColor }]}>
+            <Text style={[styles.kpiLabel, { color: roomCardMutedTextColor }]}>Raum</Text>
+            <Text style={[styles.kpiPrimary, { color: roomCardTextColor }]}>{roomTempDisplay}</Text>
+            <Text style={[styles.kpiSecondary, { color: roomCardMutedTextColor }]}>Soll {formatTemperature(normalTarget)}</Text>
           </View>
-          <View style={[styles.kpiCard, { borderColor: panelBorder, backgroundColor: panelColor }]}>
-            <Text style={[styles.kpiLabel, { color: mutedTextColor }]}>Warmwasser</Text>
-            <Text style={[styles.kpiPrimary, { color: textColor }]}>{dhwTempDisplay}</Text>
-            <Text style={[styles.kpiSecondary, { color: mutedTextColor }]}>Soll {formatTemperature(dhwTarget)}</Text>
+          <View style={[styles.kpiCard, { borderColor: dhwCardBorderColor, backgroundColor: dhwCardBackgroundColor }]}>
+            <Text style={[styles.kpiLabel, { color: dhwCardMutedTextColor }]}>Warmwasser</Text>
+            <Text style={[styles.kpiPrimary, { color: dhwCardTextColor }]}>{dhwTempDisplay}</Text>
+            <Text style={[styles.kpiSecondary, { color: dhwCardMutedTextColor }]}>Soll {formatTemperature(dhwTarget)}</Text>
           </View>
         </View>
 
@@ -598,29 +724,6 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
                 <Text style={[styles.stepLabel, { color: textColor }]}>+</Text>
               </Pressable>
             </View>
-            <View style={styles.temperatureBarHeader}>
-              <Text style={[styles.temperatureBarLabel, { color: mutedTextColor }]}>Ist</Text>
-              <Text style={[styles.temperatureBarValue, { color: textColor }]}>{roomTempDisplay}</Text>
-            </View>
-            <View style={styles.temperatureBarTrack}>
-              <View style={[styles.temperatureBarFill, { width: roomFillWidth }]}>
-                {Platform.OS === "web"
-                  ? createElement("div", {
-                      style: {
-                        ...webGradientLayerStyle,
-                        borderRadius: 999,
-                        background: `linear-gradient(90deg, #174a9f 0%, ${roomBarTintColor} 100%)`,
-                      },
-                    })
-                  : <View style={[StyleSheet.absoluteFillObject, { borderRadius: 999, backgroundColor: roomBarTintColor }]} />}
-              </View>
-            </View>
-            <View style={styles.sliderScaleRow}>
-              <Text style={[styles.sliderScaleLabel, { color: mutedTextColor }]}>{Math.round(roomScaleTicks[0].value)}°</Text>
-              <Text style={[styles.sliderScaleLabel, { color: mutedTextColor }]}>
-                {Math.round(roomScaleTicks[roomScaleTicks.length - 1].value)}°
-              </Text>
-            </View>
           </View>
 
           <View style={[styles.controlCard, { borderColor: panelBorder, backgroundColor: panelColor }]}>
@@ -671,92 +774,137 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
                 <Text style={[styles.stepLabel, { color: textColor }]}>+</Text>
               </Pressable>
             </View>
-            <View style={styles.temperatureBarHeader}>
-              <Text style={[styles.temperatureBarLabel, { color: mutedTextColor }]}>Ist</Text>
-              <Text style={[styles.temperatureBarValue, { color: textColor }]}>{dhwTempDisplay}</Text>
-            </View>
-            <View
-              onLayout={(event) => {
-                const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
-                setDhwBarTrackWidth((current) => (current === nextWidth ? current : nextWidth));
-              }}
-              style={styles.temperatureBarTrack}
-            >
-              <View style={[styles.temperatureBarFill, { width: dhwFillWidth }]}>
-                {Platform.OS === "web"
-                  ? createElement("div", {
-                      style: {
-                        ...webGradientLayerStyle,
-                        borderRadius: 999,
-                        background: `linear-gradient(90deg, #0f4aa5 0%, ${dhwBarTintColor} 100%)`,
-                      },
-                    })
-                  : <View style={[StyleSheet.absoluteFillObject, { borderRadius: 999, backgroundColor: dhwBarTintColor }]} />}
-                <Animated.View
-                  pointerEvents="none"
-                  style={[
-                    styles.temperatureBarGlow,
-                    {
-                      width: dhwGlowWidthPx,
-                      transform: [{ translateX: dhwGlowTranslateX }],
-                      opacity: dhwHeatingActive && dhwFillRatio > 0.01 ? 1 : 0,
-                    },
-                  ]}
-                />
-              </View>
-            </View>
-            <View style={styles.sliderScaleRow}>
-              <Text style={[styles.sliderScaleLabel, { color: mutedTextColor }]}>{Math.round(dhwScaleTicks[0].value)}°</Text>
-              <Text style={[styles.sliderScaleLabel, { color: mutedTextColor }]}>
-                {Math.round(dhwScaleTicks[dhwScaleTicks.length - 1].value)}°
+          </View>
+
+          <View style={[styles.controlCard, { borderColor: panelBorder, backgroundColor: panelColor }]}>
+            <View style={styles.blockHeaderInline}>
+              <Text style={[styles.blockLabel, { color: mutedTextColor }]}>Lueftung</Text>
+              <Text style={[styles.valueText, { color: textColor }]}>
+                Stufe {formatVentilationLevel(ventilationSliderValue)}
               </Text>
             </View>
-          </View>
-        </View>
-
-        {showInfoPanel ? (
-          <View style={styles.block}>
             <Pressable
-              onPress={() => setDetailsExpanded((current) => !current)}
+              disabled={!ventilationAutoToggleAvailable}
+              onPress={toggleVentilationAuto}
               style={({ pressed }) => [
-                styles.detailsToggle,
-                { borderColor: panelBorder, backgroundColor: panelColor },
+                styles.ventilationAutoButton,
+                ventilationAutoActive ? styles.ventilationAutoButtonActive : styles.ventilationAutoButtonInactive,
+                !ventilationAutoToggleAvailable ? styles.disabledControl : null,
                 pressed ? styles.pressScale : null,
               ]}
             >
-              <Text style={[styles.detailsToggleText, { color: textColor }]}>
-                {detailsExpanded ? "Details ausblenden" : "Details anzeigen"}
-              </Text>
-              <MaterialCommunityIcons
-                color={mutedTextColor}
-                name={detailsExpanded ? "chevron-up" : "chevron-down"}
-                size={18}
-              />
-            </Pressable>
-            {detailsExpanded ? (
-              <View style={[styles.infoPanel, { borderColor: panelBorder, backgroundColor: panelColor }]}>
-                {showInfoProgram ? (
-                  <View style={styles.infoRow}>
-                    <Text style={[styles.infoLabel, { color: mutedTextColor }]}>Programm</Text>
-                    <Text style={[styles.infoValue, { color: textColor }]}>{formatProgramLabel(activeProgram)}</Text>
-                  </View>
-                ) : null}
-                {showInfoTargets ? (
-                  <View style={styles.infoRow}>
-                    <Text style={[styles.infoLabel, { color: mutedTextColor }]}>Zielwerte</Text>
-                    <Text style={[styles.infoValue, { color: textColor }]}>
-                      N {formatTemperature(normalTarget)} | R {formatTemperature(reducedTarget)} | K {formatTemperature(comfortTarget)}
-                    </Text>
-                  </View>
-                ) : null}
-                {infoRows.map((row) => (
-                  <View key={row.label} style={styles.infoRow}>
-                    <Text style={[styles.infoLabel, { color: mutedTextColor }]}>{row.label}</Text>
-                    <Text style={[styles.infoValue, { color: textColor }]}>{row.value}</Text>
-                  </View>
-                ))}
+              <View style={styles.ventilationAutoButtonContent}>
+                <MaterialCommunityIcons
+                  color={textColor}
+                  name={"fan" as never}
+                  size={16}
+                />
+                <Text style={[styles.ventilationAutoButtonText, { color: textColor }]}>
+                  {ventilationAutoActive ? "Lueftungsautomatik ein" : "Lueftungsautomatik aus"}
+                </Text>
               </View>
-            ) : null}
+            </Pressable>
+            <View
+              style={[
+                styles.sliderShell,
+                ventilationAutoActive ? styles.sliderShellDisabled : null,
+                !ventilationSliderWritable ? styles.disabledControl : null,
+              ]}
+            >
+              <Pressable
+                disabled={!ventilationManualControlEnabled}
+                onPress={() => setVentilationLevel(ventilationSliderValue - VENTILATION_LEVEL_STEP, "button")}
+                style={({ pressed }) => [
+                  styles.stepButton,
+                  !ventilationManualControlEnabled ? styles.disabledControl : null,
+                  pressed ? styles.pressScale : null,
+                ]}
+              >
+                <Text style={[styles.stepLabel, { color: textColor }]}>-</Text>
+              </Pressable>
+              <View style={styles.sliderWrap}>
+                {Platform.OS === "web"
+                  ? createElement("input", {
+                      type: "range",
+                      min: VENTILATION_LEVEL_MIN,
+                      max: VENTILATION_LEVEL_MAX,
+                      step: VENTILATION_LEVEL_STEP,
+                      value: ventilationSliderValue,
+                      disabled: !ventilationManualControlEnabled,
+                      onInput: (event: { target: { value: string } }) => {
+                        const next = clampVentilationLevel(
+                          Number.parseFloat(event.target.value) || ventilationLevelCurrent
+                        );
+                        setVentilationLevelDraft(next);
+                      },
+                      onChange: (event: { target: { value: string } }) => {
+                        const next = clampVentilationLevel(
+                          Number.parseFloat(event.target.value) || ventilationLevelCurrent
+                        );
+                        setVentilationLevelDraft(next);
+                        void setVentilationLevel(next, "slider");
+                      },
+                      style: {
+                        ...webSliderStyle,
+                        accentColor: sliderStart,
+                        opacity: ventilationManualControlEnabled ? 1 : 0.45,
+                        backgroundImage: `linear-gradient(90deg, ${sliderStart} 0%, ${sliderEnd} 100%)`,
+                      },
+                    })
+                  : null}
+                <View style={styles.sliderScaleRow}>
+                  <Text style={[styles.sliderScaleLabel, { color: mutedTextColor }]}>{VENTILATION_LEVEL_MIN}</Text>
+                  <Text style={[styles.sliderScaleLabel, { color: mutedTextColor }]}>{VENTILATION_LEVEL_MAX}</Text>
+                </View>
+              </View>
+              <Pressable
+                disabled={!ventilationManualControlEnabled}
+                onPress={() => setVentilationLevel(ventilationSliderValue + VENTILATION_LEVEL_STEP, "button")}
+                style={({ pressed }) => [
+                  styles.stepButton,
+                  !ventilationManualControlEnabled ? styles.disabledControl : null,
+                  pressed ? styles.pressScale : null,
+                ]}
+              >
+                <Text style={[styles.stepLabel, { color: textColor }]}>+</Text>
+              </Pressable>
+            </View>
+            <Text style={[styles.ventilationHint, { color: mutedTextColor }]}>
+              {ventilationAutoActive
+                ? "Automatik aktiv: manuelle Lueftungsstufe gesperrt."
+                : ventilationSliderWritable
+                  ? "Automatik aus: manuelle Lueftungsstufe aktiv."
+                  : "Automatik aus: kein Datenpunkt fuer manuelle Lueftungsstufe gesetzt."}
+            </Text>
+          </View>
+        </View>
+
+        {showDetailsTicker ? (
+          <View style={styles.block}>
+            <View
+              onLayout={(event) => {
+                const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
+                setDetailsTrackWidth((current) => (current === nextWidth ? current : nextWidth));
+              }}
+              style={[styles.detailsTickerTrack, { borderColor: panelBorder, backgroundColor: panelColor }]}
+            >
+              <Animated.Text
+                numberOfLines={1}
+                onLayout={(event) => {
+                  const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
+                  setDetailsContentWidth((current) => (current === nextWidth ? current : nextWidth));
+                }}
+                style={[
+                  styles.detailsTickerText,
+                  {
+                    color: textColor,
+                    transform: [{ translateX: detailsTickerOffset }],
+                  },
+                ]}
+              >
+                {detailsTickerText}
+              </Animated.Text>
+            </View>
           </View>
         ) : null}
 
@@ -872,6 +1020,21 @@ function clampTemperature(value: number, min: number, max: number, step: number)
   return Number(rounded.toFixed(2));
 }
 
+function clampVentilationLevel(value: number) {
+  if (!Number.isFinite(value)) {
+    return VENTILATION_LEVEL_MIN;
+  }
+  const rounded = Math.round(value / VENTILATION_LEVEL_STEP) * VENTILATION_LEVEL_STEP;
+  return Math.max(VENTILATION_LEVEL_MIN, Math.min(VENTILATION_LEVEL_MAX, rounded));
+}
+
+function formatVentilationLevel(value: number | null) {
+  if (value === null || !Number.isFinite(value)) {
+    return "-";
+  }
+  return String(clampVentilationLevel(value));
+}
+
 function formatTemperature(value: number | null) {
   if (value === null || !Number.isFinite(value)) {
     return "-";
@@ -932,31 +1095,45 @@ function formatPower(valueW: number | null) {
   return `${(valueW / 1000).toFixed(2)} kW`;
 }
 
-function mapValueToPercent(value: number | null, min: number, max: number) {
-  if (value === null || !Number.isFinite(value) || max <= min) {
-    return null;
+function resolveTemperatureColor(value: number | null, stops: TemperatureColorStop[], fallback: string) {
+  if (value === null || !Number.isFinite(value) || stops.length < 2) {
+    return fallback;
   }
-  const clamped = Math.max(min, Math.min(max, value));
-  return ((clamped - min) / (max - min)) * 100;
+
+  const sortedStops = [...stops].sort((a, b) => a.temp - b.temp);
+  if (value <= sortedStops[0].temp) {
+    return sortedStops[0].color;
+  }
+  if (value >= sortedStops[sortedStops.length - 1].temp) {
+    return sortedStops[sortedStops.length - 1].color;
+  }
+
+  for (let index = 0; index < sortedStops.length - 1; index += 1) {
+    const start = sortedStops[index];
+    const end = sortedStops[index + 1];
+    if (value >= start.temp && value <= end.temp) {
+      const range = end.temp - start.temp;
+      const ratio = range <= 0 ? 0 : (value - start.temp) / range;
+      return interpolateHexColor(start.color, end.color, ratio);
+    }
+  }
+
+  return fallback;
 }
 
-function interpolateBiColor(ratio: number, startHex: string, endHex: string) {
-  return interpolateHexColor(startHex, endHex, clamp01(ratio));
+function mixColorWith(baseColor: string, mixColor: string, mixRatio: number) {
+  return interpolateHexColor(baseColor, mixColor, mixRatio);
 }
 
-function interpolateTriColor(
-  ratio: number,
-  startHex: string,
-  midHex: string,
-  endHex: string,
-  midPosition: number
-) {
-  const normalized = clamp01(ratio);
-  const split = clamp01(midPosition);
-  if (normalized <= split) {
-    return interpolateHexColor(startHex, midHex, split <= 0 ? 0 : normalized / split);
-  }
-  return interpolateHexColor(midHex, endHex, split >= 1 ? 1 : (normalized - split) / (1 - split));
+function withAlpha(color: string, alpha: number) {
+  const { r, g, b } = parseHexColor(color);
+  return `rgba(${r}, ${g}, ${b}, ${clamp01(alpha)})`;
+}
+
+function resolveReadableTextColor(backgroundColor: string) {
+  const { r, g, b } = parseHexColor(backgroundColor);
+  const relativeLuma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return relativeLuma > 0.57 ? "#08111f" : "#f4f8ff";
 }
 
 function clamp01(value: number) {
@@ -977,38 +1154,35 @@ function interpolateHexColor(startHex: string, endHex: string, ratio: number) {
 }
 
 function parseHexColor(hex: string) {
-  const normalized = hex.replace("#", "").trim();
-  if (normalized.length !== 6) {
-    return { r: 127, g: 127, b: 127 };
+  const normalized = hex.trim().toLowerCase();
+  const rgbMatch = normalized.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/);
+  if (rgbMatch) {
+    return {
+      r: Math.max(0, Math.min(255, Number(rgbMatch[1]))),
+      g: Math.max(0, Math.min(255, Number(rgbMatch[2]))),
+      b: Math.max(0, Math.min(255, Number(rgbMatch[3]))),
+    };
   }
-  const r = Number.parseInt(normalized.slice(0, 2), 16);
-  const g = Number.parseInt(normalized.slice(2, 4), 16);
-  const b = Number.parseInt(normalized.slice(4, 6), 16);
+
+  const withoutHash = normalized.replace("#", "");
+  const expanded = withoutHash.length === 3
+    ? withoutHash
+        .split("")
+        .map((part) => `${part}${part}`)
+        .join("")
+    : withoutHash;
+
+  if (expanded.length !== 6) {
+    return { r: 111, g: 130, b: 162 };
+  }
+
+  const r = Number.parseInt(expanded.slice(0, 2), 16);
+  const g = Number.parseInt(expanded.slice(2, 4), 16);
+  const b = Number.parseInt(expanded.slice(4, 6), 16);
   if (![r, g, b].every(Number.isFinite)) {
-    return { r: 127, g: 127, b: 127 };
+    return { r: 111, g: 130, b: 162 };
   }
   return { r, g, b };
-}
-
-function buildTemperatureTicks(min: number, max: number, step: number) {
-  if (!(max > min) || !(step > 0)) {
-    return [{ value: min, position: 0 }, { value: max, position: 100 }];
-  }
-
-  const values: number[] = [min];
-  let cursor = min + step;
-  while (cursor < max - 0.0001) {
-    values.push(Number(cursor.toFixed(3)));
-    cursor += step;
-  }
-  if (Math.abs(values[values.length - 1] - max) > 0.0001) {
-    values.push(max);
-  }
-
-  return values.map((value) => ({
-    value,
-    position: ((value - min) / (max - min)) * 100,
-  }));
 }
 
 function buildStatusText(input: {
@@ -1232,6 +1406,9 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: "rgba(10, 18, 30, 0.38)",
   },
+  sliderShellDisabled: {
+    backgroundColor: "rgba(90, 102, 124, 0.26)",
+  },
   stepButton: {
     width: 28,
     height: 28,
@@ -1258,105 +1435,47 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "600",
   },
-  temperatureBarPanel: {
+  ventilationAutoButton: {
     borderWidth: 1,
-    borderRadius: 13,
+    borderRadius: 10,
+    minHeight: 40,
     paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 4,
+    justifyContent: "center",
   },
-  temperatureBarHeader: {
+  ventilationAutoButtonActive: {
+    borderColor: "rgba(104, 231, 142, 0.72)",
+    backgroundColor: "rgba(52, 172, 97, 0.32)",
+  },
+  ventilationAutoButtonInactive: {
+    borderColor: "rgba(156, 170, 194, 0.35)",
+    backgroundColor: "rgba(112, 124, 142, 0.2)",
+  },
+  ventilationAutoButtonContent: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
+    gap: 8,
   },
-  temperatureBarLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-  },
-  temperatureBarValue: {
+  ventilationAutoButtonText: {
     fontSize: 12,
     fontWeight: "700",
+    flexShrink: 1,
   },
-  temperatureBarTrack: {
-    height: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(184, 206, 242, 0.23)",
-    overflow: "hidden",
-    backgroundColor: "rgba(15, 24, 38, 0.72)",
-  },
-  temperatureBarFill: {
-    height: "100%",
-    borderRadius: 999,
-    minWidth: 0,
-    overflow: "hidden",
-    position: "relative",
-  },
-  temperatureBarGlow: {
-    position: "absolute",
-    left: 0,
-    top: -5,
-    bottom: -5,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.52)",
-    shadowColor: "#ffffff",
-    shadowOpacity: 0.42,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  temperatureBarScaleTicks: {
-    position: "relative",
-    minHeight: 12,
-    marginTop: 1,
-  },
-  temperatureBarScaleLabel: {
-    position: "absolute",
-    width: 34,
-    textAlign: "center",
+  ventilationHint: {
     fontSize: 10,
     fontWeight: "600",
+    lineHeight: 14,
   },
-  infoPanel: {
-    position: "relative",
-    zIndex: 2,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    gap: 4,
-  },
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 10,
-  },
-  infoLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  infoValue: {
-    fontSize: 11,
-    fontWeight: "700",
-    flexShrink: 1,
-    textAlign: "right",
-  },
-  detailsToggle: {
+  detailsTickerTrack: {
     borderWidth: 1,
     borderRadius: 12,
     minHeight: 38,
-    paddingHorizontal: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    overflow: "hidden",
+    justifyContent: "center",
   },
-  detailsToggleText: {
+  detailsTickerText: {
     fontSize: 12,
     fontWeight: "700",
+    paddingHorizontal: 12,
   },
   footer: {
     position: "relative",

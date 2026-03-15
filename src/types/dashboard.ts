@@ -220,6 +220,10 @@ export type HeatingWidgetConfig = WidgetBase & {
   ecoSetActiveStateId?: string;
   oneTimeChargeSetActiveStateId?: string;
   oneTimeChargeActiveStateId?: string;
+  ventilationAutoSetActiveStateId?: string;
+  ventilationAutoActiveStateId?: string;
+  ventilationLevelSetStateId?: string;
+  ventilationLevelStateId?: string;
   roomTempStateId?: string;
   heatingTempStateId?: string;
   supplyTempStateId?: string;

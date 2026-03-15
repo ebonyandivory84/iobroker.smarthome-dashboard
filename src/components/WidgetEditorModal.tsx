@@ -373,6 +373,10 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ecoSetActiveStateId: widget.ecoSetActiveStateId || "",
         oneTimeChargeSetActiveStateId: widget.oneTimeChargeSetActiveStateId || "",
         oneTimeChargeActiveStateId: widget.oneTimeChargeActiveStateId || "",
+        ventilationAutoSetActiveStateId: widget.ventilationAutoSetActiveStateId || "",
+        ventilationAutoActiveStateId: widget.ventilationAutoActiveStateId || "",
+        ventilationLevelSetStateId: widget.ventilationLevelSetStateId || "",
+        ventilationLevelStateId: widget.ventilationLevelStateId || "",
         roomTempStateId: widget.roomTempStateId || "",
         heatingTempStateId: widget.heatingTempStateId || "",
         supplyTempStateId: widget.supplyTempStateId || "",
@@ -757,6 +761,10 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ecoSetActiveStateId: draft.ecoSetActiveStateId?.trim() || undefined,
         oneTimeChargeSetActiveStateId: draft.oneTimeChargeSetActiveStateId?.trim() || undefined,
         oneTimeChargeActiveStateId: draft.oneTimeChargeActiveStateId?.trim() || undefined,
+        ventilationAutoSetActiveStateId: draft.ventilationAutoSetActiveStateId?.trim() || undefined,
+        ventilationAutoActiveStateId: draft.ventilationAutoActiveStateId?.trim() || undefined,
+        ventilationLevelSetStateId: draft.ventilationLevelSetStateId?.trim() || undefined,
+        ventilationLevelStateId: draft.ventilationLevelStateId?.trim() || undefined,
         roomTempStateId: draft.roomTempStateId?.trim() || undefined,
         heatingTempStateId: draft.heatingTempStateId?.trim() || undefined,
         supplyTempStateId: draft.supplyTempStateId?.trim() || undefined,
@@ -2159,6 +2167,22 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     />
                   </Field>
                 </View>
+                <View style={styles.splitRow}>
+                  <Field label="Lueftungsautomatik setActive">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("ventilationAutoSetActiveStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, ventilationAutoSetActiveStateId: value }))}
+                      value={draft.ventilationAutoSetActiveStateId || ""}
+                    />
+                  </Field>
+                  <Field label="Lueftungsstufe setzen">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("ventilationLevelSetStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, ventilationLevelSetStateId: value }))}
+                      value={draft.ventilationLevelSetStateId || ""}
+                    />
+                  </Field>
+                </View>
 
                 <Text style={styles.sectionTitle}>Live-States (optional)</Text>
                 <View style={styles.splitRow}>
@@ -2229,6 +2253,22 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       onBrowse={() => setPickerField("oneTimeChargeActiveStateId")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, oneTimeChargeActiveStateId: value }))}
                       value={draft.oneTimeChargeActiveStateId || ""}
+                    />
+                  </Field>
+                </View>
+                <View style={styles.splitRow}>
+                  <Field label="Lueftungsautomatik aktiv">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("ventilationAutoActiveStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, ventilationAutoActiveStateId: value }))}
+                      value={draft.ventilationAutoActiveStateId || ""}
+                    />
+                  </Field>
+                  <Field label="Lueftungsstufe Ist">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("ventilationLevelStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, ventilationLevelStateId: value }))}
+                      value={draft.ventilationLevelStateId || ""}
                     />
                   </Field>
                 </View>
