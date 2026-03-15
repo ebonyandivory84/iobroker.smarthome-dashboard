@@ -473,10 +473,14 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
 
   const roomCardTone = resolveTemperatureColor(roomTemp, ROOM_TEMP_COLOR_STOPS, "#587197");
   const dhwCardTone = resolveTemperatureColor(dhwTemp, DHW_TEMP_COLOR_STOPS, "#587197");
-  const roomCardBackgroundColor = mixColorWith(roomCardTone, "#0b1625", 0.44);
-  const dhwCardBackgroundColor = mixColorWith(dhwCardTone, "#0b1625", 0.44);
-  const roomCardBorderColor = withAlpha(roomCardTone, 0.68);
-  const dhwCardBorderColor = withAlpha(dhwCardTone, 0.68);
+  const roomCardFillStart = withAlpha(roomCardTone, 0.2);
+  const roomCardFillEnd = withAlpha(mixColorWith(roomCardTone, "#08131f", 0.42), 0.34);
+  const dhwCardFillStart = withAlpha(dhwCardTone, 0.2);
+  const dhwCardFillEnd = withAlpha(mixColorWith(dhwCardTone, "#08131f", 0.42), 0.34);
+  const roomCardBackgroundColor = withAlpha(mixColorWith(roomCardTone, "#0b1625", 0.52), 0.28);
+  const dhwCardBackgroundColor = withAlpha(mixColorWith(dhwCardTone, "#0b1625", 0.52), 0.28);
+  const roomCardBorderColor = withAlpha(roomCardTone, 0.5);
+  const dhwCardBorderColor = withAlpha(dhwCardTone, 0.5);
   const roomCardTextColor = resolveReadableTextColor(roomCardBackgroundColor);
   const dhwCardTextColor = resolveReadableTextColor(dhwCardBackgroundColor);
   const roomCardMutedTextColor = withAlpha(roomCardTextColor, 0.82);
@@ -606,11 +610,29 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
 
         <View style={styles.kpiRow}>
           <View style={[styles.kpiCard, { borderColor: roomCardBorderColor, backgroundColor: roomCardBackgroundColor }]}>
+            {Platform.OS === "web"
+              ? createElement("div", {
+                  style: {
+                    ...webGradientLayerStyle,
+                    borderRadius: 12,
+                    background: `linear-gradient(145deg, ${roomCardFillStart} 0%, ${roomCardFillEnd} 100%)`,
+                  },
+                })
+              : <View style={[StyleSheet.absoluteFillObject, { borderRadius: 12, backgroundColor: roomCardFillEnd, opacity: 0.86 }]} />}
             <Text style={[styles.kpiLabel, { color: roomCardMutedTextColor }]}>Raum</Text>
             <Text style={[styles.kpiPrimary, { color: roomCardTextColor }]}>{roomTempDisplay}</Text>
             <Text style={[styles.kpiSecondary, { color: roomCardMutedTextColor }]}>Soll {formatTemperature(normalTarget)}</Text>
           </View>
           <View style={[styles.kpiCard, { borderColor: dhwCardBorderColor, backgroundColor: dhwCardBackgroundColor }]}>
+            {Platform.OS === "web"
+              ? createElement("div", {
+                  style: {
+                    ...webGradientLayerStyle,
+                    borderRadius: 12,
+                    background: `linear-gradient(145deg, ${dhwCardFillStart} 0%, ${dhwCardFillEnd} 100%)`,
+                  },
+                })
+              : <View style={[StyleSheet.absoluteFillObject, { borderRadius: 12, backgroundColor: dhwCardFillEnd, opacity: 0.86 }]} />}
             <Text style={[styles.kpiLabel, { color: dhwCardMutedTextColor }]}>Warmwasser</Text>
             <Text style={[styles.kpiPrimary, { color: dhwCardTextColor }]}>{dhwTempDisplay}</Text>
             <Text style={[styles.kpiSecondary, { color: dhwCardMutedTextColor }]}>Soll {formatTemperature(dhwTarget)}</Text>
@@ -1331,20 +1353,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     gap: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    position: "relative",
   },
   kpiLabel: {
     fontSize: 10,
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.4,
+    textAlign: "center",
   },
   kpiPrimary: {
     fontSize: 16,
     fontWeight: "800",
+    textAlign: "center",
   },
   kpiSecondary: {
     fontSize: 11,
     fontWeight: "600",
+    textAlign: "center",
   },
   modeRow: {
     borderWidth: 1,
