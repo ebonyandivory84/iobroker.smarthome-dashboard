@@ -398,8 +398,10 @@ export function HeatingWidget({ config, client }: HeatingWidgetProps) {
     inputRange: [0, 1],
     outputRange: [-dhwGlowWidthPx, Math.max(0, dhwFillWidthPx)],
   });
-  const roomNativeColor = interpolateTriColor(roomFillRatio, "#1a4c9f", "#33c786", "#cc4c4c", 0.24);
-  const dhwNativeColor = interpolateBiColor(dhwFillRatio, "#1049a2", "#7d1212");
+  const roomBarTintColor = interpolateTriColor(roomFillRatio, "#1a4c9f", "#33c786", "#cc4c4c", 0.24);
+  const dhwBarTintColor = interpolateBiColor(dhwFillRatio, "#1049a2", "#7d1212");
+  const roomScaleTicks = buildTemperatureTicks(ROOM_TEMP_BAR_MIN, ROOM_TEMP_BAR_MAX, 5);
+  const dhwScaleTicks = buildTemperatureTicks(DHW_TEMP_BAR_MIN, DHW_TEMP_BAR_MAX, 10);
   const showInfoPanel = showInfoProgram || showInfoTargets || infoRows.length > 0;
 
   return (
@@ -576,15 +578,28 @@ export function HeatingWidget({ config, client }: HeatingWidgetProps) {
                       style: {
                         ...webGradientLayerStyle,
                         borderRadius: 999,
-                        background: "linear-gradient(90deg, #174a9f 0%, #36ca87 24%, #c44f4f 100%)",
+                        background: `linear-gradient(90deg, #174a9f 0%, ${roomBarTintColor} 100%)`,
                       },
                     })
-                  : <View style={[StyleSheet.absoluteFillObject, { borderRadius: 999, backgroundColor: roomNativeColor }]} />}
+                  : <View style={[StyleSheet.absoluteFillObject, { borderRadius: 999, backgroundColor: roomBarTintColor }]} />}
               </View>
             </View>
-            <View style={styles.temperatureBarScale}>
-              <Text style={[styles.temperatureBarScaleLabel, { color: mutedTextColor }]}>15°C</Text>
-              <Text style={[styles.temperatureBarScaleLabel, { color: mutedTextColor }]}>40°C</Text>
+            <View style={styles.temperatureBarScaleTicks}>
+              {roomScaleTicks.map((tick, index) => (
+                <Text
+                  key={`room-tick-${tick.value}`}
+                  style={[
+                    styles.temperatureBarScaleLabel,
+                    {
+                      color: mutedTextColor,
+                      left: `${tick.position}%`,
+                      marginLeft: index === 0 ? 0 : index === roomScaleTicks.length - 1 ? -34 : -17,
+                    },
+                  ]}
+                >
+                  {`${Math.round(tick.value)}°`}
+                </Text>
+              ))}
             </View>
           </View>
         </View>
@@ -660,10 +675,10 @@ export function HeatingWidget({ config, client }: HeatingWidgetProps) {
                       style: {
                         ...webGradientLayerStyle,
                         borderRadius: 999,
-                        background: "linear-gradient(90deg, #0f4aa5 0%, #7d1212 100%)",
+                        background: `linear-gradient(90deg, #0f4aa5 0%, ${dhwBarTintColor} 100%)`,
                       },
                     })
-                  : <View style={[StyleSheet.absoluteFillObject, { borderRadius: 999, backgroundColor: dhwNativeColor }]} />}
+                  : <View style={[StyleSheet.absoluteFillObject, { borderRadius: 999, backgroundColor: dhwBarTintColor }]} />}
                 <Animated.View
                   pointerEvents="none"
                   style={[
@@ -677,9 +692,22 @@ export function HeatingWidget({ config, client }: HeatingWidgetProps) {
                 />
               </View>
             </View>
-            <View style={styles.temperatureBarScale}>
-              <Text style={[styles.temperatureBarScaleLabel, { color: mutedTextColor }]}>15°C</Text>
-              <Text style={[styles.temperatureBarScaleLabel, { color: mutedTextColor }]}>60°C</Text>
+            <View style={styles.temperatureBarScaleTicks}>
+              {dhwScaleTicks.map((tick, index) => (
+                <Text
+                  key={`dhw-tick-${tick.value}`}
+                  style={[
+                    styles.temperatureBarScaleLabel,
+                    {
+                      color: mutedTextColor,
+                      left: `${tick.position}%`,
+                      marginLeft: index === 0 ? 0 : index === dhwScaleTicks.length - 1 ? -34 : -17,
+                    },
+                  ]}
+                >
+                  {`${Math.round(tick.value)}°`}
+                </Text>
+              ))}
             </View>
           </View>
         </View>
@@ -931,6 +959,27 @@ function parseHexColor(hex: string) {
   return { r, g, b };
 }
 
+function buildTemperatureTicks(min: number, max: number, step: number) {
+  if (!(max > min) || !(step > 0)) {
+    return [{ value: min, position: 0 }, { value: max, position: 100 }];
+  }
+
+  const values: number[] = [min];
+  let cursor = min + step;
+  while (cursor < max - 0.0001) {
+    values.push(Number(cursor.toFixed(3)));
+    cursor += step;
+  }
+  if (Math.abs(values[values.length - 1] - max) > 0.0001) {
+    values.push(max);
+  }
+
+  return values.map((value) => ({
+    value,
+    position: ((value - min) / (max - min)) * 100,
+  }));
+}
+
 function buildStatusText(input: {
   mode: HeatingMode;
   activeProgram: ProgramMode | null;
@@ -1165,11 +1214,15 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 0 },
   },
-  temperatureBarScale: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  temperatureBarScaleTicks: {
+    position: "relative",
+    minHeight: 12,
+    marginTop: 1,
   },
   temperatureBarScaleLabel: {
+    position: "absolute",
+    width: 34,
+    textAlign: "center",
     fontSize: 10,
     fontWeight: "600",
   },
