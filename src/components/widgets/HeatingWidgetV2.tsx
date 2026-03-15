@@ -29,6 +29,10 @@ const DHW_TEMP_MIN = 10;
 const DHW_TEMP_MAX = 60;
 const DHW_TEMP_STEP = 1;
 const DETAILS_TICKER_SPEED_PX_PER_S = 46;
+const DETAILS_TICKER_ENTRY_OFFSET_PX = 18;
+const DETAILS_TICKER_RESTART_DELAY_MS = 1200;
+const DETAILS_TICKER_SEPARATOR = "\u00a0\u00a0\u00a0\u00a0•\u00a0\u00a0\u00a0\u00a0";
+const DETAILS_TICKER_END_GAP = "\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0";
 
 const ROOM_TEMP_COLOR_STOPS: TemperatureColorStop[] = [
   { temp: 16, color: "#1f49a5" },
@@ -492,8 +496,10 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
     ventilationSliderWritable ? `Lueftungsstufe ${formatVentilationLevel(ventilationSliderValue)}` : null,
     ...infoRows.filter((row) => row.value !== "-").map((row) => `${row.label} ${row.value}`),
   ].filter(Boolean) as string[];
-  const detailsTickerText = detailsSegments.join("   •   ");
-  const showDetailsTicker = detailsTickerText.length > 0;
+  const showDetailsTicker = detailsSegments.length > 0;
+  const detailsTickerText = showDetailsTicker
+    ? `${detailsSegments.join(DETAILS_TICKER_SEPARATOR)}${DETAILS_TICKER_END_GAP}`
+    : "";
 
   const liveBadgeText = error ? "Fehler" : writePending ? "Sync" : "";
   const footerStatusText = error ? error : writePending ? "Synchronisiere..." : "";
@@ -502,18 +508,20 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
     detailsTickerAnimationRef.current?.stop();
     detailsTickerAnimationRef.current = null;
 
+    const startOffset = detailsTrackWidth + DETAILS_TICKER_ENTRY_OFFSET_PX;
+
     if (!showDetailsTicker || detailsTrackWidth <= 0 || detailsContentWidth <= 0) {
-      detailsTickerOffset.setValue(detailsTrackWidth > 0 ? detailsTrackWidth : 0);
+      detailsTickerOffset.setValue(detailsTrackWidth > 0 ? startOffset : 0);
       return;
     }
 
-    const travelDistance = detailsTrackWidth + detailsContentWidth;
+    const travelDistance = startOffset + detailsContentWidth;
     const durationMs = Math.max(
       8000,
       Math.round((travelDistance / DETAILS_TICKER_SPEED_PX_PER_S) * 1000)
     );
 
-    detailsTickerOffset.setValue(detailsTrackWidth);
+    detailsTickerOffset.setValue(startOffset);
     const tickerLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(detailsTickerOffset, {
@@ -523,11 +531,11 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
           useNativeDriver: true,
         }),
         Animated.timing(detailsTickerOffset, {
-          toValue: detailsTrackWidth,
+          toValue: startOffset,
           duration: 0,
           useNativeDriver: true,
         }),
-        Animated.delay(700),
+        Animated.delay(DETAILS_TICKER_RESTART_DELAY_MS),
       ])
     );
     detailsTickerAnimationRef.current = tickerLoop;
@@ -1470,12 +1478,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     minHeight: 38,
     overflow: "hidden",
+    position: "relative",
     justifyContent: "center",
   },
   detailsTickerText: {
     fontSize: 12,
     fontWeight: "700",
     paddingHorizontal: 12,
+    alignSelf: "flex-start",
   },
   footer: {
     position: "relative",
