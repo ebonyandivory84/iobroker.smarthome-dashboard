@@ -391,7 +391,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         heatingIcon: widget.heatingIcon || "radiator",
         comfortIcon: widget.comfortIcon || "white-balance-sunny",
         ecoIcon: widget.ecoIcon || "leaf",
-        oneTimeChargeIcon: widget.oneTimeChargeIcon || "shower-head",
+        oneTimeChargeIcon: normalizeHeatingOneTimeIcon(widget.oneTimeChargeIcon),
         ...appearanceDraft,
       });
       return;
@@ -3442,6 +3442,17 @@ function setCameraUrlByMode(
 function normalizeOptionalInput(value: string | undefined) {
   const normalized = (value || "").trim();
   return normalized || undefined;
+}
+
+function normalizeHeatingOneTimeIcon(value: string | undefined) {
+  const normalized = (value || "").trim();
+  if (!normalized) {
+    return "shower-head";
+  }
+  if (normalized === "flash" || normalized === "flash-outline") {
+    return "shower-head";
+  }
+  return normalized;
 }
 
 function normalizeAddonMode(raw: string | undefined) {

@@ -349,6 +349,7 @@ export function HeatingWidget({ config, client }: HeatingWidgetProps) {
   const sliderEnd = config.appearance?.iconColor2 || "#5a85ef";
   const oneTimeColor = config.appearance?.statColor || "rgba(246, 97, 98, 0.42)";
   const backgroundBlur = Math.min(24, clampInt(config.backgroundImageBlur, 8, 0));
+  const oneTimeChargeIcon = normalizeOneTimeChargeIcon(config.oneTimeChargeIcon);
 
   const modeButtons: Array<{
     mode: HeatingMode;
@@ -508,7 +509,7 @@ export function HeatingWidget({ config, client }: HeatingWidgetProps) {
                     })
                   : <View style={[StyleSheet.absoluteFillObject, { borderRadius: 11, backgroundColor: oneTimeColor }]} />
                 : null}
-              <MaterialCommunityIcons color={textColor} name={normalizeIcon(config.oneTimeChargeIcon, "shower-head") as never} size={18} />
+              <MaterialCommunityIcons color={textColor} name={oneTimeChargeIcon as never} size={18} />
             </Pressable>
           </View>
         </View>
@@ -775,6 +776,14 @@ function resolveOptionalStateId(candidate: string | undefined, fallback?: string
 function normalizeIcon(value: string | undefined, fallback: string) {
   const trimmed = (value || "").trim();
   return trimmed || fallback;
+}
+
+function normalizeOneTimeChargeIcon(value: string | undefined) {
+  const icon = normalizeIcon(value, "shower-head");
+  if (icon === "flash" || icon === "flash-outline") {
+    return "shower-head";
+  }
+  return icon;
 }
 
 function clampInt(value: number | undefined, fallback: number, min: number) {
