@@ -325,6 +325,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         allowChargingStateId: widget.allowChargingStateId || "go-e.0.allow_charging",
         solarLoadOnlyStateId: widget.solarLoadOnlyStateId || "go-e.0.solarLoadOnly",
         phaseSwitchModeStateId: widget.phaseSwitchModeStateId || "go-e.0.phaseSwitchMode",
+        phaseSwitchModeEnabledStateId: widget.phaseSwitchModeEnabledStateId || "go-e.0.phaseSwitchModeEnabled",
         ampereStateId: widget.ampereStateId || "go-e.0.ampere",
         carStateId: widget.carStateId || "go-e.0.car",
         batterySocStateId: widget.batterySocStateId || "go-e.0.carBatterySoc",
@@ -722,6 +723,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         allowChargingStateId: draft.allowChargingStateId?.trim() || undefined,
         solarLoadOnlyStateId: draft.solarLoadOnlyStateId?.trim() || undefined,
         phaseSwitchModeStateId: draft.phaseSwitchModeStateId?.trim() || undefined,
+        phaseSwitchModeEnabledStateId: draft.phaseSwitchModeEnabledStateId?.trim() || undefined,
         ampereStateId: draft.ampereStateId?.trim() || undefined,
         carStateId: draft.carStateId?.trim() || undefined,
         batterySocStateId: draft.batterySocStateId?.trim() || undefined,
@@ -1979,6 +1981,17 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       value={draft.phaseSwitchModeStateId || ""}
                     />
                   </Field>
+                  <Field label="phaseSwitchModeEnabled">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("phaseSwitchModeEnabledStateId")}
+                      onChangeText={(value) =>
+                        setDraft((current) => ({ ...current, phaseSwitchModeEnabledStateId: value }))
+                      }
+                      value={draft.phaseSwitchModeEnabledStateId || ""}
+                    />
+                  </Field>
+                </View>
+                <View style={styles.splitRow}>
                   <Field label="ampere">
                     <StateFieldInput
                       onBrowse={() => setPickerField("ampereStateId")}

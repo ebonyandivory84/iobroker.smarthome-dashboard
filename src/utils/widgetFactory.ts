@@ -236,6 +236,7 @@ export function buildWidgetTemplate(
       allowChargingStateId: "go-e.0.allow_charging",
       solarLoadOnlyStateId: "go-e.0.solarLoadOnly",
       phaseSwitchModeStateId: "go-e.0.phaseSwitchMode",
+      phaseSwitchModeEnabledStateId: "go-e.0.phaseSwitchModeEnabled",
       ampereStateId: "go-e.0.ampere",
       carStateId: "go-e.0.car",
       batterySocStateId: "go-e.0.carBatterySoc",

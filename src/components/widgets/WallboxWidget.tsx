@@ -31,6 +31,7 @@ const DEFAULT_IDS = {
   gridAmpere: "0_userdata.0.goe.gridAmpere",
   limit80: "0_userdata.0.goe.limit80",
   phaseSwitchMode: "go-e.0.phaseSwitchMode",
+  phaseSwitchModeEnabled: "go-e.0.phaseSwitchModeEnabled",
   ampere: "go-e.0.ampere",
   car: "go-e.0.car",
   batterySoc: "go-e.0.carBatterySoc",
@@ -46,6 +47,10 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       gridAmpere: resolveStateId(config.gridAmpereStateId, DEFAULT_IDS.gridAmpere),
       limit80: resolveStateId(config.limit80StateId, DEFAULT_IDS.limit80),
       phaseSwitchMode: resolveStateId(config.phaseSwitchModeStateId, DEFAULT_IDS.phaseSwitchMode),
+      phaseSwitchModeEnabled: resolveStateId(
+        config.phaseSwitchModeEnabledStateId,
+        DEFAULT_IDS.phaseSwitchModeEnabled
+      ),
       ampere: resolveStateId(config.ampereStateId, DEFAULT_IDS.ampere),
       car: resolveStateId(config.carStateId, DEFAULT_IDS.car),
       batterySoc: resolveStateId(config.batterySocStateId, DEFAULT_IDS.batterySoc),
@@ -62,6 +67,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       config.limit80StateId,
       config.modeStateId,
       config.phaseSwitchModeStateId,
+      config.phaseSwitchModeEnabledStateId,
       config.batterySocStateId,
       config.stopChargeingAtCarSoc80StateId,
     ]
@@ -137,6 +143,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const phaseModeRaw = readValue(stateIds.phaseSwitchMode);
   const phaseMode = mapPhaseMode(phaseModeRaw);
   const currentPhaseSelection = resolvePhaseControlSelection(phaseModeRaw);
+  const phaseSwitchModeEnabled = normalizeBoolean(readValue(stateIds.phaseSwitchModeEnabled));
   const liveAmpere = normalizeFloat(readValue(stateIds.ampere));
   const carCode = normalizeInteger(readValue(stateIds.car));
   const batterySoc = normalizeFloat(readValue(stateIds.batterySoc));
@@ -311,18 +318,18 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     playPressSound("limit80");
     void writeState(stateIds.limit80, !limit80Enabled, `limit80:${!limit80Enabled ? "on" : "off"}`);
   }, [limit80Enabled, playPressSound, stateIds.limit80, writeState]);
-  const setPhaseMode = useCallback(
-    (phaseCount: 1 | 3) => {
-      if (!isGridMode || !stateIds.phaseSwitchMode) {
+  const setPhaseAutoEnabled = useCallback(
+    (enabled: boolean) => {
+      if (!stateIds.phaseSwitchModeEnabled) {
         return;
       }
-      if (currentPhaseSelection === phaseCount) {
+      if (phaseSwitchModeEnabled === enabled) {
         return;
       }
-      playPressSound(`phase:${phaseCount}`);
-      void writeState(stateIds.phaseSwitchMode, phaseCount === 1 ? 1 : 2, `phase:${phaseCount}`);
+      playPressSound(`phaseAuto:${enabled ? "on" : "off"}`);
+      void writeState(stateIds.phaseSwitchModeEnabled, enabled, `phaseAuto:${enabled ? "on" : "off"}`);
     },
-    [currentPhaseSelection, isGridMode, playPressSound, stateIds.phaseSwitchMode, writeState]
+    [phaseSwitchModeEnabled, playPressSound, stateIds.phaseSwitchModeEnabled, writeState]
   );
 
   const chargingStatusText = liveCharging
@@ -369,6 +376,8 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const roundedLiveAmpere = liveAmpere === null ? null : Math.round(liveAmpere);
   const phaseStatusLabel =
     currentPhaseSelection === 1 ? "1-phasig" : currentPhaseSelection === 3 ? "3-phasig" : phaseMode;
+  const phaseAutoStatusLabel =
+    phaseSwitchModeEnabled === null ? "-" : phaseSwitchModeEnabled ? "Auto an" : "Auto aus";
   const activeAmperePreset = useMemo(() => {
     if (roundedLiveAmpere === null || !Number.isFinite(roundedLiveAmpere)) {
       return Math.round(sliderValue);
@@ -647,24 +656,30 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
                 {phaseStatusLabel}
               </Text>
             </View>
+            <View style={styles.quickControlHeader}>
+              <Text numberOfLines={1} style={[styles.quickControlLabel, { color: mutedTextColor }]}>
+                Auto-Umschaltung
+              </Text>
+              <Text numberOfLines={1} style={[styles.quickControlValue, { color: textColor }]}>
+                {phaseAutoStatusLabel}
+              </Text>
+            </View>
             <View style={styles.quickButtonRow}>
               {(
                 [
-                  { phaseCount: 1 as const, label: "1-phasig" },
-                  { phaseCount: 3 as const, label: "3-phasig" },
+                  { enabled: false, label: "Auto aus" },
+                  { enabled: true, label: "Auto an" },
                 ] as const
               ).map((item) => {
-                const active = currentPhaseSelection === item.phaseCount;
+                const active = phaseSwitchModeEnabled !== null && phaseSwitchModeEnabled === item.enabled;
                 return (
                   <Pressable
-                    key={`phase-mode-${item.phaseCount}`}
-                    disabled={!isGridMode}
-                    onPress={() => setPhaseMode(item.phaseCount)}
+                    key={`phase-auto-${item.enabled ? "on" : "off"}`}
+                    onPress={() => setPhaseAutoEnabled(item.enabled)}
                     style={({ pressed }) => [
                       styles.quickSelectButton,
                       styles.quickSelectButtonWide,
                       active ? styles.quickSelectButtonActive : null,
-                      !isGridMode ? styles.quickSelectButtonDisabled : null,
                       pressed ? styles.pressScale : null,
                     ]}
                   >
@@ -694,7 +709,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
 
           {!isGridMode ? (
             <Text numberOfLines={1} style={[styles.quickControlHint, { color: mutedTextColor }]}>
-              Manuelle Auswahl nur im Netz-Modus
+              Ampere manuell nur im Netz-Modus
             </Text>
           ) : null}
         </View>
