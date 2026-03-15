@@ -1174,13 +1174,20 @@ function resolveSolarStatCards(
   dayConsumedKWh: number | null
 ) {
   const statDefinitions = resolveSolarStatDefinitions(config);
-  return statDefinitions.map((entry, index) => {
+  return statDefinitions.flatMap((entry, index) => {
+    // Keep Stat 1/2 as core KPIs, but hide unconfigured optional cards (Stat 3-6).
+    if (index >= 2 && !entry.stateId) {
+      return [];
+    }
+
     const rawValue = entry.stateId ? states[entry.stateId] : undefined;
     const fallback = index === 0 ? fmtKWh(daySelfKWh) : index === 1 ? fmtKWh(dayConsumedKWh) : "—";
-    return {
-      label: entry.label,
-      value: resolveSolarStatValue(rawValue, fallback, config.statValueUnit || "none"),
-    };
+    return [
+      {
+        label: entry.label,
+        value: resolveSolarStatValue(rawValue, fallback, config.statValueUnit || "none"),
+      },
+    ];
   });
 }
 
