@@ -320,7 +320,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         return;
       }
       playPressSound(`phase:${phaseCount}`);
-      void writeState(stateIds.phaseSwitchMode, phaseCount === 1 ? 2 : 3, `phase:${phaseCount}`);
+      void writeState(stateIds.phaseSwitchMode, phaseCount === 1 ? 1 : 2, `phase:${phaseCount}`);
     },
     [currentPhaseSelection, isGridMode, playPressSound, stateIds.phaseSwitchMode, writeState]
   );
@@ -990,7 +990,6 @@ function mapPhaseMode(value: unknown) {
   }
   if (
     normalized === "0" ||
-    normalized === "1" ||
     normalized === "auto" ||
     normalized === "automatic" ||
     normalized === "automatisch"
@@ -998,17 +997,22 @@ function mapPhaseMode(value: unknown) {
     return "Automatisch";
   }
   if (
-    normalized === "2" ||
+    normalized === "1" ||
     normalized === "1p" ||
     normalized === "single" ||
+    normalized === "force_1_phase" ||
+    normalized === "force_1" ||
     normalized === "single_phase" ||
     normalized === "one_phase"
   ) {
     return "1 Phase";
   }
   if (
+    normalized === "2" ||
     normalized === "3" ||
     normalized === "3p" ||
+    normalized === "force_3_phase" ||
+    normalized === "force_3" ||
     normalized === "three" ||
     normalized === "three_phase"
   ) {
@@ -1025,17 +1029,22 @@ function resolvePhaseControlSelection(raw: unknown): 1 | 3 | null {
     return null;
   }
   if (
-    normalized === "2" ||
+    normalized === "1" ||
     normalized === "1p" ||
     normalized === "single" ||
+    normalized === "force_1_phase" ||
+    normalized === "force_1" ||
     normalized === "single_phase" ||
     normalized === "one_phase"
   ) {
     return 1;
   }
   if (
+    normalized === "2" ||
     normalized === "3" ||
     normalized === "3p" ||
+    normalized === "force_3_phase" ||
+    normalized === "force_3" ||
     normalized === "three" ||
     normalized === "three_phase"
   ) {
@@ -1049,17 +1058,22 @@ function resolvePhaseCount(raw: unknown) {
     .trim()
     .toLowerCase();
   if (
-    normalized === "2" ||
+    normalized === "1" ||
     normalized === "1p" ||
     normalized === "single" ||
+    normalized === "force_1_phase" ||
+    normalized === "force_1" ||
     normalized === "single_phase" ||
     normalized === "one_phase"
   ) {
     return 1;
   }
   if (
+    normalized === "2" ||
     normalized === "3" ||
     normalized === "3p" ||
+    normalized === "force_3_phase" ||
+    normalized === "force_3" ||
     normalized === "three" ||
     normalized === "three_phase"
   ) {
