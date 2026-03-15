@@ -381,6 +381,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const normalizedChargingPowerW = Math.max(0, Math.min(CHARGING_BAR_MAX_POWER_W, chargingPowerW));
   const chargingPowerRatio = normalizedChargingPowerW / CHARGING_BAR_MAX_POWER_W;
   const chargingPowerPercent = chargingPowerRatio * 100;
+  const chargingPowerFillWidth = `${Number(chargingPowerPercent.toFixed(2))}%` as `${number}%`;
   const barFillWidthPx = powerBarTrackWidth * chargingPowerRatio;
   const barGlowWidthPx = Math.max(32, Math.min(74, barFillWidthPx * 0.42));
   const barGlowTranslateX = barGlowAnim.interpolate({
@@ -673,7 +674,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
             }}
             style={styles.powerBarTrack}
           >
-            <View style={[styles.powerBarFillClip, { width: `${chargingPowerPercent.toFixed(2)}%` }]}>
+            <View style={[styles.powerBarFillClip, { width: chargingPowerFillWidth }]}>
               {Platform.OS === "web"
                 ? createElement("div", {
                     style: {

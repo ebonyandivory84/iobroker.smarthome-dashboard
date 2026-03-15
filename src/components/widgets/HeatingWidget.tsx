@@ -401,6 +401,8 @@ export function HeatingWidget({ config, client }: HeatingWidgetProps) {
   });
   const roomBarTintColor = interpolateTriColor(roomFillRatio, "#1a4c9f", "#33c786", "#cc4c4c", 0.24);
   const dhwBarTintColor = interpolateBiColor(dhwFillRatio, "#1049a2", "#7d1212");
+  const roomFillWidth = `${Number((roomTempPercent ?? 0).toFixed(2))}%` as `${number}%`;
+  const dhwFillWidth = `${Number((dhwTempPercent ?? 0).toFixed(2))}%` as `${number}%`;
   const roomScaleTicks = buildTemperatureTicks(ROOM_TEMP_BAR_MIN, ROOM_TEMP_BAR_MAX, 5);
   const dhwScaleTicks = buildTemperatureTicks(DHW_TEMP_BAR_MIN, DHW_TEMP_BAR_MAX, 10);
   const showInfoPanel = showInfoProgram || showInfoTargets || infoRows.length > 0;
@@ -573,7 +575,7 @@ export function HeatingWidget({ config, client }: HeatingWidgetProps) {
               </Text>
             </View>
             <View style={styles.temperatureBarTrack}>
-              <View style={[styles.temperatureBarFill, { width: `${(roomTempPercent ?? 0).toFixed(2)}%` }]}>
+              <View style={[styles.temperatureBarFill, { width: roomFillWidth }]}>
                 {Platform.OS === "web"
                   ? createElement("div", {
                       style: {
@@ -670,7 +672,7 @@ export function HeatingWidget({ config, client }: HeatingWidgetProps) {
               }}
               style={styles.temperatureBarTrack}
             >
-              <View style={[styles.temperatureBarFill, { width: `${(dhwTempPercent ?? 0).toFixed(2)}%` }]}>
+              <View style={[styles.temperatureBarFill, { width: dhwFillWidth }]}>
                 {Platform.OS === "web"
                   ? createElement("div", {
                       style: {
