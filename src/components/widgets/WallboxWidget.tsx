@@ -20,9 +20,7 @@ const DEFAULT_GRID_AMPERE = 10;
 const DEFAULT_TARGET_SOC = 80;
 const DEFAULT_TARGET_KM = 300;
 const TARGET_SOC_VALUES = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as const;
-const TARGET_KM_VALUES = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500] as const;
-const TARGET_CARD_COLUMNS = 5;
-const TARGET_CARD_GAP = 6;
+const TARGET_KM_VALUES = [50, 100, 150, 200, 250, 300, 350, 400] as const;
 const PHASE_VOLTAGE_V = 230;
 const CHARGING_ACTIVE_THRESHOLD_W = 100;
 const FAST_CHARGING_THRESHOLD_W = 5000;
@@ -129,7 +127,6 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const [error, setError] = useState<string | null>(null);
   const [chargingPulseOn, setChargingPulseOn] = useState(true);
   const [powerBarTrackWidth, setPowerBarTrackWidth] = useState(0);
-  const [targetRowWidth, setTargetRowWidth] = useState(0);
   const barGlowAnim = useRef(new Animated.Value(0)).current;
   const autoStopMarkerRef = useRef("");
   const refreshMs = clampInt(config.refreshMs, DEFAULT_REFRESH_MS, MIN_REFRESH_MS);
@@ -222,7 +219,6 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const chargeCompleted = carCode === 4 && !liveCharging;
 
   const writePending = Object.values(pendingWrites).some(Boolean);
-  const showGridAmpereControl = config.showGridAmpereControl !== false;
   const activeTargetValue = targetMode === "km" ? targetKmValue : targetSocPercent;
   const activeTargetUnit = targetMode === "km" ? "km" : "%";
   const chargePowerCardMode: "idle" | "slow" | "fast" =
@@ -525,11 +521,9 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     [displayAmpere]
   );
   const targetValues = targetMode === "km" ? TARGET_KM_VALUES : TARGET_SOC_VALUES;
-  const targetRows = useMemo(() => [targetValues.slice(0, 5), targetValues.slice(5, 10)], [targetValues]);
-  const targetCardWidth =
-    targetRowWidth > 0
-      ? Math.max(0, Math.floor((targetRowWidth - TARGET_CARD_GAP * (TARGET_CARD_COLUMNS - 1)) / TARGET_CARD_COLUMNS))
-      : null;
+  const targetMin = targetValues[0];
+  const targetMax = targetValues[targetValues.length - 1];
+  const targetStep = targetMode === "km" ? 50 : 10;
   const targetLabel = targetMode === "km" ? "Ziel-km" : "Ziel-SoC";
 
   const modeItems: Array<{
@@ -648,171 +642,173 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
             <Text style={[styles.quickControlValue, { color: textColor }]}>{`${activeTargetValue} ${activeTargetUnit}`}</Text>
           </View>
           <View
-            onLayout={(event) => {
-              const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
-              setTargetRowWidth((current) => (current === nextWidth ? current : nextWidth));
-            }}
-            style={styles.block}
+            style={[
+              styles.targetSliderPanel,
+              {
+                borderColor: panelBorderColor,
+                backgroundColor: modePanelBackground,
+              },
+            ]}
           >
-            {targetRows.map((row, rowIndex) => (
-              <View key={`target-row-${rowIndex}`} style={styles.quickButtonRow}>
-                {row.map((value) => {
-                  const active = value === activeTargetValue;
+            {Platform.OS === "web" ? (
+              createElement("input", {
+                type: "range",
+                min: targetMin,
+                max: targetMax,
+                step: targetStep,
+                value: activeTargetValue,
+                onChange: (event: { target: { value: string } }) => setTargetValue(Number(event.target.value)),
+                style: {
+                  ...webSliderStyle,
+                  accentColor: withAlpha(gridStart, Math.max(0.42, highlightOpacity + 0.24)),
+                },
+              })
+            ) : (
+              <View style={styles.nativeTickRow}>
+                {targetValues.map((value) => {
+                  const active = value <= activeTargetValue;
                   return (
                     <Pressable
-                      key={`target-value-${value}`}
+                      key={`target-slider-${value}`}
                       onPress={() => setTargetValue(value)}
-                      style={({ pressed }) => [
-                        styles.quickSelectButton,
-                        {
-                          width: targetCardWidth ?? undefined,
-                          flex: targetCardWidth ? 0 : 1,
-                          minHeight: 34,
-                        },
-                        active ? styles.quickSelectButtonActive : null,
-                        pressed ? styles.pressScale : null,
-                      ]}
+                      style={styles.nativeTickButton}
                     >
-                      {active
-                        ? Platform.OS === "web"
-                          ? createElement("div", {
-                              style: {
-                                ...webGradientLayerStyle,
-                                borderRadius: 10,
-                                background: `linear-gradient(135deg, ${targetActiveStart}, ${targetActiveEnd})`,
-                              },
-                            })
-                          : (
-                              <View
-                                style={[StyleSheet.absoluteFillObject, { borderRadius: 10, backgroundColor: targetActiveStart }]}
-                              />
-                            )
-                        : null}
-                      <Text style={[styles.quickSelectLabel, { color: textColor }]}>
-                        {`${value}${targetMode === "km" ? " km" : "%"}`}
-                      </Text>
+                      <View
+                        style={[
+                          styles.nativeTickBar,
+                          {
+                            backgroundColor: active ? withAlpha(gridStart, Math.max(0.35, highlightOpacity)) : "rgba(255,255,255,0.14)",
+                          },
+                        ]}
+                      />
                     </Pressable>
                   );
                 })}
               </View>
-            ))}
+            )}
+            <View style={styles.targetScaleRow}>
+              <Text style={[styles.targetScaleLabel, { color: mutedTextColor }]}>
+                {`${targetMin}${targetMode === "km" ? " km" : "%"}`}
+              </Text>
+              <Text style={[styles.targetScaleLabel, { color: mutedTextColor }]}>
+                {`${targetMax}${targetMode === "km" ? " km" : "%"}`}
+              </Text>
+            </View>
           </View>
         </View>
 
-        {showGridAmpereControl ? (
-          <View
-            style={[
-              styles.quickControlPanel,
-              { borderColor: panelBorderColor, backgroundColor: modePanelBackground },
-              !isGridMode ? { opacity: disabledOpacity } : null,
-            ]}
-          >
-            <View style={styles.quickControlHeader}>
-              <Text numberOfLines={1} style={[styles.quickControlLabel, { color: mutedTextColor }]}>
-                Wallbox-Strom {isGridMode ? "(Manuell)" : "(Ist)"}
-              </Text>
-              <Text numberOfLines={1} style={[styles.quickControlValue, { color: textColor }]}>
-                {`${displayAmpere} A | ${phaseStatusLabel}`}
-              </Text>
-            </View>
-
-            <View style={styles.quickControlGroup}>
-              <Text numberOfLines={1} style={[styles.quickControlLabel, { color: mutedTextColor }]}>Ampere</Text>
-              <View style={styles.quickButtonRow}>
-                {AMPERE_PRESET_VALUES.map((value) => {
-                  const active = activeAmperePreset === value;
-                  return (
-                    <Pressable
-                      key={`amp-preset-${value}`}
-                      disabled={!isGridMode}
-                      onPress={() => setGridAmpere(value)}
-                      style={({ pressed }) => [
-                        styles.quickSelectButton,
-                        active ? styles.quickSelectButtonActive : null,
-                        !isGridMode ? styles.quickSelectButtonDisabled : null,
-                        pressed ? styles.pressScale : null,
-                      ]}
-                    >
-                      {active
-                        ? Platform.OS === "web"
-                          ? createElement("div", {
-                              style: {
-                                ...webGradientLayerStyle,
-                                borderRadius: 10,
-                                background: `linear-gradient(135deg, ${controlActiveStart}, ${controlActiveEnd})`,
-                              },
-                            })
-                          : (
-                              <View
-                                style={[
-                                  StyleSheet.absoluteFillObject,
-                                  { borderRadius: 10, backgroundColor: controlActiveStart },
-                                ]}
-                              />
-                            )
-                        : null}
-                      <Text style={[styles.quickSelectLabel, { color: textColor }]}>{value} A</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
-            <View style={styles.quickControlGroup}>
-              <Text numberOfLines={1} style={[styles.quickControlLabel, { color: mutedTextColor }]}>Phasen</Text>
-              <View style={styles.quickButtonRow}>
-                {(
-                  [
-                    { value: 1 as const, label: "1-phasig" },
-                    { value: 3 as const, label: "3-phasig" },
-                  ] as const
-                ).map((item) => {
-                  const active = displayedPhaseSelection === item.value;
-                  return (
-                    <Pressable
-                      key={`phase-${item.value}`}
-                      disabled={!isGridMode}
-                      onPress={() => setGridPhase(item.value)}
-                      style={({ pressed }) => [
-                        styles.quickSelectButton,
-                        styles.quickSelectButtonWide,
-                        active ? styles.quickSelectButtonActive : null,
-                        !isGridMode ? styles.quickSelectButtonDisabled : null,
-                        pressed ? styles.pressScale : null,
-                      ]}
-                    >
-                      {active
-                        ? Platform.OS === "web"
-                          ? createElement("div", {
-                              style: {
-                                ...webGradientLayerStyle,
-                                borderRadius: 10,
-                                background: `linear-gradient(135deg, ${controlActiveStart}, ${controlActiveEnd})`,
-                              },
-                            })
-                          : (
-                              <View
-                                style={[
-                                  StyleSheet.absoluteFillObject,
-                                  { borderRadius: 10, backgroundColor: controlActiveStart },
-                                ]}
-                              />
-                            )
-                        : null}
-                      <Text style={[styles.quickSelectLabel, { color: textColor }]}>
-                        {item.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
-            <Text numberOfLines={1} style={[styles.quickControlHint, { color: mutedTextColor }]}>
-              {isGridMode ? "Manuell steuerbar" : "Automatik aktiv (Ist-Werte)"}
+        <View
+          style={[
+            styles.quickControlPanel,
+            { borderColor: panelBorderColor, backgroundColor: modePanelBackground },
+            !isGridMode ? { opacity: disabledOpacity } : null,
+          ]}
+        >
+          <View style={styles.quickControlHeader}>
+            <Text numberOfLines={1} style={[styles.quickControlLabel, { color: mutedTextColor }]}>
+              Wallbox-Strom {isGridMode ? "(Manuell)" : "(Ist)"}
+            </Text>
+            <Text numberOfLines={1} style={[styles.quickControlValue, { color: textColor }]}>
+              {`${displayAmpere} A | ${phaseStatusLabel}`}
             </Text>
           </View>
-        ) : null}
+
+          <View style={styles.quickControlGroup}>
+            <Text numberOfLines={1} style={[styles.quickControlLabel, { color: mutedTextColor }]}>Ampere</Text>
+            <View style={styles.quickButtonRow}>
+              {AMPERE_PRESET_VALUES.map((value) => {
+                const active = activeAmperePreset === value;
+                return (
+                  <Pressable
+                    key={`amp-preset-${value}`}
+                    disabled={!isGridMode}
+                    onPress={() => setGridAmpere(value)}
+                    style={({ pressed }) => [
+                      styles.quickSelectButton,
+                      active ? styles.quickSelectButtonActive : null,
+                      !isGridMode ? styles.quickSelectButtonDisabled : null,
+                      pressed ? styles.pressScale : null,
+                    ]}
+                  >
+                    {active
+                      ? Platform.OS === "web"
+                        ? createElement("div", {
+                            style: {
+                              ...webGradientLayerStyle,
+                              borderRadius: 10,
+                              background: `linear-gradient(135deg, ${controlActiveStart}, ${controlActiveEnd})`,
+                            },
+                          })
+                        : (
+                            <View
+                              style={[
+                                StyleSheet.absoluteFillObject,
+                                { borderRadius: 10, backgroundColor: controlActiveStart },
+                              ]}
+                            />
+                          )
+                      : null}
+                    <Text style={[styles.quickSelectLabel, { color: textColor }]}>{value} A</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={styles.quickControlGroup}>
+            <Text numberOfLines={1} style={[styles.quickControlLabel, { color: mutedTextColor }]}>Phasen</Text>
+            <View style={styles.quickButtonRow}>
+              {(
+                [
+                  { value: 1 as const, label: "1-phasig" },
+                  { value: 3 as const, label: "3-phasig" },
+                ] as const
+              ).map((item) => {
+                const active = displayedPhaseSelection === item.value;
+                return (
+                  <Pressable
+                    key={`phase-${item.value}`}
+                    disabled={!isGridMode}
+                    onPress={() => setGridPhase(item.value)}
+                    style={({ pressed }) => [
+                      styles.quickSelectButton,
+                      styles.quickSelectButtonWide,
+                      active ? styles.quickSelectButtonActive : null,
+                      !isGridMode ? styles.quickSelectButtonDisabled : null,
+                      pressed ? styles.pressScale : null,
+                    ]}
+                  >
+                    {active
+                      ? Platform.OS === "web"
+                        ? createElement("div", {
+                            style: {
+                              ...webGradientLayerStyle,
+                              borderRadius: 10,
+                              background: `linear-gradient(135deg, ${controlActiveStart}, ${controlActiveEnd})`,
+                            },
+                          })
+                        : (
+                            <View
+                              style={[
+                                StyleSheet.absoluteFillObject,
+                                { borderRadius: 10, backgroundColor: controlActiveStart },
+                              ]}
+                            />
+                          )
+                      : null}
+                    <Text style={[styles.quickSelectLabel, { color: textColor }]}>
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          <Text numberOfLines={1} style={[styles.quickControlHint, { color: mutedTextColor }]}>
+            {isGridMode ? "Manuell steuerbar" : "Automatik aktiv (Ist-Werte)"}
+          </Text>
+        </View>
 
         {config.showStatusSubtitle === true ? (
           <Text numberOfLines={2} style={[styles.subtitleBottom, { color: mutedTextColor }]}>
@@ -1080,7 +1076,7 @@ function normalizeTargetKm(value: unknown) {
   if (numeric === null) {
     return null;
   }
-  const clamped = Math.max(50, Math.min(500, Math.round(numeric / 50) * 50));
+  const clamped = Math.max(50, Math.min(400, Math.round(numeric / 50) * 50));
   return clamped;
 }
 
@@ -1538,6 +1534,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 8,
+  },
+  targetSliderPanel: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  targetScaleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  targetScaleLabel: {
+    fontSize: 11,
+    fontWeight: "600",
   },
   blockLabel: {
     fontSize: 11,
