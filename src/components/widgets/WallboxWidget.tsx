@@ -10,14 +10,15 @@ type WallboxWidgetProps = {
   client: IoBrokerClient;
 };
 
-type WallboxMode = "off" | "pv" | "grid";
+type WallboxMode = "stop" | "pv" | "pvPriority" | "grid";
 
 const DEFAULT_REFRESH_MS = 2000;
 const MIN_REFRESH_MS = 500;
 const AMPERE_MIN = 6;
 const AMPERE_MAX = 16;
-const AMPERE_STEP = 1;
 const DEFAULT_GRID_AMPERE = 10;
+const DEFAULT_TARGET_SOC = 80;
+const TARGET_SOC_VALUES = [20, 30, 40, 50, 60, 70, 80, 90, 100] as const;
 const PHASE_VOLTAGE_V = 230;
 const CHARGING_ACTIVE_THRESHOLD_W = 100;
 const FAST_CHARGING_THRESHOLD_W = 5000;
@@ -27,58 +28,97 @@ const CHARGING_BAR_GLOW_CYCLE_MS = 2000;
 const AMPERE_PRESET_VALUES = [6, 10, 12, 14, 16] as const;
 
 const DEFAULT_IDS = {
+  mode: "go-e-gemini-adapter.0.control.mode",
+  gridAmpere: "go-e-gemini-adapter.0.control.gridManual.currentA",
+  targetSocPercent: "go-e-gemini-adapter.0.control.targetSocPercent",
+  targetSocEnabled: "go-e-gemini-adapter.0.control.targetSocEnabled",
+  allowCharging: "go-e-gemini-adapter.0.control.allowCharging",
+  gridPhaseMode: "go-e-gemini-adapter.0.control.gridManual.phaseMode",
+  actualPhaseCount: "go-e-gemini-adapter.0.status.enabledPhases",
+  actualAmpere: "go-e-gemini-adapter.0.status.setCurrentA",
+  car: "go-e-gemini-adapter.0.status.carState",
+  batterySoc: "go-e-gemini-adapter.0.status.carSocPercent",
+  chargePower: "go-e-gemini-adapter.0.status.chargerPowerW",
+  chargedEnergy: "go-e.0.eto",
+} as const;
+
+const LEGACY_IDS = {
   mode: "0_userdata.0.goe.mode",
   gridAmpere: "0_userdata.0.goe.gridAmpere",
-  limit80: "0_userdata.0.goe.limit80",
-  phaseSwitchMode: "go-e.0.phaseSwitchMode",
-  phaseSwitchModeEnabled: "go-e.0.phaseSwitchModeEnabled",
-  ampere: "go-e.0.ampere",
+  targetSocPercent: "0_userdata.0.goe.limit80",
+  targetSocEnabled: "go-e.0.stopChargeingAtCarSoc80",
+  allowCharging: "go-e.0.allow_charging",
+  gridPhaseMode: "go-e.0.phaseSwitchMode",
+  actualPhaseCount: "go-e.0.phaseSwitchModeEnabled",
+  actualAmpere: "go-e.0.ampere",
   car: "go-e.0.car",
   batterySoc: "go-e.0.carBatterySoc",
   chargePower: "go-e.0.nrg.11",
   chargedEnergy: "go-e.0.eto",
-  stopAt80: "go-e.0.stopChargeingAtCarSoc80",
 } as const;
 
 export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const stateIds = useMemo(
     () => ({
-      mode: resolveStateId(config.modeStateId, DEFAULT_IDS.mode),
-      gridAmpere: resolveStateId(config.gridAmpereStateId, DEFAULT_IDS.gridAmpere),
-      limit80: resolveStateId(config.limit80StateId, DEFAULT_IDS.limit80),
-      phaseSwitchMode: resolveStateId(config.phaseSwitchModeStateId, DEFAULT_IDS.phaseSwitchMode),
-      phaseSwitchModeEnabled: resolveStateId(
-        config.phaseSwitchModeEnabledStateId,
-        DEFAULT_IDS.phaseSwitchModeEnabled
+      mode: resolveStateIdWithLegacy(config.modeStateId, DEFAULT_IDS.mode, LEGACY_IDS.mode),
+      gridAmpere: resolveStateIdWithLegacy(config.gridAmpereStateId, DEFAULT_IDS.gridAmpere, LEGACY_IDS.gridAmpere),
+      targetSocPercent: resolveStateIdWithLegacy(
+        config.limit80StateId,
+        DEFAULT_IDS.targetSocPercent,
+        LEGACY_IDS.targetSocPercent
       ),
-      ampere: resolveStateId(config.ampereStateId, DEFAULT_IDS.ampere),
-      car: resolveStateId(config.carStateId, DEFAULT_IDS.car),
-      batterySoc: resolveStateId(config.batterySocStateId, DEFAULT_IDS.batterySoc),
-      chargePower: resolveStateId(config.chargePowerStateId, DEFAULT_IDS.chargePower),
-      chargedEnergy: resolveStateId(config.chargedEnergyStateId, DEFAULT_IDS.chargedEnergy),
-      stopAt80: resolveStateId(config.stopChargeingAtCarSoc80StateId, DEFAULT_IDS.stopAt80),
+      targetSocEnabled: resolveStateIdWithLegacy(
+        config.stopChargeingAtCarSoc80StateId,
+        DEFAULT_IDS.targetSocEnabled,
+        LEGACY_IDS.targetSocEnabled
+      ),
+      allowCharging: resolveStateIdWithLegacy(
+        config.allowChargingStateId,
+        DEFAULT_IDS.allowCharging,
+        LEGACY_IDS.allowCharging
+      ),
+      gridPhaseMode: resolveStateIdWithLegacy(
+        config.phaseSwitchModeStateId,
+        DEFAULT_IDS.gridPhaseMode,
+        LEGACY_IDS.gridPhaseMode
+      ),
+      actualPhaseCount: resolveStateIdWithLegacy(
+        config.phaseSwitchModeEnabledStateId,
+        DEFAULT_IDS.actualPhaseCount,
+        LEGACY_IDS.actualPhaseCount
+      ),
+      actualAmpere: resolveStateIdWithLegacy(config.ampereStateId, DEFAULT_IDS.actualAmpere, LEGACY_IDS.actualAmpere),
+      car: resolveStateIdWithLegacy(config.carStateId, DEFAULT_IDS.car, LEGACY_IDS.car),
+      batterySoc: resolveStateIdWithLegacy(config.batterySocStateId, DEFAULT_IDS.batterySoc, LEGACY_IDS.batterySoc),
+      chargePower: resolveStateIdWithLegacy(config.chargePowerStateId, DEFAULT_IDS.chargePower, LEGACY_IDS.chargePower),
+      chargedEnergy: resolveStateIdWithLegacy(
+        config.chargedEnergyStateId,
+        DEFAULT_IDS.chargedEnergy,
+        LEGACY_IDS.chargedEnergy
+      ),
     }),
     [
+      config.allowChargingStateId,
       config.ampereStateId,
+      config.batterySocStateId,
       config.carStateId,
       config.chargePowerStateId,
       config.chargedEnergyStateId,
       config.gridAmpereStateId,
       config.limit80StateId,
       config.modeStateId,
-      config.phaseSwitchModeStateId,
       config.phaseSwitchModeEnabledStateId,
-      config.batterySocStateId,
+      config.phaseSwitchModeStateId,
       config.stopChargeingAtCarSoc80StateId,
     ]
   );
   const [stateSnapshot, setStateSnapshot] = useState<StateSnapshot>({});
   const [pendingWrites, setPendingWrites] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
-  const [sliderDraft, setSliderDraft] = useState<number | null>(null);
   const [chargingPulseOn, setChargingPulseOn] = useState(true);
   const [powerBarTrackWidth, setPowerBarTrackWidth] = useState(0);
   const barGlowAnim = useRef(new Animated.Value(0)).current;
+  const autoStopMarkerRef = useRef("");
   const refreshMs = clampInt(config.refreshMs, DEFAULT_REFRESH_MS, MIN_REFRESH_MS);
 
   useEffect(() => {
@@ -134,30 +174,38 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     [stateSnapshot]
   );
 
-  const mode = normalizeMode(readValue(stateIds.mode)) || "off";
+  const rawMode = readValue(stateIds.mode);
+  const allowCharging = normalizeBoolean(readValue(stateIds.allowCharging));
+  const mode = resolveWallboxMode(rawMode, allowCharging);
   const isGridMode = mode === "grid";
+
   const gridAmpere = clampAmpere(normalizeAmpere(readValue(stateIds.gridAmpere)) ?? DEFAULT_GRID_AMPERE);
-  const limit80Explicit = normalizeBoolean(readValue(stateIds.limit80));
-  const stopAt80ByCharger = normalizeBoolean(readValue(stateIds.stopAt80));
-  const limit80Enabled = limit80Explicit ?? stopAt80ByCharger ?? false;
-  const phaseModeRaw = readValue(stateIds.phaseSwitchMode);
-  const phaseMode = mapPhaseMode(phaseModeRaw);
-  const currentPhaseSelection = resolvePhaseControlSelection(phaseModeRaw);
-  const phaseSwitchModeEnabled = normalizeBoolean(readValue(stateIds.phaseSwitchModeEnabled));
-  const liveAmpere = normalizeFloat(readValue(stateIds.ampere));
+  const targetSocPercent = normalizeTargetSocPercent(readValue(stateIds.targetSocPercent)) ?? DEFAULT_TARGET_SOC;
+  const targetSocEnabled = normalizeBoolean(readValue(stateIds.targetSocEnabled)) ?? true;
+
+  const gridPhaseRaw = readValue(stateIds.gridPhaseMode);
+  const actualPhaseRaw = readValue(stateIds.actualPhaseCount);
+  const gridPhaseSelection = resolvePhaseSelection(gridPhaseRaw);
+  const actualPhaseSelection = resolvePhaseSelection(actualPhaseRaw) ?? gridPhaseSelection;
+  const displayedPhaseSelection = (isGridMode ? gridPhaseSelection : actualPhaseSelection) ?? actualPhaseSelection;
+
+  const liveAmpere = normalizeFloat(readValue(stateIds.actualAmpere));
+  const roundedLiveAmpere = liveAmpere === null ? null : Math.max(0, Math.round(liveAmpere));
+  const displayAmpere = isGridMode ? gridAmpere : roundedLiveAmpere ?? gridAmpere;
+
   const carCode = normalizeInteger(readValue(stateIds.car));
   const batterySoc = normalizeFloat(readValue(stateIds.batterySoc));
   const chargedEnergyKWh = normalizeEnergyToKWh(readValue(stateIds.chargedEnergy));
   const directChargingPowerW = normalizePowerToWatts(readValue(stateIds.chargePower));
-  const estimatedChargingPowerW = estimateChargingPowerW(liveAmpere, phaseModeRaw);
+  const estimatedChargingPowerW = estimateChargingPowerW(liveAmpere, actualPhaseSelection);
   const chargingPowerW = directChargingPowerW ?? estimatedChargingPowerW;
   const liveCharging =
     carCode === 2 ||
     (carCode === null && typeof liveAmpere === "number" && liveAmpere > 0.25) ||
     chargingPowerW >= CHARGING_ACTIVE_THRESHOLD_W;
   const chargeCompleted = carCode === 4 && !liveCharging;
+
   const writePending = Object.values(pendingWrites).some(Boolean);
-  const sliderValue = sliderDraft ?? gridAmpere;
   const showGridAmpereControl = config.showGridAmpereControl !== false;
   const chargePowerCardMode: "idle" | "slow" | "fast" =
     chargingPowerW < CHARGING_ACTIVE_THRESHOLD_W
@@ -176,12 +224,6 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     }, CHARGING_INDICATOR_BLINK_MS);
     return () => clearInterval(timer);
   }, [liveCharging]);
-
-  useEffect(() => {
-    if (!pendingWrites[stateIds.gridAmpere]) {
-      setSliderDraft(null);
-    }
-  }, [gridAmpere, pendingWrites, stateIds.gridAmpere]);
 
   useEffect(() => {
     barGlowAnim.setValue(0);
@@ -206,28 +248,27 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         mode,
         carCode,
         liveAmpere,
-        limit80Enabled,
+        targetSocEnabled,
+        targetSocPercent,
       }),
-    [carCode, limit80Enabled, liveAmpere, mode]
+    [carCode, liveAmpere, mode, targetSocEnabled, targetSocPercent]
   );
 
   const textColor = config.appearance?.textColor || "#f5f8ff";
   const mutedTextColor = config.appearance?.mutedTextColor || "rgba(214, 224, 244, 0.75)";
   const cardStart = config.appearance?.widgetColor || "rgba(20, 30, 44, 0.96)";
   const cardEnd = config.appearance?.widgetColor2 || "rgba(12, 18, 30, 0.98)";
-  const offStart = config.appearance?.cardColor || "rgba(166, 176, 194, 0.2)";
-  const offEnd = config.appearance?.cardColor2 || "rgba(123, 135, 158, 0.2)";
+  const stopStart = config.appearance?.cardColor || "rgba(166, 176, 194, 0.2)";
+  const stopEnd = config.appearance?.cardColor2 || "rgba(123, 135, 158, 0.2)";
   const pvStart = config.appearance?.activeWidgetColor || "#3bbd83";
   const pvEnd = config.appearance?.activeWidgetColor2 || "#2f976c";
+  const pvPriorityStart = config.appearance?.inactiveWidgetColor || "#f5bd6c";
+  const pvPriorityEnd = config.appearance?.inactiveWidgetColor2 || "#e69b56";
   const gridStart = config.appearance?.statColor || "#5f9eff";
   const gridEnd = config.appearance?.statColor2 || "#4578e6";
-  const sliderStart = config.appearance?.iconColor || "#7eb9ff";
-  const sliderEnd = config.appearance?.iconColor2 || "#5f8cf0";
-  const toggleStart = config.appearance?.inactiveWidgetColor || "#f5bd6c";
-  const toggleEnd = config.appearance?.inactiveWidgetColor2 || "#e69b56";
   const panelBorderColor = "rgba(191, 209, 245, 0.18)";
   const modePanelBackground = "rgba(255,255,255,0.025)";
-  const disabledOpacity = 0.46;
+  const disabledOpacity = 0.5;
   const backgroundBlur = Math.min(24, clampInt(config.backgroundImageBlur, 8, 0));
 
   const playPressSound = useCallback(
@@ -242,13 +283,6 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       playConfiguredUiSound(config.interactionSounds?.confirm, "toggle", `${config.id}:confirm:${key}`);
     },
     [config.id, config.interactionSounds?.confirm]
-  );
-
-  const playSliderSound = useCallback(
-    (key: string) => {
-      playConfiguredUiSound(config.interactionSounds?.slider, "swipe", `${config.id}:slider:${key}`);
-    },
-    [config.id, config.interactionSounds?.slider]
   );
 
   const writeState = useCallback(
@@ -280,13 +314,28 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         return;
       }
       playPressSound(`mode:${nextMode}`);
-      void writeState(stateIds.mode, nextMode, `mode:${nextMode}`);
+      void (async () => {
+        if (nextMode === "stop") {
+          await writeState(stateIds.allowCharging, false, "mode:stop:allowCharging");
+          const stopModeValue = resolveModeWriteValue(rawMode, "stop");
+          if (stopModeValue !== null) {
+            await writeState(stateIds.mode, stopModeValue, "mode:stop");
+          }
+          return;
+        }
+
+        await writeState(stateIds.allowCharging, true, `mode:${nextMode}:allowCharging`);
+        const modeValue = resolveModeWriteValue(rawMode, nextMode);
+        if (modeValue !== null) {
+          await writeState(stateIds.mode, modeValue, `mode:${nextMode}`);
+        }
+      })();
     },
-    [mode, playPressSound, stateIds.mode, writeState]
+    [mode, playPressSound, rawMode, stateIds.allowCharging, stateIds.mode, writeState]
   );
 
   const setGridAmpere = useCallback(
-    (nextAmpere: number, source: "slider" | "button") => {
+    (nextAmpere: number) => {
       if (!isGridMode || !stateIds.gridAmpere) {
         return;
       }
@@ -294,43 +343,64 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       if (clamped === gridAmpere) {
         return;
       }
-      if (source === "button") {
-        playPressSound(`gridAmpere:${clamped}`);
-      } else {
-        playSliderSound(`gridAmpere:${clamped}`);
-      }
+      playPressSound(`gridAmpere:${clamped}`);
       void writeState(stateIds.gridAmpere, clamped, `gridAmpere:${clamped}`);
     },
-    [gridAmpere, isGridMode, playPressSound, playSliderSound, stateIds.gridAmpere, writeState]
+    [gridAmpere, isGridMode, playPressSound, stateIds.gridAmpere, writeState]
   );
 
-  const adjustGridAmpere = useCallback(
-    (delta: number) => {
-      if (!isGridMode) {
+  const setGridPhase = useCallback(
+    (nextPhase: 1 | 3) => {
+      if (!isGridMode || !stateIds.gridPhaseMode) {
         return;
       }
-      setGridAmpere(gridAmpere + delta, "button");
+      if (gridPhaseSelection === nextPhase) {
+        return;
+      }
+      const writeValue = resolvePhaseWriteValue(gridPhaseRaw, nextPhase);
+      playPressSound(`gridPhase:${nextPhase}`);
+      void writeState(stateIds.gridPhaseMode, writeValue, `gridPhase:${nextPhase}`);
     },
-    [gridAmpere, isGridMode, setGridAmpere]
+    [gridPhaseRaw, gridPhaseSelection, isGridMode, playPressSound, stateIds.gridPhaseMode, writeState]
   );
 
-  const toggleLimit80 = useCallback(() => {
-    playPressSound("limit80");
-    void writeState(stateIds.limit80, !limit80Enabled, `limit80:${!limit80Enabled ? "on" : "off"}`);
-  }, [limit80Enabled, playPressSound, stateIds.limit80, writeState]);
-  const setPhaseAutoEnabled = useCallback(
-    (enabled: boolean) => {
-      if (!stateIds.phaseSwitchModeEnabled) {
+  const setTargetSoc = useCallback(
+    (nextSoc: number) => {
+      if (!stateIds.targetSocPercent) {
         return;
       }
-      if (phaseSwitchModeEnabled === enabled) {
+      const normalized = normalizeTargetSocPercent(nextSoc) ?? DEFAULT_TARGET_SOC;
+      if (normalized === targetSocPercent && targetSocEnabled) {
         return;
       }
-      playPressSound(`phaseAuto:${enabled ? "on" : "off"}`);
-      void writeState(stateIds.phaseSwitchModeEnabled, enabled, `phaseAuto:${enabled ? "on" : "off"}`);
+      playPressSound(`targetSoc:${normalized}`);
+      void (async () => {
+        await writeState(stateIds.targetSocPercent, normalized, `targetSoc:${normalized}`);
+        if (stateIds.targetSocEnabled) {
+          await writeState(stateIds.targetSocEnabled, true, "targetSocEnabled:true");
+        }
+      })();
     },
-    [phaseSwitchModeEnabled, playPressSound, stateIds.phaseSwitchModeEnabled, writeState]
+    [playPressSound, stateIds.targetSocEnabled, stateIds.targetSocPercent, targetSocEnabled, targetSocPercent, writeState]
   );
+
+  useEffect(() => {
+    if (!stateIds.allowCharging || allowCharging !== true || !targetSocEnabled || batterySoc === null) {
+      autoStopMarkerRef.current = "";
+      return;
+    }
+    if (batterySoc + 0.01 < targetSocPercent) {
+      autoStopMarkerRef.current = "";
+      return;
+    }
+
+    const marker = `${Math.round(targetSocPercent)}:${Math.round(batterySoc * 10) / 10}`;
+    if (autoStopMarkerRef.current === marker) {
+      return;
+    }
+    autoStopMarkerRef.current = marker;
+    void writeState(stateIds.allowCharging, false, `socLimitReached:${targetSocPercent}`);
+  }, [allowCharging, batterySoc, stateIds.allowCharging, targetSocEnabled, targetSocPercent, writeState]);
 
   const chargingStatusText = liveCharging
     ? `Laedt mit ${formatPowerKW(chargingPowerW)}`
@@ -373,19 +443,15 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     outputRange: [-barGlowWidthPx, Math.max(0, barFillWidthPx)],
   });
   const nativeBarColor = chargingPowerRatio < 0.45 ? "#ef5d6b" : chargingPowerRatio < 0.75 ? "#f0c35f" : "#42cf8c";
-  const roundedLiveAmpere = liveAmpere === null ? null : Math.round(liveAmpere);
   const phaseStatusLabel =
-    currentPhaseSelection === 1 ? "1-phasig" : currentPhaseSelection === 3 ? "3-phasig" : phaseMode;
-  const phaseAutoStatusLabel =
-    phaseSwitchModeEnabled === null ? "-" : phaseSwitchModeEnabled ? "Auto an" : "Auto aus";
-  const activeAmperePreset = useMemo(() => {
-    if (roundedLiveAmpere === null || !Number.isFinite(roundedLiveAmpere)) {
-      return Math.round(sliderValue);
-    }
-    return AMPERE_PRESET_VALUES.reduce((closest, value) =>
-      Math.abs(value - roundedLiveAmpere) < Math.abs(closest - roundedLiveAmpere) ? value : closest
-    );
-  }, [roundedLiveAmpere, sliderValue]);
+    displayedPhaseSelection === 1 ? "1-phasig" : displayedPhaseSelection === 3 ? "3-phasig" : "-";
+  const activeAmperePreset = useMemo(
+    () =>
+      AMPERE_PRESET_VALUES.reduce((closest, value) =>
+        Math.abs(value - displayAmpere) < Math.abs(closest - displayAmpere) ? value : closest
+      ),
+    [displayAmpere]
+  );
 
   const modeItems: Array<{
     mode: WallboxMode;
@@ -393,8 +459,9 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     start: string;
     end: string;
   }> = [
-    { mode: "off", label: "Aus", start: offStart, end: offEnd },
+    { mode: "stop", label: "Stopp", start: stopStart, end: stopEnd },
     { mode: "pv", label: "PV", start: pvStart, end: pvEnd },
+    { mode: "pvPriority", label: "PV (go-e priority)", start: pvPriorityStart, end: pvPriorityEnd },
     { mode: "grid", label: "Netz", start: gridStart, end: gridEnd },
   ];
 
@@ -449,6 +516,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
           <View style={[styles.segmentShell, { backgroundColor: modePanelBackground, borderColor: panelBorderColor }]}>
             {modeItems.map((item) => {
               const active = mode === item.mode;
+              const compactLabel = item.mode === "pvPriority";
               return (
                 <Pressable
                   key={`mode-${item.mode}`}
@@ -472,7 +540,61 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
                           <View style={[StyleSheet.absoluteFillObject, { backgroundColor: item.start, borderRadius: 10 }]} />
                         )
                     : null}
-                  <Text style={[styles.segmentLabel, { color: active ? "#06101a" : textColor }]}>{item.label}</Text>
+                  <Text
+                    style={[
+                      styles.segmentLabel,
+                      compactLabel ? { fontSize: 11.5, lineHeight: 13, textAlign: "center", paddingHorizontal: 2 } : null,
+                      { color: active ? "#06101a" : textColor },
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.block}>
+          <View style={styles.blockHeaderInline}>
+            <Text style={[styles.blockLabel, { color: mutedTextColor }]}>Ziel-SoC</Text>
+            <Text style={[styles.quickControlValue, { color: textColor }]}>{`${targetSocPercent} %`}</Text>
+          </View>
+          <View style={[styles.quickButtonRow, { flexWrap: "wrap" }]}>
+            {TARGET_SOC_VALUES.map((value) => {
+              const active = value === targetSocPercent && targetSocEnabled;
+              return (
+                <Pressable
+                  key={`target-soc-${value}`}
+                  onPress={() => setTargetSoc(value)}
+                  style={({ pressed }) => [
+                    styles.quickSelectButton,
+                    {
+                      flexBasis: "18.8%",
+                      maxWidth: "18.8%",
+                      minHeight: 34,
+                      marginBottom: 6,
+                    },
+                    active ? styles.quickSelectButtonActive : null,
+                    pressed ? styles.pressScale : null,
+                  ]}
+                >
+                  {active
+                    ? Platform.OS === "web"
+                      ? createElement("div", {
+                          style: {
+                            ...webGradientLayerStyle,
+                            borderRadius: 10,
+                            background: `linear-gradient(135deg, ${pvPriorityStart}, ${pvPriorityEnd})`,
+                          },
+                        })
+                      : (
+                          <View
+                            style={[StyleSheet.absoluteFillObject, { borderRadius: 10, backgroundColor: pvPriorityStart }]}
+                          />
+                        )
+                    : null}
+                  <Text style={[styles.quickSelectLabel, { color: active ? "#06101a" : textColor }]}>{`${value}%`}</Text>
                 </Pressable>
               );
             })}
@@ -480,239 +602,113 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         </View>
 
         {showGridAmpereControl ? (
-          <View style={[styles.block, !isGridMode ? { opacity: disabledOpacity } : null]}>
-            <View style={styles.blockHeaderInline}>
-              <Text style={[styles.blockLabel, { color: mutedTextColor }]}>Netzladen-Strom</Text>
-              <Text style={[styles.ampereValue, { color: textColor }]}>{Math.round(sliderValue)} A</Text>
-            </View>
-            <View style={[styles.ampereControls, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
-              <Pressable
-                disabled={!isGridMode}
-                onPress={() => adjustGridAmpere(-AMPERE_STEP)}
-                style={({ pressed }) => [styles.stepButton, pressed ? styles.pressScale : null, !isGridMode ? styles.disabledControl : null]}
-              >
-                <Text style={[styles.stepButtonLabel, { color: textColor }]}>-</Text>
-              </Pressable>
-
-              <View style={styles.sliderWrap}>
-                {Platform.OS === "web"
-                  ? createElement("input", {
-                      type: "range",
-                      min: AMPERE_MIN,
-                      max: AMPERE_MAX,
-                      step: AMPERE_STEP,
-                      disabled: !isGridMode,
-                      value: sliderValue,
-                      onInput: (event: { target: { value: string } }) => {
-                        setSliderDraft(clampAmpere(Number.parseInt(event.target.value, 10) || DEFAULT_GRID_AMPERE));
-                      },
-                      onChange: (event: { target: { value: string } }) => {
-                        const next = clampAmpere(Number.parseInt(event.target.value, 10) || DEFAULT_GRID_AMPERE);
-                        setSliderDraft(next);
-                        void setGridAmpere(next, "slider");
-                      },
-                      style: {
-                        ...webSliderStyle,
-                        opacity: isGridMode ? 1 : 0.45,
-                        accentColor: sliderStart,
-                        backgroundImage: `linear-gradient(90deg, ${sliderStart} 0%, ${sliderEnd} 100%)`,
-                      },
-                    })
-                  : (
-                      <View style={[styles.nativeTickRow, !isGridMode ? styles.disabledControl : null]}>
-                        {Array.from({ length: AMPERE_MAX - AMPERE_MIN + 1 }, (_, index) => {
-                          const value = AMPERE_MIN + index;
-                          const active = value <= sliderValue;
-                          return (
-                            <Pressable
-                              key={`amp-tick-${value}`}
-                              disabled={!isGridMode}
-                              onPress={() => {
-                                setSliderDraft(value);
-                                void setGridAmpere(value, "slider");
-                              }}
-                              style={({ pressed }) => [styles.nativeTickButton, pressed ? styles.pressScale : null]}
-                            >
-                              <View
-                                style={[
-                                  styles.nativeTickBar,
-                                  {
-                                    backgroundColor: active ? sliderStart : "rgba(255,255,255,0.16)",
-                                  },
-                                ]}
-                              />
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    )}
-                <View style={styles.sliderScaleRow}>
-                  <Text style={[styles.sliderScaleLabel, { color: mutedTextColor }]}>{AMPERE_MIN} A</Text>
-                  <Text style={[styles.sliderScaleLabel, { color: mutedTextColor }]}>{AMPERE_MAX} A</Text>
-                </View>
-              </View>
-
-              <Pressable
-                disabled={!isGridMode}
-                onPress={() => adjustGridAmpere(AMPERE_STEP)}
-                style={({ pressed }) => [styles.stepButton, pressed ? styles.pressScale : null, !isGridMode ? styles.disabledControl : null]}
-              >
-                <Text style={[styles.stepButtonLabel, { color: textColor }]}>+</Text>
-              </Pressable>
-            </View>
-          </View>
-        ) : null}
-
-        <View style={[styles.block, styles.toggleBlock, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
-          <View style={styles.toggleTextWrap}>
-            <Text style={[styles.toggleTitle, { color: textColor }]}>Begrenzen auf 80 %</Text>
-            <Text style={[styles.toggleHint, { color: mutedTextColor }]}>
-              Stoppt den Ladevorgang bei 80 % Fahrzeug-SoC
-            </Text>
-          </View>
-          <Pressable
-            onPress={toggleLimit80}
-            style={({ pressed }) => [
-              styles.toggleTrack,
-              limit80Enabled ? styles.toggleTrackActive : styles.toggleTrackInactive,
-              pressed ? styles.pressScale : null,
+          <View
+            style={[
+              styles.quickControlPanel,
+              { borderColor: panelBorderColor, backgroundColor: modePanelBackground },
+              !isGridMode ? { opacity: disabledOpacity } : null,
             ]}
           >
-            {limit80Enabled
-              ? Platform.OS === "web"
-                ? createElement("div", {
-                    style: {
-                      ...webGradientLayerStyle,
-                      borderRadius: 999,
-                      background: `linear-gradient(120deg, ${toggleStart}, ${toggleEnd})`,
-                    },
-                  })
-                : (
-                    <View style={[StyleSheet.absoluteFillObject, { borderRadius: 999, backgroundColor: toggleStart }]} />
-                  )
-              : null}
-            <View
-              style={[
-                styles.toggleKnob,
-                limit80Enabled ? styles.toggleKnobActive : styles.toggleKnobInactive,
-              ]}
-            />
-          </Pressable>
-        </View>
-
-        <View style={[styles.quickControlPanel, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
-          <View style={styles.quickControlGroup}>
             <View style={styles.quickControlHeader}>
               <Text numberOfLines={1} style={[styles.quickControlLabel, { color: mutedTextColor }]}>
-                Wallbox-Strom (Ist)
+                Wallbox-Strom {isGridMode ? "(Manuell)" : "(Ist)"}
               </Text>
               <Text numberOfLines={1} style={[styles.quickControlValue, { color: textColor }]}>
-                {roundedLiveAmpere === null ? "-" : `${roundedLiveAmpere} A`}
+                {`${displayAmpere} A | ${phaseStatusLabel}`}
               </Text>
             </View>
-            <View style={styles.quickButtonRow}>
-              {AMPERE_PRESET_VALUES.map((value) => {
-                const active = activeAmperePreset === value;
-                return (
-                  <Pressable
-                    key={`amp-preset-${value}`}
-                    disabled={!isGridMode}
-                    onPress={() => setGridAmpere(value, "button")}
-                    style={({ pressed }) => [
-                      styles.quickSelectButton,
-                      active ? styles.quickSelectButtonActive : null,
-                      !isGridMode ? styles.quickSelectButtonDisabled : null,
-                      pressed ? styles.pressScale : null,
-                    ]}
-                  >
-                    {active
-                      ? Platform.OS === "web"
-                        ? createElement("div", {
-                            style: {
-                              ...webGradientLayerStyle,
-                              borderRadius: 10,
-                              background: `linear-gradient(135deg, ${gridStart}, ${gridEnd})`,
-                            },
-                          })
-                        : (
-                            <View
-                              style={[StyleSheet.absoluteFillObject, { borderRadius: 10, backgroundColor: gridStart }]}
-                            />
-                          )
-                      : null}
-                    <Text style={[styles.quickSelectLabel, { color: active ? "#06101a" : textColor }]}>{value} A</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
 
-          <View style={styles.quickControlGroup}>
-            <View style={styles.quickControlHeader}>
-              <Text numberOfLines={1} style={[styles.quickControlLabel, { color: mutedTextColor }]}>
-                Phasenmodus (Ist)
-              </Text>
-              <Text numberOfLines={1} style={[styles.quickControlValue, { color: textColor }]}>
-                {phaseStatusLabel}
-              </Text>
+            <View style={styles.quickControlGroup}>
+              <Text numberOfLines={1} style={[styles.quickControlLabel, { color: mutedTextColor }]}>Ampere</Text>
+              <View style={styles.quickButtonRow}>
+                {AMPERE_PRESET_VALUES.map((value) => {
+                  const active = activeAmperePreset === value;
+                  return (
+                    <Pressable
+                      key={`amp-preset-${value}`}
+                      disabled={!isGridMode}
+                      onPress={() => setGridAmpere(value)}
+                      style={({ pressed }) => [
+                        styles.quickSelectButton,
+                        active ? styles.quickSelectButtonActive : null,
+                        !isGridMode ? styles.quickSelectButtonDisabled : null,
+                        pressed ? styles.pressScale : null,
+                      ]}
+                    >
+                      {active
+                        ? Platform.OS === "web"
+                          ? createElement("div", {
+                              style: {
+                                ...webGradientLayerStyle,
+                                borderRadius: 10,
+                                background: `linear-gradient(135deg, ${gridStart}, ${gridEnd})`,
+                              },
+                            })
+                          : (
+                              <View
+                                style={[StyleSheet.absoluteFillObject, { borderRadius: 10, backgroundColor: gridStart }]}
+                              />
+                            )
+                        : null}
+                      <Text style={[styles.quickSelectLabel, { color: active ? "#06101a" : textColor }]}>{value} A</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
-            <View style={styles.quickControlHeader}>
-              <Text numberOfLines={1} style={[styles.quickControlLabel, { color: mutedTextColor }]}>
-                Auto-Umschaltung
-              </Text>
-              <Text numberOfLines={1} style={[styles.quickControlValue, { color: textColor }]}>
-                {phaseAutoStatusLabel}
-              </Text>
-            </View>
-            <View style={styles.quickButtonRow}>
-              {(
-                [
-                  { enabled: false, label: "Auto aus" },
-                  { enabled: true, label: "Auto an" },
-                ] as const
-              ).map((item) => {
-                const active = phaseSwitchModeEnabled !== null && phaseSwitchModeEnabled === item.enabled;
-                return (
-                  <Pressable
-                    key={`phase-auto-${item.enabled ? "on" : "off"}`}
-                    onPress={() => setPhaseAutoEnabled(item.enabled)}
-                    style={({ pressed }) => [
-                      styles.quickSelectButton,
-                      styles.quickSelectButtonWide,
-                      active ? styles.quickSelectButtonActive : null,
-                      pressed ? styles.pressScale : null,
-                    ]}
-                  >
-                    {active
-                      ? Platform.OS === "web"
-                        ? createElement("div", {
-                            style: {
-                              ...webGradientLayerStyle,
-                              borderRadius: 10,
-                              background: `linear-gradient(135deg, ${gridStart}, ${gridEnd})`,
-                            },
-                          })
-                        : (
-                            <View
-                              style={[StyleSheet.absoluteFillObject, { borderRadius: 10, backgroundColor: gridStart }]}
-                            />
-                          )
-                      : null}
-                    <Text style={[styles.quickSelectLabel, { color: active ? "#06101a" : textColor }]}>
-                      {item.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
 
-          {!isGridMode ? (
+            <View style={styles.quickControlGroup}>
+              <Text numberOfLines={1} style={[styles.quickControlLabel, { color: mutedTextColor }]}>Phasen</Text>
+              <View style={styles.quickButtonRow}>
+                {(
+                  [
+                    { value: 1 as const, label: "1-phasig" },
+                    { value: 3 as const, label: "3-phasig" },
+                  ] as const
+                ).map((item) => {
+                  const active = displayedPhaseSelection === item.value;
+                  return (
+                    <Pressable
+                      key={`phase-${item.value}`}
+                      disabled={!isGridMode}
+                      onPress={() => setGridPhase(item.value)}
+                      style={({ pressed }) => [
+                        styles.quickSelectButton,
+                        styles.quickSelectButtonWide,
+                        active ? styles.quickSelectButtonActive : null,
+                        !isGridMode ? styles.quickSelectButtonDisabled : null,
+                        pressed ? styles.pressScale : null,
+                      ]}
+                    >
+                      {active
+                        ? Platform.OS === "web"
+                          ? createElement("div", {
+                              style: {
+                                ...webGradientLayerStyle,
+                                borderRadius: 10,
+                                background: `linear-gradient(135deg, ${gridStart}, ${gridEnd})`,
+                              },
+                            })
+                          : (
+                              <View
+                                style={[StyleSheet.absoluteFillObject, { borderRadius: 10, backgroundColor: gridStart }]}
+                              />
+                            )
+                        : null}
+                      <Text style={[styles.quickSelectLabel, { color: active ? "#06101a" : textColor }]}>
+                        {item.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
             <Text numberOfLines={1} style={[styles.quickControlHint, { color: mutedTextColor }]}>
-              Ampere manuell nur im Netz-Modus
+              {isGridMode ? "Manuell steuerbar" : "Automatik aktiv (Ist-Werte)"}
             </Text>
-          ) : null}
-        </View>
+          </View>
+        ) : null}
 
         {config.showStatusSubtitle === true ? (
           <Text numberOfLines={2} style={[styles.subtitleBottom, { color: mutedTextColor }]}>
@@ -731,25 +727,19 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
               },
             ]}
           >
-            <Text numberOfLines={1} style={[styles.metricLabel, { color: mutedTextColor }]}>
-              Laden jetzt
-            </Text>
+            <Text numberOfLines={1} style={[styles.metricLabel, { color: mutedTextColor }]}>Ladeleistung</Text>
             <Text numberOfLines={1} style={[styles.metricValue, { color: textColor }]}>
               {formatPowerKW(chargingPowerW)}
             </Text>
           </View>
           <View style={[styles.metricCard, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
-            <Text numberOfLines={1} style={[styles.metricLabel, { color: mutedTextColor }]}>
-              Gesamt geladen
-            </Text>
+            <Text numberOfLines={1} style={[styles.metricLabel, { color: mutedTextColor }]}>Gesamt</Text>
             <Text numberOfLines={1} style={[styles.metricValue, { color: textColor }]}>
               {formatEnergyKWh(chargedEnergyKWh)}
             </Text>
           </View>
           <View style={[styles.metricCard, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
-            <Text numberOfLines={1} style={[styles.metricLabel, { color: mutedTextColor }]}>
-              Auto SoC
-            </Text>
+            <Text numberOfLines={1} style={[styles.metricLabel, { color: mutedTextColor }]}>Auto Akku</Text>
             <Text numberOfLines={1} style={[styles.metricValue, { color: textColor }]}>
               {formatPercent(batterySoc)}
             </Text>
@@ -758,9 +748,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
 
         <View style={styles.powerBarBlock}>
           <View style={styles.powerBarHeader}>
-            <Text numberOfLines={1} style={[styles.powerBarLabel, { color: mutedTextColor }]}>
-              Ladeleistung 0-11 kW
-            </Text>
+            <Text numberOfLines={1} style={[styles.powerBarLabel, { color: mutedTextColor }]}>Ladeleistung 0-11 kW</Text>
             <Text numberOfLines={1} style={[styles.powerBarValue, { color: textColor }]}>
               {formatPowerKW(chargingPowerW)}
             </Text>
@@ -852,6 +840,11 @@ function resolveStateId(candidate: string | undefined, fallback: string) {
   return trimmed || fallback;
 }
 
+function resolveStateIdWithLegacy(candidate: string | undefined, fallback: string, legacyFallback: string) {
+  const resolved = resolveStateId(candidate, fallback);
+  return resolved === legacyFallback ? fallback : resolved;
+}
+
 function clampInt(value: number | undefined, fallback: number, min: number) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return fallback;
@@ -864,13 +857,96 @@ function clampAmpere(value: number) {
 }
 
 function normalizeMode(value: unknown): WallboxMode | null {
+  const numeric = normalizeInteger(value);
+  if (numeric === 0) {
+    return "stop";
+  }
+  if (numeric === 1) {
+    return "pv";
+  }
+  if (numeric === 2) {
+    return "pvPriority";
+  }
+  if (numeric === 3) {
+    return "grid";
+  }
+
   const normalized = String(value ?? "")
     .trim()
     .toLowerCase();
-  if (normalized === "off" || normalized === "pv" || normalized === "grid") {
-    return normalized;
+  if (!normalized) {
+    return null;
+  }
+
+  if (["off", "stop", "aus", "paused", "disabled"].includes(normalized)) {
+    return "stop";
+  }
+  if (["pv", "pv only", "pv_only", "pvonly", "1"].includes(normalized)) {
+    return "pv";
+  }
+  if (
+    [
+      "pv priority",
+      "pv_priority",
+      "pv-priority",
+      "pv (go-e priority)",
+      "pv only (go-e = priority)",
+      "2",
+    ].includes(normalized)
+  ) {
+    return "pvPriority";
+  }
+  if (["grid", "grid mode", "netz", "3"].includes(normalized)) {
+    return "grid";
   }
   return null;
+}
+
+function resolveWallboxMode(rawMode: unknown, allowCharging: boolean | null) {
+  if (allowCharging === false) {
+    return "stop" as WallboxMode;
+  }
+  return normalizeMode(rawMode) ?? "stop";
+}
+
+function resolveModeWriteValue(rawMode: unknown, nextMode: WallboxMode) {
+  const numeric = normalizeInteger(rawMode);
+  if (numeric !== null) {
+    if (nextMode === "stop") {
+      return null;
+    }
+    if (nextMode === "pv") {
+      return 1;
+    }
+    if (nextMode === "pvPriority") {
+      return 2;
+    }
+    return 3;
+  }
+
+  const normalized = String(rawMode ?? "")
+    .trim()
+    .toLowerCase();
+  if (!normalized) {
+    if (nextMode === "stop") {
+      return null;
+    }
+    if (nextMode === "pv") {
+      return 1;
+    }
+    if (nextMode === "pvPriority") {
+      return 2;
+    }
+    return 3;
+  }
+
+  if (nextMode === "stop") {
+    return "off";
+  }
+  if (nextMode === "grid") {
+    return "grid";
+  }
+  return "pv";
 }
 
 function normalizeAmpere(value: unknown) {
@@ -879,6 +955,15 @@ function normalizeAmpere(value: unknown) {
     return null;
   }
   return clampAmpere(numeric);
+}
+
+function normalizeTargetSocPercent(value: unknown) {
+  const numeric = normalizeInteger(value);
+  if (numeric === null) {
+    return null;
+  }
+  const clamped = Math.max(20, Math.min(100, Math.round(numeric / 10) * 10));
+  return clamped;
 }
 
 function normalizePowerToWatts(value: unknown) {
@@ -996,47 +1081,15 @@ function normalizeBoolean(value: unknown) {
   return null;
 }
 
-function mapPhaseMode(value: unknown) {
-  const normalized = String(value ?? "")
-    .trim()
-    .toLowerCase();
-  if (!normalized) {
-    return "-";
+function resolvePhaseSelection(raw: unknown): 1 | 3 | null {
+  const numeric = normalizeInteger(raw);
+  if (numeric === 1) {
+    return 1;
   }
-  if (
-    normalized === "0" ||
-    normalized === "auto" ||
-    normalized === "automatic" ||
-    normalized === "automatisch"
-  ) {
-    return "Automatisch";
+  if (numeric === 2 || numeric === 3) {
+    return 3;
   }
-  if (
-    normalized === "1" ||
-    normalized === "1p" ||
-    normalized === "single" ||
-    normalized === "force_1_phase" ||
-    normalized === "force_1" ||
-    normalized === "single_phase" ||
-    normalized === "one_phase"
-  ) {
-    return "1 Phase";
-  }
-  if (
-    normalized === "2" ||
-    normalized === "3" ||
-    normalized === "3p" ||
-    normalized === "force_3_phase" ||
-    normalized === "force_3" ||
-    normalized === "three" ||
-    normalized === "three_phase"
-  ) {
-    return "3 Phasen";
-  }
-  return normalized;
-}
 
-function resolvePhaseControlSelection(raw: unknown): 1 | 3 | null {
   const normalized = String(raw ?? "")
     .trim()
     .toLowerCase();
@@ -1044,7 +1097,6 @@ function resolvePhaseControlSelection(raw: unknown): 1 | 3 | null {
     return null;
   }
   if (
-    normalized === "1" ||
     normalized === "1p" ||
     normalized === "single" ||
     normalized === "force_1_phase" ||
@@ -1055,12 +1107,10 @@ function resolvePhaseControlSelection(raw: unknown): 1 | 3 | null {
     return 1;
   }
   if (
-    normalized === "2" ||
-    normalized === "3" ||
     normalized === "3p" ||
+    normalized === "three" ||
     normalized === "force_3_phase" ||
     normalized === "force_3" ||
-    normalized === "three" ||
     normalized === "three_phase"
   ) {
     return 3;
@@ -1068,40 +1118,33 @@ function resolvePhaseControlSelection(raw: unknown): 1 | 3 | null {
   return null;
 }
 
-function resolvePhaseCount(raw: unknown) {
+function resolvePhaseWriteValue(raw: unknown, phase: 1 | 3) {
+  const numeric = normalizeInteger(raw);
+  if (numeric !== null) {
+    if (numeric === 3) {
+      return phase === 1 ? 1 : 3;
+    }
+    return phase === 1 ? 1 : 2;
+  }
+
   const normalized = String(raw ?? "")
     .trim()
     .toLowerCase();
-  if (
-    normalized === "1" ||
-    normalized === "1p" ||
-    normalized === "single" ||
-    normalized === "force_1_phase" ||
-    normalized === "force_1" ||
-    normalized === "single_phase" ||
-    normalized === "one_phase"
-  ) {
-    return 1;
+  if (normalized.includes("force_")) {
+    return phase === 1 ? "force_1_phase" : "force_3_phase";
   }
-  if (
-    normalized === "2" ||
-    normalized === "3" ||
-    normalized === "3p" ||
-    normalized === "force_3_phase" ||
-    normalized === "force_3" ||
-    normalized === "three" ||
-    normalized === "three_phase"
-  ) {
-    return 3;
+  if (normalized === "1p" || normalized === "3p") {
+    return phase === 1 ? "1p" : "3p";
   }
-  return 1;
+
+  return phase === 1 ? 1 : 2;
 }
 
-function estimateChargingPowerW(liveAmpere: number | null, phaseModeRaw: unknown) {
+function estimateChargingPowerW(liveAmpere: number | null, phaseSelection: 1 | 3 | null) {
   if (liveAmpere === null || !Number.isFinite(liveAmpere) || liveAmpere <= 0) {
     return 0;
   }
-  const phaseCount = resolvePhaseCount(phaseModeRaw);
+  const phaseCount = phaseSelection === 3 ? 3 : 1;
   const estimated = liveAmpere * PHASE_VOLTAGE_V * phaseCount;
   if (!Number.isFinite(estimated) || estimated < 0) {
     return 0;
@@ -1136,24 +1179,29 @@ function formatPercent(value: number | null) {
 
 function modeStatusLabel(mode: WallboxMode) {
   if (mode === "pv") {
-    return "PV-Ueberschussladen aktiv";
+    return "PV aktiv";
+  }
+  if (mode === "pvPriority") {
+    return "PV (go-e priority) aktiv";
   }
   if (mode === "grid") {
-    return "Netzladen aktiv";
+    return "Netz-Modus aktiv";
   }
-  return "Laden deaktiviert";
+  return "Laden gestoppt";
 }
 
 function buildStatusSubtitle({
   mode,
   carCode,
   liveAmpere,
-  limit80Enabled,
+  targetSocEnabled,
+  targetSocPercent,
 }: {
   mode: WallboxMode;
   carCode: number | null;
   liveAmpere: number | null;
-  limit80Enabled: boolean;
+  targetSocEnabled: boolean;
+  targetSocPercent: number;
 }) {
   const parts: string[] = [];
   const hasCarSignal = carCode !== null;
@@ -1168,8 +1216,8 @@ function buildStatusSubtitle({
     parts.push("Fahrzeug bereit");
   }
   parts.push(modeStatusLabel(mode));
-  if (limit80Enabled) {
-    parts.push("80%-Begrenzung aktiv");
+  if (targetSocEnabled) {
+    parts.push(`Ziel-SoC ${targetSocPercent}%`);
   }
   return parts.join(" | ");
 }
@@ -1181,7 +1229,6 @@ function buildBlurredWidgetBackgroundStyle(imageName: string, blur: number) {
     filter: `blur(${blur}px)`,
   };
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

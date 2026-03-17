@@ -319,19 +319,21 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         refreshMs: String(widget.refreshMs || 2000),
         backgroundImage: widget.backgroundImage || "",
         backgroundImageBlur: String(widget.backgroundImageBlur ?? 8),
-        modeStateId: widget.modeStateId || "0_userdata.0.goe.mode",
-        gridAmpereStateId: widget.gridAmpereStateId || "0_userdata.0.goe.gridAmpere",
-        limit80StateId: widget.limit80StateId || "0_userdata.0.goe.limit80",
-        allowChargingStateId: widget.allowChargingStateId || "go-e.0.allow_charging",
-        solarLoadOnlyStateId: widget.solarLoadOnlyStateId || "go-e.0.solarLoadOnly",
-        phaseSwitchModeStateId: widget.phaseSwitchModeStateId || "go-e.0.phaseSwitchMode",
-        phaseSwitchModeEnabledStateId: widget.phaseSwitchModeEnabledStateId || "go-e.0.phaseSwitchModeEnabled",
-        ampereStateId: widget.ampereStateId || "go-e.0.ampere",
-        carStateId: widget.carStateId || "go-e.0.car",
-        batterySocStateId: widget.batterySocStateId || "go-e.0.carBatterySoc",
-        chargePowerStateId: widget.chargePowerStateId || "go-e.0.nrg.11",
+        modeStateId: widget.modeStateId || "go-e-gemini-adapter.0.control.mode",
+        gridAmpereStateId: widget.gridAmpereStateId || "go-e-gemini-adapter.0.control.gridManual.currentA",
+        limit80StateId: widget.limit80StateId || "go-e-gemini-adapter.0.control.targetSocPercent",
+        allowChargingStateId: widget.allowChargingStateId || "go-e-gemini-adapter.0.control.allowCharging",
+        solarLoadOnlyStateId: widget.solarLoadOnlyStateId || "",
+        phaseSwitchModeStateId: widget.phaseSwitchModeStateId || "go-e-gemini-adapter.0.control.gridManual.phaseMode",
+        phaseSwitchModeEnabledStateId:
+          widget.phaseSwitchModeEnabledStateId || "go-e-gemini-adapter.0.status.enabledPhases",
+        ampereStateId: widget.ampereStateId || "go-e-gemini-adapter.0.status.setCurrentA",
+        carStateId: widget.carStateId || "go-e-gemini-adapter.0.status.carState",
+        batterySocStateId: widget.batterySocStateId || "go-e-gemini-adapter.0.status.carSocPercent",
+        chargePowerStateId: widget.chargePowerStateId || "go-e-gemini-adapter.0.status.chargerPowerW",
         chargedEnergyStateId: widget.chargedEnergyStateId || "go-e.0.eto",
-        stopChargeingAtCarSoc80StateId: widget.stopChargeingAtCarSoc80StateId || "go-e.0.stopChargeingAtCarSoc80",
+        stopChargeingAtCarSoc80StateId:
+          widget.stopChargeingAtCarSoc80StateId || "go-e-gemini-adapter.0.control.targetSocEnabled",
         ...appearanceDraft,
       });
       return;
@@ -1944,21 +1946,21 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 </Field>
 
                 <Text style={styles.sectionTitle}>Steuerbare Datenpunkte</Text>
-                <Field label="Mode State ID">
+                <Field label="Betriebsart (control.mode)">
                   <StateFieldInput
                     onBrowse={() => setPickerField("modeStateId")}
                     onChangeText={(value) => setDraft((current) => ({ ...current, modeStateId: value }))}
                     value={draft.modeStateId || ""}
                   />
                 </Field>
-                <Field label="Grid Ampere State ID">
+                <Field label="Netzstrom (control.gridManual.currentA)">
                   <StateFieldInput
                     onBrowse={() => setPickerField("gridAmpereStateId")}
                     onChangeText={(value) => setDraft((current) => ({ ...current, gridAmpereStateId: value }))}
                     value={draft.gridAmpereStateId || ""}
                   />
                 </Field>
-                <Field label="Limit 80 State ID">
+                <Field label="Ziel-SoC Prozent (control.targetSocPercent)">
                   <StateFieldInput
                     onBrowse={() => setPickerField("limit80StateId")}
                     onChangeText={(value) => setDraft((current) => ({ ...current, limit80StateId: value }))}
@@ -1968,14 +1970,14 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
 
                 <Text style={styles.sectionTitle}>Optionale Live-Infos</Text>
                 <View style={styles.splitRow}>
-                  <Field label="allow_charging">
+                  <Field label="Freigabe (control.allowCharging)">
                     <StateFieldInput
                       onBrowse={() => setPickerField("allowChargingStateId")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, allowChargingStateId: value }))}
                       value={draft.allowChargingStateId || ""}
                     />
                   </Field>
-                  <Field label="solarLoadOnly">
+                  <Field label="Legacy: solarLoadOnly (optional)">
                     <StateFieldInput
                       onBrowse={() => setPickerField("solarLoadOnlyStateId")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, solarLoadOnlyStateId: value }))}
@@ -1984,14 +1986,14 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   </Field>
                 </View>
                 <View style={styles.splitRow}>
-                  <Field label="phaseSwitchMode">
+                  <Field label="Netz-Phasenmodus (control.gridManual.phaseMode)">
                     <StateFieldInput
                       onBrowse={() => setPickerField("phaseSwitchModeStateId")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, phaseSwitchModeStateId: value }))}
                       value={draft.phaseSwitchModeStateId || ""}
                     />
                   </Field>
-                  <Field label="phaseSwitchModeEnabled">
+                  <Field label="Aktive Phasen (status.enabledPhases)">
                     <StateFieldInput
                       onBrowse={() => setPickerField("phaseSwitchModeEnabledStateId")}
                       onChangeText={(value) =>
@@ -2002,7 +2004,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   </Field>
                 </View>
                 <View style={styles.splitRow}>
-                  <Field label="ampere">
+                  <Field label="Aktueller Sollstrom (status.setCurrentA)">
                     <StateFieldInput
                       onBrowse={() => setPickerField("ampereStateId")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, ampereStateId: value }))}
@@ -2011,14 +2013,14 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   </Field>
                 </View>
                 <View style={styles.splitRow}>
-                  <Field label="car">
+                  <Field label="Fahrzeugstatus (status.carState)">
                     <StateFieldInput
                       onBrowse={() => setPickerField("carStateId")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, carStateId: value }))}
                       value={draft.carStateId || ""}
                     />
                   </Field>
-                  <Field label="carBatterySoc">
+                  <Field label="Fahrzeug-SoC (status.carSocPercent)">
                     <StateFieldInput
                       onBrowse={() => setPickerField("batterySocStateId")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, batterySocStateId: value }))}
@@ -2027,7 +2029,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   </Field>
                 </View>
                 <View style={styles.splitRow}>
-                  <Field label="chargePower (kW/W)">
+                  <Field label="Ladeleistung (status.chargerPowerW)">
                     <StateFieldInput
                       onBrowse={() => setPickerField("chargePowerStateId")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, chargePowerStateId: value }))}
@@ -2042,7 +2044,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     />
                   </Field>
                 </View>
-                <Field label="stopChargeingAtCarSoc80">
+                <Field label="Ziel-SoC aktiv (control.targetSocEnabled)">
                   <StateFieldInput
                     onBrowse={() => setPickerField("stopChargeingAtCarSoc80StateId")}
                     onChangeText={(value) =>
@@ -2051,9 +2053,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={draft.stopChargeingAtCarSoc80StateId || ""}
                   />
                 </Field>
-                <Text style={styles.mappingHint}>
-                  `carBatterySoc` sollte den aktuellen Fahrzeug-SoC in Prozent liefern.
-                </Text>
+                <Text style={styles.mappingHint}>`status.carSocPercent` sollte den Fahrzeug-SoC in Prozent liefern.</Text>
 
                 <Field label="Sounds bei Interaktion">
                   <Field label="Button Press">
@@ -2062,7 +2062,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       value={soundDraft.press}
                     />
                   </Field>
-                  <Field label="Slider Bewegung">
+                  <Field label="Karten-Auswahl">
                     <SoundPickerField
                       onChange={(value) => setSoundDraft((current) => ({ ...current, slider: value }))}
                       value={soundDraft.slider}
