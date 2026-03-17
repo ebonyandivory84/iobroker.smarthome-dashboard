@@ -321,6 +321,58 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         refreshMs: String(widget.refreshMs || 2000),
         backgroundImage: widget.backgroundImage || "",
         backgroundImageBlur: String(widget.backgroundImageBlur ?? 8),
+        stopWriteStateId: widget.stopWriteStateId || widget.allowChargingStateId || "go-e-gemini-adapter.0.control.allowCharging",
+        stopStateId:
+          widget.stopStateId ||
+          resolveMappedStateId(
+            widget.stopWriteStateId || widget.allowChargingStateId || "go-e-gemini-adapter.0.control.allowCharging",
+            ".control.allowCharging",
+            ".status.effectiveAllowCharging"
+          ) ||
+          "go-e-gemini-adapter.0.status.effectiveAllowCharging",
+        pvWriteStateId: widget.pvWriteStateId || widget.modeStateId || "go-e-gemini-adapter.0.control.mode",
+        pvStateId:
+          widget.pvStateId ||
+          resolveMappedStateId(
+            widget.pvWriteStateId || widget.modeStateId || "go-e-gemini-adapter.0.control.mode",
+            ".control.mode",
+            ".status.activeMode"
+          ) ||
+          "go-e-gemini-adapter.0.status.activeMode",
+        pvPriorityWriteStateId: widget.pvPriorityWriteStateId || widget.modeStateId || "go-e-gemini-adapter.0.control.mode",
+        pvPriorityStateId:
+          widget.pvPriorityStateId ||
+          resolveMappedStateId(
+            widget.pvPriorityWriteStateId || widget.modeStateId || "go-e-gemini-adapter.0.control.mode",
+            ".control.mode",
+            ".status.activeMode"
+          ) ||
+          "go-e-gemini-adapter.0.status.activeMode",
+        gridWriteStateId: widget.gridWriteStateId || widget.modeStateId || "go-e-gemini-adapter.0.control.mode",
+        gridStateId:
+          widget.gridStateId ||
+          resolveMappedStateId(
+            widget.gridWriteStateId || widget.modeStateId || "go-e-gemini-adapter.0.control.mode",
+            ".control.mode",
+            ".status.activeMode"
+          ) ||
+          "go-e-gemini-adapter.0.status.activeMode",
+        manualCurrentWriteStateId:
+          widget.manualCurrentWriteStateId || widget.gridAmpereStateId || "go-e-gemini-adapter.0.control.gridManual.currentA",
+        manualCurrentStateId: widget.manualCurrentStateId || widget.ampereStateId || "go-e-gemini-adapter.0.status.setCurrentA",
+        ampereCardsWriteStateId:
+          widget.ampereCardsWriteStateId || widget.gridAmpereStateId || "go-e-gemini-adapter.0.control.gridManual.currentA",
+        ampereCardsStateId: widget.ampereCardsStateId || widget.ampereStateId || "go-e-gemini-adapter.0.status.setCurrentA",
+        phaseCardsWriteStateId:
+          widget.phaseCardsWriteStateId || widget.phaseSwitchModeStateId || "go-e-gemini-adapter.0.control.gridManual.phaseMode",
+        phaseCardsStateId:
+          widget.phaseCardsStateId ||
+          resolveMappedStateId(
+            widget.phaseCardsWriteStateId || widget.phaseSwitchModeStateId || "go-e-gemini-adapter.0.control.gridManual.phaseMode",
+            ".control.gridManual.phaseMode",
+            ".status.targetPhaseMode"
+          ) ||
+          "go-e-gemini-adapter.0.status.targetPhaseMode",
         modeStateId: widget.modeStateId || "go-e-gemini-adapter.0.control.mode",
         gridAmpereStateId: widget.gridAmpereStateId || "go-e-gemini-adapter.0.control.gridManual.currentA",
         limit80StateId: widget.limit80StateId || "go-e-gemini-adapter.0.control.targetSocPercent",
@@ -730,15 +782,31 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 500),
         backgroundImage: draft.backgroundImage?.trim() || undefined,
         backgroundImageBlur: clampInt(draft.backgroundImageBlur, widget.backgroundImageBlur ?? 8, 0),
-        modeStateId: draft.modeStateId?.trim() || widget.modeStateId,
-        gridAmpereStateId: draft.gridAmpereStateId?.trim() || widget.gridAmpereStateId,
+        stopWriteStateId: draft.stopWriteStateId?.trim() || undefined,
+        stopStateId: draft.stopStateId?.trim() || undefined,
+        pvWriteStateId: draft.pvWriteStateId?.trim() || undefined,
+        pvStateId: draft.pvStateId?.trim() || undefined,
+        pvPriorityWriteStateId: draft.pvPriorityWriteStateId?.trim() || undefined,
+        pvPriorityStateId: draft.pvPriorityStateId?.trim() || undefined,
+        gridWriteStateId: draft.gridWriteStateId?.trim() || undefined,
+        gridStateId: draft.gridStateId?.trim() || undefined,
+        manualCurrentWriteStateId: draft.manualCurrentWriteStateId?.trim() || undefined,
+        manualCurrentStateId: draft.manualCurrentStateId?.trim() || undefined,
+        ampereCardsWriteStateId: draft.ampereCardsWriteStateId?.trim() || undefined,
+        ampereCardsStateId: draft.ampereCardsStateId?.trim() || undefined,
+        phaseCardsWriteStateId: draft.phaseCardsWriteStateId?.trim() || undefined,
+        phaseCardsStateId: draft.phaseCardsStateId?.trim() || undefined,
+        modeStateId: draft.pvWriteStateId?.trim() || draft.modeStateId?.trim() || widget.modeStateId,
+        gridAmpereStateId:
+          draft.manualCurrentWriteStateId?.trim() || draft.gridAmpereStateId?.trim() || widget.gridAmpereStateId,
         limit80StateId: draft.limit80StateId?.trim() || widget.limit80StateId,
         targetKmStateId: draft.targetKmStateId?.trim() || undefined,
-        allowChargingStateId: draft.allowChargingStateId?.trim() || undefined,
+        allowChargingStateId: draft.stopWriteStateId?.trim() || draft.allowChargingStateId?.trim() || undefined,
         solarLoadOnlyStateId: draft.solarLoadOnlyStateId?.trim() || undefined,
-        phaseSwitchModeStateId: draft.phaseSwitchModeStateId?.trim() || undefined,
+        phaseSwitchModeStateId:
+          draft.phaseCardsWriteStateId?.trim() || draft.phaseSwitchModeStateId?.trim() || undefined,
         phaseSwitchModeEnabledStateId: draft.phaseSwitchModeEnabledStateId?.trim() || undefined,
-        ampereStateId: draft.ampereStateId?.trim() || undefined,
+        ampereStateId: draft.manualCurrentStateId?.trim() || draft.ampereStateId?.trim() || undefined,
         carStateId: draft.carStateId?.trim() || undefined,
         batterySocStateId: draft.batterySocStateId?.trim() || undefined,
         carRangeStateId: draft.carRangeStateId?.trim() || undefined,
@@ -1973,32 +2041,121 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 </View>
 
                 <View style={styles.groupCard}>
-                  <Text style={styles.groupTitle}>Steuerbare Datenpunkte</Text>
-                  <Field label="Betriebsart (control.mode)">
-                    <StateFieldInput
-                      onBrowse={() => setPickerField("modeStateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, modeStateId: value }))}
-                      value={draft.modeStateId || ""}
-                    />
-                  </Field>
+                  <Text style={styles.groupTitle}>Schreiben + Status-Bestaetigung</Text>
                   <View style={styles.splitRow}>
-                    <Field label="Netzstrom (control.gridManual.currentA)">
+                    <Field label="Stopp - Write Value">
                       <StateFieldInput
-                        onBrowse={() => setPickerField("gridAmpereStateId")}
-                        onChangeText={(value) => setDraft((current) => ({ ...current, gridAmpereStateId: value }))}
-                        value={draft.gridAmpereStateId || ""}
+                        onBrowse={() => setPickerField("stopWriteStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, stopWriteStateId: value }))}
+                        value={draft.stopWriteStateId || ""}
                       />
                     </Field>
-                    <Field label="Netz-Phasenmodus (control.gridManual.phaseMode)">
+                    <Field label="Stopp - State Value">
                       <StateFieldInput
-                        onBrowse={() => setPickerField("phaseSwitchModeStateId")}
-                        onChangeText={(value) => setDraft((current) => ({ ...current, phaseSwitchModeStateId: value }))}
-                        value={draft.phaseSwitchModeStateId || ""}
+                        onBrowse={() => setPickerField("stopStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, stopStateId: value }))}
+                        value={draft.stopStateId || ""}
                       />
                     </Field>
                   </View>
                   <View style={styles.splitRow}>
-                    <Field label="Ziel-SoC Prozent (control.targetSocPercent)">
+                    <Field label="PV - Write Value">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("pvWriteStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, pvWriteStateId: value }))}
+                        value={draft.pvWriteStateId || ""}
+                      />
+                    </Field>
+                    <Field label="PV - State Value">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("pvStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, pvStateId: value }))}
+                        value={draft.pvStateId || ""}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="PV (go-e priority) - Write Value">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("pvPriorityWriteStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, pvPriorityWriteStateId: value }))}
+                        value={draft.pvPriorityWriteStateId || ""}
+                      />
+                    </Field>
+                    <Field label="PV (go-e priority) - State Value">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("pvPriorityStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, pvPriorityStateId: value }))}
+                        value={draft.pvPriorityStateId || ""}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Netz - Write Value">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("gridWriteStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, gridWriteStateId: value }))}
+                        value={draft.gridWriteStateId || ""}
+                      />
+                    </Field>
+                    <Field label="Netz - State Value">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("gridStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, gridStateId: value }))}
+                        value={draft.gridStateId || ""}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Wallbox-Strom (manuell) - Write Value">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("manualCurrentWriteStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, manualCurrentWriteStateId: value }))}
+                        value={draft.manualCurrentWriteStateId || ""}
+                      />
+                    </Field>
+                    <Field label="Wallbox-Strom (manuell) - State Value">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("manualCurrentStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, manualCurrentStateId: value }))}
+                        value={draft.manualCurrentStateId || ""}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Ampere-Cards - Write Value">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("ampereCardsWriteStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, ampereCardsWriteStateId: value }))}
+                        value={draft.ampereCardsWriteStateId || ""}
+                      />
+                    </Field>
+                    <Field label="Ampere-Cards - State Value">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("ampereCardsStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, ampereCardsStateId: value }))}
+                        value={draft.ampereCardsStateId || ""}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Phasen-Cards - Write Value">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("phaseCardsWriteStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, phaseCardsWriteStateId: value }))}
+                        value={draft.phaseCardsWriteStateId || ""}
+                      />
+                    </Field>
+                    <Field label="Phasen-Cards - State Value">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("phaseCardsStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, phaseCardsStateId: value }))}
+                        value={draft.phaseCardsStateId || ""}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Ziel-SoC Prozent (write only, 0-100)">
                       <StateFieldInput
                         onBrowse={() => setPickerField("limit80StateId")}
                         onChangeText={(value) => setDraft((current) => ({ ...current, limit80StateId: value }))}
@@ -2022,13 +2179,10 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       value={draft.stopChargeingAtCarSoc80StateId || ""}
                     />
                   </Field>
-                  <Field label="Freigabe (control.allowCharging)">
-                    <StateFieldInput
-                      onBrowse={() => setPickerField("allowChargingStateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, allowChargingStateId: value }))}
-                      value={draft.allowChargingStateId || ""}
-                    />
-                  </Field>
+                  <Text style={styles.mappingHint}>
+                    Fuer `control.targetSocPercent` gibt es keinen passenden Status-Spiegelwert. Dieser Datenpunkt wird
+                    deshalb als write only genutzt.
+                  </Text>
                 </View>
 
                 <View style={styles.groupCard}>
@@ -3402,6 +3556,17 @@ function applyObjectSelection(
   }
 
   onChange((current) => ({ ...current, [fieldKey]: objectId }));
+}
+
+function resolveMappedStateId(sourceStateId: string | undefined, fromSegment: string, toSegment: string) {
+  const source = (sourceStateId || "").trim();
+  if (!source) {
+    return "";
+  }
+  if (!source.includes(fromSegment)) {
+    return "";
+  }
+  return source.replace(fromSegment, toSegment);
 }
 
 function ColorInputRow({

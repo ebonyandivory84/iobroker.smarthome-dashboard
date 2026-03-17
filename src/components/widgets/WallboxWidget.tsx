@@ -11,6 +11,13 @@ type WallboxWidgetProps = {
 };
 
 type WallboxMode = "stop" | "pv" | "pvPriority" | "grid";
+type PendingConfirmation = {
+  pendingKey: string;
+  watchStateId: string;
+  confirmKey: string;
+  matcher: (value: unknown) => boolean;
+  timeoutAt: number;
+};
 
 const DEFAULT_REFRESH_MS = 2000;
 const MIN_REFRESH_MS = 500;
@@ -28,17 +35,29 @@ const CHARGING_INDICATOR_BLINK_MS = 720;
 const CHARGING_BAR_MAX_POWER_W = 11000;
 const CHARGING_BAR_GLOW_CYCLE_MS = 2000;
 const AMPERE_PRESET_VALUES = [6, 10, 12, 14, 16] as const;
+const CONFIRMATION_TIMEOUT_MS = 12_000;
 
-const DEFAULT_IDS = {
+const WRITE_DEFAULT_IDS = {
+  stop: "go-e-gemini-adapter.0.control.allowCharging",
   mode: "go-e-gemini-adapter.0.control.mode",
-  gridAmpere: "go-e-gemini-adapter.0.control.gridManual.currentA",
+  manualCurrent: "go-e-gemini-adapter.0.control.gridManual.currentA",
+  phaseCards: "go-e-gemini-adapter.0.control.gridManual.phaseMode",
   targetSocPercent: "go-e-gemini-adapter.0.control.targetSocPercent",
   targetKm: "",
   targetSocEnabled: "go-e-gemini-adapter.0.control.targetSocEnabled",
-  allowCharging: "go-e-gemini-adapter.0.control.allowCharging",
-  gridPhaseMode: "go-e-gemini-adapter.0.control.gridManual.phaseMode",
+} as const;
+
+const STATUS_DEFAULT_IDS = {
+  stop: "go-e-gemini-adapter.0.status.effectiveAllowCharging",
+  mode: "go-e-gemini-adapter.0.status.activeMode",
+  manualCurrent: "go-e-gemini-adapter.0.status.setCurrentA",
+  ampereCards: "go-e-gemini-adapter.0.status.setCurrentA",
+  phaseCards: "go-e-gemini-adapter.0.status.targetPhaseMode",
+} as const;
+
+const READ_DEFAULT_IDS = {
   actualPhaseCount: "go-e-gemini-adapter.0.status.enabledPhases",
-  actualAmpere: "go-e-gemini-adapter.0.status.setCurrentA",
+  liveAmpere: "go-e-gemini-adapter.0.status.setCurrentA",
   car: "go-e-gemini-adapter.0.status.carState",
   batterySoc: "go-e-gemini-adapter.0.status.carSocPercent",
   carRange: "",
@@ -46,16 +65,27 @@ const DEFAULT_IDS = {
   chargedEnergy: "go-e.0.eto",
 } as const;
 
-const LEGACY_IDS = {
+const LEGACY_WRITE_IDS = {
+  stop: "go-e.0.allow_charging",
   mode: "0_userdata.0.goe.mode",
-  gridAmpere: "0_userdata.0.goe.gridAmpere",
+  manualCurrent: "0_userdata.0.goe.gridAmpere",
+  phaseCards: "go-e.0.phaseSwitchMode",
   targetSocPercent: "0_userdata.0.goe.limit80",
   targetKm: "",
   targetSocEnabled: "go-e.0.stopChargeingAtCarSoc80",
-  allowCharging: "go-e.0.allow_charging",
-  gridPhaseMode: "go-e.0.phaseSwitchMode",
+} as const;
+
+const LEGACY_STATUS_IDS = {
+  stop: "go-e.0.allow_charging",
+  mode: "0_userdata.0.goe.mode",
+  manualCurrent: "go-e.0.ampere",
+  ampereCards: "go-e.0.ampere",
+  phaseCards: "go-e.0.phaseSwitchModeEnabled",
+} as const;
+
+const LEGACY_READ_IDS = {
   actualPhaseCount: "go-e.0.phaseSwitchModeEnabled",
-  actualAmpere: "go-e.0.ampere",
+  liveAmpere: "go-e.0.ampere",
   car: "go-e.0.car",
   batterySoc: "go-e.0.carBatterySoc",
   carRange: "",
@@ -65,58 +95,136 @@ const LEGACY_IDS = {
 
 export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const stateIds = useMemo(
-    () => ({
-      mode: resolveStateIdWithLegacy(config.modeStateId, DEFAULT_IDS.mode, LEGACY_IDS.mode),
-      gridAmpere: resolveStateIdWithLegacy(config.gridAmpereStateId, DEFAULT_IDS.gridAmpere, LEGACY_IDS.gridAmpere),
-      targetSocPercent: resolveStateIdWithLegacy(
-        config.limit80StateId,
-        DEFAULT_IDS.targetSocPercent,
-        LEGACY_IDS.targetSocPercent
-      ),
-      targetKm: resolveOptionalStateId(config.targetKmStateId, DEFAULT_IDS.targetKm),
-      targetSocEnabled: resolveStateIdWithLegacy(
-        config.stopChargeingAtCarSoc80StateId,
-        DEFAULT_IDS.targetSocEnabled,
-        LEGACY_IDS.targetSocEnabled
-      ),
-      allowCharging: resolveStateIdWithLegacy(
+    () => {
+      const modeWriteBase = resolveStateIdWithLegacy(config.modeStateId, WRITE_DEFAULT_IDS.mode, LEGACY_WRITE_IDS.mode);
+      const stopWriteBase = resolveStateIdWithLegacy(
         config.allowChargingStateId,
-        DEFAULT_IDS.allowCharging,
-        LEGACY_IDS.allowCharging
-      ),
-      gridPhaseMode: resolveStateIdWithLegacy(
+        WRITE_DEFAULT_IDS.stop,
+        LEGACY_WRITE_IDS.stop
+      );
+      const manualCurrentWriteBase = resolveStateIdWithLegacy(
+        config.gridAmpereStateId,
+        WRITE_DEFAULT_IDS.manualCurrent,
+        LEGACY_WRITE_IDS.manualCurrent
+      );
+      const phaseCardsWriteBase = resolveStateIdWithLegacy(
         config.phaseSwitchModeStateId,
-        DEFAULT_IDS.gridPhaseMode,
-        LEGACY_IDS.gridPhaseMode
-      ),
-      actualPhaseCount: resolveStateIdWithLegacy(
-        config.phaseSwitchModeEnabledStateId,
-        DEFAULT_IDS.actualPhaseCount,
-        LEGACY_IDS.actualPhaseCount
-      ),
-      actualAmpere: resolveStateIdWithLegacy(config.ampereStateId, DEFAULT_IDS.actualAmpere, LEGACY_IDS.actualAmpere),
-      car: resolveStateIdWithLegacy(config.carStateId, DEFAULT_IDS.car, LEGACY_IDS.car),
-      batterySoc: resolveStateIdWithLegacy(config.batterySocStateId, DEFAULT_IDS.batterySoc, LEGACY_IDS.batterySoc),
-      carRange: resolveOptionalStateId(config.carRangeStateId, DEFAULT_IDS.carRange),
-      chargePower: resolveStateIdWithLegacy(config.chargePowerStateId, DEFAULT_IDS.chargePower, LEGACY_IDS.chargePower),
-      chargedEnergy: resolveStateIdWithLegacy(
-        config.chargedEnergyStateId,
-        DEFAULT_IDS.chargedEnergy,
-        LEGACY_IDS.chargedEnergy
-      ),
-    }),
+        WRITE_DEFAULT_IDS.phaseCards,
+        LEGACY_WRITE_IDS.phaseCards
+      );
+      const manualCurrentStatusBase = resolveStateIdWithLegacy(
+        config.ampereStateId,
+        STATUS_DEFAULT_IDS.manualCurrent,
+        LEGACY_STATUS_IDS.manualCurrent
+      );
+
+      const write = {
+        stop: resolveStateId(config.stopWriteStateId, stopWriteBase),
+        pv: resolveStateId(config.pvWriteStateId, modeWriteBase),
+        pvPriority: resolveStateId(config.pvPriorityWriteStateId, modeWriteBase),
+        grid: resolveStateId(config.gridWriteStateId, modeWriteBase),
+        manualCurrent: resolveStateId(config.manualCurrentWriteStateId, manualCurrentWriteBase),
+        ampereCards: resolveStateId(config.ampereCardsWriteStateId, manualCurrentWriteBase),
+        phaseCards: resolveStateId(config.phaseCardsWriteStateId, phaseCardsWriteBase),
+        targetSocPercent: resolveStateIdWithLegacy(
+          config.limit80StateId,
+          WRITE_DEFAULT_IDS.targetSocPercent,
+          LEGACY_WRITE_IDS.targetSocPercent
+        ),
+        targetKm: resolveOptionalStateId(config.targetKmStateId, WRITE_DEFAULT_IDS.targetKm),
+        targetSocEnabled: resolveStateIdWithLegacy(
+          config.stopChargeingAtCarSoc80StateId,
+          WRITE_DEFAULT_IDS.targetSocEnabled,
+          LEGACY_WRITE_IDS.targetSocEnabled
+        ),
+      };
+
+      const status = {
+        stop: resolveStateIdWithLegacy(
+          config.stopStateId,
+          resolveMappedStatusId(write.stop, ".control.allowCharging", ".status.effectiveAllowCharging") ||
+            STATUS_DEFAULT_IDS.stop,
+          LEGACY_STATUS_IDS.stop
+        ),
+        pv: resolveStateIdWithLegacy(
+          config.pvStateId,
+          resolveMappedStatusId(write.pv, ".control.mode", ".status.activeMode") || STATUS_DEFAULT_IDS.mode,
+          LEGACY_STATUS_IDS.mode
+        ),
+        pvPriority: resolveStateIdWithLegacy(
+          config.pvPriorityStateId,
+          resolveMappedStatusId(write.pvPriority, ".control.mode", ".status.activeMode") || STATUS_DEFAULT_IDS.mode,
+          LEGACY_STATUS_IDS.mode
+        ),
+        grid: resolveStateIdWithLegacy(
+          config.gridStateId,
+          resolveMappedStatusId(write.grid, ".control.mode", ".status.activeMode") || STATUS_DEFAULT_IDS.mode,
+          LEGACY_STATUS_IDS.mode
+        ),
+        manualCurrent: resolveStateIdWithLegacy(
+          config.manualCurrentStateId,
+          manualCurrentStatusBase,
+          LEGACY_STATUS_IDS.manualCurrent
+        ),
+        ampereCards: resolveStateIdWithLegacy(
+          config.ampereCardsStateId,
+          manualCurrentStatusBase,
+          LEGACY_STATUS_IDS.ampereCards
+        ),
+        phaseCards: resolveStateIdWithLegacy(
+          config.phaseCardsStateId,
+          resolveMappedStatusId(write.phaseCards, ".control.gridManual.phaseMode", ".status.targetPhaseMode") ||
+            STATUS_DEFAULT_IDS.phaseCards,
+          LEGACY_STATUS_IDS.phaseCards
+        ),
+      };
+
+      const read = {
+        actualPhaseCount: resolveStateIdWithLegacy(
+          config.phaseSwitchModeEnabledStateId,
+          READ_DEFAULT_IDS.actualPhaseCount,
+          LEGACY_READ_IDS.actualPhaseCount
+        ),
+        liveAmpere: resolveStateIdWithLegacy(config.ampereStateId, READ_DEFAULT_IDS.liveAmpere, LEGACY_READ_IDS.liveAmpere),
+        car: resolveStateIdWithLegacy(config.carStateId, READ_DEFAULT_IDS.car, LEGACY_READ_IDS.car),
+        batterySoc: resolveStateIdWithLegacy(config.batterySocStateId, READ_DEFAULT_IDS.batterySoc, LEGACY_READ_IDS.batterySoc),
+        carRange: resolveOptionalStateId(config.carRangeStateId, READ_DEFAULT_IDS.carRange),
+        chargePower: resolveStateIdWithLegacy(config.chargePowerStateId, READ_DEFAULT_IDS.chargePower, LEGACY_READ_IDS.chargePower),
+        chargedEnergy: resolveStateIdWithLegacy(
+          config.chargedEnergyStateId,
+          READ_DEFAULT_IDS.chargedEnergy,
+          LEGACY_READ_IDS.chargedEnergy
+        ),
+      };
+
+      return { write, status, read };
+    },
     [
+      config.ampereCardsStateId,
+      config.ampereCardsWriteStateId,
       config.allowChargingStateId,
       config.ampereStateId,
       config.batterySocStateId,
       config.carStateId,
+      config.gridStateId,
       config.chargePowerStateId,
       config.chargedEnergyStateId,
       config.gridAmpereStateId,
+      config.gridWriteStateId,
       config.limit80StateId,
       config.modeStateId,
+      config.manualCurrentStateId,
+      config.manualCurrentWriteStateId,
       config.phaseSwitchModeEnabledStateId,
       config.phaseSwitchModeStateId,
+      config.phaseCardsStateId,
+      config.phaseCardsWriteStateId,
+      config.pvPriorityStateId,
+      config.pvPriorityWriteStateId,
+      config.pvStateId,
+      config.pvWriteStateId,
+      config.stopStateId,
+      config.stopWriteStateId,
       config.stopChargeingAtCarSoc80StateId,
       config.targetKmStateId,
       config.carRangeStateId,
@@ -129,14 +237,17 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const [powerBarTrackWidth, setPowerBarTrackWidth] = useState(0);
   const barGlowAnim = useRef(new Animated.Value(0)).current;
   const autoStopMarkerRef = useRef("");
+  const pendingConfirmationsRef = useRef<Record<string, PendingConfirmation>>({});
   const refreshMs = clampInt(config.refreshMs, DEFAULT_REFRESH_MS, MIN_REFRESH_MS);
+  const readIds = useMemo(
+    () => uniqueStateIds([...Object.values(stateIds.write), ...Object.values(stateIds.status), ...Object.values(stateIds.read)]),
+    [stateIds]
+  );
 
   useEffect(() => {
     let active = true;
     let inFlight = false;
     let pendingSync = false;
-
-    const readIds = uniqueStateIds(Object.values(stateIds));
 
     const sync = async () => {
       if (inFlight) {
@@ -172,7 +283,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       active = false;
       clearInterval(timer);
     };
-  }, [client, refreshMs, stateIds]);
+  }, [client, readIds, refreshMs]);
 
   const readValue = useCallback(
     (stateId: string) => {
@@ -184,32 +295,36 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     [stateSnapshot]
   );
 
-  const rawMode = readValue(stateIds.mode);
-  const allowCharging = normalizeBoolean(readValue(stateIds.allowCharging));
+  const rawMode =
+    readValue(stateIds.status.grid) ??
+    readValue(stateIds.status.pvPriority) ??
+    readValue(stateIds.status.pv) ??
+    readValue(stateIds.write.grid);
+  const allowCharging = normalizeBoolean(readValue(stateIds.status.stop));
   const mode = resolveWallboxMode(rawMode, allowCharging);
   const isGridMode = mode === "grid";
   const targetMode = config.targetMode === "km" ? "km" : "soc";
 
-  const gridAmpere = clampAmpere(normalizeAmpere(readValue(stateIds.gridAmpere)) ?? DEFAULT_GRID_AMPERE);
-  const targetSocPercent = normalizeTargetSocPercent(readValue(stateIds.targetSocPercent)) ?? DEFAULT_TARGET_SOC;
-  const targetKmValue = normalizeTargetKm(readValue(stateIds.targetKm)) ?? DEFAULT_TARGET_KM;
-  const targetSocEnabled = normalizeBoolean(readValue(stateIds.targetSocEnabled)) ?? true;
+  const gridAmpere = clampAmpere(normalizeAmpere(readValue(stateIds.status.manualCurrent)) ?? DEFAULT_GRID_AMPERE);
+  const targetSocPercent = normalizeTargetSocPercent(readValue(stateIds.write.targetSocPercent)) ?? DEFAULT_TARGET_SOC;
+  const targetKmValue = normalizeTargetKm(readValue(stateIds.write.targetKm)) ?? DEFAULT_TARGET_KM;
+  const targetSocEnabled = normalizeBoolean(readValue(stateIds.write.targetSocEnabled)) ?? true;
 
-  const gridPhaseRaw = readValue(stateIds.gridPhaseMode);
-  const actualPhaseRaw = readValue(stateIds.actualPhaseCount);
-  const gridPhaseSelection = resolvePhaseSelection(gridPhaseRaw);
-  const actualPhaseSelection = resolvePhaseSelection(actualPhaseRaw) ?? gridPhaseSelection;
-  const displayedPhaseSelection = (isGridMode ? gridPhaseSelection : actualPhaseSelection) ?? actualPhaseSelection;
+  const phaseCardRaw = readValue(stateIds.status.phaseCards);
+  const actualPhaseRaw = readValue(stateIds.read.actualPhaseCount);
+  const phaseCardSelection = resolvePhaseSelection(phaseCardRaw);
+  const actualPhaseSelection = resolvePhaseSelection(actualPhaseRaw) ?? phaseCardSelection;
+  const displayedPhaseSelection = (isGridMode ? phaseCardSelection : actualPhaseSelection) ?? actualPhaseSelection;
 
-  const liveAmpere = normalizeFloat(readValue(stateIds.actualAmpere));
+  const liveAmpere = normalizeFloat(readValue(stateIds.read.liveAmpere));
   const roundedLiveAmpere = liveAmpere === null ? null : Math.max(0, Math.round(liveAmpere));
   const displayAmpere = isGridMode ? gridAmpere : roundedLiveAmpere ?? gridAmpere;
 
-  const carCode = normalizeInteger(readValue(stateIds.car));
-  const batterySoc = normalizeFloat(readValue(stateIds.batterySoc));
-  const carRangeKm = normalizeFloat(readValue(stateIds.carRange));
-  const chargedEnergyKWh = normalizeEnergyToKWh(readValue(stateIds.chargedEnergy));
-  const directChargingPowerW = normalizePowerToWatts(readValue(stateIds.chargePower));
+  const carCode = normalizeInteger(readValue(stateIds.read.car));
+  const batterySoc = normalizeFloat(readValue(stateIds.read.batterySoc));
+  const carRangeKm = normalizeFloat(readValue(stateIds.read.carRange));
+  const chargedEnergyKWh = normalizeEnergyToKWh(readValue(stateIds.read.chargedEnergy));
+  const directChargingPowerW = normalizePowerToWatts(readValue(stateIds.read.chargePower));
   const estimatedChargingPowerW = estimateChargingPowerW(liveAmpere, actualPhaseSelection);
   const chargingPowerW = directChargingPowerW ?? estimatedChargingPowerW;
   const liveCharging =
@@ -305,28 +420,107 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     [config.id, config.interactionSounds?.confirm]
   );
 
-  const writeState = useCallback(
-    async (stateId: string, value: unknown, key: string) => {
-      if (!stateId) {
+  const clearPending = useCallback((pendingKey: string) => {
+    setPendingWrites((current) => ({ ...current, [pendingKey]: false }));
+  }, []);
+
+  const writeStateWithConfirmation = useCallback(
+    async ({
+      writeStateId,
+      value,
+      pendingKey,
+      confirmStateId,
+      confirmKey,
+      matcher,
+    }: {
+      writeStateId: string;
+      value: unknown;
+      pendingKey: string;
+      confirmStateId?: string;
+      confirmKey: string;
+      matcher?: (value: unknown) => boolean;
+    }) => {
+      if (!writeStateId) {
         return;
       }
-      setPendingWrites((current) => ({ ...current, [stateId]: true }));
-      setStateSnapshot((current) => ({
-        ...current,
-        [stateId]: value,
-      }));
+
+      const hasConfirmation = Boolean(confirmStateId && matcher);
+      setPendingWrites((current) => ({ ...current, [pendingKey]: true }));
       setError(null);
+
+      if (hasConfirmation) {
+        const confirmationId = `${pendingKey}:${Date.now()}:${Math.random().toString(36).slice(2, 9)}`;
+        pendingConfirmationsRef.current[confirmationId] = {
+          pendingKey,
+          watchStateId: confirmStateId || "",
+          confirmKey,
+          matcher: matcher || (() => false),
+          timeoutAt: Date.now() + CONFIRMATION_TIMEOUT_MS,
+        };
+      }
+
       try {
-        await client.writeState(stateId, value);
-        playConfirmSound(key);
+        await client.writeState(writeStateId, value);
       } catch (writeError) {
         setError(writeError instanceof Error ? writeError.message : "State konnte nicht geschrieben werden");
-      } finally {
-        setPendingWrites((current) => ({ ...current, [stateId]: false }));
+        clearPending(pendingKey);
+        return;
+      }
+
+      if (!hasConfirmation) {
+        playConfirmSound(confirmKey);
+        clearPending(pendingKey);
       }
     },
-    [client, playConfirmSound]
+    [clearPending, client, playConfirmSound]
   );
+
+  useEffect(() => {
+    const entries = Object.entries(pendingConfirmationsRef.current);
+    if (!entries.length) {
+      return;
+    }
+
+    const now = Date.now();
+    const resolved: PendingConfirmation[] = [];
+    const expired: PendingConfirmation[] = [];
+
+    entries.forEach(([confirmationId, confirmation]) => {
+      const currentValue = stateSnapshot[confirmation.watchStateId];
+      if (confirmation.matcher(currentValue)) {
+        resolved.push(confirmation);
+        delete pendingConfirmationsRef.current[confirmationId];
+        return;
+      }
+      if (now >= confirmation.timeoutAt) {
+        expired.push(confirmation);
+        delete pendingConfirmationsRef.current[confirmationId];
+      }
+    });
+
+    if (!resolved.length && !expired.length) {
+      return;
+    }
+
+    setPendingWrites((current) => {
+      const next = { ...current };
+      resolved.forEach((entry) => {
+        next[entry.pendingKey] = false;
+      });
+      expired.forEach((entry) => {
+        next[entry.pendingKey] = false;
+      });
+      return next;
+    });
+
+    resolved.forEach((entry) => {
+      playConfirmSound(entry.confirmKey);
+    });
+
+    if (expired.length) {
+      setError("Bestaetigung aus Status blieb aus");
+    }
+  }, [playConfirmSound, stateSnapshot]);
 
   const setMode = useCallback(
     (nextMode: WallboxMode) => {
@@ -336,27 +530,49 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       playPressSound(`mode:${nextMode}`);
       void (async () => {
         if (nextMode === "stop") {
-          await writeState(stateIds.allowCharging, false, "mode:stop:allowCharging");
-          const stopModeValue = resolveModeWriteValue(rawMode, "stop");
-          if (stopModeValue !== null) {
-            await writeState(stateIds.mode, stopModeValue, "mode:stop");
-          }
+          await writeStateWithConfirmation({
+            writeStateId: stateIds.write.stop,
+            value: false,
+            pendingKey: "mode:stop:allowCharging",
+            confirmStateId: stateIds.status.stop,
+            confirmKey: "mode:stop:allowCharging",
+            matcher: (value) => normalizeBoolean(value) === false,
+          });
           return;
         }
 
-        await writeState(stateIds.allowCharging, true, `mode:${nextMode}:allowCharging`);
-        const modeValue = resolveModeWriteValue(rawMode, nextMode);
+        await writeStateWithConfirmation({
+          writeStateId: stateIds.write.stop,
+          value: true,
+          pendingKey: `mode:${nextMode}:allowCharging`,
+          confirmStateId: stateIds.status.stop,
+          confirmKey: `mode:${nextMode}:allowCharging`,
+          matcher: (value) => normalizeBoolean(value) === true,
+        });
+
+        const writeStateId =
+          nextMode === "pv" ? stateIds.write.pv : nextMode === "pvPriority" ? stateIds.write.pvPriority : stateIds.write.grid;
+        const statusStateId =
+          nextMode === "pv" ? stateIds.status.pv : nextMode === "pvPriority" ? stateIds.status.pvPriority : stateIds.status.grid;
+        const modeValue = resolveModeWriteValue(readValue(writeStateId) ?? rawMode, nextMode);
         if (modeValue !== null) {
-          await writeState(stateIds.mode, modeValue, `mode:${nextMode}`);
+          await writeStateWithConfirmation({
+            writeStateId,
+            value: modeValue,
+            pendingKey: `mode:${nextMode}:mode`,
+            confirmStateId: statusStateId,
+            confirmKey: `mode:${nextMode}`,
+            matcher: (value) => normalizeMode(value) === nextMode,
+          });
         }
       })();
     },
-    [mode, playPressSound, rawMode, stateIds.allowCharging, stateIds.mode, writeState]
+    [mode, playPressSound, rawMode, readValue, stateIds.status, stateIds.write, writeStateWithConfirmation]
   );
 
   const setGridAmpere = useCallback(
     (nextAmpere: number) => {
-      if (!isGridMode || !stateIds.gridAmpere) {
+      if (!isGridMode || !stateIds.write.ampereCards) {
         return;
       }
       const clamped = clampAmpere(nextAmpere);
@@ -364,29 +580,70 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         return;
       }
       playPressSound(`gridAmpere:${clamped}`);
-      void writeState(stateIds.gridAmpere, clamped, `gridAmpere:${clamped}`);
+      void writeStateWithConfirmation({
+        writeStateId: stateIds.write.ampereCards,
+        value: clamped,
+        pendingKey: `ampere:${clamped}`,
+        confirmStateId: stateIds.status.ampereCards,
+        confirmKey: `gridAmpere:${clamped}`,
+        matcher: (value) => normalizeAmpere(value) === clamped,
+      });
+      if (stateIds.write.manualCurrent && stateIds.write.manualCurrent !== stateIds.write.ampereCards) {
+        void writeStateWithConfirmation({
+          writeStateId: stateIds.write.manualCurrent,
+          value: clamped,
+          pendingKey: `manualCurrent:${clamped}`,
+          confirmStateId: stateIds.status.manualCurrent,
+          confirmKey: `manualCurrent:${clamped}`,
+          matcher: (value) => normalizeAmpere(value) === clamped,
+        });
+      }
     },
-    [gridAmpere, isGridMode, playPressSound, stateIds.gridAmpere, writeState]
+    [
+      gridAmpere,
+      isGridMode,
+      playPressSound,
+      stateIds.status.ampereCards,
+      stateIds.status.manualCurrent,
+      stateIds.write.ampereCards,
+      stateIds.write.manualCurrent,
+      writeStateWithConfirmation,
+    ]
   );
 
   const setGridPhase = useCallback(
     (nextPhase: 1 | 3) => {
-      if (!isGridMode || !stateIds.gridPhaseMode) {
+      if (!isGridMode || !stateIds.write.phaseCards) {
         return;
       }
-      if (gridPhaseSelection === nextPhase) {
+      if (phaseCardSelection === nextPhase) {
         return;
       }
-      const writeValue = resolvePhaseWriteValue(gridPhaseRaw, nextPhase);
+      const writeValue = resolvePhaseWriteValue(readValue(stateIds.write.phaseCards), nextPhase);
       playPressSound(`gridPhase:${nextPhase}`);
-      void writeState(stateIds.gridPhaseMode, writeValue, `gridPhase:${nextPhase}`);
+      void writeStateWithConfirmation({
+        writeStateId: stateIds.write.phaseCards,
+        value: writeValue,
+        pendingKey: `phase:${nextPhase}`,
+        confirmStateId: stateIds.status.phaseCards,
+        confirmKey: `gridPhase:${nextPhase}`,
+        matcher: (value) => resolvePhaseSelection(value) === nextPhase,
+      });
     },
-    [gridPhaseRaw, gridPhaseSelection, isGridMode, playPressSound, stateIds.gridPhaseMode, writeState]
+    [
+      isGridMode,
+      phaseCardSelection,
+      playPressSound,
+      readValue,
+      stateIds.status.phaseCards,
+      stateIds.write.phaseCards,
+      writeStateWithConfirmation,
+    ]
   );
 
   const setTargetSoc = useCallback(
     (nextSoc: number) => {
-      if (!stateIds.targetSocPercent) {
+      if (!stateIds.write.targetSocPercent) {
         return;
       }
       const normalized = normalizeTargetSocPercent(nextSoc) ?? DEFAULT_TARGET_SOC;
@@ -395,18 +652,39 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       }
       playPressSound(`targetSoc:${normalized}`);
       void (async () => {
-        await writeState(stateIds.targetSocPercent, normalized, `targetSoc:${normalized}`);
-        if (stateIds.targetSocEnabled) {
-          await writeState(stateIds.targetSocEnabled, true, "targetSocEnabled:true");
+        await writeStateWithConfirmation({
+          writeStateId: stateIds.write.targetSocPercent,
+          value: normalized,
+          pendingKey: `targetSoc:${normalized}`,
+          confirmStateId: stateIds.write.targetSocPercent,
+          confirmKey: `targetSoc:${normalized}`,
+          matcher: (value) => normalizeTargetSocPercent(value) === normalized,
+        });
+        if (stateIds.write.targetSocEnabled) {
+          await writeStateWithConfirmation({
+            writeStateId: stateIds.write.targetSocEnabled,
+            value: true,
+            pendingKey: "targetSocEnabled:true",
+            confirmStateId: stateIds.write.targetSocEnabled,
+            confirmKey: "targetSocEnabled:true",
+            matcher: (value) => normalizeBoolean(value) === true,
+          });
         }
       })();
     },
-    [playPressSound, stateIds.targetSocEnabled, stateIds.targetSocPercent, targetSocEnabled, targetSocPercent, writeState]
+    [
+      playPressSound,
+      stateIds.write.targetSocEnabled,
+      stateIds.write.targetSocPercent,
+      targetSocEnabled,
+      targetSocPercent,
+      writeStateWithConfirmation,
+    ]
   );
 
   const setTargetKm = useCallback(
     (nextKm: number) => {
-      if (!stateIds.targetKm) {
+      if (!stateIds.write.targetKm) {
         return;
       }
       const normalized = normalizeTargetKm(nextKm) ?? DEFAULT_TARGET_KM;
@@ -415,13 +693,27 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       }
       playPressSound(`targetKm:${normalized}`);
       void (async () => {
-        await writeState(stateIds.targetKm, normalized, `targetKm:${normalized}`);
-        if (stateIds.targetSocEnabled) {
-          await writeState(stateIds.targetSocEnabled, true, "targetSocEnabled:true");
+        await writeStateWithConfirmation({
+          writeStateId: stateIds.write.targetKm,
+          value: normalized,
+          pendingKey: `targetKm:${normalized}`,
+          confirmStateId: stateIds.write.targetKm,
+          confirmKey: `targetKm:${normalized}`,
+          matcher: (value) => normalizeTargetKm(value) === normalized,
+        });
+        if (stateIds.write.targetSocEnabled) {
+          await writeStateWithConfirmation({
+            writeStateId: stateIds.write.targetSocEnabled,
+            value: true,
+            pendingKey: "targetSocEnabled:true",
+            confirmStateId: stateIds.write.targetSocEnabled,
+            confirmKey: "targetSocEnabled:true",
+            matcher: (value) => normalizeBoolean(value) === true,
+          });
         }
       })();
     },
-    [playPressSound, stateIds.targetKm, stateIds.targetSocEnabled, targetKmValue, targetSocEnabled, writeState]
+    [playPressSound, stateIds.write.targetKm, stateIds.write.targetSocEnabled, targetKmValue, targetSocEnabled, writeStateWithConfirmation]
   );
 
   const setTargetValue = useCallback(
@@ -436,7 +728,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   );
 
   useEffect(() => {
-    if (!stateIds.allowCharging || allowCharging !== true || !targetSocEnabled) {
+    if (!stateIds.write.stop || allowCharging !== true || !targetSocEnabled) {
       autoStopMarkerRef.current = "";
       return;
     }
@@ -457,17 +749,25 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     }
     autoStopMarkerRef.current = marker;
     const stopReason = targetMode === "km" ? "kmLimitReached" : "socLimitReached";
-    void writeState(stateIds.allowCharging, false, `${stopReason}:${Math.round(targetValue)}`);
+    void writeStateWithConfirmation({
+      writeStateId: stateIds.write.stop,
+      value: false,
+      pendingKey: `${stopReason}:${Math.round(targetValue)}`,
+      confirmStateId: stateIds.status.stop,
+      confirmKey: `${stopReason}:${Math.round(targetValue)}`,
+      matcher: (value) => normalizeBoolean(value) === false,
+    });
   }, [
     allowCharging,
     batterySoc,
     carRangeKm,
-    stateIds.allowCharging,
+    stateIds.status.stop,
+    stateIds.write.stop,
     targetKmValue,
     targetMode,
     targetSocEnabled,
     targetSocPercent,
-    writeState,
+    writeStateWithConfirmation,
   ]);
 
   const chargingStatusText = liveCharging
@@ -948,6 +1248,17 @@ function resolveStateIdWithLegacy(candidate: string | undefined, fallback: strin
 function resolveOptionalStateId(candidate: string | undefined, fallback = "") {
   const trimmed = String(candidate || "").trim();
   return trimmed || fallback;
+}
+
+function resolveMappedStatusId(sourceStateId: string, fromSegment: string, toSegment: string) {
+  const normalizedSource = String(sourceStateId || "").trim();
+  if (!normalizedSource) {
+    return "";
+  }
+  if (!normalizedSource.includes(fromSegment)) {
+    return "";
+  }
+  return normalizedSource.replace(fromSegment, toSegment);
 }
 
 function clampInt(value: number | undefined, fallback: number, min: number) {
