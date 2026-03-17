@@ -184,11 +184,14 @@ export type WallboxWidgetConfig = WidgetBase & {
   refreshMs?: number;
   showStatusSubtitle?: boolean;
   showGridAmpereControl?: boolean;
+  targetMode?: "soc" | "km";
+  highlightOpacity?: number;
   backgroundImage?: string;
   backgroundImageBlur?: number;
   modeStateId: string;
   gridAmpereStateId: string;
   limit80StateId: string;
+  targetKmStateId?: string;
   allowChargingStateId?: string;
   solarLoadOnlyStateId?: string;
   phaseSwitchModeStateId?: string;
@@ -196,6 +199,7 @@ export type WallboxWidgetConfig = WidgetBase & {
   ampereStateId?: string;
   carStateId?: string;
   batterySocStateId?: string;
+  carRangeStateId?: string;
   chargePowerStateId?: string;
   chargedEnergyStateId?: string;
   stopChargeingAtCarSoc80StateId?: string;

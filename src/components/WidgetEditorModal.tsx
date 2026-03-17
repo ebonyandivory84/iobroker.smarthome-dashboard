@@ -316,12 +316,15 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         showTitle: widget.showTitle === false ? "false" : "true",
         showStatusSubtitle: widget.showStatusSubtitle === true ? "true" : "false",
         showGridAmpereControl: widget.showGridAmpereControl === false ? "false" : "true",
+        targetMode: widget.targetMode === "km" ? "km" : "soc",
+        highlightOpacity: String(widget.highlightOpacity ?? 0.32),
         refreshMs: String(widget.refreshMs || 2000),
         backgroundImage: widget.backgroundImage || "",
         backgroundImageBlur: String(widget.backgroundImageBlur ?? 8),
         modeStateId: widget.modeStateId || "go-e-gemini-adapter.0.control.mode",
         gridAmpereStateId: widget.gridAmpereStateId || "go-e-gemini-adapter.0.control.gridManual.currentA",
         limit80StateId: widget.limit80StateId || "go-e-gemini-adapter.0.control.targetSocPercent",
+        targetKmStateId: widget.targetKmStateId || "",
         allowChargingStateId: widget.allowChargingStateId || "go-e-gemini-adapter.0.control.allowCharging",
         solarLoadOnlyStateId: widget.solarLoadOnlyStateId || "",
         phaseSwitchModeStateId: widget.phaseSwitchModeStateId || "go-e-gemini-adapter.0.control.gridManual.phaseMode",
@@ -330,6 +333,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ampereStateId: widget.ampereStateId || "go-e-gemini-adapter.0.status.setCurrentA",
         carStateId: widget.carStateId || "go-e-gemini-adapter.0.status.carState",
         batterySocStateId: widget.batterySocStateId || "go-e-gemini-adapter.0.status.carSocPercent",
+        carRangeStateId: widget.carRangeStateId || "",
         chargePowerStateId: widget.chargePowerStateId || "go-e-gemini-adapter.0.status.chargerPowerW",
         chargedEnergyStateId: widget.chargedEnergyStateId || "go-e.0.eto",
         stopChargeingAtCarSoc80StateId:
@@ -721,12 +725,15 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         showTitle: draft.showTitle !== "false",
         showStatusSubtitle: draft.showStatusSubtitle === "true",
         showGridAmpereControl: draft.showGridAmpereControl !== "false",
+        targetMode: draft.targetMode === "km" ? "km" : "soc",
+        highlightOpacity: clampFloatRange(draft.highlightOpacity, widget.highlightOpacity ?? 0.32, 0.08, 0.9),
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 500),
         backgroundImage: draft.backgroundImage?.trim() || undefined,
         backgroundImageBlur: clampInt(draft.backgroundImageBlur, widget.backgroundImageBlur ?? 8, 0),
         modeStateId: draft.modeStateId?.trim() || widget.modeStateId,
         gridAmpereStateId: draft.gridAmpereStateId?.trim() || widget.gridAmpereStateId,
         limit80StateId: draft.limit80StateId?.trim() || widget.limit80StateId,
+        targetKmStateId: draft.targetKmStateId?.trim() || undefined,
         allowChargingStateId: draft.allowChargingStateId?.trim() || undefined,
         solarLoadOnlyStateId: draft.solarLoadOnlyStateId?.trim() || undefined,
         phaseSwitchModeStateId: draft.phaseSwitchModeStateId?.trim() || undefined,
@@ -734,6 +741,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ampereStateId: draft.ampereStateId?.trim() || undefined,
         carStateId: draft.carStateId?.trim() || undefined,
         batterySocStateId: draft.batterySocStateId?.trim() || undefined,
+        carRangeStateId: draft.carRangeStateId?.trim() || undefined,
         chargePowerStateId: draft.chargePowerStateId?.trim() || undefined,
         chargedEnergyStateId: draft.chargedEnergyStateId?.trim() || undefined,
         stopChargeingAtCarSoc80StateId: draft.stopChargeingAtCarSoc80StateId?.trim() || undefined,
@@ -1898,78 +1906,122 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
             ) : null}
             {widget.type === "wallbox" ? (
               <>
-                <View style={styles.splitRow}>
-                  <Field label="Refresh (ms)">
-                    <TextInput
-                      keyboardType="numeric"
-                      onChangeText={(value) => setDraft((current) => ({ ...current, refreshMs: value }))}
-                      style={styles.input}
-                      value={draft.refreshMs || "2000"}
-                    />
-                  </Field>
-                  <Field label="Status-Untertitel anzeigen">
+                <View style={styles.groupCard}>
+                  <Text style={styles.groupTitle}>Basis</Text>
+                  <View style={styles.splitRow}>
+                    <Field label="Refresh (ms)">
+                      <TextInput
+                        keyboardType="numeric"
+                        onChangeText={(value) => setDraft((current) => ({ ...current, refreshMs: value }))}
+                        style={styles.input}
+                        value={draft.refreshMs || "2000"}
+                      />
+                    </Field>
+                    <Field label="Status-Untertitel anzeigen">
+                      <ChoiceRow
+                        options={["true", "false"]}
+                        value={draft.showStatusSubtitle || "false"}
+                        onSelect={(value) => setDraft((current) => ({ ...current, showStatusSubtitle: value }))}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Zielmodus">
+                      <ChoiceRow
+                        options={["soc", "km"]}
+                        value={draft.targetMode || "soc"}
+                        onSelect={(value) => setDraft((current) => ({ ...current, targetMode: value }))}
+                      />
+                    </Field>
+                    <Field label="Highlight Transparenz (0.08-0.9)">
+                      <TextInput
+                        keyboardType="numeric"
+                        onChangeText={(value) => setDraft((current) => ({ ...current, highlightOpacity: value }))}
+                        style={styles.input}
+                        value={draft.highlightOpacity || "0.32"}
+                      />
+                    </Field>
+                  </View>
+                  <Field label="Netzladen-Strom anzeigen">
                     <ChoiceRow
                       options={["true", "false"]}
-                      value={draft.showStatusSubtitle || "false"}
-                      onSelect={(value) => setDraft((current) => ({ ...current, showStatusSubtitle: value }))}
+                      value={draft.showGridAmpereControl || "true"}
+                      onSelect={(value) => setDraft((current) => ({ ...current, showGridAmpereControl: value }))}
                     />
+                  </Field>
+                  <Field label="Widget-Hintergrundbild (optional)">
+                    <View style={styles.stateFieldRow}>
+                      <TextInput
+                        editable={false}
+                        style={[styles.input, styles.stateFieldInput]}
+                        value={draft.backgroundImage || ""}
+                      />
+                      <EditorButtonPressable
+                        onPress={() => setImagePickerField("backgroundImage")}
+                        style={styles.stateBrowseButton}
+                      >
+                        <Text style={styles.stateBrowseLabel}>Bild waehlen</Text>
+                      </EditorButtonPressable>
+                    </View>
+                    <Field label="Bild-Unschaerfe">
+                      <BlurControl
+                        value={draft.backgroundImageBlur || "8"}
+                        onChange={(value) => setDraft((current) => ({ ...current, backgroundImageBlur: value }))}
+                      />
+                    </Field>
                   </Field>
                 </View>
-                <Field label="Netzladen-Strom anzeigen">
-                  <ChoiceRow
-                    options={["true", "false"]}
-                    value={draft.showGridAmpereControl || "true"}
-                    onSelect={(value) => setDraft((current) => ({ ...current, showGridAmpereControl: value }))}
-                  />
-                </Field>
 
-                <Field label="Widget-Hintergrundbild (optional)">
-                  <View style={styles.stateFieldRow}>
-                    <TextInput
-                      editable={false}
-                      style={[styles.input, styles.stateFieldInput]}
-                      value={draft.backgroundImage || ""}
-                    />
-                    <EditorButtonPressable
-                      onPress={() => setImagePickerField("backgroundImage")}
-                      style={styles.stateBrowseButton}
-                    >
-                      <Text style={styles.stateBrowseLabel}>Bild waehlen</Text>
-                    </EditorButtonPressable>
-                  </View>
-                  <Field label="Bild-Unschaerfe">
-                    <BlurControl
-                      value={draft.backgroundImageBlur || "8"}
-                      onChange={(value) => setDraft((current) => ({ ...current, backgroundImageBlur: value }))}
+                <View style={styles.groupCard}>
+                  <Text style={styles.groupTitle}>Steuerbare Datenpunkte</Text>
+                  <Field label="Betriebsart (control.mode)">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("modeStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, modeStateId: value }))}
+                      value={draft.modeStateId || ""}
                     />
                   </Field>
-                </Field>
-
-                <Text style={styles.sectionTitle}>Steuerbare Datenpunkte</Text>
-                <Field label="Betriebsart (control.mode)">
-                  <StateFieldInput
-                    onBrowse={() => setPickerField("modeStateId")}
-                    onChangeText={(value) => setDraft((current) => ({ ...current, modeStateId: value }))}
-                    value={draft.modeStateId || ""}
-                  />
-                </Field>
-                <Field label="Netzstrom (control.gridManual.currentA)">
-                  <StateFieldInput
-                    onBrowse={() => setPickerField("gridAmpereStateId")}
-                    onChangeText={(value) => setDraft((current) => ({ ...current, gridAmpereStateId: value }))}
-                    value={draft.gridAmpereStateId || ""}
-                  />
-                </Field>
-                <Field label="Ziel-SoC Prozent (control.targetSocPercent)">
-                  <StateFieldInput
-                    onBrowse={() => setPickerField("limit80StateId")}
-                    onChangeText={(value) => setDraft((current) => ({ ...current, limit80StateId: value }))}
-                    value={draft.limit80StateId || ""}
-                  />
-                </Field>
-
-                <Text style={styles.sectionTitle}>Optionale Live-Infos</Text>
-                <View style={styles.splitRow}>
+                  <View style={styles.splitRow}>
+                    <Field label="Netzstrom (control.gridManual.currentA)">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("gridAmpereStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, gridAmpereStateId: value }))}
+                        value={draft.gridAmpereStateId || ""}
+                      />
+                    </Field>
+                    <Field label="Netz-Phasenmodus (control.gridManual.phaseMode)">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("phaseSwitchModeStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, phaseSwitchModeStateId: value }))}
+                        value={draft.phaseSwitchModeStateId || ""}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Ziel-SoC Prozent (control.targetSocPercent)">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("limit80StateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, limit80StateId: value }))}
+                        value={draft.limit80StateId || ""}
+                      />
+                    </Field>
+                    <Field label="Ziel-km (frei waehlbarer Datenpunkt)">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("targetKmStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, targetKmStateId: value }))}
+                        value={draft.targetKmStateId || ""}
+                      />
+                    </Field>
+                  </View>
+                  <Field label="Zielwert aktiv (control.targetSocEnabled)">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("stopChargeingAtCarSoc80StateId")}
+                      onChangeText={(value) =>
+                        setDraft((current) => ({ ...current, stopChargeingAtCarSoc80StateId: value }))
+                      }
+                      value={draft.stopChargeingAtCarSoc80StateId || ""}
+                    />
+                  </Field>
                   <Field label="Freigabe (control.allowCharging)">
                     <StateFieldInput
                       onBrowse={() => setPickerField("allowChargingStateId")}
@@ -1977,85 +2029,84 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       value={draft.allowChargingStateId || ""}
                     />
                   </Field>
-                  <Field label="Legacy: solarLoadOnly (optional)">
-                    <StateFieldInput
-                      onBrowse={() => setPickerField("solarLoadOnlyStateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, solarLoadOnlyStateId: value }))}
-                      value={draft.solarLoadOnlyStateId || ""}
-                    />
-                  </Field>
                 </View>
-                <View style={styles.splitRow}>
-                  <Field label="Netz-Phasenmodus (control.gridManual.phaseMode)">
-                    <StateFieldInput
-                      onBrowse={() => setPickerField("phaseSwitchModeStateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, phaseSwitchModeStateId: value }))}
-                      value={draft.phaseSwitchModeStateId || ""}
-                    />
-                  </Field>
-                  <Field label="Aktive Phasen (status.enabledPhases)">
-                    <StateFieldInput
-                      onBrowse={() => setPickerField("phaseSwitchModeEnabledStateId")}
-                      onChangeText={(value) =>
-                        setDraft((current) => ({ ...current, phaseSwitchModeEnabledStateId: value }))
-                      }
-                      value={draft.phaseSwitchModeEnabledStateId || ""}
-                    />
-                  </Field>
-                </View>
-                <View style={styles.splitRow}>
-                  <Field label="Aktueller Sollstrom (status.setCurrentA)">
-                    <StateFieldInput
-                      onBrowse={() => setPickerField("ampereStateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, ampereStateId: value }))}
-                      value={draft.ampereStateId || ""}
-                    />
-                  </Field>
-                </View>
-                <View style={styles.splitRow}>
-                  <Field label="Fahrzeugstatus (status.carState)">
-                    <StateFieldInput
-                      onBrowse={() => setPickerField("carStateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, carStateId: value }))}
-                      value={draft.carStateId || ""}
-                    />
-                  </Field>
-                  <Field label="Fahrzeug-SoC (status.carSocPercent)">
-                    <StateFieldInput
-                      onBrowse={() => setPickerField("batterySocStateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, batterySocStateId: value }))}
-                      value={draft.batterySocStateId || ""}
-                    />
-                  </Field>
-                </View>
-                <View style={styles.splitRow}>
-                  <Field label="Ladeleistung (status.chargerPowerW)">
-                    <StateFieldInput
-                      onBrowse={() => setPickerField("chargePowerStateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, chargePowerStateId: value }))}
-                      value={draft.chargePowerStateId || ""}
-                    />
-                  </Field>
-                  <Field label="chargedEnergy (kWh/Wh)">
-                    <StateFieldInput
-                      onBrowse={() => setPickerField("chargedEnergyStateId")}
-                      onChangeText={(value) => setDraft((current) => ({ ...current, chargedEnergyStateId: value }))}
-                      value={draft.chargedEnergyStateId || ""}
-                    />
-                  </Field>
-                </View>
-                <Field label="Ziel-SoC aktiv (control.targetSocEnabled)">
-                  <StateFieldInput
-                    onBrowse={() => setPickerField("stopChargeingAtCarSoc80StateId")}
-                    onChangeText={(value) =>
-                      setDraft((current) => ({ ...current, stopChargeingAtCarSoc80StateId: value }))
-                    }
-                    value={draft.stopChargeingAtCarSoc80StateId || ""}
-                  />
-                </Field>
-                <Text style={styles.mappingHint}>`status.carSocPercent` sollte den Fahrzeug-SoC in Prozent liefern.</Text>
 
-                <Field label="Sounds bei Interaktion">
+                <View style={styles.groupCard}>
+                  <Text style={styles.groupTitle}>Live-Infos und Stat-Cards</Text>
+                  <View style={styles.splitRow}>
+                    <Field label="Aktueller Sollstrom (status.setCurrentA)">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("ampereStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, ampereStateId: value }))}
+                        value={draft.ampereStateId || ""}
+                      />
+                    </Field>
+                    <Field label="Aktive Phasen (status.enabledPhases)">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("phaseSwitchModeEnabledStateId")}
+                        onChangeText={(value) =>
+                          setDraft((current) => ({ ...current, phaseSwitchModeEnabledStateId: value }))
+                        }
+                        value={draft.phaseSwitchModeEnabledStateId || ""}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Fahrzeugstatus (status.carState)">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("carStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, carStateId: value }))}
+                        value={draft.carStateId || ""}
+                      />
+                    </Field>
+                    <Field label="Fahrzeug-SoC (status.carSocPercent)">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("batterySocStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, batterySocStateId: value }))}
+                        value={draft.batterySocStateId || ""}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Fahrzeug-km (optional, Ist-Wert)">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("carRangeStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, carRangeStateId: value }))}
+                        value={draft.carRangeStateId || ""}
+                      />
+                    </Field>
+                    <Field label="Ladeleistung (status.chargerPowerW)">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("chargePowerStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, chargePowerStateId: value }))}
+                        value={draft.chargePowerStateId || ""}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="chargedEnergy (kWh/Wh)">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("chargedEnergyStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, chargedEnergyStateId: value }))}
+                        value={draft.chargedEnergyStateId || ""}
+                      />
+                    </Field>
+                    <Field label="Legacy: solarLoadOnly (optional)">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("solarLoadOnlyStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, solarLoadOnlyStateId: value }))}
+                        value={draft.solarLoadOnlyStateId || ""}
+                      />
+                    </Field>
+                  </View>
+                  <Text style={styles.mappingHint}>
+                    `status.carSocPercent` und optional `Fahrzeug-km` dienen als Ist-Werte fuer Auto-Stop.
+                  </Text>
+                </View>
+
+                <View style={styles.groupCard}>
+                  <Text style={styles.groupTitle}>Sounds</Text>
+                  <Field label="Sounds bei Interaktion">
                   <Field label="Button Press">
                     <SoundPickerField
                       onChange={(value) => setSoundDraft((current) => ({ ...current, press: value }))}
@@ -2078,6 +2129,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     <Text style={styles.inlineActionLabel}>Als Default fuer alle Wallbox-Widgets verwenden</Text>
                   </EditorButtonPressable>
                 </Field>
+                </View>
               </>
             ) : null}
             {widget.type === "heating" || widget.type === "heatingV2" ? (
@@ -3700,6 +3752,22 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 14,
     fontWeight: "800",
+  },
+  groupCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.025)",
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 4,
+    marginBottom: 8,
+  },
+  groupTitle: {
+    color: palette.text,
+    fontSize: 13,
+    fontWeight: "800",
+    marginBottom: 8,
   },
   splitRow: {
     flexDirection: "row",

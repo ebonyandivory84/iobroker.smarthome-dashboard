@@ -18,7 +18,11 @@ const AMPERE_MIN = 6;
 const AMPERE_MAX = 16;
 const DEFAULT_GRID_AMPERE = 10;
 const DEFAULT_TARGET_SOC = 80;
-const TARGET_SOC_VALUES = [20, 30, 40, 50, 60, 70, 80, 90, 100] as const;
+const DEFAULT_TARGET_KM = 300;
+const TARGET_SOC_VALUES = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as const;
+const TARGET_KM_VALUES = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500] as const;
+const TARGET_CARD_COLUMNS = 5;
+const TARGET_CARD_GAP = 6;
 const PHASE_VOLTAGE_V = 230;
 const CHARGING_ACTIVE_THRESHOLD_W = 100;
 const FAST_CHARGING_THRESHOLD_W = 5000;
@@ -31,6 +35,7 @@ const DEFAULT_IDS = {
   mode: "go-e-gemini-adapter.0.control.mode",
   gridAmpere: "go-e-gemini-adapter.0.control.gridManual.currentA",
   targetSocPercent: "go-e-gemini-adapter.0.control.targetSocPercent",
+  targetKm: "",
   targetSocEnabled: "go-e-gemini-adapter.0.control.targetSocEnabled",
   allowCharging: "go-e-gemini-adapter.0.control.allowCharging",
   gridPhaseMode: "go-e-gemini-adapter.0.control.gridManual.phaseMode",
@@ -38,6 +43,7 @@ const DEFAULT_IDS = {
   actualAmpere: "go-e-gemini-adapter.0.status.setCurrentA",
   car: "go-e-gemini-adapter.0.status.carState",
   batterySoc: "go-e-gemini-adapter.0.status.carSocPercent",
+  carRange: "",
   chargePower: "go-e-gemini-adapter.0.status.chargerPowerW",
   chargedEnergy: "go-e.0.eto",
 } as const;
@@ -46,6 +52,7 @@ const LEGACY_IDS = {
   mode: "0_userdata.0.goe.mode",
   gridAmpere: "0_userdata.0.goe.gridAmpere",
   targetSocPercent: "0_userdata.0.goe.limit80",
+  targetKm: "",
   targetSocEnabled: "go-e.0.stopChargeingAtCarSoc80",
   allowCharging: "go-e.0.allow_charging",
   gridPhaseMode: "go-e.0.phaseSwitchMode",
@@ -53,6 +60,7 @@ const LEGACY_IDS = {
   actualAmpere: "go-e.0.ampere",
   car: "go-e.0.car",
   batterySoc: "go-e.0.carBatterySoc",
+  carRange: "",
   chargePower: "go-e.0.nrg.11",
   chargedEnergy: "go-e.0.eto",
 } as const;
@@ -67,6 +75,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         DEFAULT_IDS.targetSocPercent,
         LEGACY_IDS.targetSocPercent
       ),
+      targetKm: resolveOptionalStateId(config.targetKmStateId, DEFAULT_IDS.targetKm),
       targetSocEnabled: resolveStateIdWithLegacy(
         config.stopChargeingAtCarSoc80StateId,
         DEFAULT_IDS.targetSocEnabled,
@@ -90,6 +99,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       actualAmpere: resolveStateIdWithLegacy(config.ampereStateId, DEFAULT_IDS.actualAmpere, LEGACY_IDS.actualAmpere),
       car: resolveStateIdWithLegacy(config.carStateId, DEFAULT_IDS.car, LEGACY_IDS.car),
       batterySoc: resolveStateIdWithLegacy(config.batterySocStateId, DEFAULT_IDS.batterySoc, LEGACY_IDS.batterySoc),
+      carRange: resolveOptionalStateId(config.carRangeStateId, DEFAULT_IDS.carRange),
       chargePower: resolveStateIdWithLegacy(config.chargePowerStateId, DEFAULT_IDS.chargePower, LEGACY_IDS.chargePower),
       chargedEnergy: resolveStateIdWithLegacy(
         config.chargedEnergyStateId,
@@ -110,6 +120,8 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       config.phaseSwitchModeEnabledStateId,
       config.phaseSwitchModeStateId,
       config.stopChargeingAtCarSoc80StateId,
+      config.targetKmStateId,
+      config.carRangeStateId,
     ]
   );
   const [stateSnapshot, setStateSnapshot] = useState<StateSnapshot>({});
@@ -117,6 +129,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const [error, setError] = useState<string | null>(null);
   const [chargingPulseOn, setChargingPulseOn] = useState(true);
   const [powerBarTrackWidth, setPowerBarTrackWidth] = useState(0);
+  const [targetRowWidth, setTargetRowWidth] = useState(0);
   const barGlowAnim = useRef(new Animated.Value(0)).current;
   const autoStopMarkerRef = useRef("");
   const refreshMs = clampInt(config.refreshMs, DEFAULT_REFRESH_MS, MIN_REFRESH_MS);
@@ -178,9 +191,11 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const allowCharging = normalizeBoolean(readValue(stateIds.allowCharging));
   const mode = resolveWallboxMode(rawMode, allowCharging);
   const isGridMode = mode === "grid";
+  const targetMode = config.targetMode === "km" ? "km" : "soc";
 
   const gridAmpere = clampAmpere(normalizeAmpere(readValue(stateIds.gridAmpere)) ?? DEFAULT_GRID_AMPERE);
   const targetSocPercent = normalizeTargetSocPercent(readValue(stateIds.targetSocPercent)) ?? DEFAULT_TARGET_SOC;
+  const targetKmValue = normalizeTargetKm(readValue(stateIds.targetKm)) ?? DEFAULT_TARGET_KM;
   const targetSocEnabled = normalizeBoolean(readValue(stateIds.targetSocEnabled)) ?? true;
 
   const gridPhaseRaw = readValue(stateIds.gridPhaseMode);
@@ -195,6 +210,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
 
   const carCode = normalizeInteger(readValue(stateIds.car));
   const batterySoc = normalizeFloat(readValue(stateIds.batterySoc));
+  const carRangeKm = normalizeFloat(readValue(stateIds.carRange));
   const chargedEnergyKWh = normalizeEnergyToKWh(readValue(stateIds.chargedEnergy));
   const directChargingPowerW = normalizePowerToWatts(readValue(stateIds.chargePower));
   const estimatedChargingPowerW = estimateChargingPowerW(liveAmpere, actualPhaseSelection);
@@ -207,6 +223,8 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
 
   const writePending = Object.values(pendingWrites).some(Boolean);
   const showGridAmpereControl = config.showGridAmpereControl !== false;
+  const activeTargetValue = targetMode === "km" ? targetKmValue : targetSocPercent;
+  const activeTargetUnit = targetMode === "km" ? "km" : "%";
   const chargePowerCardMode: "idle" | "slow" | "fast" =
     chargingPowerW < CHARGING_ACTIVE_THRESHOLD_W
       ? "idle"
@@ -248,10 +266,11 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         mode,
         carCode,
         liveAmpere,
+        targetMode,
         targetSocEnabled,
-        targetSocPercent,
+        targetValue: activeTargetValue,
       }),
-    [carCode, liveAmpere, mode, targetSocEnabled, targetSocPercent]
+    [activeTargetValue, carCode, liveAmpere, mode, targetMode, targetSocEnabled]
   );
 
   const textColor = config.appearance?.textColor || "#f5f8ff";
@@ -266,6 +285,11 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const pvPriorityEnd = config.appearance?.inactiveWidgetColor2 || "#e69b56";
   const gridStart = config.appearance?.statColor || "#5f9eff";
   const gridEnd = config.appearance?.statColor2 || "#4578e6";
+  const highlightOpacity = clampOpacity(config.highlightOpacity, 0.32);
+  const targetActiveStart = withAlpha(pvPriorityStart, highlightOpacity);
+  const targetActiveEnd = withAlpha(pvPriorityEnd, highlightOpacity);
+  const controlActiveStart = withAlpha(gridStart, highlightOpacity);
+  const controlActiveEnd = withAlpha(gridEnd, highlightOpacity);
   const panelBorderColor = "rgba(191, 209, 245, 0.18)";
   const modePanelBackground = "rgba(255,255,255,0.025)";
   const disabledOpacity = 0.5;
@@ -384,23 +408,71 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     [playPressSound, stateIds.targetSocEnabled, stateIds.targetSocPercent, targetSocEnabled, targetSocPercent, writeState]
   );
 
+  const setTargetKm = useCallback(
+    (nextKm: number) => {
+      if (!stateIds.targetKm) {
+        return;
+      }
+      const normalized = normalizeTargetKm(nextKm) ?? DEFAULT_TARGET_KM;
+      if (normalized === targetKmValue && targetSocEnabled) {
+        return;
+      }
+      playPressSound(`targetKm:${normalized}`);
+      void (async () => {
+        await writeState(stateIds.targetKm, normalized, `targetKm:${normalized}`);
+        if (stateIds.targetSocEnabled) {
+          await writeState(stateIds.targetSocEnabled, true, "targetSocEnabled:true");
+        }
+      })();
+    },
+    [playPressSound, stateIds.targetKm, stateIds.targetSocEnabled, targetKmValue, targetSocEnabled, writeState]
+  );
+
+  const setTargetValue = useCallback(
+    (value: number) => {
+      if (targetMode === "km") {
+        setTargetKm(value);
+        return;
+      }
+      setTargetSoc(value);
+    },
+    [setTargetKm, setTargetSoc, targetMode]
+  );
+
   useEffect(() => {
-    if (!stateIds.allowCharging || allowCharging !== true || !targetSocEnabled || batterySoc === null) {
+    if (!stateIds.allowCharging || allowCharging !== true || !targetSocEnabled) {
       autoStopMarkerRef.current = "";
       return;
     }
-    if (batterySoc + 0.01 < targetSocPercent) {
+    const liveValue = targetMode === "km" ? carRangeKm : batterySoc;
+    if (liveValue === null) {
+      autoStopMarkerRef.current = "";
+      return;
+    }
+    const targetValue = targetMode === "km" ? targetKmValue : targetSocPercent;
+    if (liveValue + 0.01 < targetValue) {
       autoStopMarkerRef.current = "";
       return;
     }
 
-    const marker = `${Math.round(targetSocPercent)}:${Math.round(batterySoc * 10) / 10}`;
+    const marker = `${targetMode}:${Math.round(targetValue)}:${Math.round(liveValue * 10) / 10}`;
     if (autoStopMarkerRef.current === marker) {
       return;
     }
     autoStopMarkerRef.current = marker;
-    void writeState(stateIds.allowCharging, false, `socLimitReached:${targetSocPercent}`);
-  }, [allowCharging, batterySoc, stateIds.allowCharging, targetSocEnabled, targetSocPercent, writeState]);
+    const stopReason = targetMode === "km" ? "kmLimitReached" : "socLimitReached";
+    void writeState(stateIds.allowCharging, false, `${stopReason}:${Math.round(targetValue)}`);
+  }, [
+    allowCharging,
+    batterySoc,
+    carRangeKm,
+    stateIds.allowCharging,
+    targetKmValue,
+    targetMode,
+    targetSocEnabled,
+    targetSocPercent,
+    writeState,
+  ]);
 
   const chargingStatusText = liveCharging
     ? `Laedt mit ${formatPowerKW(chargingPowerW)}`
@@ -452,6 +524,13 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       ),
     [displayAmpere]
   );
+  const targetValues = targetMode === "km" ? TARGET_KM_VALUES : TARGET_SOC_VALUES;
+  const targetRows = useMemo(() => [targetValues.slice(0, 5), targetValues.slice(5, 10)], [targetValues]);
+  const targetCardWidth =
+    targetRowWidth > 0
+      ? Math.max(0, Math.floor((targetRowWidth - TARGET_CARD_GAP * (TARGET_CARD_COLUMNS - 1)) / TARGET_CARD_COLUMNS))
+      : null;
+  const targetLabel = targetMode === "km" ? "Ziel-km" : "Ziel-SoC";
 
   const modeItems: Array<{
     mode: WallboxMode;
@@ -533,18 +612,26 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
                           style: {
                             ...webGradientLayerStyle,
                             borderRadius: 10,
-                            background: `linear-gradient(135deg, ${item.start}, ${item.end})`,
+                            background: `linear-gradient(135deg, ${withAlpha(item.start, highlightOpacity)}, ${withAlpha(
+                              item.end,
+                              highlightOpacity
+                            )})`,
                           },
                         })
                       : (
-                          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: item.start, borderRadius: 10 }]} />
+                          <View
+                            style={[
+                              StyleSheet.absoluteFillObject,
+                              { backgroundColor: withAlpha(item.start, highlightOpacity), borderRadius: 10 },
+                            ]}
+                          />
                         )
                     : null}
                   <Text
                     style={[
                       styles.segmentLabel,
                       compactLabel ? { fontSize: 11.5, lineHeight: 13, textAlign: "center", paddingHorizontal: 2 } : null,
-                      { color: active ? "#06101a" : textColor },
+                      { color: textColor },
                     ]}
                   >
                     {item.label}
@@ -557,47 +644,58 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
 
         <View style={styles.block}>
           <View style={styles.blockHeaderInline}>
-            <Text style={[styles.blockLabel, { color: mutedTextColor }]}>Ziel-SoC</Text>
-            <Text style={[styles.quickControlValue, { color: textColor }]}>{`${targetSocPercent} %`}</Text>
+            <Text style={[styles.blockLabel, { color: mutedTextColor }]}>{targetLabel}</Text>
+            <Text style={[styles.quickControlValue, { color: textColor }]}>{`${activeTargetValue} ${activeTargetUnit}`}</Text>
           </View>
-          <View style={[styles.quickButtonRow, { flexWrap: "wrap" }]}>
-            {TARGET_SOC_VALUES.map((value) => {
-              const active = value === targetSocPercent && targetSocEnabled;
-              return (
-                <Pressable
-                  key={`target-soc-${value}`}
-                  onPress={() => setTargetSoc(value)}
-                  style={({ pressed }) => [
-                    styles.quickSelectButton,
-                    {
-                      flexBasis: "18.8%",
-                      maxWidth: "18.8%",
-                      minHeight: 34,
-                      marginBottom: 6,
-                    },
-                    active ? styles.quickSelectButtonActive : null,
-                    pressed ? styles.pressScale : null,
-                  ]}
-                >
-                  {active
-                    ? Platform.OS === "web"
-                      ? createElement("div", {
-                          style: {
-                            ...webGradientLayerStyle,
-                            borderRadius: 10,
-                            background: `linear-gradient(135deg, ${pvPriorityStart}, ${pvPriorityEnd})`,
-                          },
-                        })
-                      : (
-                          <View
-                            style={[StyleSheet.absoluteFillObject, { borderRadius: 10, backgroundColor: pvPriorityStart }]}
-                          />
-                        )
-                    : null}
-                  <Text style={[styles.quickSelectLabel, { color: active ? "#06101a" : textColor }]}>{`${value}%`}</Text>
-                </Pressable>
-              );
-            })}
+          <View
+            onLayout={(event) => {
+              const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
+              setTargetRowWidth((current) => (current === nextWidth ? current : nextWidth));
+            }}
+            style={styles.block}
+          >
+            {targetRows.map((row, rowIndex) => (
+              <View key={`target-row-${rowIndex}`} style={styles.quickButtonRow}>
+                {row.map((value) => {
+                  const active = value === activeTargetValue;
+                  return (
+                    <Pressable
+                      key={`target-value-${value}`}
+                      onPress={() => setTargetValue(value)}
+                      style={({ pressed }) => [
+                        styles.quickSelectButton,
+                        {
+                          width: targetCardWidth ?? undefined,
+                          flex: targetCardWidth ? 0 : 1,
+                          minHeight: 34,
+                        },
+                        active ? styles.quickSelectButtonActive : null,
+                        pressed ? styles.pressScale : null,
+                      ]}
+                    >
+                      {active
+                        ? Platform.OS === "web"
+                          ? createElement("div", {
+                              style: {
+                                ...webGradientLayerStyle,
+                                borderRadius: 10,
+                                background: `linear-gradient(135deg, ${targetActiveStart}, ${targetActiveEnd})`,
+                              },
+                            })
+                          : (
+                              <View
+                                style={[StyleSheet.absoluteFillObject, { borderRadius: 10, backgroundColor: targetActiveStart }]}
+                              />
+                            )
+                        : null}
+                      <Text style={[styles.quickSelectLabel, { color: textColor }]}>
+                        {`${value}${targetMode === "km" ? " km" : "%"}`}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ))}
           </View>
         </View>
 
@@ -641,16 +739,19 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
                               style: {
                                 ...webGradientLayerStyle,
                                 borderRadius: 10,
-                                background: `linear-gradient(135deg, ${gridStart}, ${gridEnd})`,
+                                background: `linear-gradient(135deg, ${controlActiveStart}, ${controlActiveEnd})`,
                               },
                             })
                           : (
                               <View
-                                style={[StyleSheet.absoluteFillObject, { borderRadius: 10, backgroundColor: gridStart }]}
+                                style={[
+                                  StyleSheet.absoluteFillObject,
+                                  { borderRadius: 10, backgroundColor: controlActiveStart },
+                                ]}
                               />
                             )
                         : null}
-                      <Text style={[styles.quickSelectLabel, { color: active ? "#06101a" : textColor }]}>{value} A</Text>
+                      <Text style={[styles.quickSelectLabel, { color: textColor }]}>{value} A</Text>
                     </Pressable>
                   );
                 })}
@@ -686,16 +787,19 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
                               style: {
                                 ...webGradientLayerStyle,
                                 borderRadius: 10,
-                                background: `linear-gradient(135deg, ${gridStart}, ${gridEnd})`,
+                                background: `linear-gradient(135deg, ${controlActiveStart}, ${controlActiveEnd})`,
                               },
                             })
                           : (
                               <View
-                                style={[StyleSheet.absoluteFillObject, { borderRadius: 10, backgroundColor: gridStart }]}
+                                style={[
+                                  StyleSheet.absoluteFillObject,
+                                  { borderRadius: 10, backgroundColor: controlActiveStart },
+                                ]}
                               />
                             )
                         : null}
-                      <Text style={[styles.quickSelectLabel, { color: active ? "#06101a" : textColor }]}>
+                      <Text style={[styles.quickSelectLabel, { color: textColor }]}>
                         {item.label}
                       </Text>
                     </Pressable>
@@ -845,6 +949,11 @@ function resolveStateIdWithLegacy(candidate: string | undefined, fallback: strin
   return resolved === legacyFallback ? fallback : resolved;
 }
 
+function resolveOptionalStateId(candidate: string | undefined, fallback = "") {
+  const trimmed = String(candidate || "").trim();
+  return trimmed || fallback;
+}
+
 function clampInt(value: number | undefined, fallback: number, min: number) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return fallback;
@@ -962,7 +1071,16 @@ function normalizeTargetSocPercent(value: unknown) {
   if (numeric === null) {
     return null;
   }
-  const clamped = Math.max(20, Math.min(100, Math.round(numeric / 10) * 10));
+  const clamped = Math.max(10, Math.min(100, Math.round(numeric / 10) * 10));
+  return clamped;
+}
+
+function normalizeTargetKm(value: unknown) {
+  const numeric = normalizeInteger(value);
+  if (numeric === null) {
+    return null;
+  }
+  const clamped = Math.max(50, Math.min(500, Math.round(numeric / 50) * 50));
   return clamped;
 }
 
@@ -1194,14 +1312,16 @@ function buildStatusSubtitle({
   mode,
   carCode,
   liveAmpere,
+  targetMode,
   targetSocEnabled,
-  targetSocPercent,
+  targetValue,
 }: {
   mode: WallboxMode;
   carCode: number | null;
   liveAmpere: number | null;
+  targetMode: "soc" | "km";
   targetSocEnabled: boolean;
-  targetSocPercent: number;
+  targetValue: number;
 }) {
   const parts: string[] = [];
   const hasCarSignal = carCode !== null;
@@ -1217,7 +1337,7 @@ function buildStatusSubtitle({
   }
   parts.push(modeStatusLabel(mode));
   if (targetSocEnabled) {
-    parts.push(`Ziel-SoC ${targetSocPercent}%`);
+    parts.push(targetMode === "km" ? `Ziel ${targetValue} km` : `Ziel-SoC ${targetValue}%`);
   }
   return parts.join(" | ");
 }
@@ -1228,6 +1348,43 @@ function buildBlurredWidgetBackgroundStyle(imageName: string, blur: number) {
     backgroundImage: `url("/smarthome-dashboard/widget-assets/${encodeURIComponent(imageName)}")`,
     filter: `blur(${blur}px)`,
   };
+}
+
+function clampOpacity(value: number | undefined, fallback: number) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(0.08, Math.min(0.9, value));
+}
+
+function withAlpha(color: string, alpha: number) {
+  const normalized = String(color || "").trim();
+  if (!normalized) {
+    return `rgba(255,255,255,${alpha})`;
+  }
+  const safeAlpha = clampOpacity(alpha, 0.32);
+  if (normalized.startsWith("#")) {
+    const hex = normalized.slice(1);
+    if (hex.length === 6) {
+      const r = Number.parseInt(hex.slice(0, 2), 16);
+      const g = Number.parseInt(hex.slice(2, 4), 16);
+      const b = Number.parseInt(hex.slice(4, 6), 16);
+      if ([r, g, b].every(Number.isFinite)) {
+        return `rgba(${r}, ${g}, ${b}, ${safeAlpha})`;
+      }
+    }
+  }
+  const rgbMatch = normalized.match(/^rgba?\(([^)]+)\)$/i);
+  if (rgbMatch) {
+    const channels = rgbMatch[1].split(",").map((entry) => Number.parseFloat(entry.trim()));
+    if (channels.length >= 3) {
+      const [r, g, b] = channels;
+      if ([r, g, b].every(Number.isFinite)) {
+        return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${safeAlpha})`;
+      }
+    }
+  }
+  return normalized;
 }
 const styles = StyleSheet.create({
   container: {
