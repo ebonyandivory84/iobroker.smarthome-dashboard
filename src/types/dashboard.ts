@@ -189,6 +189,7 @@ export type WallboxWidgetConfig = WidgetBase & {
   backgroundImage?: string;
   backgroundImageBlur?: number;
   stopWriteStateId?: string;
+  stopSecondaryWriteStateId?: string;
   stopStateId?: string;
   pvWriteStateId?: string;
   pvStateId?: string;
@@ -204,6 +205,8 @@ export type WallboxWidgetConfig = WidgetBase & {
   phaseCardsStateId?: string;
   stopWriteValueType?: "boolean" | "number" | "string";
   stopWriteValue?: string;
+  stopSecondaryWriteValueType?: "boolean" | "number" | "string";
+  stopSecondaryWriteValue?: string;
   stopStateValueType?: "boolean" | "number" | "string";
   stopStateValue?: string;
   pvWriteValueType?: "boolean" | "number" | "string";

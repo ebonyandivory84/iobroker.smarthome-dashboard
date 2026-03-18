@@ -103,6 +103,11 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         WRITE_DEFAULT_IDS.stop,
         LEGACY_WRITE_IDS.stop
       );
+      const stopSecondaryWriteBase = resolveStateIdWithLegacy(
+        config.allowChargingStateId,
+        WRITE_DEFAULT_IDS.stop,
+        LEGACY_WRITE_IDS.stop
+      );
       const manualCurrentWriteBase = resolveStateIdWithLegacy(
         config.gridAmpereStateId,
         WRITE_DEFAULT_IDS.manualCurrent,
@@ -121,6 +126,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
 
       const write = {
         stop: resolveStateId(config.stopWriteStateId, stopWriteBase),
+        stopSecondary: resolveOptionalStateId(config.stopSecondaryWriteStateId, stopSecondaryWriteBase),
         pv: resolveStateId(config.pvWriteStateId, modeWriteBase),
         pvPriority: resolveStateId(config.pvPriorityWriteStateId, modeWriteBase),
         grid: resolveStateId(config.gridWriteStateId, modeWriteBase),
@@ -221,6 +227,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       config.pvWriteStateId,
       config.stopStateId,
       config.stopWriteStateId,
+      config.stopSecondaryWriteStateId,
       config.targetKmStateId,
       config.carRangeStateId,
     ]
@@ -292,12 +299,14 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
 
   const modeWriteTypes = {
     stop: normalizeConfigValueType(config.stopWriteValueType, "boolean"),
+    stopSecondary: normalizeConfigValueType(config.stopSecondaryWriteValueType, "boolean"),
     pv: normalizeConfigValueType(config.pvWriteValueType, "number"),
     pvPriority: normalizeConfigValueType(config.pvPriorityWriteValueType, "number"),
     grid: normalizeConfigValueType(config.gridWriteValueType, "number"),
   } as const;
   const modeWriteValues = {
     stop: config.stopWriteValue,
+    stopSecondary: config.stopSecondaryWriteValue,
     pv: config.pvWriteValue,
     pvPriority: config.pvPriorityWriteValue,
     grid: config.gridWriteValue,
@@ -344,6 +353,11 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   } as const;
   const targetChargeValueType = normalizeConfigValueType(config.targetChargeValueType, "number");
   const stopDisabledWriteValue = resolveStopDisabledValue(modeWriteValues.stop, modeWriteTypes.stop, stateIds.write.stop);
+  const stopSecondaryDisabledWriteValue = resolveStopDisabledValue(
+    modeWriteValues.stopSecondary,
+    modeWriteTypes.stopSecondary,
+    stateIds.write.stopSecondary
+  );
   const stopDisabledStateValue = resolveStopDisabledValue(modeStateValues.stop, modeStateTypes.stop, stateIds.status.stop);
 
   const rawMode =
@@ -601,6 +615,22 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     };
   }, []);
 
+  const writeSecondaryChargingState = useCallback(
+    async (nextAllowed: boolean) => {
+      if (!stateIds.write.stopSecondary || stateIds.write.stopSecondary === stateIds.write.stop) {
+        return;
+      }
+      const secondaryEnabledWriteValue = deriveOppositeTypedValue(stopSecondaryDisabledWriteValue, modeWriteTypes.stopSecondary);
+      const secondaryWriteValue = nextAllowed ? secondaryEnabledWriteValue : stopSecondaryDisabledWriteValue;
+      try {
+        await client.writeState(stateIds.write.stopSecondary, secondaryWriteValue);
+      } catch (writeError) {
+        setError(writeError instanceof Error ? writeError.message : "State konnte nicht geschrieben werden");
+      }
+    },
+    [client, modeWriteTypes.stopSecondary, stateIds.write.stop, stateIds.write.stopSecondary, stopSecondaryDisabledWriteValue]
+  );
+
   const setMode = useCallback(
     (nextMode: WallboxMode) => {
       if (nextMode === mode) {
@@ -619,6 +649,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
             confirmKey: "mode:stop:allowCharging",
             matcher: (value) => typedValuesEqual(value, stopDisabledStateValue, modeStateTypes.stop),
           });
+          void writeSecondaryChargingState(false);
           return;
         }
 
@@ -630,6 +661,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
           confirmKey: `mode:${nextMode}:allowCharging`,
           matcher: (value) => typedValuesEqual(value, stopEnabledExpectedValue, modeStateTypes.stop),
         });
+        void writeSecondaryChargingState(true);
 
         const modeKey = nextMode === "pv" ? "pv" : nextMode === "pvPriority" ? "pvPriority" : "grid";
         const writeStateId =
@@ -679,6 +711,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       stateIds.write,
       stopDisabledStateValue,
       stopDisabledWriteValue,
+      writeSecondaryChargingState,
       writeStateWithConfirmation,
     ]
   );
@@ -703,6 +736,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         confirmKey: `chargingAllowed:${nextAllowed ? "on" : "off"}`,
         matcher: (value) => typedValuesEqual(value, expectedValue, modeStateTypes.stop),
       });
+      void writeSecondaryChargingState(nextAllowed);
     },
     [
       modeStateTypes.stop,
@@ -715,6 +749,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       stateIds.write.stop,
       stopDisabledStateValue,
       stopDisabledWriteValue,
+      writeSecondaryChargingState,
       writeStateWithConfirmation,
     ]
   );
@@ -907,6 +942,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       confirmKey: `${stopReason}:${Math.round(targetValue)}`,
       matcher: (value) => typedValuesEqual(value, stopDisabledStateValue, modeStateTypes.stop),
     });
+    void writeSecondaryChargingState(false);
   }, [
     chargingAllowed,
     batterySoc,
@@ -920,6 +956,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     targetKmValue,
     targetMode,
     targetSocPercent,
+    writeSecondaryChargingState,
     writeStateWithConfirmation,
   ]);
 

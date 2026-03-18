@@ -322,6 +322,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         backgroundImage: widget.backgroundImage || "",
         backgroundImageBlur: String(widget.backgroundImageBlur ?? 8),
         stopWriteStateId: widget.stopWriteStateId || widget.allowChargingStateId || "go-e-gemini-adapter.0.control.allowCharging",
+        stopSecondaryWriteStateId:
+          widget.stopSecondaryWriteStateId || widget.allowChargingStateId || "go-e-gemini-adapter.0.control.allowCharging",
         stopStateId:
           widget.stopStateId ||
           resolveMappedStateId(
@@ -375,6 +377,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           "go-e-gemini-adapter.0.status.targetPhaseMode",
         stopWriteValueType: widget.stopWriteValueType || "boolean",
         stopWriteValue: widget.stopWriteValue ?? "",
+        stopSecondaryWriteValueType: widget.stopSecondaryWriteValueType || "boolean",
+        stopSecondaryWriteValue: widget.stopSecondaryWriteValue ?? "",
         stopStateValueType: widget.stopStateValueType || "boolean",
         stopStateValue: widget.stopStateValue ?? "",
         pvWriteValueType: widget.pvWriteValueType || "number",
@@ -820,6 +824,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         backgroundImage: draft.backgroundImage?.trim() || undefined,
         backgroundImageBlur: clampInt(draft.backgroundImageBlur, widget.backgroundImageBlur ?? 8, 0),
         stopWriteStateId: draft.stopWriteStateId?.trim() || undefined,
+        stopSecondaryWriteStateId: draft.stopSecondaryWriteStateId?.trim() || undefined,
         stopStateId: draft.stopStateId?.trim() || undefined,
         pvWriteStateId: draft.pvWriteStateId?.trim() || undefined,
         pvStateId: draft.pvStateId?.trim() || undefined,
@@ -835,6 +840,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         phaseCardsStateId: draft.phaseCardsStateId?.trim() || undefined,
         stopWriteValueType: normalizeWallboxValueType(draft.stopWriteValueType, "boolean"),
         stopWriteValue: draft.stopWriteValue?.trim() || undefined,
+        stopSecondaryWriteValueType: normalizeWallboxValueType(draft.stopSecondaryWriteValueType, "boolean"),
+        stopSecondaryWriteValue: draft.stopSecondaryWriteValue?.trim() || undefined,
         stopStateValueType: normalizeWallboxValueType(draft.stopStateValueType, "boolean"),
         stopStateValue: draft.stopStateValue?.trim() || undefined,
         pvWriteValueType: normalizeWallboxValueType(draft.pvWriteValueType, "number"),
@@ -875,7 +882,11 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           draft.manualCurrentWriteStateId?.trim() || draft.gridAmpereStateId?.trim() || widget.gridAmpereStateId,
         limit80StateId: draft.limit80StateId?.trim() || widget.limit80StateId,
         targetKmStateId: draft.targetKmStateId?.trim() || undefined,
-        allowChargingStateId: draft.stopWriteStateId?.trim() || draft.allowChargingStateId?.trim() || undefined,
+        allowChargingStateId:
+          draft.stopSecondaryWriteStateId?.trim() ||
+          draft.allowChargingStateId?.trim() ||
+          draft.stopWriteStateId?.trim() ||
+          undefined,
         solarLoadOnlyStateId: draft.solarLoadOnlyStateId?.trim() || undefined,
         phaseSwitchModeStateId:
           draft.phaseCardsWriteStateId?.trim() || draft.phaseSwitchModeStateId?.trim() || undefined,
@@ -2149,6 +2160,33 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                         value={draft.stopWriteValue || ""}
                       />
                     </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Laden erlaubt - Zusatz Write Value">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("stopSecondaryWriteStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, stopSecondaryWriteStateId: value }))}
+                        value={draft.stopSecondaryWriteStateId || ""}
+                      />
+                    </Field>
+                    <Field label="Laden erlaubt - Zusatz Write Typ">
+                      <ChoiceRow
+                        options={["boolean", "number", "string"]}
+                        value={draft.stopSecondaryWriteValueType || "boolean"}
+                        onSelect={(value) => setDraft((current) => ({ ...current, stopSecondaryWriteValueType: value }))}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Laden erlaubt - Zusatz Write Wert">
+                      <TextInput
+                        autoCapitalize="none"
+                        onChangeText={(value) => setDraft((current) => ({ ...current, stopSecondaryWriteValue: value }))}
+                        style={styles.input}
+                        value={draft.stopSecondaryWriteValue || ""}
+                      />
+                    </Field>
+                    <View style={styles.field} />
                   </View>
                   <View style={styles.splitRow}>
                     <Field label="Laden erlaubt - State Typ">
