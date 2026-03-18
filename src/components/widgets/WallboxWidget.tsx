@@ -384,6 +384,9 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const chargeCompleted = carCode === 4 && !liveCharging;
 
   const writePending = Object.values(pendingWrites).some(Boolean);
+  const chargingTogglePendingOn = pendingWrites["chargingAllowed:on"] === true;
+  const chargingTogglePendingOff = pendingWrites["chargingAllowed:off"] === true;
+  const chargingAllowedDisplay = chargingTogglePendingOn ? true : chargingTogglePendingOff ? false : chargingAllowed;
   const activeTargetValue = targetMode === "km" ? targetKmValue : targetSocPercent;
   const activeTargetUnit = targetMode === "km" ? "km" : "%";
   const chargePowerCardMode: "idle" | "slow" | "fast" =
@@ -569,6 +572,35 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     }
   }, [playConfirmSound, stateSnapshot]);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = Date.now();
+      const expired: PendingConfirmation[] = [];
+      Object.entries(pendingConfirmationsRef.current).forEach(([confirmationId, confirmation]) => {
+        if (now < confirmation.timeoutAt) {
+          return;
+        }
+        expired.push(confirmation);
+        delete pendingConfirmationsRef.current[confirmationId];
+      });
+      if (!expired.length) {
+        return;
+      }
+      setPendingWrites((current) => {
+        const next = { ...current };
+        expired.forEach((entry) => {
+          next[entry.pendingKey] = false;
+        });
+        return next;
+      });
+      setError("Bestaetigung aus Status blieb aus");
+    }, 500);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, []);
+
   const setMode = useCallback(
     (nextMode: WallboxMode) => {
       if (nextMode === mode) {
@@ -653,6 +685,10 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
 
   const setChargingAllowed = useCallback(
     (nextAllowed: boolean) => {
+      const pendingKey = `chargingAllowed:${nextAllowed ? "on" : "off"}`;
+      if (pendingWrites[pendingKey]) {
+        return;
+      }
       const stopEnabledWriteValue = deriveOppositeTypedValue(stopDisabledWriteValue, modeWriteTypes.stop);
       const stopEnabledExpectedValue = deriveOppositeTypedValue(stopDisabledStateValue, modeStateTypes.stop);
       const writeValue = nextAllowed ? stopEnabledWriteValue : stopDisabledWriteValue;
@@ -662,7 +698,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       void writeStateWithConfirmation({
         writeStateId: stateIds.write.stop,
         value: writeValue,
-        pendingKey: `chargingAllowed:${nextAllowed ? "on" : "off"}`,
+        pendingKey,
         confirmStateId: stateIds.status.stop,
         confirmKey: `chargingAllowed:${nextAllowed ? "on" : "off"}`,
         matcher: (value) => typedValuesEqual(value, expectedValue, modeStateTypes.stop),
@@ -673,6 +709,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       modeStateValues.stop,
       modeWriteTypes.stop,
       modeWriteValues.stop,
+      pendingWrites,
       playPressSound,
       stateIds.status.stop,
       stateIds.write.stop,
@@ -997,10 +1034,10 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
             Laden erlaubt
           </Text>
           <Switch
-            disabled={writePending}
+            disabled={!stateIds.write.stop}
             onValueChange={setChargingAllowed}
             trackColor={{ false: "rgba(145, 164, 196, 0.34)", true: withAlpha(pvStart, 0.5) }}
-            value={chargingAllowed}
+            value={chargingAllowedDisplay}
           />
         </View>
 
