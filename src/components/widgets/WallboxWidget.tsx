@@ -1,5 +1,5 @@
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, ImageBackground, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, ImageBackground, Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { IoBrokerClient } from "../../services/iobroker";
 import { StateSnapshot, WallboxWidgetConfig } from "../../types/dashboard";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
@@ -343,14 +343,17 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     3: config.phase3StateValue,
   } as const;
   const targetChargeValueType = normalizeConfigValueType(config.targetChargeValueType, "number");
+  const stopDisabledWriteFallback = inferStopDisabledFallback(stateIds.write.stop, modeWriteTypes.stop);
+  const stopDisabledStateFallback = inferStopDisabledFallback(stateIds.status.stop, modeStateTypes.stop);
 
   const rawMode =
     readValue(stateIds.status.grid) ??
     readValue(stateIds.status.pvPriority) ??
     readValue(stateIds.status.pv) ??
     readValue(stateIds.write.grid);
-  const allowCharging = normalizeBoolean(readValue(stateIds.status.stop));
-  const mode = resolveWallboxMode(rawMode, allowCharging);
+  const stopDisabledStateValue = parseConfiguredValue(modeStateValues.stop, modeStateTypes.stop, stopDisabledStateFallback);
+  const chargingAllowed = !typedValuesEqual(readValue(stateIds.status.stop), stopDisabledStateValue, modeStateTypes.stop);
+  const mode = resolveWallboxMode(rawMode, chargingAllowed);
   const isGridMode = mode === "grid";
   const targetMode = config.targetMode === "km" ? "km" : "soc";
 
@@ -435,8 +438,6 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const mutedTextColor = config.appearance?.mutedTextColor || "rgba(214, 224, 244, 0.75)";
   const cardStart = config.appearance?.widgetColor || "rgba(20, 30, 44, 0.96)";
   const cardEnd = config.appearance?.widgetColor2 || "rgba(12, 18, 30, 0.98)";
-  const stopStart = config.appearance?.cardColor || "rgba(166, 176, 194, 0.2)";
-  const stopEnd = config.appearance?.cardColor2 || "rgba(123, 135, 158, 0.2)";
   const pvStart = config.appearance?.activeWidgetColor || "#3bbd83";
   const pvEnd = config.appearance?.activeWidgetColor2 || "#2f976c";
   const pvPriorityStart = config.appearance?.inactiveWidgetColor || "#f5bd6c";
@@ -576,31 +577,33 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       }
       playPressSound(`mode:${nextMode}`);
       void (async () => {
+        const stopDisabledWriteValue = parseConfiguredValue(modeWriteValues.stop, modeWriteTypes.stop, stopDisabledWriteFallback);
+        const stopEnabledWriteValue = deriveOppositeTypedValue(stopDisabledWriteValue, modeWriteTypes.stop);
+        const stopDisabledExpectedValue = parseConfiguredValue(
+          modeStateValues.stop,
+          modeStateTypes.stop,
+          stopDisabledStateFallback
+        );
+        const stopEnabledExpectedValue = deriveOppositeTypedValue(stopDisabledExpectedValue, modeStateTypes.stop);
         if (nextMode === "stop") {
-          const stopWriteValue = parseConfiguredValue(modeWriteValues.stop, modeWriteTypes.stop, false);
-          const stopExpectedValue = parseConfiguredValue(modeStateValues.stop, modeStateTypes.stop, false);
           await writeStateWithConfirmation({
             writeStateId: stateIds.write.stop,
-            value: stopWriteValue,
+            value: stopDisabledWriteValue,
             pendingKey: "mode:stop:allowCharging",
             confirmStateId: stateIds.status.stop,
             confirmKey: "mode:stop:allowCharging",
-            matcher: (value) =>
-              hasConfiguredValue(modeStateValues.stop)
-                ? typedValuesEqual(value, stopExpectedValue, modeStateTypes.stop)
-                : normalizeBoolean(value) === false,
+            matcher: (value) => typedValuesEqual(value, stopDisabledExpectedValue, modeStateTypes.stop),
           });
           return;
         }
 
-        const allowChargingWrite = castValueToType(true, modeWriteTypes.stop);
         await writeStateWithConfirmation({
           writeStateId: stateIds.write.stop,
-          value: allowChargingWrite,
+          value: stopEnabledWriteValue,
           pendingKey: `mode:${nextMode}:allowCharging`,
           confirmStateId: stateIds.status.stop,
           confirmKey: `mode:${nextMode}:allowCharging`,
-          matcher: (value) => normalizeBoolean(value) === true,
+          matcher: (value) => typedValuesEqual(value, stopEnabledExpectedValue, modeStateTypes.stop),
         });
 
         const modeKey = nextMode === "pv" ? "pv" : nextMode === "pvPriority" ? "pvPriority" : "grid";
@@ -649,6 +652,45 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       readValue,
       stateIds.status,
       stateIds.write,
+      stopDisabledStateFallback,
+      stopDisabledWriteFallback,
+      writeStateWithConfirmation,
+    ]
+  );
+
+  const setChargingAllowed = useCallback(
+    (nextAllowed: boolean) => {
+      const stopDisabledWriteValue = parseConfiguredValue(modeWriteValues.stop, modeWriteTypes.stop, stopDisabledWriteFallback);
+      const stopEnabledWriteValue = deriveOppositeTypedValue(stopDisabledWriteValue, modeWriteTypes.stop);
+      const stopDisabledExpectedValue = parseConfiguredValue(
+        modeStateValues.stop,
+        modeStateTypes.stop,
+        stopDisabledStateFallback
+      );
+      const stopEnabledExpectedValue = deriveOppositeTypedValue(stopDisabledExpectedValue, modeStateTypes.stop);
+      const writeValue = nextAllowed ? stopEnabledWriteValue : stopDisabledWriteValue;
+      const expectedValue = nextAllowed ? stopEnabledExpectedValue : stopDisabledExpectedValue;
+
+      playPressSound(`chargingAllowed:${nextAllowed ? "on" : "off"}`);
+      void writeStateWithConfirmation({
+        writeStateId: stateIds.write.stop,
+        value: writeValue,
+        pendingKey: `chargingAllowed:${nextAllowed ? "on" : "off"}`,
+        confirmStateId: stateIds.status.stop,
+        confirmKey: `chargingAllowed:${nextAllowed ? "on" : "off"}`,
+        matcher: (value) => typedValuesEqual(value, expectedValue, modeStateTypes.stop),
+      });
+    },
+    [
+      modeStateTypes.stop,
+      modeStateValues.stop,
+      modeWriteTypes.stop,
+      modeWriteValues.stop,
+      playPressSound,
+      stateIds.status.stop,
+      stateIds.write.stop,
+      stopDisabledStateFallback,
+      stopDisabledWriteFallback,
       writeStateWithConfirmation,
     ]
   );
@@ -812,7 +854,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   );
 
   useEffect(() => {
-    if (!stateIds.write.stop || allowCharging !== true) {
+    if (!stateIds.write.stop || chargingAllowed !== true) {
       autoStopMarkerRef.current = "";
       return;
     }
@@ -833,21 +875,18 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     }
     autoStopMarkerRef.current = marker;
     const stopReason = targetMode === "km" ? "kmLimitReached" : "socLimitReached";
-    const stopWriteValue = parseConfiguredValue(modeWriteValues.stop, modeWriteTypes.stop, false);
-    const stopExpectedValue = parseConfiguredValue(modeStateValues.stop, modeStateTypes.stop, false);
+    const stopWriteValue = parseConfiguredValue(modeWriteValues.stop, modeWriteTypes.stop, stopDisabledWriteFallback);
+    const stopExpectedValue = parseConfiguredValue(modeStateValues.stop, modeStateTypes.stop, stopDisabledStateFallback);
     void writeStateWithConfirmation({
       writeStateId: stateIds.write.stop,
       value: stopWriteValue,
       pendingKey: `${stopReason}:${Math.round(targetValue)}`,
       confirmStateId: stateIds.status.stop,
       confirmKey: `${stopReason}:${Math.round(targetValue)}`,
-      matcher: (value) =>
-        hasConfiguredValue(modeStateValues.stop)
-          ? typedValuesEqual(value, stopExpectedValue, modeStateTypes.stop)
-          : normalizeBoolean(value) === false,
+        matcher: (value) => typedValuesEqual(value, stopExpectedValue, modeStateTypes.stop),
     });
   }, [
-    allowCharging,
+    chargingAllowed,
     batterySoc,
     carRangeKm,
     modeStateTypes.stop,
@@ -856,6 +895,8 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     modeWriteValues.stop,
     stateIds.status.stop,
     stateIds.write.stop,
+    stopDisabledStateFallback,
+    stopDisabledWriteFallback,
     targetKmValue,
     targetMode,
     targetSocPercent,
@@ -924,7 +965,6 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     start: string;
     end: string;
   }> = [
-    { mode: "stop", label: "Stopp", start: stopStart, end: stopEnd },
     { mode: "pv", label: "PV", start: pvStart, end: pvEnd },
     { mode: "pvPriority", label: "PV (go-e priority)", start: pvPriorityStart, end: pvPriorityEnd },
     { mode: "grid", label: "Netz", start: gridStart, end: gridEnd },
@@ -967,6 +1007,18 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
               {titleText}
             </Text>
           ) : null}
+        </View>
+
+        <View style={[styles.allowChargingRow, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
+          <Text numberOfLines={1} style={[styles.allowChargingLabel, { color: mutedTextColor }]}>
+            Laden erlaubt
+          </Text>
+          <Switch
+            disabled={writePending}
+            onValueChange={setChargingAllowed}
+            trackColor={{ false: "rgba(145, 164, 196, 0.34)", true: withAlpha(pvStart, 0.5) }}
+            value={chargingAllowed}
+          />
         </View>
 
         <View style={[styles.chargeStatusStrip, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
@@ -1374,6 +1426,20 @@ function parseConfiguredValue(raw: string | undefined, type: ConfigValueType, fa
   return castValueToType(raw, type);
 }
 
+function inferStopDisabledFallback(stateId: string, type: ConfigValueType) {
+  const normalizedId = String(stateId || "")
+    .trim()
+    .toLowerCase();
+  const emergencySemantic = normalizedId.includes("emergencystop") || normalizedId.includes("emergency_stop");
+  if (type === "number") {
+    return emergencySemantic ? 1 : 0;
+  }
+  if (type === "string") {
+    return emergencySemantic ? "true" : "false";
+  }
+  return emergencySemantic;
+}
+
 function castValueToType(value: unknown, type: ConfigValueType) {
   if (type === "string") {
     return String(value ?? "");
@@ -1383,6 +1449,29 @@ function castValueToType(value: unknown, type: ConfigValueType) {
     return numeric === null ? 0 : numeric;
   }
   return normalizeBoolean(value) === true;
+}
+
+function deriveOppositeTypedValue(value: unknown, type: ConfigValueType) {
+  if (type === "number") {
+    const numeric = normalizeFloat(value);
+    if (numeric === null) {
+      return 0;
+    }
+    return Math.abs(numeric) < 0.0001 ? 1 : 0;
+  }
+  if (type === "string") {
+    const normalized = String(value ?? "")
+      .trim()
+      .toLowerCase();
+    if (["off", "false", "0", "stop", "disabled"].includes(normalized)) {
+      return "on";
+    }
+    if (["on", "true", "1", "start", "enabled"].includes(normalized)) {
+      return "off";
+    }
+    return String(value ?? "");
+  }
+  return !(normalizeBoolean(value) === true);
 }
 
 function typedValuesEqual(actual: unknown, expected: unknown, type: ConfigValueType) {
@@ -1877,6 +1966,24 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontWeight: "700",
+  },
+  allowChargingRow: {
+    borderRadius: 12,
+    borderWidth: 1,
+    minHeight: 42,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  allowChargingLabel: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+    textTransform: "uppercase",
   },
   title: {
     fontSize: 16,
