@@ -366,7 +366,14 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     readValue(stateIds.status.pv) ??
     readValue(stateIds.write.grid);
   const chargingAllowed = !typedValuesEqual(readValue(stateIds.status.stop), stopDisabledStateValue, modeStateTypes.stop);
-  const mode = resolveWallboxMode(rawMode, chargingAllowed);
+  const modePendingDisplay: WallboxMode | null = pendingWrites["mode:grid:mode"] || pendingWrites["mode:grid:allowCharging"]
+    ? "grid"
+    : pendingWrites["mode:pvPriority:mode"] || pendingWrites["mode:pvPriority:allowCharging"]
+      ? "pvPriority"
+      : pendingWrites["mode:pv:mode"] || pendingWrites["mode:pv:allowCharging"]
+        ? "pv"
+        : null;
+  const mode = modePendingDisplay ?? normalizeMode(rawMode) ?? "pv";
   const isGridMode = mode === "grid";
   const targetMode = config.targetMode === "km" ? "km" : "soc";
 
