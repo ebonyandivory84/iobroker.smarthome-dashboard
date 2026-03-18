@@ -374,9 +374,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           ) ||
           "go-e-gemini-adapter.0.status.targetPhaseMode",
         stopWriteValueType: widget.stopWriteValueType || "boolean",
-        stopWriteValue: widget.stopWriteValue || "false",
+        stopWriteValue: widget.stopWriteValue ?? "",
         stopStateValueType: widget.stopStateValueType || "boolean",
-        stopStateValue: widget.stopStateValue || "false",
+        stopStateValue: widget.stopStateValue ?? "",
         pvWriteValueType: widget.pvWriteValueType || "number",
         pvWriteValue: widget.pvWriteValue || "1",
         pvStateValueType: widget.pvStateValueType || "string",

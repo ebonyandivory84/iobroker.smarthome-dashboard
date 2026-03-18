@@ -343,15 +343,14 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     3: config.phase3StateValue,
   } as const;
   const targetChargeValueType = normalizeConfigValueType(config.targetChargeValueType, "number");
-  const stopDisabledWriteFallback = inferStopDisabledFallback(stateIds.write.stop, modeWriteTypes.stop);
-  const stopDisabledStateFallback = inferStopDisabledFallback(stateIds.status.stop, modeStateTypes.stop);
+  const stopDisabledWriteValue = resolveStopDisabledValue(modeWriteValues.stop, modeWriteTypes.stop, stateIds.write.stop);
+  const stopDisabledStateValue = resolveStopDisabledValue(modeStateValues.stop, modeStateTypes.stop, stateIds.status.stop);
 
   const rawMode =
     readValue(stateIds.status.grid) ??
     readValue(stateIds.status.pvPriority) ??
     readValue(stateIds.status.pv) ??
     readValue(stateIds.write.grid);
-  const stopDisabledStateValue = parseConfiguredValue(modeStateValues.stop, modeStateTypes.stop, stopDisabledStateFallback);
   const chargingAllowed = !typedValuesEqual(readValue(stateIds.status.stop), stopDisabledStateValue, modeStateTypes.stop);
   const mode = resolveWallboxMode(rawMode, chargingAllowed);
   const isGridMode = mode === "grid";
@@ -577,14 +576,8 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       }
       playPressSound(`mode:${nextMode}`);
       void (async () => {
-        const stopDisabledWriteValue = parseConfiguredValue(modeWriteValues.stop, modeWriteTypes.stop, stopDisabledWriteFallback);
         const stopEnabledWriteValue = deriveOppositeTypedValue(stopDisabledWriteValue, modeWriteTypes.stop);
-        const stopDisabledExpectedValue = parseConfiguredValue(
-          modeStateValues.stop,
-          modeStateTypes.stop,
-          stopDisabledStateFallback
-        );
-        const stopEnabledExpectedValue = deriveOppositeTypedValue(stopDisabledExpectedValue, modeStateTypes.stop);
+        const stopEnabledExpectedValue = deriveOppositeTypedValue(stopDisabledStateValue, modeStateTypes.stop);
         if (nextMode === "stop") {
           await writeStateWithConfirmation({
             writeStateId: stateIds.write.stop,
@@ -592,7 +585,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
             pendingKey: "mode:stop:allowCharging",
             confirmStateId: stateIds.status.stop,
             confirmKey: "mode:stop:allowCharging",
-            matcher: (value) => typedValuesEqual(value, stopDisabledExpectedValue, modeStateTypes.stop),
+            matcher: (value) => typedValuesEqual(value, stopDisabledStateValue, modeStateTypes.stop),
           });
           return;
         }
@@ -652,24 +645,18 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       readValue,
       stateIds.status,
       stateIds.write,
-      stopDisabledStateFallback,
-      stopDisabledWriteFallback,
+      stopDisabledStateValue,
+      stopDisabledWriteValue,
       writeStateWithConfirmation,
     ]
   );
 
   const setChargingAllowed = useCallback(
     (nextAllowed: boolean) => {
-      const stopDisabledWriteValue = parseConfiguredValue(modeWriteValues.stop, modeWriteTypes.stop, stopDisabledWriteFallback);
       const stopEnabledWriteValue = deriveOppositeTypedValue(stopDisabledWriteValue, modeWriteTypes.stop);
-      const stopDisabledExpectedValue = parseConfiguredValue(
-        modeStateValues.stop,
-        modeStateTypes.stop,
-        stopDisabledStateFallback
-      );
-      const stopEnabledExpectedValue = deriveOppositeTypedValue(stopDisabledExpectedValue, modeStateTypes.stop);
+      const stopEnabledExpectedValue = deriveOppositeTypedValue(stopDisabledStateValue, modeStateTypes.stop);
       const writeValue = nextAllowed ? stopEnabledWriteValue : stopDisabledWriteValue;
-      const expectedValue = nextAllowed ? stopEnabledExpectedValue : stopDisabledExpectedValue;
+      const expectedValue = nextAllowed ? stopEnabledExpectedValue : stopDisabledStateValue;
 
       playPressSound(`chargingAllowed:${nextAllowed ? "on" : "off"}`);
       void writeStateWithConfirmation({
@@ -689,8 +676,8 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       playPressSound,
       stateIds.status.stop,
       stateIds.write.stop,
-      stopDisabledStateFallback,
-      stopDisabledWriteFallback,
+      stopDisabledStateValue,
+      stopDisabledWriteValue,
       writeStateWithConfirmation,
     ]
   );
@@ -875,28 +862,24 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     }
     autoStopMarkerRef.current = marker;
     const stopReason = targetMode === "km" ? "kmLimitReached" : "socLimitReached";
-    const stopWriteValue = parseConfiguredValue(modeWriteValues.stop, modeWriteTypes.stop, stopDisabledWriteFallback);
-    const stopExpectedValue = parseConfiguredValue(modeStateValues.stop, modeStateTypes.stop, stopDisabledStateFallback);
     void writeStateWithConfirmation({
       writeStateId: stateIds.write.stop,
-      value: stopWriteValue,
+      value: stopDisabledWriteValue,
       pendingKey: `${stopReason}:${Math.round(targetValue)}`,
       confirmStateId: stateIds.status.stop,
       confirmKey: `${stopReason}:${Math.round(targetValue)}`,
-        matcher: (value) => typedValuesEqual(value, stopExpectedValue, modeStateTypes.stop),
+      matcher: (value) => typedValuesEqual(value, stopDisabledStateValue, modeStateTypes.stop),
     });
   }, [
     chargingAllowed,
     batterySoc,
     carRangeKm,
     modeStateTypes.stop,
-    modeStateValues.stop,
     modeWriteTypes.stop,
-    modeWriteValues.stop,
     stateIds.status.stop,
     stateIds.write.stop,
-    stopDisabledStateFallback,
-    stopDisabledWriteFallback,
+    stopDisabledStateValue,
+    stopDisabledWriteValue,
     targetKmValue,
     targetMode,
     targetSocPercent,
@@ -1438,6 +1421,34 @@ function inferStopDisabledFallback(stateId: string, type: ConfigValueType) {
     return emergencySemantic ? "true" : "false";
   }
   return emergencySemantic;
+}
+
+function resolveStopDisabledValue(raw: string | undefined, type: ConfigValueType, stateId: string) {
+  const fallback = inferStopDisabledFallback(stateId, type);
+  if (!hasConfiguredValue(raw)) {
+    return fallback;
+  }
+
+  const configuredValue = castValueToType(raw, type);
+  const emergencySemantic = String(stateId || "")
+    .trim()
+    .toLowerCase()
+    .includes("emergencystop") ||
+    String(stateId || "")
+      .trim()
+      .toLowerCase()
+      .includes("emergency_stop");
+
+  if (!emergencySemantic) {
+    return configuredValue;
+  }
+
+  const legacyAllowChargingDefault = type === "number" ? 0 : type === "string" ? "false" : false;
+  if (typedValuesEqual(configuredValue, legacyAllowChargingDefault, type)) {
+    return fallback;
+  }
+
+  return configuredValue;
 }
 
 function castValueToType(value: unknown, type: ConfigValueType) {
