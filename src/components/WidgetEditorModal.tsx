@@ -373,6 +373,43 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
             ".status.targetPhaseMode"
           ) ||
           "go-e-gemini-adapter.0.status.targetPhaseMode",
+        stopWriteValueType: widget.stopWriteValueType || "boolean",
+        stopWriteValue: widget.stopWriteValue || "false",
+        stopStateValueType: widget.stopStateValueType || "boolean",
+        stopStateValue: widget.stopStateValue || "false",
+        pvWriteValueType: widget.pvWriteValueType || "number",
+        pvWriteValue: widget.pvWriteValue || "1",
+        pvStateValueType: widget.pvStateValueType || "string",
+        pvStateValue: widget.pvStateValue || "pv only",
+        pvPriorityWriteValueType: widget.pvPriorityWriteValueType || "number",
+        pvPriorityWriteValue: widget.pvPriorityWriteValue || "2",
+        pvPriorityStateValueType: widget.pvPriorityStateValueType || "string",
+        pvPriorityStateValue: widget.pvPriorityStateValue || "pv only (go-e = priority)",
+        gridWriteValueType: widget.gridWriteValueType || "number",
+        gridWriteValue: widget.gridWriteValue || "3",
+        gridStateValueType: widget.gridStateValueType || "string",
+        gridStateValue: widget.gridStateValue || "grid mode",
+        manualCurrentWriteValueType: widget.manualCurrentWriteValueType || "number",
+        manualCurrentStateValueType: widget.manualCurrentStateValueType || "number",
+        ampereCardsWriteValueType: widget.ampereCardsWriteValueType || "number",
+        ampereCardsStateValueType: widget.ampereCardsStateValueType || "number",
+        ampere6WriteValue: widget.ampere6WriteValue || "6",
+        ampere10WriteValue: widget.ampere10WriteValue || "10",
+        ampere12WriteValue: widget.ampere12WriteValue || "12",
+        ampere14WriteValue: widget.ampere14WriteValue || "14",
+        ampere16WriteValue: widget.ampere16WriteValue || "16",
+        ampere6StateValue: widget.ampere6StateValue || "6",
+        ampere10StateValue: widget.ampere10StateValue || "10",
+        ampere12StateValue: widget.ampere12StateValue || "12",
+        ampere14StateValue: widget.ampere14StateValue || "14",
+        ampere16StateValue: widget.ampere16StateValue || "16",
+        phaseCardsWriteValueType: widget.phaseCardsWriteValueType || "number",
+        phaseCardsStateValueType: widget.phaseCardsStateValueType || "number",
+        phase1WriteValue: widget.phase1WriteValue || "1",
+        phase3WriteValue: widget.phase3WriteValue || "2",
+        phase1StateValue: widget.phase1StateValue || "1",
+        phase3StateValue: widget.phase3StateValue || "2",
+        targetChargeValueType: widget.targetChargeValueType || "number",
         modeStateId: widget.modeStateId || "go-e-gemini-adapter.0.control.mode",
         gridAmpereStateId: widget.gridAmpereStateId || "go-e-gemini-adapter.0.control.gridManual.currentA",
         limit80StateId: widget.limit80StateId || "go-e-gemini-adapter.0.control.targetSocPercent",
@@ -796,6 +833,43 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ampereCardsStateId: draft.ampereCardsStateId?.trim() || undefined,
         phaseCardsWriteStateId: draft.phaseCardsWriteStateId?.trim() || undefined,
         phaseCardsStateId: draft.phaseCardsStateId?.trim() || undefined,
+        stopWriteValueType: normalizeWallboxValueType(draft.stopWriteValueType, "boolean"),
+        stopWriteValue: draft.stopWriteValue?.trim() || undefined,
+        stopStateValueType: normalizeWallboxValueType(draft.stopStateValueType, "boolean"),
+        stopStateValue: draft.stopStateValue?.trim() || undefined,
+        pvWriteValueType: normalizeWallboxValueType(draft.pvWriteValueType, "number"),
+        pvWriteValue: draft.pvWriteValue?.trim() || undefined,
+        pvStateValueType: normalizeWallboxValueType(draft.pvStateValueType, "string"),
+        pvStateValue: draft.pvStateValue?.trim() || undefined,
+        pvPriorityWriteValueType: normalizeWallboxValueType(draft.pvPriorityWriteValueType, "number"),
+        pvPriorityWriteValue: draft.pvPriorityWriteValue?.trim() || undefined,
+        pvPriorityStateValueType: normalizeWallboxValueType(draft.pvPriorityStateValueType, "string"),
+        pvPriorityStateValue: draft.pvPriorityStateValue?.trim() || undefined,
+        gridWriteValueType: normalizeWallboxValueType(draft.gridWriteValueType, "number"),
+        gridWriteValue: draft.gridWriteValue?.trim() || undefined,
+        gridStateValueType: normalizeWallboxValueType(draft.gridStateValueType, "string"),
+        gridStateValue: draft.gridStateValue?.trim() || undefined,
+        manualCurrentWriteValueType: normalizeWallboxValueType(draft.manualCurrentWriteValueType, "number"),
+        manualCurrentStateValueType: normalizeWallboxValueType(draft.manualCurrentStateValueType, "number"),
+        ampereCardsWriteValueType: normalizeWallboxValueType(draft.ampereCardsWriteValueType, "number"),
+        ampereCardsStateValueType: normalizeWallboxValueType(draft.ampereCardsStateValueType, "number"),
+        ampere6WriteValue: draft.ampere6WriteValue?.trim() || undefined,
+        ampere10WriteValue: draft.ampere10WriteValue?.trim() || undefined,
+        ampere12WriteValue: draft.ampere12WriteValue?.trim() || undefined,
+        ampere14WriteValue: draft.ampere14WriteValue?.trim() || undefined,
+        ampere16WriteValue: draft.ampere16WriteValue?.trim() || undefined,
+        ampere6StateValue: draft.ampere6StateValue?.trim() || undefined,
+        ampere10StateValue: draft.ampere10StateValue?.trim() || undefined,
+        ampere12StateValue: draft.ampere12StateValue?.trim() || undefined,
+        ampere14StateValue: draft.ampere14StateValue?.trim() || undefined,
+        ampere16StateValue: draft.ampere16StateValue?.trim() || undefined,
+        phaseCardsWriteValueType: normalizeWallboxValueType(draft.phaseCardsWriteValueType, "number"),
+        phaseCardsStateValueType: normalizeWallboxValueType(draft.phaseCardsStateValueType, "number"),
+        phase1WriteValue: draft.phase1WriteValue?.trim() || undefined,
+        phase3WriteValue: draft.phase3WriteValue?.trim() || undefined,
+        phase1StateValue: draft.phase1StateValue?.trim() || undefined,
+        phase3StateValue: draft.phase3StateValue?.trim() || undefined,
+        targetChargeValueType: normalizeWallboxValueType(draft.targetChargeValueType, "number"),
         modeStateId: draft.pvWriteStateId?.trim() || draft.modeStateId?.trim() || widget.modeStateId,
         gridAmpereStateId:
           draft.manualCurrentWriteStateId?.trim() || draft.gridAmpereStateId?.trim() || widget.gridAmpereStateId,
@@ -2042,6 +2116,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
 
                 <View style={styles.groupCard}>
                   <Text style={styles.groupTitle}>Schreiben + Status-Bestaetigung</Text>
+                  <Text style={styles.sectionTitle}>Stopp</Text>
                   <View style={styles.splitRow}>
                     <Field label="Stopp - Write Value">
                       <StateFieldInput
@@ -2059,6 +2134,42 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     </Field>
                   </View>
                   <View style={styles.splitRow}>
+                    <Field label="Stopp - Write Typ">
+                      <ChoiceRow
+                        options={["boolean", "number", "string"]}
+                        value={draft.stopWriteValueType || "boolean"}
+                        onSelect={(value) => setDraft((current) => ({ ...current, stopWriteValueType: value }))}
+                      />
+                    </Field>
+                    <Field label="Stopp - Write Wert">
+                      <TextInput
+                        autoCapitalize="none"
+                        onChangeText={(value) => setDraft((current) => ({ ...current, stopWriteValue: value }))}
+                        style={styles.input}
+                        value={draft.stopWriteValue || ""}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Stopp - State Typ">
+                      <ChoiceRow
+                        options={["boolean", "number", "string"]}
+                        value={draft.stopStateValueType || "boolean"}
+                        onSelect={(value) => setDraft((current) => ({ ...current, stopStateValueType: value }))}
+                      />
+                    </Field>
+                    <Field label="Stopp - State Wert">
+                      <TextInput
+                        autoCapitalize="none"
+                        onChangeText={(value) => setDraft((current) => ({ ...current, stopStateValue: value }))}
+                        style={styles.input}
+                        value={draft.stopStateValue || ""}
+                      />
+                    </Field>
+                  </View>
+
+                  <Text style={styles.sectionTitle}>PV</Text>
+                  <View style={styles.splitRow}>
                     <Field label="PV - Write Value">
                       <StateFieldInput
                         onBrowse={() => setPickerField("pvWriteStateId")}
@@ -2074,6 +2185,42 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       />
                     </Field>
                   </View>
+                  <View style={styles.splitRow}>
+                    <Field label="PV - Write Typ">
+                      <ChoiceRow
+                        options={["boolean", "number", "string"]}
+                        value={draft.pvWriteValueType || "number"}
+                        onSelect={(value) => setDraft((current) => ({ ...current, pvWriteValueType: value }))}
+                      />
+                    </Field>
+                    <Field label="PV - Write Wert">
+                      <TextInput
+                        autoCapitalize="none"
+                        onChangeText={(value) => setDraft((current) => ({ ...current, pvWriteValue: value }))}
+                        style={styles.input}
+                        value={draft.pvWriteValue || ""}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="PV - State Typ">
+                      <ChoiceRow
+                        options={["boolean", "number", "string"]}
+                        value={draft.pvStateValueType || "string"}
+                        onSelect={(value) => setDraft((current) => ({ ...current, pvStateValueType: value }))}
+                      />
+                    </Field>
+                    <Field label="PV - State Wert">
+                      <TextInput
+                        autoCapitalize="none"
+                        onChangeText={(value) => setDraft((current) => ({ ...current, pvStateValue: value }))}
+                        style={styles.input}
+                        value={draft.pvStateValue || ""}
+                      />
+                    </Field>
+                  </View>
+
+                  <Text style={styles.sectionTitle}>PV (go-e priority)</Text>
                   <View style={styles.splitRow}>
                     <Field label="PV (go-e priority) - Write Value">
                       <StateFieldInput
@@ -2091,6 +2238,42 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     </Field>
                   </View>
                   <View style={styles.splitRow}>
+                    <Field label="PV Priority - Write Typ">
+                      <ChoiceRow
+                        options={["boolean", "number", "string"]}
+                        value={draft.pvPriorityWriteValueType || "number"}
+                        onSelect={(value) => setDraft((current) => ({ ...current, pvPriorityWriteValueType: value }))}
+                      />
+                    </Field>
+                    <Field label="PV Priority - Write Wert">
+                      <TextInput
+                        autoCapitalize="none"
+                        onChangeText={(value) => setDraft((current) => ({ ...current, pvPriorityWriteValue: value }))}
+                        style={styles.input}
+                        value={draft.pvPriorityWriteValue || ""}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="PV Priority - State Typ">
+                      <ChoiceRow
+                        options={["boolean", "number", "string"]}
+                        value={draft.pvPriorityStateValueType || "string"}
+                        onSelect={(value) => setDraft((current) => ({ ...current, pvPriorityStateValueType: value }))}
+                      />
+                    </Field>
+                    <Field label="PV Priority - State Wert">
+                      <TextInput
+                        autoCapitalize="none"
+                        onChangeText={(value) => setDraft((current) => ({ ...current, pvPriorityStateValue: value }))}
+                        style={styles.input}
+                        value={draft.pvPriorityStateValue || ""}
+                      />
+                    </Field>
+                  </View>
+
+                  <Text style={styles.sectionTitle}>Netz</Text>
+                  <View style={styles.splitRow}>
                     <Field label="Netz - Write Value">
                       <StateFieldInput
                         onBrowse={() => setPickerField("gridWriteStateId")}
@@ -2106,6 +2289,42 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       />
                     </Field>
                   </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Netz - Write Typ">
+                      <ChoiceRow
+                        options={["boolean", "number", "string"]}
+                        value={draft.gridWriteValueType || "number"}
+                        onSelect={(value) => setDraft((current) => ({ ...current, gridWriteValueType: value }))}
+                      />
+                    </Field>
+                    <Field label="Netz - Write Wert">
+                      <TextInput
+                        autoCapitalize="none"
+                        onChangeText={(value) => setDraft((current) => ({ ...current, gridWriteValue: value }))}
+                        style={styles.input}
+                        value={draft.gridWriteValue || ""}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Netz - State Typ">
+                      <ChoiceRow
+                        options={["boolean", "number", "string"]}
+                        value={draft.gridStateValueType || "string"}
+                        onSelect={(value) => setDraft((current) => ({ ...current, gridStateValueType: value }))}
+                      />
+                    </Field>
+                    <Field label="Netz - State Wert">
+                      <TextInput
+                        autoCapitalize="none"
+                        onChangeText={(value) => setDraft((current) => ({ ...current, gridStateValue: value }))}
+                        style={styles.input}
+                        value={draft.gridStateValue || ""}
+                      />
+                    </Field>
+                  </View>
+
+                  <Text style={styles.sectionTitle}>Wallbox-Strom (manuell)</Text>
                   <View style={styles.splitRow}>
                     <Field label="Wallbox-Strom (manuell) - Write Value">
                       <StateFieldInput
@@ -2123,6 +2342,24 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     </Field>
                   </View>
                   <View style={styles.splitRow}>
+                    <Field label="Manuell - Write Typ">
+                      <ChoiceRow
+                        options={["boolean", "number", "string"]}
+                        value={draft.manualCurrentWriteValueType || "number"}
+                        onSelect={(value) => setDraft((current) => ({ ...current, manualCurrentWriteValueType: value }))}
+                      />
+                    </Field>
+                    <Field label="Manuell - State Typ">
+                      <ChoiceRow
+                        options={["boolean", "number", "string"]}
+                        value={draft.manualCurrentStateValueType || "number"}
+                        onSelect={(value) => setDraft((current) => ({ ...current, manualCurrentStateValueType: value }))}
+                      />
+                    </Field>
+                  </View>
+
+                  <Text style={styles.sectionTitle}>Ampere Cards</Text>
+                  <View style={styles.splitRow}>
                     <Field label="Ampere-Cards - Write Value">
                       <StateFieldInput
                         onBrowse={() => setPickerField("ampereCardsWriteStateId")}
@@ -2138,6 +2375,108 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       />
                     </Field>
                   </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Ampere-Cards - Write Typ">
+                      <ChoiceRow
+                        options={["boolean", "number", "string"]}
+                        value={draft.ampereCardsWriteValueType || "number"}
+                        onSelect={(value) => setDraft((current) => ({ ...current, ampereCardsWriteValueType: value }))}
+                      />
+                    </Field>
+                    <Field label="Ampere-Cards - State Typ">
+                      <ChoiceRow
+                        options={["boolean", "number", "string"]}
+                        value={draft.ampereCardsStateValueType || "number"}
+                        onSelect={(value) => setDraft((current) => ({ ...current, ampereCardsStateValueType: value }))}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="6A Write / State">
+                      <View style={styles.splitRow}>
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, ampere6WriteValue: value }))}
+                          style={styles.input}
+                          value={draft.ampere6WriteValue || ""}
+                        />
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, ampere6StateValue: value }))}
+                          style={styles.input}
+                          value={draft.ampere6StateValue || ""}
+                        />
+                      </View>
+                    </Field>
+                    <Field label="10A Write / State">
+                      <View style={styles.splitRow}>
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, ampere10WriteValue: value }))}
+                          style={styles.input}
+                          value={draft.ampere10WriteValue || ""}
+                        />
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, ampere10StateValue: value }))}
+                          style={styles.input}
+                          value={draft.ampere10StateValue || ""}
+                        />
+                      </View>
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="12A Write / State">
+                      <View style={styles.splitRow}>
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, ampere12WriteValue: value }))}
+                          style={styles.input}
+                          value={draft.ampere12WriteValue || ""}
+                        />
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, ampere12StateValue: value }))}
+                          style={styles.input}
+                          value={draft.ampere12StateValue || ""}
+                        />
+                      </View>
+                    </Field>
+                    <Field label="14A Write / State">
+                      <View style={styles.splitRow}>
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, ampere14WriteValue: value }))}
+                          style={styles.input}
+                          value={draft.ampere14WriteValue || ""}
+                        />
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, ampere14StateValue: value }))}
+                          style={styles.input}
+                          value={draft.ampere14StateValue || ""}
+                        />
+                      </View>
+                    </Field>
+                  </View>
+                  <Field label="16A Write / State">
+                    <View style={styles.splitRow}>
+                      <TextInput
+                        autoCapitalize="none"
+                        onChangeText={(value) => setDraft((current) => ({ ...current, ampere16WriteValue: value }))}
+                        style={styles.input}
+                        value={draft.ampere16WriteValue || ""}
+                      />
+                      <TextInput
+                        autoCapitalize="none"
+                        onChangeText={(value) => setDraft((current) => ({ ...current, ampere16StateValue: value }))}
+                        style={styles.input}
+                        value={draft.ampere16StateValue || ""}
+                      />
+                    </View>
+                  </Field>
+
+                  <Text style={styles.sectionTitle}>Phasen Cards</Text>
                   <View style={styles.splitRow}>
                     <Field label="Phasen-Cards - Write Value">
                       <StateFieldInput
@@ -2155,13 +2494,73 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     </Field>
                   </View>
                   <View style={styles.splitRow}>
-                    <Field label="Ziel-SoC Prozent (write only, 0-100)">
+                    <Field label="Phasen-Cards - Write Typ">
+                      <ChoiceRow
+                        options={["boolean", "number", "string"]}
+                        value={draft.phaseCardsWriteValueType || "number"}
+                        onSelect={(value) => setDraft((current) => ({ ...current, phaseCardsWriteValueType: value }))}
+                      />
+                    </Field>
+                    <Field label="Phasen-Cards - State Typ">
+                      <ChoiceRow
+                        options={["boolean", "number", "string"]}
+                        value={draft.phaseCardsStateValueType || "number"}
+                        onSelect={(value) => setDraft((current) => ({ ...current, phaseCardsStateValueType: value }))}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="1-phasig Write / State">
+                      <View style={styles.splitRow}>
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, phase1WriteValue: value }))}
+                          style={styles.input}
+                          value={draft.phase1WriteValue || ""}
+                        />
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, phase1StateValue: value }))}
+                          style={styles.input}
+                          value={draft.phase1StateValue || ""}
+                        />
+                      </View>
+                    </Field>
+                    <Field label="3-phasig Write / State">
+                      <View style={styles.splitRow}>
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, phase3WriteValue: value }))}
+                          style={styles.input}
+                          value={draft.phase3WriteValue || ""}
+                        />
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, phase3StateValue: value }))}
+                          style={styles.input}
+                          value={draft.phase3StateValue || ""}
+                        />
+                      </View>
+                    </Field>
+                  </View>
+
+                  <View style={styles.splitRow}>
+                    <Field label="Ziel-Ladung (0-100)">
                       <StateFieldInput
                         onBrowse={() => setPickerField("limit80StateId")}
                         onChangeText={(value) => setDraft((current) => ({ ...current, limit80StateId: value }))}
                         value={draft.limit80StateId || ""}
                       />
                     </Field>
+                    <Field label="Ziel-Ladung Typ">
+                      <ChoiceRow
+                        options={["number", "string", "boolean"]}
+                        value={draft.targetChargeValueType || "number"}
+                        onSelect={(value) => setDraft((current) => ({ ...current, targetChargeValueType: value }))}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
                     <Field label="Ziel-km (frei waehlbarer Datenpunkt)">
                       <StateFieldInput
                         onBrowse={() => setPickerField("targetKmStateId")}
@@ -2170,15 +2569,6 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       />
                     </Field>
                   </View>
-                  <Field label="Zielwert aktiv (control.targetSocEnabled)">
-                    <StateFieldInput
-                      onBrowse={() => setPickerField("stopChargeingAtCarSoc80StateId")}
-                      onChangeText={(value) =>
-                        setDraft((current) => ({ ...current, stopChargeingAtCarSoc80StateId: value }))
-                      }
-                      value={draft.stopChargeingAtCarSoc80StateId || ""}
-                    />
-                  </Field>
                   <Text style={styles.mappingHint}>
                     Fuer `control.targetSocPercent` gibt es keinen passenden Status-Spiegelwert. Dieser Datenpunkt wird
                     deshalb als write only genutzt.
@@ -3682,6 +4072,16 @@ function normalizeStateFormat(raw: string | undefined) {
     return raw;
   }
   return "boolean";
+}
+
+function normalizeWallboxValueType(raw: string | undefined, fallback: "boolean" | "number" | "string") {
+  if (raw === "boolean" || raw === "string") {
+    return raw;
+  }
+  if (raw === "number") {
+    return "number";
+  }
+  return fallback;
 }
 
 function normalizeLogSeverity(raw: string | undefined) {

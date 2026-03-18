@@ -18,6 +18,7 @@ type PendingConfirmation = {
   matcher: (value: unknown) => boolean;
   timeoutAt: number;
 };
+type ConfigValueType = "boolean" | "number" | "string";
 
 const DEFAULT_REFRESH_MS = 2000;
 const MIN_REFRESH_MS = 500;
@@ -132,11 +133,6 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
           LEGACY_WRITE_IDS.targetSocPercent
         ),
         targetKm: resolveOptionalStateId(config.targetKmStateId, WRITE_DEFAULT_IDS.targetKm),
-        targetSocEnabled: resolveStateIdWithLegacy(
-          config.stopChargeingAtCarSoc80StateId,
-          WRITE_DEFAULT_IDS.targetSocEnabled,
-          LEGACY_WRITE_IDS.targetSocEnabled
-        ),
       };
 
       const status = {
@@ -225,7 +221,6 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       config.pvWriteStateId,
       config.stopStateId,
       config.stopWriteStateId,
-      config.stopChargeingAtCarSoc80StateId,
       config.targetKmStateId,
       config.carRangeStateId,
     ]
@@ -295,6 +290,60 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     [stateSnapshot]
   );
 
+  const modeWriteTypes = {
+    stop: normalizeConfigValueType(config.stopWriteValueType, "boolean"),
+    pv: normalizeConfigValueType(config.pvWriteValueType, "number"),
+    pvPriority: normalizeConfigValueType(config.pvPriorityWriteValueType, "number"),
+    grid: normalizeConfigValueType(config.gridWriteValueType, "number"),
+  } as const;
+  const modeWriteValues = {
+    stop: config.stopWriteValue,
+    pv: config.pvWriteValue,
+    pvPriority: config.pvPriorityWriteValue,
+    grid: config.gridWriteValue,
+  } as const;
+  const modeStateTypes = {
+    stop: normalizeConfigValueType(config.stopStateValueType, "boolean"),
+    pv: normalizeConfigValueType(config.pvStateValueType, "string"),
+    pvPriority: normalizeConfigValueType(config.pvPriorityStateValueType, "string"),
+    grid: normalizeConfigValueType(config.gridStateValueType, "string"),
+  } as const;
+  const modeStateValues = {
+    stop: config.stopStateValue,
+    pv: config.pvStateValue,
+    pvPriority: config.pvPriorityStateValue,
+    grid: config.gridStateValue,
+  } as const;
+  const manualCurrentWriteType = normalizeConfigValueType(config.manualCurrentWriteValueType, "number");
+  const manualCurrentStateType = normalizeConfigValueType(config.manualCurrentStateValueType, "number");
+  const ampereCardsWriteType = normalizeConfigValueType(config.ampereCardsWriteValueType, "number");
+  const ampereCardsStateType = normalizeConfigValueType(config.ampereCardsStateValueType, "number");
+  const ampereWriteValuesByPreset = {
+    6: config.ampere6WriteValue,
+    10: config.ampere10WriteValue,
+    12: config.ampere12WriteValue,
+    14: config.ampere14WriteValue,
+    16: config.ampere16WriteValue,
+  } as const;
+  const ampereStateValuesByPreset = {
+    6: config.ampere6StateValue,
+    10: config.ampere10StateValue,
+    12: config.ampere12StateValue,
+    14: config.ampere14StateValue,
+    16: config.ampere16StateValue,
+  } as const;
+  const phaseCardsWriteType = normalizeConfigValueType(config.phaseCardsWriteValueType, "number");
+  const phaseCardsStateType = normalizeConfigValueType(config.phaseCardsStateValueType, "number");
+  const phaseWriteValues = {
+    1: config.phase1WriteValue,
+    3: config.phase3WriteValue,
+  } as const;
+  const phaseStateValues = {
+    1: config.phase1StateValue,
+    3: config.phase3StateValue,
+  } as const;
+  const targetChargeValueType = normalizeConfigValueType(config.targetChargeValueType, "number");
+
   const rawMode =
     readValue(stateIds.status.grid) ??
     readValue(stateIds.status.pvPriority) ??
@@ -308,7 +357,6 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const gridAmpere = clampAmpere(normalizeAmpere(readValue(stateIds.status.manualCurrent)) ?? DEFAULT_GRID_AMPERE);
   const targetSocPercent = normalizeTargetSocPercent(readValue(stateIds.write.targetSocPercent)) ?? DEFAULT_TARGET_SOC;
   const targetKmValue = normalizeTargetKm(readValue(stateIds.write.targetKm)) ?? DEFAULT_TARGET_KM;
-  const targetSocEnabled = normalizeBoolean(readValue(stateIds.write.targetSocEnabled)) ?? true;
 
   const phaseCardRaw = readValue(stateIds.status.phaseCards);
   const actualPhaseRaw = readValue(stateIds.read.actualPhaseCount);
@@ -378,10 +426,9 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         carCode,
         liveAmpere,
         targetMode,
-        targetSocEnabled,
         targetValue: activeTargetValue,
       }),
-    [activeTargetValue, carCode, liveAmpere, mode, targetMode, targetSocEnabled]
+    [activeTargetValue, carCode, liveAmpere, mode, targetMode]
   );
 
   const textColor = config.appearance?.textColor || "#f5f8ff";
@@ -530,44 +577,80 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       playPressSound(`mode:${nextMode}`);
       void (async () => {
         if (nextMode === "stop") {
+          const stopWriteValue = parseConfiguredValue(modeWriteValues.stop, modeWriteTypes.stop, false);
+          const stopExpectedValue = parseConfiguredValue(modeStateValues.stop, modeStateTypes.stop, false);
           await writeStateWithConfirmation({
             writeStateId: stateIds.write.stop,
-            value: false,
+            value: stopWriteValue,
             pendingKey: "mode:stop:allowCharging",
             confirmStateId: stateIds.status.stop,
             confirmKey: "mode:stop:allowCharging",
-            matcher: (value) => normalizeBoolean(value) === false,
+            matcher: (value) =>
+              hasConfiguredValue(modeStateValues.stop)
+                ? typedValuesEqual(value, stopExpectedValue, modeStateTypes.stop)
+                : normalizeBoolean(value) === false,
           });
           return;
         }
 
+        const allowChargingWrite = castValueToType(true, modeWriteTypes.stop);
         await writeStateWithConfirmation({
           writeStateId: stateIds.write.stop,
-          value: true,
+          value: allowChargingWrite,
           pendingKey: `mode:${nextMode}:allowCharging`,
           confirmStateId: stateIds.status.stop,
           confirmKey: `mode:${nextMode}:allowCharging`,
           matcher: (value) => normalizeBoolean(value) === true,
         });
 
+        const modeKey = nextMode === "pv" ? "pv" : nextMode === "pvPriority" ? "pvPriority" : "grid";
         const writeStateId =
-          nextMode === "pv" ? stateIds.write.pv : nextMode === "pvPriority" ? stateIds.write.pvPriority : stateIds.write.grid;
+          modeKey === "pv" ? stateIds.write.pv : modeKey === "pvPriority" ? stateIds.write.pvPriority : stateIds.write.grid;
         const statusStateId =
-          nextMode === "pv" ? stateIds.status.pv : nextMode === "pvPriority" ? stateIds.status.pvPriority : stateIds.status.grid;
-        const modeValue = resolveModeWriteValue(readValue(writeStateId) ?? rawMode, nextMode);
-        if (modeValue !== null) {
+          modeKey === "pv" ? stateIds.status.pv : modeKey === "pvPriority" ? stateIds.status.pvPriority : stateIds.status.grid;
+        const fallbackModeValue = resolveModeWriteValue(readValue(writeStateId) ?? rawMode, nextMode);
+        const modeValue = parseConfiguredValue(modeWriteValues[modeKey], modeWriteTypes[modeKey], fallbackModeValue);
+        if (modeValue !== null && modeValue !== undefined) {
+          const expectedModeValue = parseConfiguredValue(modeStateValues[modeKey], modeStateTypes[modeKey], nextMode);
           await writeStateWithConfirmation({
             writeStateId,
             value: modeValue,
             pendingKey: `mode:${nextMode}:mode`,
             confirmStateId: statusStateId,
             confirmKey: `mode:${nextMode}`,
-            matcher: (value) => normalizeMode(value) === nextMode,
+            matcher: (value) =>
+              hasConfiguredValue(modeStateValues[modeKey])
+                ? typedValuesEqual(value, expectedModeValue, modeStateTypes[modeKey])
+                : normalizeMode(value) === nextMode,
           });
         }
       })();
     },
-    [mode, playPressSound, rawMode, readValue, stateIds.status, stateIds.write, writeStateWithConfirmation]
+    [
+      mode,
+      modeStateTypes.grid,
+      modeStateTypes.pv,
+      modeStateTypes.pvPriority,
+      modeStateTypes.stop,
+      modeStateValues.grid,
+      modeStateValues.pv,
+      modeStateValues.pvPriority,
+      modeStateValues.stop,
+      modeWriteTypes.grid,
+      modeWriteTypes.pv,
+      modeWriteTypes.pvPriority,
+      modeWriteTypes.stop,
+      modeWriteValues.grid,
+      modeWriteValues.pv,
+      modeWriteValues.pvPriority,
+      modeWriteValues.stop,
+      playPressSound,
+      rawMode,
+      readValue,
+      stateIds.status,
+      stateIds.write,
+      writeStateWithConfirmation,
+    ]
   );
 
   const setGridAmpere = useCallback(
@@ -580,28 +663,50 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         return;
       }
       playPressSound(`gridAmpere:${clamped}`);
+      const presetKey = clamped as (typeof AMPERE_PRESET_VALUES)[number];
+      const ampereWriteValue = parseConfiguredValue(
+        ampereWriteValuesByPreset[presetKey],
+        ampereCardsWriteType,
+        clamped
+      );
+      const ampereExpectedValue = parseConfiguredValue(
+        ampereStateValuesByPreset[presetKey],
+        ampereCardsStateType,
+        clamped
+      );
       void writeStateWithConfirmation({
         writeStateId: stateIds.write.ampereCards,
-        value: clamped,
+        value: ampereWriteValue,
         pendingKey: `ampere:${clamped}`,
         confirmStateId: stateIds.status.ampereCards,
         confirmKey: `gridAmpere:${clamped}`,
-        matcher: (value) => normalizeAmpere(value) === clamped,
+        matcher: (value) =>
+          hasConfiguredValue(ampereStateValuesByPreset[presetKey])
+            ? typedValuesEqual(value, ampereExpectedValue, ampereCardsStateType)
+            : normalizeAmpere(value) === clamped,
       });
       if (stateIds.write.manualCurrent && stateIds.write.manualCurrent !== stateIds.write.ampereCards) {
+        const manualCurrentWrite = castValueToType(clamped, manualCurrentWriteType);
+        const manualCurrentExpected = castValueToType(clamped, manualCurrentStateType);
         void writeStateWithConfirmation({
           writeStateId: stateIds.write.manualCurrent,
-          value: clamped,
+          value: manualCurrentWrite,
           pendingKey: `manualCurrent:${clamped}`,
           confirmStateId: stateIds.status.manualCurrent,
           confirmKey: `manualCurrent:${clamped}`,
-          matcher: (value) => normalizeAmpere(value) === clamped,
+          matcher: (value) => typedValuesEqual(value, manualCurrentExpected, manualCurrentStateType),
         });
       }
     },
     [
+      ampereCardsStateType,
+      ampereCardsWriteType,
+      ampereStateValuesByPreset,
+      ampereWriteValuesByPreset,
       gridAmpere,
       isGridMode,
+      manualCurrentStateType,
+      manualCurrentWriteType,
       playPressSound,
       stateIds.status.ampereCards,
       stateIds.status.manualCurrent,
@@ -619,7 +724,9 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       if (phaseCardSelection === nextPhase) {
         return;
       }
-      const writeValue = resolvePhaseWriteValue(readValue(stateIds.write.phaseCards), nextPhase);
+      const fallbackWriteValue = resolvePhaseWriteValue(readValue(stateIds.write.phaseCards), nextPhase);
+      const writeValue = parseConfiguredValue(phaseWriteValues[nextPhase], phaseCardsWriteType, fallbackWriteValue);
+      const expectedStateValue = parseConfiguredValue(phaseStateValues[nextPhase], phaseCardsStateType, nextPhase);
       playPressSound(`gridPhase:${nextPhase}`);
       void writeStateWithConfirmation({
         writeStateId: stateIds.write.phaseCards,
@@ -627,12 +734,19 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         pendingKey: `phase:${nextPhase}`,
         confirmStateId: stateIds.status.phaseCards,
         confirmKey: `gridPhase:${nextPhase}`,
-        matcher: (value) => resolvePhaseSelection(value) === nextPhase,
+        matcher: (value) =>
+          hasConfiguredValue(phaseStateValues[nextPhase])
+            ? typedValuesEqual(value, expectedStateValue, phaseCardsStateType)
+            : resolvePhaseSelection(value) === nextPhase,
       });
     },
     [
       isGridMode,
       phaseCardSelection,
+      phaseCardsStateType,
+      phaseCardsWriteType,
+      phaseStateValues,
+      phaseWriteValues,
       playPressSound,
       readValue,
       stateIds.status.phaseCards,
@@ -647,39 +761,21 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         return;
       }
       const normalized = normalizeTargetSocPercent(nextSoc) ?? DEFAULT_TARGET_SOC;
-      if (normalized === targetSocPercent && targetSocEnabled) {
+      if (normalized === targetSocPercent) {
         return;
       }
       playPressSound(`targetSoc:${normalized}`);
-      void (async () => {
-        await writeStateWithConfirmation({
-          writeStateId: stateIds.write.targetSocPercent,
-          value: normalized,
-          pendingKey: `targetSoc:${normalized}`,
-          confirmStateId: stateIds.write.targetSocPercent,
-          confirmKey: `targetSoc:${normalized}`,
-          matcher: (value) => normalizeTargetSocPercent(value) === normalized,
-        });
-        if (stateIds.write.targetSocEnabled) {
-          await writeStateWithConfirmation({
-            writeStateId: stateIds.write.targetSocEnabled,
-            value: true,
-            pendingKey: "targetSocEnabled:true",
-            confirmStateId: stateIds.write.targetSocEnabled,
-            confirmKey: "targetSocEnabled:true",
-            matcher: (value) => normalizeBoolean(value) === true,
-          });
-        }
-      })();
+      const writeValue = castValueToType(normalized, targetChargeValueType);
+      void writeStateWithConfirmation({
+        writeStateId: stateIds.write.targetSocPercent,
+        value: writeValue,
+        pendingKey: `targetSoc:${normalized}`,
+        confirmStateId: stateIds.write.targetSocPercent,
+        confirmKey: `targetSoc:${normalized}`,
+        matcher: (value) => typedValuesEqual(value, writeValue, targetChargeValueType),
+      });
     },
-    [
-      playPressSound,
-      stateIds.write.targetSocEnabled,
-      stateIds.write.targetSocPercent,
-      targetSocEnabled,
-      targetSocPercent,
-      writeStateWithConfirmation,
-    ]
+    [playPressSound, stateIds.write.targetSocPercent, targetChargeValueType, targetSocPercent, writeStateWithConfirmation]
   );
 
   const setTargetKm = useCallback(
@@ -688,32 +784,20 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         return;
       }
       const normalized = normalizeTargetKm(nextKm) ?? DEFAULT_TARGET_KM;
-      if (normalized === targetKmValue && targetSocEnabled) {
+      if (normalized === targetKmValue) {
         return;
       }
       playPressSound(`targetKm:${normalized}`);
-      void (async () => {
-        await writeStateWithConfirmation({
-          writeStateId: stateIds.write.targetKm,
-          value: normalized,
-          pendingKey: `targetKm:${normalized}`,
-          confirmStateId: stateIds.write.targetKm,
-          confirmKey: `targetKm:${normalized}`,
-          matcher: (value) => normalizeTargetKm(value) === normalized,
-        });
-        if (stateIds.write.targetSocEnabled) {
-          await writeStateWithConfirmation({
-            writeStateId: stateIds.write.targetSocEnabled,
-            value: true,
-            pendingKey: "targetSocEnabled:true",
-            confirmStateId: stateIds.write.targetSocEnabled,
-            confirmKey: "targetSocEnabled:true",
-            matcher: (value) => normalizeBoolean(value) === true,
-          });
-        }
-      })();
+      void writeStateWithConfirmation({
+        writeStateId: stateIds.write.targetKm,
+        value: normalized,
+        pendingKey: `targetKm:${normalized}`,
+        confirmStateId: stateIds.write.targetKm,
+        confirmKey: `targetKm:${normalized}`,
+        matcher: (value) => normalizeTargetKm(value) === normalized,
+      });
     },
-    [playPressSound, stateIds.write.targetKm, stateIds.write.targetSocEnabled, targetKmValue, targetSocEnabled, writeStateWithConfirmation]
+    [playPressSound, stateIds.write.targetKm, targetKmValue, writeStateWithConfirmation]
   );
 
   const setTargetValue = useCallback(
@@ -728,7 +812,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   );
 
   useEffect(() => {
-    if (!stateIds.write.stop || allowCharging !== true || !targetSocEnabled) {
+    if (!stateIds.write.stop || allowCharging !== true) {
       autoStopMarkerRef.current = "";
       return;
     }
@@ -749,23 +833,31 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     }
     autoStopMarkerRef.current = marker;
     const stopReason = targetMode === "km" ? "kmLimitReached" : "socLimitReached";
+    const stopWriteValue = parseConfiguredValue(modeWriteValues.stop, modeWriteTypes.stop, false);
+    const stopExpectedValue = parseConfiguredValue(modeStateValues.stop, modeStateTypes.stop, false);
     void writeStateWithConfirmation({
       writeStateId: stateIds.write.stop,
-      value: false,
+      value: stopWriteValue,
       pendingKey: `${stopReason}:${Math.round(targetValue)}`,
       confirmStateId: stateIds.status.stop,
       confirmKey: `${stopReason}:${Math.round(targetValue)}`,
-      matcher: (value) => normalizeBoolean(value) === false,
+      matcher: (value) =>
+        hasConfiguredValue(modeStateValues.stop)
+          ? typedValuesEqual(value, stopExpectedValue, modeStateTypes.stop)
+          : normalizeBoolean(value) === false,
     });
   }, [
     allowCharging,
     batterySoc,
     carRangeKm,
+    modeStateTypes.stop,
+    modeStateValues.stop,
+    modeWriteTypes.stop,
+    modeWriteValues.stop,
     stateIds.status.stop,
     stateIds.write.stop,
     targetKmValue,
     targetMode,
-    targetSocEnabled,
     targetSocPercent,
     writeStateWithConfirmation,
   ]);
@@ -1261,6 +1353,53 @@ function resolveMappedStatusId(sourceStateId: string, fromSegment: string, toSeg
   return normalizedSource.replace(fromSegment, toSegment);
 }
 
+function normalizeConfigValueType(value: string | undefined, fallback: ConfigValueType): ConfigValueType {
+  if (value === "boolean" || value === "string") {
+    return value;
+  }
+  if (value === "number") {
+    return "number";
+  }
+  return fallback;
+}
+
+function hasConfiguredValue(value: string | undefined) {
+  return String(value ?? "").trim().length > 0;
+}
+
+function parseConfiguredValue(raw: string | undefined, type: ConfigValueType, fallback: unknown) {
+  if (!hasConfiguredValue(raw)) {
+    return fallback;
+  }
+  return castValueToType(raw, type);
+}
+
+function castValueToType(value: unknown, type: ConfigValueType) {
+  if (type === "string") {
+    return String(value ?? "");
+  }
+  if (type === "number") {
+    const numeric = normalizeFloat(value);
+    return numeric === null ? 0 : numeric;
+  }
+  return normalizeBoolean(value) === true;
+}
+
+function typedValuesEqual(actual: unknown, expected: unknown, type: ConfigValueType) {
+  if (type === "number") {
+    const left = normalizeFloat(actual);
+    const right = normalizeFloat(expected);
+    if (left === null || right === null) {
+      return false;
+    }
+    return Math.abs(left - right) < 0.0001;
+  }
+  if (type === "string") {
+    return String(actual ?? "").trim().toLowerCase() === String(expected ?? "").trim().toLowerCase();
+  }
+  return normalizeBoolean(actual) === normalizeBoolean(expected);
+}
+
 function clampInt(value: number | undefined, fallback: number, min: number) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return fallback;
@@ -1620,14 +1759,12 @@ function buildStatusSubtitle({
   carCode,
   liveAmpere,
   targetMode,
-  targetSocEnabled,
   targetValue,
 }: {
   mode: WallboxMode;
   carCode: number | null;
   liveAmpere: number | null;
   targetMode: "soc" | "km";
-  targetSocEnabled: boolean;
   targetValue: number;
 }) {
   const parts: string[] = [];
@@ -1643,9 +1780,7 @@ function buildStatusSubtitle({
     parts.push("Fahrzeug bereit");
   }
   parts.push(modeStatusLabel(mode));
-  if (targetSocEnabled) {
-    parts.push(targetMode === "km" ? `Ziel ${targetValue} km` : `Ziel-SoC ${targetValue}%`);
-  }
+  parts.push(targetMode === "km" ? `Ziel ${targetValue} km` : `Ziel-SoC ${targetValue}%`);
   return parts.join(" | ");
 }
 
