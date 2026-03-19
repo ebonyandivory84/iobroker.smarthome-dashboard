@@ -349,7 +349,11 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   } as const;
   const targetChargeValueType = normalizeConfigValueType(config.targetChargeValueType, "number");
   const stopDisabledWriteValue = resolveStopDisabledValue(modeWriteValues.stop, modeWriteTypes.stop);
-  const stopSecondaryDisabledWriteValue = resolveStopDisabledValue(modeWriteValues.stopSecondary, modeWriteTypes.stopSecondary);
+  const stopSecondaryDisabledWriteValue = resolveStopDisabledValue(
+    modeWriteValues.stopSecondary,
+    modeWriteTypes.stopSecondary,
+    stateIds.write.stopSecondary
+  );
   const stopDisabledStateValue = resolveStopDisabledValue(modeStateValues.stop, modeStateTypes.stop);
 
   const rawMode =
@@ -1482,18 +1486,26 @@ function parseConfiguredValue(raw: string | undefined, type: ConfigValueType, fa
   return castValueToType(raw, type);
 }
 
-function inferStopDisabledFallback(type: ConfigValueType) {
-  if (type === "number") {
-    return 0;
-  }
-  if (type === "string") {
-    return "false";
-  }
-  return false;
+function isEmergencyStopStateId(stateId?: string) {
+  const normalized = String(stateId || "")
+    .trim()
+    .toLowerCase();
+  return normalized.includes("emergencystop") || normalized.includes("emergency_stop");
 }
 
-function resolveStopDisabledValue(raw: string | undefined, type: ConfigValueType) {
-  const fallback = inferStopDisabledFallback(type);
+function inferStopDisabledFallback(type: ConfigValueType, stateId?: string) {
+  const emergencySemantic = isEmergencyStopStateId(stateId);
+  if (type === "number") {
+    return emergencySemantic ? 1 : 0;
+  }
+  if (type === "string") {
+    return emergencySemantic ? "true" : "false";
+  }
+  return emergencySemantic;
+}
+
+function resolveStopDisabledValue(raw: string | undefined, type: ConfigValueType, stateId?: string) {
+  const fallback = inferStopDisabledFallback(type, stateId);
   if (!hasConfiguredValue(raw)) {
     return fallback;
   }
