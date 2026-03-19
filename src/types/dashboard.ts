@@ -247,6 +247,7 @@ export type WallboxWidgetConfig = WidgetBase & {
   limit80StateId: string;
   targetKmStateId?: string;
   allowChargingStateId?: string;
+  emergencyStopStateId?: string;
   solarLoadOnlyStateId?: string;
   phaseSwitchModeStateId?: string;
   phaseSwitchModeEnabledStateId?: string;

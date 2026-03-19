@@ -295,6 +295,12 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     }
 
     if (widget.type === "wallbox") {
+      const allowChargingWriteStateId =
+        widget.stopWriteStateId || widget.allowChargingStateId || "go-e-gemini-adapter.0.control.allowCharging";
+      const emergencyStopStateId =
+        widget.emergencyStopStateId ||
+        resolveLegacyEmergencyStopFromSecondary(widget.stopSecondaryWriteStateId, allowChargingWriteStateId) ||
+        "go-e-gemini-adapter.0.control.emergencyStop";
       setSoundDraft({
         press: resolveDraftSoundValue(
           widget.interactionSounds?.press,
@@ -321,15 +327,11 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         refreshMs: String(widget.refreshMs || 2000),
         backgroundImage: widget.backgroundImage || "",
         backgroundImageBlur: String(widget.backgroundImageBlur ?? 8),
-        stopWriteStateId: widget.stopWriteStateId || widget.allowChargingStateId || "go-e-gemini-adapter.0.control.allowCharging",
-        stopSecondaryWriteStateId: widget.stopSecondaryWriteStateId || "",
+        stopWriteStateId: allowChargingWriteStateId,
+        stopSecondaryWriteStateId: "",
         stopStateId:
           widget.stopStateId ||
-          resolveMappedStateId(
-            widget.stopWriteStateId || widget.allowChargingStateId || "go-e-gemini-adapter.0.control.allowCharging",
-            ".control.allowCharging",
-            ".status.effectiveAllowCharging"
-          ) ||
+          resolveMappedStateId(allowChargingWriteStateId, ".control.allowCharging", ".status.effectiveAllowCharging") ||
           "go-e-gemini-adapter.0.status.effectiveAllowCharging",
         pvWriteStateId: widget.pvWriteStateId || widget.modeStateId || "go-e-gemini-adapter.0.control.mode",
         pvStateId:
@@ -417,7 +419,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         gridAmpereStateId: widget.gridAmpereStateId || "go-e-gemini-adapter.0.control.gridManual.currentA",
         limit80StateId: widget.limit80StateId || "go-e-gemini-adapter.0.control.targetSocPercent",
         targetKmStateId: widget.targetKmStateId || "",
-        allowChargingStateId: widget.allowChargingStateId || "go-e-gemini-adapter.0.control.allowCharging",
+        allowChargingStateId: allowChargingWriteStateId,
+        emergencyStopStateId,
         solarLoadOnlyStateId: widget.solarLoadOnlyStateId || "",
         phaseSwitchModeStateId: widget.phaseSwitchModeStateId || "go-e-gemini-adapter.0.control.gridManual.phaseMode",
         phaseSwitchModeEnabledStateId:
@@ -823,7 +826,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         backgroundImage: draft.backgroundImage?.trim() || undefined,
         backgroundImageBlur: clampInt(draft.backgroundImageBlur, widget.backgroundImageBlur ?? 8, 0),
         stopWriteStateId: draft.stopWriteStateId?.trim() || undefined,
-        stopSecondaryWriteStateId: draft.stopSecondaryWriteStateId?.trim() || undefined,
+        stopSecondaryWriteStateId: undefined,
         stopStateId: draft.stopStateId?.trim() || undefined,
         pvWriteStateId: draft.pvWriteStateId?.trim() || undefined,
         pvStateId: draft.pvStateId?.trim() || undefined,
@@ -839,8 +842,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         phaseCardsStateId: draft.phaseCardsStateId?.trim() || undefined,
         stopWriteValueType: normalizeWallboxValueType(draft.stopWriteValueType, "boolean"),
         stopWriteValue: draft.stopWriteValue?.trim() || undefined,
-        stopSecondaryWriteValueType: normalizeWallboxValueType(draft.stopSecondaryWriteValueType, "boolean"),
-        stopSecondaryWriteValue: draft.stopSecondaryWriteValue?.trim() || undefined,
+        stopSecondaryWriteValueType: undefined,
+        stopSecondaryWriteValue: undefined,
         stopStateValueType: normalizeWallboxValueType(draft.stopStateValueType, "boolean"),
         stopStateValue: draft.stopStateValue?.trim() || undefined,
         pvWriteValueType: normalizeWallboxValueType(draft.pvWriteValueType, "number"),
@@ -883,9 +886,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         targetKmStateId: draft.targetKmStateId?.trim() || undefined,
         allowChargingStateId:
           draft.stopWriteStateId?.trim() ||
-          draft.stopSecondaryWriteStateId?.trim() ||
           draft.allowChargingStateId?.trim() ||
           undefined,
+        emergencyStopStateId: draft.emergencyStopStateId?.trim() || undefined,
         solarLoadOnlyStateId: draft.solarLoadOnlyStateId?.trim() || undefined,
         phaseSwitchModeStateId:
           draft.phaseCardsWriteStateId?.trim() || draft.phaseSwitchModeStateId?.trim() || undefined,
@@ -2160,33 +2163,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       />
                     </Field>
                   </View>
-                  <View style={styles.splitRow}>
-                    <Field label="Laden erlaubt - Zusatz Write Value">
-                      <StateFieldInput
-                        onBrowse={() => setPickerField("stopSecondaryWriteStateId")}
-                        onChangeText={(value) => setDraft((current) => ({ ...current, stopSecondaryWriteStateId: value }))}
-                        value={draft.stopSecondaryWriteStateId || ""}
-                      />
-                    </Field>
-                    <Field label="Laden erlaubt - Zusatz Write Typ">
-                      <ChoiceRow
-                        options={["boolean", "number", "string"]}
-                        value={draft.stopSecondaryWriteValueType || "boolean"}
-                        onSelect={(value) => setDraft((current) => ({ ...current, stopSecondaryWriteValueType: value }))}
-                      />
-                    </Field>
-                  </View>
-                  <View style={styles.splitRow}>
-                    <Field label="Laden erlaubt - Zusatz Write Wert">
-                      <TextInput
-                        autoCapitalize="none"
-                        onChangeText={(value) => setDraft((current) => ({ ...current, stopSecondaryWriteValue: value }))}
-                        style={styles.input}
-                        value={draft.stopSecondaryWriteValue || ""}
-                      />
-                    </Field>
-                    <View style={styles.field} />
-                  </View>
+                  <Text style={styles.mappingHint}>Interne Lade-Logik nutzt ausschliesslich diesen AllowCharging-Datenpunkt.</Text>
                   <View style={styles.splitRow}>
                     <Field label="Laden erlaubt - State Typ">
                       <ChoiceRow
@@ -2204,6 +2181,17 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       />
                     </Field>
                   </View>
+                  <Text style={styles.sectionTitle}>Emergency Stop (global)</Text>
+                  <Field label="Emergency Stop - Datenpunkt">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("emergencyStopStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, emergencyStopStateId: value }))}
+                      value={draft.emergencyStopStateId || ""}
+                    />
+                  </Field>
+                  <Text style={styles.mappingHint}>
+                    Separater globaler Not-Aus-Schalter. Dieser Datenpunkt wird nicht fuer die interne Lade-Logik verwendet.
+                  </Text>
 
                   <Text style={styles.sectionTitle}>PV</Text>
                   <View style={styles.splitRow}>
@@ -3994,6 +3982,18 @@ function resolveMappedStateId(sourceStateId: string | undefined, fromSegment: st
     return "";
   }
   return source.replace(fromSegment, toSegment);
+}
+
+function resolveLegacyEmergencyStopFromSecondary(secondaryStateId: string | undefined, allowChargingStateId: string | undefined) {
+  const secondary = (secondaryStateId || "").trim();
+  if (!secondary) {
+    return "";
+  }
+  const allowCharging = (allowChargingStateId || "").trim();
+  if (allowCharging && secondary === allowCharging) {
+    return "";
+  }
+  return secondary;
 }
 
 function ColorInputRow({

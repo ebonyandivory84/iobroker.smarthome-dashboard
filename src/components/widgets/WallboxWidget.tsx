@@ -40,6 +40,7 @@ const CONFIRMATION_TIMEOUT_MS = 12_000;
 
 const WRITE_DEFAULT_IDS = {
   stop: "go-e-gemini-adapter.0.control.allowCharging",
+  emergencyStop: "go-e-gemini-adapter.0.control.emergencyStop",
   mode: "go-e-gemini-adapter.0.control.mode",
   manualCurrent: "go-e-gemini-adapter.0.control.gridManual.currentA",
   phaseCards: "go-e-gemini-adapter.0.control.gridManual.phaseMode",
@@ -104,6 +105,11 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         LEGACY_WRITE_IDS.stop
       );
       const resolvedStopWriteStateId = resolveStateId(config.stopWriteStateId, stopWriteBase);
+      const emergencyStopStateId = resolveOptionalStateId(
+        config.emergencyStopStateId,
+        resolveLegacyEmergencyStopStateId(config.stopSecondaryWriteStateId, resolvedStopWriteStateId) ||
+          WRITE_DEFAULT_IDS.emergencyStop
+      );
       const manualCurrentWriteBase = resolveStateIdWithLegacy(
         config.gridAmpereStateId,
         WRITE_DEFAULT_IDS.manualCurrent,
@@ -122,7 +128,6 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
 
       const write = {
         stop: resolvedStopWriteStateId,
-        stopSecondary: resolveOptionalStateId(config.stopSecondaryWriteStateId, resolvedStopWriteStateId),
         pv: resolveStateId(config.pvWriteStateId, modeWriteBase),
         pvPriority: resolveStateId(config.pvPriorityWriteStateId, modeWriteBase),
         grid: resolveStateId(config.gridWriteStateId, modeWriteBase),
@@ -195,7 +200,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         ),
       };
 
-      return { write, status, read };
+      return { write, status, read, emergencyStop: emergencyStopStateId };
     },
     [
       config.ampereCardsStateId,
@@ -207,6 +212,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       config.gridStateId,
       config.chargePowerStateId,
       config.chargedEnergyStateId,
+      config.emergencyStopStateId,
       config.gridAmpereStateId,
       config.gridWriteStateId,
       config.limit80StateId,
@@ -238,7 +244,13 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const pendingConfirmationsRef = useRef<Record<string, PendingConfirmation>>({});
   const refreshMs = clampInt(config.refreshMs, DEFAULT_REFRESH_MS, MIN_REFRESH_MS);
   const readIds = useMemo(
-    () => uniqueStateIds([...Object.values(stateIds.write), ...Object.values(stateIds.status), ...Object.values(stateIds.read)]),
+    () =>
+      uniqueStateIds([
+        ...Object.values(stateIds.write),
+        ...Object.values(stateIds.status),
+        ...Object.values(stateIds.read),
+        stateIds.emergencyStop,
+      ]),
     [stateIds]
   );
 
@@ -295,14 +307,12 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
 
   const modeWriteTypes = {
     stop: normalizeConfigValueType(config.stopWriteValueType, "boolean"),
-    stopSecondary: normalizeConfigValueType(config.stopSecondaryWriteValueType, "boolean"),
     pv: normalizeConfigValueType(config.pvWriteValueType, "number"),
     pvPriority: normalizeConfigValueType(config.pvPriorityWriteValueType, "number"),
     grid: normalizeConfigValueType(config.gridWriteValueType, "number"),
   } as const;
   const modeWriteValues = {
     stop: config.stopWriteValue,
-    stopSecondary: config.stopSecondaryWriteValue,
     pv: config.pvWriteValue,
     pvPriority: config.pvPriorityWriteValue,
     grid: config.gridWriteValue,
@@ -349,11 +359,6 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   } as const;
   const targetChargeValueType = normalizeConfigValueType(config.targetChargeValueType, "number");
   const stopDisabledWriteValue = resolveStopDisabledValue(modeWriteValues.stop, modeWriteTypes.stop);
-  const stopSecondaryDisabledWriteValue = resolveStopDisabledValue(
-    modeWriteValues.stopSecondary,
-    modeWriteTypes.stopSecondary,
-    stateIds.write.stopSecondary
-  );
   const stopDisabledStateValue = resolveStopDisabledValue(modeStateValues.stop, modeStateTypes.stop);
 
   const rawMode =
@@ -362,6 +367,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     readValue(stateIds.status.pv) ??
     readValue(stateIds.write.grid);
   const chargingAllowed = !typedValuesEqual(readValue(stateIds.status.stop), stopDisabledStateValue, modeStateTypes.stop);
+  const emergencyStopActive = normalizeBoolean(readValue(stateIds.emergencyStop)) === true;
   const modePendingDisplay: WallboxMode | null = pendingWrites["mode:grid:mode"] || pendingWrites["mode:grid:allowCharging"]
     ? "grid"
     : pendingWrites["mode:pvPriority:mode"] || pendingWrites["mode:pvPriority:allowCharging"]
@@ -404,6 +410,9 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const chargingTogglePendingOn = pendingWrites["chargingAllowed:on"] === true;
   const chargingTogglePendingOff = pendingWrites["chargingAllowed:off"] === true;
   const chargingAllowedDisplay = chargingTogglePendingOn ? true : chargingTogglePendingOff ? false : chargingAllowed;
+  const emergencyTogglePendingOn = pendingWrites["emergencyStop:on"] === true;
+  const emergencyTogglePendingOff = pendingWrites["emergencyStop:off"] === true;
+  const emergencyStopDisplay = emergencyTogglePendingOn ? true : emergencyTogglePendingOff ? false : emergencyStopActive;
   const activeTargetValue = targetMode === "km" ? targetKmValue : targetSocPercent;
   const activeTargetUnit = targetMode === "km" ? "km" : "%";
   const chargePowerCardMode: "idle" | "slow" | "fast" =
@@ -618,22 +627,6 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     };
   }, []);
 
-  const writeSecondaryChargingState = useCallback(
-    async (nextAllowed: boolean) => {
-      if (!stateIds.write.stopSecondary || stateIds.write.stopSecondary === stateIds.write.stop) {
-        return;
-      }
-      const secondaryEnabledWriteValue = deriveOppositeTypedValue(stopSecondaryDisabledWriteValue, modeWriteTypes.stopSecondary);
-      const secondaryWriteValue = nextAllowed ? secondaryEnabledWriteValue : stopSecondaryDisabledWriteValue;
-      try {
-        await client.writeState(stateIds.write.stopSecondary, secondaryWriteValue);
-      } catch (writeError) {
-        setError(writeError instanceof Error ? writeError.message : "State konnte nicht geschrieben werden");
-      }
-    },
-    [client, modeWriteTypes.stopSecondary, stateIds.write.stop, stateIds.write.stopSecondary, stopSecondaryDisabledWriteValue]
-  );
-
   const setMode = useCallback(
     (nextMode: WallboxMode) => {
       if (nextMode === mode) {
@@ -652,7 +645,6 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
             confirmKey: "mode:stop:allowCharging",
             matcher: (value) => typedValuesEqual(value, stopDisabledStateValue, modeStateTypes.stop),
           });
-          void writeSecondaryChargingState(false);
           return;
         }
 
@@ -664,7 +656,6 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
           confirmKey: `mode:${nextMode}:allowCharging`,
           matcher: (value) => typedValuesEqual(value, stopEnabledExpectedValue, modeStateTypes.stop),
         });
-        void writeSecondaryChargingState(true);
 
         const modeKey = nextMode === "pv" ? "pv" : nextMode === "pvPriority" ? "pvPriority" : "grid";
         const writeStateId =
@@ -714,7 +705,6 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       stateIds.write,
       stopDisabledStateValue,
       stopDisabledWriteValue,
-      writeSecondaryChargingState,
       writeStateWithConfirmation,
     ]
   );
@@ -739,7 +729,6 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         confirmKey: `chargingAllowed:${nextAllowed ? "on" : "off"}`,
         matcher: (value) => typedValuesEqual(value, expectedValue, modeStateTypes.stop),
       });
-      void writeSecondaryChargingState(nextAllowed);
     },
     [
       modeStateTypes.stop,
@@ -752,9 +741,30 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       stateIds.write.stop,
       stopDisabledStateValue,
       stopDisabledWriteValue,
-      writeSecondaryChargingState,
       writeStateWithConfirmation,
     ]
+  );
+
+  const setEmergencyStop = useCallback(
+    (nextActive: boolean) => {
+      if (!stateIds.emergencyStop) {
+        return;
+      }
+      const pendingKey = `emergencyStop:${nextActive ? "on" : "off"}`;
+      if (pendingWrites[pendingKey]) {
+        return;
+      }
+      playPressSound(`emergencyStop:${nextActive ? "on" : "off"}`);
+      void writeStateWithConfirmation({
+        writeStateId: stateIds.emergencyStop,
+        value: nextActive,
+        pendingKey,
+        confirmStateId: stateIds.emergencyStop,
+        confirmKey: `emergencyStop:${nextActive ? "on" : "off"}`,
+        matcher: (value) => normalizeBoolean(value) === nextActive,
+      });
+    },
+    [pendingWrites, playPressSound, stateIds.emergencyStop, writeStateWithConfirmation]
   );
 
   const setGridAmpere = useCallback(
@@ -945,7 +955,6 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       confirmKey: `${stopReason}:${Math.round(targetValue)}`,
       matcher: (value) => typedValuesEqual(value, stopDisabledStateValue, modeStateTypes.stop),
     });
-    void writeSecondaryChargingState(false);
   }, [
     chargingAllowed,
     batterySoc,
@@ -959,22 +968,25 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     targetKmValue,
     targetMode,
     targetSocPercent,
-    writeSecondaryChargingState,
     writeStateWithConfirmation,
   ]);
 
-  const chargingStatusText = liveCharging
-    ? `Laedt mit ${formatPowerKW(chargingPowerW)}`
-    : chargeCompleted
-      ? "Ladevorgang abgeschlossen"
-      : "Kein aktiver Ladevorgang";
-  const chargingIndicatorColor = liveCharging
-    ? chargingPulseOn
-      ? "#f8c24b"
-      : "rgba(248, 194, 75, 0.28)"
-    : chargeCompleted
-      ? "#35d19a"
-      : "rgba(197, 209, 231, 0.35)";
+  const chargingStatusText = emergencyStopDisplay
+    ? "Emergency Stop aktiv"
+    : liveCharging
+      ? `Laedt mit ${formatPowerKW(chargingPowerW)}`
+      : chargeCompleted
+        ? "Ladevorgang abgeschlossen"
+        : "Kein aktiver Ladevorgang";
+  const chargingIndicatorColor = emergencyStopDisplay
+    ? "#ef5d6b"
+    : liveCharging
+      ? chargingPulseOn
+        ? "#f8c24b"
+        : "rgba(248, 194, 75, 0.28)"
+      : chargeCompleted
+        ? "#35d19a"
+        : "rgba(197, 209, 231, 0.35)";
   const chargePowerCardAccent =
     chargePowerCardMode === "fast"
       ? "rgba(59, 203, 141, 0.95)"
@@ -1078,6 +1090,18 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
             onValueChange={setChargingAllowed}
             trackColor={{ false: "rgba(145, 164, 196, 0.34)", true: withAlpha(pvStart, 0.5) }}
             value={chargingAllowedDisplay}
+          />
+        </View>
+
+        <View style={[styles.allowChargingRow, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
+          <Text numberOfLines={1} style={[styles.allowChargingLabel, { color: mutedTextColor }]}>
+            Emergency Stop (global)
+          </Text>
+          <Switch
+            disabled={!stateIds.emergencyStop}
+            onValueChange={setEmergencyStop}
+            trackColor={{ false: "rgba(145, 164, 196, 0.34)", true: "rgba(239, 93, 107, 0.55)" }}
+            value={emergencyStopDisplay}
           />
         </View>
 
@@ -1452,6 +1476,14 @@ function resolveStateIdWithLegacy(candidate: string | undefined, fallback: strin
 function resolveOptionalStateId(candidate: string | undefined, fallback = "") {
   const trimmed = String(candidate || "").trim();
   return trimmed || fallback;
+}
+
+function resolveLegacyEmergencyStopStateId(candidate: string | undefined, allowChargingStateId: string) {
+  const resolved = resolveOptionalStateId(candidate, "");
+  if (!resolved) {
+    return "";
+  }
+  return resolved === allowChargingStateId ? "" : resolved;
 }
 
 function resolveMappedStatusId(sourceStateId: string, fromSegment: string, toSegment: string) {

@@ -291,6 +291,7 @@ export function buildWidgetTemplate(
       limit80StateId: "go-e-gemini-adapter.0.control.targetSocPercent",
       targetKmStateId: "",
       allowChargingStateId: "go-e-gemini-adapter.0.control.allowCharging",
+      emergencyStopStateId: "go-e-gemini-adapter.0.control.emergencyStop",
       solarLoadOnlyStateId: "",
       phaseSwitchModeStateId: "go-e-gemini-adapter.0.control.gridManual.phaseMode",
       phaseSwitchModeEnabledStateId: "go-e-gemini-adapter.0.status.enabledPhases",
