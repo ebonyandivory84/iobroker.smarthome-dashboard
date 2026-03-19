@@ -322,8 +322,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         backgroundImage: widget.backgroundImage || "",
         backgroundImageBlur: String(widget.backgroundImageBlur ?? 8),
         stopWriteStateId: widget.stopWriteStateId || widget.allowChargingStateId || "go-e-gemini-adapter.0.control.allowCharging",
-        stopSecondaryWriteStateId:
-          widget.stopSecondaryWriteStateId || widget.allowChargingStateId || "go-e-gemini-adapter.0.control.allowCharging",
+        stopSecondaryWriteStateId: widget.stopSecondaryWriteStateId || "",
         stopStateId:
           widget.stopStateId ||
           resolveMappedStateId(
@@ -883,9 +882,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         limit80StateId: draft.limit80StateId?.trim() || widget.limit80StateId,
         targetKmStateId: draft.targetKmStateId?.trim() || undefined,
         allowChargingStateId:
+          draft.stopWriteStateId?.trim() ||
           draft.stopSecondaryWriteStateId?.trim() ||
           draft.allowChargingStateId?.trim() ||
-          draft.stopWriteStateId?.trim() ||
           undefined,
         solarLoadOnlyStateId: draft.solarLoadOnlyStateId?.trim() || undefined,
         phaseSwitchModeStateId:

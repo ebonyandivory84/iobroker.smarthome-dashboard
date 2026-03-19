@@ -103,11 +103,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         WRITE_DEFAULT_IDS.stop,
         LEGACY_WRITE_IDS.stop
       );
-      const stopSecondaryWriteBase = resolveStateIdWithLegacy(
-        config.allowChargingStateId,
-        WRITE_DEFAULT_IDS.stop,
-        LEGACY_WRITE_IDS.stop
-      );
+      const resolvedStopWriteStateId = resolveStateId(config.stopWriteStateId, stopWriteBase);
       const manualCurrentWriteBase = resolveStateIdWithLegacy(
         config.gridAmpereStateId,
         WRITE_DEFAULT_IDS.manualCurrent,
@@ -125,8 +121,8 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       );
 
       const write = {
-        stop: resolveStateId(config.stopWriteStateId, stopWriteBase),
-        stopSecondary: resolveOptionalStateId(config.stopSecondaryWriteStateId, stopSecondaryWriteBase),
+        stop: resolvedStopWriteStateId,
+        stopSecondary: resolveOptionalStateId(config.stopSecondaryWriteStateId, resolvedStopWriteStateId),
         pv: resolveStateId(config.pvWriteStateId, modeWriteBase),
         pvPriority: resolveStateId(config.pvPriorityWriteStateId, modeWriteBase),
         grid: resolveStateId(config.gridWriteStateId, modeWriteBase),
@@ -352,13 +348,9 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     3: config.phase3StateValue,
   } as const;
   const targetChargeValueType = normalizeConfigValueType(config.targetChargeValueType, "number");
-  const stopDisabledWriteValue = resolveStopDisabledValue(modeWriteValues.stop, modeWriteTypes.stop, stateIds.write.stop);
-  const stopSecondaryDisabledWriteValue = resolveStopDisabledValue(
-    modeWriteValues.stopSecondary,
-    modeWriteTypes.stopSecondary,
-    stateIds.write.stopSecondary
-  );
-  const stopDisabledStateValue = resolveStopDisabledValue(modeStateValues.stop, modeStateTypes.stop, stateIds.status.stop);
+  const stopDisabledWriteValue = resolveStopDisabledValue(modeWriteValues.stop, modeWriteTypes.stop);
+  const stopSecondaryDisabledWriteValue = resolveStopDisabledValue(modeWriteValues.stopSecondary, modeWriteTypes.stopSecondary);
+  const stopDisabledStateValue = resolveStopDisabledValue(modeStateValues.stop, modeStateTypes.stop);
 
   const rawMode =
     readValue(stateIds.status.grid) ??
@@ -1490,46 +1482,22 @@ function parseConfiguredValue(raw: string | undefined, type: ConfigValueType, fa
   return castValueToType(raw, type);
 }
 
-function inferStopDisabledFallback(stateId: string, type: ConfigValueType) {
-  const normalizedId = String(stateId || "")
-    .trim()
-    .toLowerCase();
-  const emergencySemantic = normalizedId.includes("emergencystop") || normalizedId.includes("emergency_stop");
+function inferStopDisabledFallback(type: ConfigValueType) {
   if (type === "number") {
-    return emergencySemantic ? 1 : 0;
+    return 0;
   }
   if (type === "string") {
-    return emergencySemantic ? "true" : "false";
+    return "false";
   }
-  return emergencySemantic;
+  return false;
 }
 
-function resolveStopDisabledValue(raw: string | undefined, type: ConfigValueType, stateId: string) {
-  const fallback = inferStopDisabledFallback(stateId, type);
+function resolveStopDisabledValue(raw: string | undefined, type: ConfigValueType) {
+  const fallback = inferStopDisabledFallback(type);
   if (!hasConfiguredValue(raw)) {
     return fallback;
   }
-
-  const configuredValue = castValueToType(raw, type);
-  const emergencySemantic = String(stateId || "")
-    .trim()
-    .toLowerCase()
-    .includes("emergencystop") ||
-    String(stateId || "")
-      .trim()
-      .toLowerCase()
-      .includes("emergency_stop");
-
-  if (!emergencySemantic) {
-    return configuredValue;
-  }
-
-  const legacyAllowChargingDefault = type === "number" ? 0 : type === "string" ? "false" : false;
-  if (typedValuesEqual(configuredValue, legacyAllowChargingDefault, type)) {
-    return fallback;
-  }
-
-  return configuredValue;
+  return castValueToType(raw, type);
 }
 
 function castValueToType(value: unknown, type: ConfigValueType) {

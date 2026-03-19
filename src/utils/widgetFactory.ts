@@ -233,7 +233,7 @@ export function buildWidgetTemplate(
       backgroundImage: "",
       backgroundImageBlur: 8,
       stopWriteStateId: "go-e-gemini-adapter.0.control.allowCharging",
-      stopSecondaryWriteStateId: "go-e-gemini-adapter.0.control.allowCharging",
+      stopSecondaryWriteStateId: "",
       stopStateId: "go-e-gemini-adapter.0.status.effectiveAllowCharging",
       pvWriteStateId: "go-e-gemini-adapter.0.control.mode",
       pvStateId: "go-e-gemini-adapter.0.status.activeMode",
