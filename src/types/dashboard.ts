@@ -11,6 +11,7 @@ export type WidgetType =
   | "script"
   | "host"
   | "wallbox"
+  | "goe"
   | "heating"
   | "heatingV2";
 
@@ -260,6 +261,10 @@ export type WallboxWidgetConfig = WidgetBase & {
   stopChargeingAtCarSoc80StateId?: string;
 };
 
+export type GoEWidgetConfig = Omit<WallboxWidgetConfig, "type"> & {
+  type: "goe";
+};
+
 export type HeatingWidgetConfig = WidgetBase & {
   type: "heating";
   manualHeightOverride?: boolean;
@@ -402,6 +407,7 @@ export type WidgetConfig =
   | ScriptWidgetConfig
   | HostStatsWidgetConfig
   | WallboxWidgetConfig
+  | GoEWidgetConfig
   | HeatingWidgetConfig
   | HeatingWidgetV2Config;
 

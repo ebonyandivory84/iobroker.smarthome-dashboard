@@ -294,7 +294,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       return;
     }
 
-    if (widget.type === "wallbox") {
+    if (widget.type === "wallbox" || widget.type === "goe") {
       const allowChargingWriteStateId =
         widget.stopWriteStateId || widget.allowChargingStateId || "go-e-gemini-adapter.0.control.allowCharging";
       const emergencyStopStateId =
@@ -304,15 +304,15 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       setSoundDraft({
         press: resolveDraftSoundValue(
           widget.interactionSounds?.press,
-          config.uiSounds?.widgetTypeDefaults?.wallbox?.press
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]?.press
         ),
         confirm: resolveDraftSoundValue(
           widget.interactionSounds?.confirm,
-          config.uiSounds?.widgetTypeDefaults?.wallbox?.confirm
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]?.confirm
         ),
         slider: resolveDraftSoundValue(
           widget.interactionSounds?.slider,
-          config.uiSounds?.widgetTypeDefaults?.wallbox?.slider
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]?.slider
         ),
       });
       setWeatherSuggestions([]);
@@ -814,7 +814,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         hostLabel: draft.hostLabel?.trim() || undefined,
         appearance,
       });
-    } else if (widget.type === "wallbox") {
+    } else if (widget.type === "wallbox" || widget.type === "goe") {
       onSave(widget.id, {
         title: draft.title,
         showTitle: draft.showTitle !== "false",
@@ -1033,6 +1033,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       widget.type !== "log" &&
       widget.type !== "script" &&
       widget.type !== "wallbox" &&
+      widget.type !== "goe" &&
       widget.type !== "heating" &&
       widget.type !== "heatingV2"
     ) {
@@ -1247,7 +1248,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   />
                 </>
               ) : null}
-              {widget.type === "wallbox" ? (
+              {widget.type === "wallbox" || widget.type === "goe" ? (
                 <>
                   <ColorInputRow
                     firstKey="cardColor"
@@ -2059,7 +2060,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 </Text>
               </>
             ) : null}
-            {widget.type === "wallbox" ? (
+            {widget.type === "wallbox" || widget.type === "goe" ? (
               <>
                 <View style={styles.groupCard}>
                   <Text style={styles.groupTitle}>Basis</Text>
@@ -2695,7 +2696,11 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     />
                   </Field>
                   <EditorButtonPressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
-                    <Text style={styles.inlineActionLabel}>Als Default fuer alle Wallbox-Widgets verwenden</Text>
+                    <Text style={styles.inlineActionLabel}>
+                      {widget.type === "goe"
+                        ? "Als Default fuer alle go-e-Widgets verwenden"
+                        : "Als Default fuer alle Wallbox-Widgets verwenden"}
+                    </Text>
                   </EditorButtonPressable>
                 </Field>
                 </View>
@@ -3371,7 +3376,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
             ? widget?.type === "state"
               ? "State-Bild waehlen"
               : "Link-Icon waehlen"
-            : widget?.type === "wallbox"
+            : widget?.type === "wallbox" || widget?.type === "goe"
               ? "Wallbox-Hintergrund waehlen"
               : (widget?.type === "heating" || widget?.type === "heatingV2")
                 ? "Heizung-Hintergrund waehlen"
@@ -3380,7 +3385,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         helperText={
           imagePickerField === "iconImage"
             ? "Waehle eine Bilddatei aus dem Ordner `assets/`."
-            : widget?.type === "wallbox"
+            : widget?.type === "wallbox" || widget?.type === "goe"
               ? "Waehle ein Hintergrundbild. Drag&Drop, Datei-Upload und Browser-Auswahl sind verfuegbar."
               : (widget?.type === "heating" || widget?.type === "heatingV2")
                 ? "Waehle ein Hintergrundbild fuer das Heizungs-Widget. Drag&Drop und Datei-Upload sind verfuegbar."
@@ -3395,7 +3400,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 iconImage: entry.name,
               };
             }
-            if (widget?.type === "wallbox") {
+            if (widget?.type === "wallbox" || widget?.type === "goe") {
               return {
                 ...current,
                 backgroundImage: entry.name,
@@ -3902,7 +3907,7 @@ function getWidgetAppearanceDefaults(
     };
   }
 
-  if (widget.type === "wallbox") {
+  if (widget.type === "wallbox" || widget.type === "goe") {
     return {
       widgetColor: "rgba(20, 30, 44, 0.96)",
       widgetColor2: "rgba(12, 18, 30, 0.98)",
@@ -4246,6 +4251,7 @@ function buildStoredInteractionSounds(
     widgetType !== "log" &&
     widgetType !== "script" &&
     widgetType !== "wallbox" &&
+    widgetType !== "goe" &&
     widgetType !== "heating" &&
     widgetType !== "heatingV2"
   ) {

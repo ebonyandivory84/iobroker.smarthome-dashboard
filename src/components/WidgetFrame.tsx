@@ -47,6 +47,7 @@ export function WidgetFrame({
   const showHeaderTitle =
     widget.type !== "camera" &&
     widget.type !== "wallbox" &&
+    widget.type !== "goe" &&
     widget.type !== "heating" &&
     widget.type !== "heatingV2" &&
     widget.showTitle !== false &&
@@ -69,6 +70,7 @@ export function WidgetFrame({
     widget.type === "script" ||
     widget.type === "host" ||
     widget.type === "wallbox" ||
+    widget.type === "goe" ||
     widget.type === "heating" ||
     widget.type === "heatingV2";
 
@@ -218,6 +220,7 @@ export function WidgetFrame({
           widget.type !== "solar" &&
           widget.type !== "state" &&
           widget.type !== "wallbox" &&
+          widget.type !== "goe" &&
           widget.type !== "heating" &&
           widget.type !== "heatingV2" &&
           widget.type !== "grafana" &&

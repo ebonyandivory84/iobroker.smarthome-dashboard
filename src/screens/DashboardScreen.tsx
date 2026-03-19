@@ -217,6 +217,9 @@ export function DashboardScreen() {
       ...(config.uiSounds?.widgetTypeDefaults?.wallbox?.press || []),
       ...(config.uiSounds?.widgetTypeDefaults?.wallbox?.confirm || []),
       ...(config.uiSounds?.widgetTypeDefaults?.wallbox?.slider || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.goe?.press || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.goe?.confirm || []),
+      ...(config.uiSounds?.widgetTypeDefaults?.goe?.slider || []),
       ...(config.uiSounds?.pageSounds?.tabPress || []),
       ...(config.uiSounds?.pageSounds?.swipe || []),
       ...(config.uiSounds?.pageSounds?.contentScroll || []),
@@ -284,6 +287,7 @@ export function DashboardScreen() {
           currentWidget.type === "script" ||
           currentWidget.type === "host" ||
           currentWidget.type === "wallbox" ||
+          currentWidget.type === "goe" ||
           currentWidget.type === "heating" ||
           currentWidget.type === "heatingV2"
             ? { manualHeightOverride: true }
@@ -305,6 +309,7 @@ export function DashboardScreen() {
         currentWidget.type === "script" ||
         currentWidget.type === "host" ||
         currentWidget.type === "wallbox" ||
+        currentWidget.type === "goe" ||
         currentWidget.type === "heating" ||
         currentWidget.type === "heatingV2"
           ? { manualHeightOverride: true }
@@ -328,6 +333,7 @@ export function DashboardScreen() {
         currentWidget.type === "script" ||
         currentWidget.type === "host" ||
         currentWidget.type === "wallbox" ||
+        currentWidget.type === "goe" ||
         currentWidget.type === "heating" ||
         currentWidget.type === "heatingV2"
           ? { manualHeightOverride: true }
@@ -350,6 +356,7 @@ export function DashboardScreen() {
                 currentWidget.type === "script" ||
                 currentWidget.type === "host" ||
                 currentWidget.type === "wallbox" ||
+                currentWidget.type === "goe" ||
                 currentWidget.type === "heating" ||
                 currentWidget.type === "heatingV2"
               ? { minHeight: 1, heightSnap: 0.1 }
@@ -365,6 +372,7 @@ export function DashboardScreen() {
         currentWidget.type === "script" ||
         currentWidget.type === "host" ||
         currentWidget.type === "wallbox" ||
+        currentWidget.type === "goe" ||
         currentWidget.type === "heating" ||
         currentWidget.type === "heatingV2"
           ? { manualHeightOverride: true }

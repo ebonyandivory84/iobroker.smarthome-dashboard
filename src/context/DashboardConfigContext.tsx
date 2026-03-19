@@ -834,6 +834,7 @@ function normalizeWidgetTypeSoundDefaults(
     script: normalizeWidgetInteractionSounds(input.script),
     host: normalizeWidgetInteractionSounds(input.host),
     wallbox: normalizeWidgetInteractionSounds(input.wallbox),
+    goe: normalizeWidgetInteractionSounds(input.goe),
     heating: normalizeWidgetInteractionSounds(input.heating),
     heatingV2: normalizeWidgetInteractionSounds(input.heatingV2),
   };

@@ -1,12 +1,12 @@
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, ImageBackground, Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { IoBrokerClient } from "../../services/iobroker";
-import { StateSnapshot, WallboxWidgetConfig } from "../../types/dashboard";
+import { GoEWidgetConfig, StateSnapshot, WallboxWidgetConfig } from "../../types/dashboard";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
 import { palette } from "../../utils/theme";
 
 type WallboxWidgetProps = {
-  config: WallboxWidgetConfig;
+  config: WallboxWidgetConfig | GoEWidgetConfig;
   client: IoBrokerClient;
 };
 

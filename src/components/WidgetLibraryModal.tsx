@@ -89,6 +89,12 @@ const OPTIONS: Array<{
     icon: "ev-station",
   },
   {
+    type: "goe",
+    title: "go-e",
+    description: "Spezial-Widget fuer den go-e-gemini-adapter mit vorkonfigurierten States.",
+    icon: "ev-station",
+  },
+  {
     type: "heating",
     title: "Heizung",
     description: "Steuert Viessmann Heizmodus, Solltemperaturen und Warmwasser in einer kompakten Card.",
