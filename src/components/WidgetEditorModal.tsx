@@ -2129,16 +2129,16 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
 
                 <View style={styles.groupCard}>
                   <Text style={styles.groupTitle}>Schreiben + Status-Bestaetigung</Text>
-                  <Text style={styles.sectionTitle}>Laden erlaubt</Text>
+                  <Text style={styles.sectionTitle}>Ladeautomatik</Text>
                   <View style={styles.splitRow}>
-                    <Field label="Laden erlaubt - Write Value">
+                    <Field label="Ladeautomatik - Write Value">
                       <StateFieldInput
                         onBrowse={() => setPickerField("stopWriteStateId")}
                         onChangeText={(value) => setDraft((current) => ({ ...current, stopWriteStateId: value }))}
                         value={draft.stopWriteStateId || ""}
                       />
                     </Field>
-                    <Field label="Laden erlaubt - State Value">
+                    <Field label="Ladeautomatik - State Value">
                       <StateFieldInput
                         onBrowse={() => setPickerField("stopStateId")}
                         onChangeText={(value) => setDraft((current) => ({ ...current, stopStateId: value }))}
@@ -2147,14 +2147,14 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     </Field>
                   </View>
                   <View style={styles.splitRow}>
-                    <Field label="Laden erlaubt - Write Typ">
+                    <Field label="Ladeautomatik - Write Typ">
                       <ChoiceRow
                         options={["boolean", "number", "string"]}
                         value={draft.stopWriteValueType || "boolean"}
                         onSelect={(value) => setDraft((current) => ({ ...current, stopWriteValueType: value }))}
                       />
                     </Field>
-                    <Field label="Laden erlaubt - Write Wert">
+                    <Field label="Ladeautomatik - Write Wert">
                       <TextInput
                         autoCapitalize="none"
                         onChangeText={(value) => setDraft((current) => ({ ...current, stopWriteValue: value }))}
@@ -2163,16 +2163,16 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       />
                     </Field>
                   </View>
-                  <Text style={styles.mappingHint}>Interne Lade-Logik nutzt ausschliesslich diesen AllowCharging-Datenpunkt.</Text>
+                  <Text style={styles.mappingHint}>Interne Lade-Logik nutzt ausschliesslich diesen Ladeautomatik-/AllowCharging-Datenpunkt.</Text>
                   <View style={styles.splitRow}>
-                    <Field label="Laden erlaubt - State Typ">
+                    <Field label="Ladeautomatik - State Typ">
                       <ChoiceRow
                         options={["boolean", "number", "string"]}
                         value={draft.stopStateValueType || "boolean"}
                         onSelect={(value) => setDraft((current) => ({ ...current, stopStateValueType: value }))}
                       />
                     </Field>
-                    <Field label="Laden erlaubt - State Wert">
+                    <Field label="Ladeautomatik - State Wert">
                       <TextInput
                         autoCapitalize="none"
                         onChangeText={(value) => setDraft((current) => ({ ...current, stopStateValue: value }))}

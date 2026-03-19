@@ -427,6 +427,7 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
   const panelBorder = "rgba(184, 206, 242, 0.16)";
   const sliderStart = config.appearance?.iconColor || "#79b5ff";
   const sliderEnd = config.appearance?.iconColor2 || "#5a85ef";
+  const sliderThumbColor = config.appearance?.activeWidgetColor || "#f6c869";
   const oneTimeColor = config.appearance?.statColor || "rgba(246, 97, 98, 0.42)";
   const backgroundBlur = Math.min(24, clampInt(config.backgroundImageBlur, 8, 0));
   const oneTimeChargeIcon = normalizeOneTimeChargeIcon(config.oneTimeChargeIcon);
@@ -741,7 +742,7 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
                       },
                       style: {
                         ...webSliderStyle,
-                        accentColor: sliderStart,
+                        accentColor: sliderThumbColor,
                         backgroundImage: `linear-gradient(90deg, ${sliderStart} 0%, ${sliderEnd} 100%)`,
                       },
                     })
@@ -791,7 +792,7 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
                       },
                       style: {
                         ...webSliderStyle,
-                        accentColor: sliderStart,
+                        accentColor: sliderThumbColor,
                         backgroundImage: `linear-gradient(90deg, ${sliderStart} 0%, ${sliderEnd} 100%)`,
                       },
                     })
@@ -880,7 +881,7 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
                       },
                       style: {
                         ...webSliderStyle,
-                        accentColor: sliderStart,
+                        accentColor: sliderThumbColor,
                         opacity: ventilationManualControlEnabled ? 1 : 0.45,
                         backgroundImage: `linear-gradient(90deg, ${sliderStart} 0%, ${sliderEnd} 100%)`,
                       },

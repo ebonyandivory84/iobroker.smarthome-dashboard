@@ -1082,27 +1082,28 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         </View>
 
         <View style={[styles.allowChargingRow, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
-          <Text numberOfLines={1} style={[styles.allowChargingLabel, { color: mutedTextColor }]}>
-            Laden erlaubt
-          </Text>
-          <Switch
-            disabled={!stateIds.write.stop}
-            onValueChange={setChargingAllowed}
-            trackColor={{ false: "rgba(145, 164, 196, 0.34)", true: withAlpha(pvStart, 0.5) }}
-            value={chargingAllowedDisplay}
-          />
-        </View>
-
-        <View style={[styles.allowChargingRow, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
-          <Text numberOfLines={1} style={[styles.allowChargingLabel, { color: mutedTextColor }]}>
-            Emergency Stop (global)
-          </Text>
-          <Switch
-            disabled={!stateIds.emergencyStop}
-            onValueChange={setEmergencyStop}
-            trackColor={{ false: "rgba(145, 164, 196, 0.34)", true: "rgba(239, 93, 107, 0.55)" }}
-            value={emergencyStopDisplay}
-          />
+          <View style={styles.allowChargingItem}>
+            <Text numberOfLines={1} style={[styles.allowChargingLabel, { color: mutedTextColor }]}>
+              Ladeautomatik
+            </Text>
+            <Switch
+              disabled={!stateIds.write.stop}
+              onValueChange={setChargingAllowed}
+              trackColor={{ false: "rgba(145, 164, 196, 0.34)", true: withAlpha(pvStart, 0.5) }}
+              value={chargingAllowedDisplay}
+            />
+          </View>
+          <View style={styles.allowChargingItem}>
+            <Text numberOfLines={1} style={[styles.allowChargingLabel, { color: mutedTextColor }]}>
+              Emergency Stop (global)
+            </Text>
+            <Switch
+              disabled={!stateIds.emergencyStop}
+              onValueChange={setEmergencyStop}
+              trackColor={{ false: "rgba(145, 164, 196, 0.34)", true: "rgba(239, 93, 107, 0.55)" }}
+              value={emergencyStopDisplay}
+            />
+          </View>
         </View>
 
         <View style={[styles.chargeStatusStrip, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
@@ -2074,17 +2075,24 @@ const styles = StyleSheet.create({
   allowChargingRow: {
     borderRadius: 12,
     borderWidth: 1,
-    minHeight: 42,
+    minHeight: 48,
     paddingHorizontal: 10,
     paddingVertical: 6,
     flexDirection: "row",
     alignItems: "center",
+    gap: 12,
+  },
+  allowChargingItem: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    gap: 10,
+    gap: 8,
   },
   allowChargingLabel: {
-    flex: 1,
-    fontSize: 12,
+    flexShrink: 1,
+    fontSize: 11.5,
     fontWeight: "700",
     letterSpacing: 0.2,
     textTransform: "uppercase",
