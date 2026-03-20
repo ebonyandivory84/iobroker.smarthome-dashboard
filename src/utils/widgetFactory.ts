@@ -233,7 +233,9 @@ export function buildWidgetTemplate(
       cpuTempStateId: "0_userdata.0.NAS-pi.cpuTemp",
       cpuLoadStateId: "0_userdata.0.NAS-pi.cpuLoad",
       ramFreeStateId: "0_userdata.0.NAS-pi.ramFree",
+      ramFreeUnit: "auto",
       diskFreeStateId: "0_userdata.0.NAS-pi.diskFree",
+      diskFreeUnit: "auto",
       onlineStateId: "0_userdata.0.NAS-pi.online",
       position: {
         ...basePosition,

@@ -8,13 +8,22 @@ type RaspberryPiStatsWidgetProps = {
   states: StateSnapshot;
 };
 
+type RaspberryValueUnit = "auto" | "B" | "kB" | "MB" | "GB" | "percent";
+
+type StorageMetric = {
+  valueLabel: string;
+  ratio: number | null;
+};
+
 export function RaspberryPiStatsWidget({ config, states }: RaspberryPiStatsWidgetProps) {
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const panelStart = config.appearance?.widgetColor || "rgba(12, 26, 52, 0.95)";
   const panelEnd = config.appearance?.widgetColor2 || "rgba(6, 14, 28, 0.98)";
-  const cardStart = config.appearance?.cardColor || "rgba(108, 232, 180, 0.26)";
-  const cardEnd = config.appearance?.cardColor2 || "rgba(255,255,255,0.1)";
+  const diskRingColor = config.appearance?.cardColor || "#6ce8b4";
+  const diskTrackColor = config.appearance?.cardColor2 || "rgba(255,255,255,0.12)";
+  const ramRingColor = config.appearance?.pvCardColor || "#73b9ff";
+  const ramTrackColor = config.appearance?.homeCardColor || "rgba(255,255,255,0.12)";
   const cpuBarStart = config.appearance?.activeWidgetColor || "#65d6ff";
   const cpuBarEnd = config.appearance?.activeWidgetColor2 || "#4d86ff";
   const tempBarStart = config.appearance?.inactiveWidgetColor || "#ffcb67";
@@ -25,17 +34,16 @@ export function RaspberryPiStatsWidget({ config, states }: RaspberryPiStatsWidge
   const online = normalizeBoolean(states[config.onlineStateId]);
   const cpuLoad = normalizePercent(states[config.cpuLoadStateId]);
   const cpuTemp = normalizeTemperature(states[config.cpuTempStateId]);
-  const ramFreePercent = normalizePercent(states[config.ramFreeStateId]);
-  const diskFreePercent = normalizePercent(states[config.diskFreeStateId]);
-  const ramFreeLabel = formatFreeValue(states[config.ramFreeStateId], ramFreePercent);
-  const diskFreeLabel = formatFreeValue(states[config.diskFreeStateId], diskFreePercent);
   const cpuLoadLabel = cpuLoad === null ? "n/a" : `${cpuLoad.toFixed(1)} %`;
   const cpuTempLabel = cpuTemp === null ? "n/a" : `${cpuTemp.toFixed(1)} C`;
   const headerLabel = (config.label || config.title || "Raspberry Pi").trim() || "Raspberry Pi";
 
+  const ramMetric = buildStorageMetric(states[config.ramFreeStateId], config.ramFreeUnit || "auto");
+  const diskMetric = buildStorageMetric(states[config.diskFreeStateId], config.diskFreeUnit || "auto");
+
   return (
     <View style={styles.container}>
-      <View style={[styles.panel, { backgroundColor: panelStart }]}>
+      <View style={[styles.panel, { backgroundColor: panelStart }]}> 
         {Platform.OS === "web"
           ? createElement("div", {
               style: {
@@ -73,23 +81,23 @@ export function RaspberryPiStatsWidget({ config, states }: RaspberryPiStatsWidge
         </View>
 
         <View style={styles.topRow}>
-          <MetricCard
-            barEnd={cardEnd}
-            barStart={cardStart}
+          <MetricDonut
             label="RAM frei"
-            ratio={ramFreePercent === null ? null : ramFreePercent / 100}
+            ratio={ramMetric.ratio}
+            ringColor={ramRingColor}
+            trackColor={ramTrackColor}
             textColor={textColor}
             mutedTextColor={mutedTextColor}
-            value={ramFreeLabel}
+            valueLabel={ramMetric.valueLabel}
           />
-          <MetricCard
-            barEnd={cardEnd}
-            barStart={cardStart}
+          <MetricDonut
             label="Disk frei"
-            ratio={diskFreePercent === null ? null : diskFreePercent / 100}
+            ratio={diskMetric.ratio}
+            ringColor={diskRingColor}
+            trackColor={diskTrackColor}
             textColor={textColor}
             mutedTextColor={mutedTextColor}
-            value={diskFreeLabel}
+            valueLabel={diskMetric.valueLabel}
           />
         </View>
 
@@ -114,63 +122,58 @@ export function RaspberryPiStatsWidget({ config, states }: RaspberryPiStatsWidge
         />
 
         <Text numberOfLines={1} style={[styles.footerText, { color: mutedTextColor }]}>
-          Datenquellen: konfigurierbare ioBroker-Datenpunkte
+          Einheiten: RAM {config.ramFreeUnit || "auto"} | Disk {config.diskFreeUnit || "auto"}
         </Text>
       </View>
     </View>
   );
 }
 
-type MetricCardProps = {
+type MetricDonutProps = {
   label: string;
-  value: string;
+  valueLabel: string;
   ratio: number | null;
-  barStart: string;
-  barEnd: string;
+  ringColor: string;
+  trackColor: string;
   textColor: string;
   mutedTextColor: string;
 };
 
-function MetricCard({
+function MetricDonut({
   label,
-  value,
+  valueLabel,
   ratio,
-  barStart,
-  barEnd,
+  ringColor,
+  trackColor,
   textColor,
   mutedTextColor,
-}: MetricCardProps) {
-  const fillRatio = ratio === null ? 0 : clampNumber(ratio, 0, 1);
-  const percentLabel = ratio === null ? "-" : `${Math.round(fillRatio * 100)}%`;
+}: MetricDonutProps) {
+  const percentText = ratio === null ? "n/a" : `${Math.round(ratio * 100)}%`;
+
+  const donut =
+    Platform.OS === "web"
+      ? createElement(
+          "div",
+          {
+            style: {
+              ...webDonutStyle,
+              background: buildDonutGradient(ratio, ringColor, trackColor),
+            },
+          },
+          createElement("div", { style: webDonutHoleStyle })
+        )
+      : (
+          <View style={[styles.nativeRing, { borderColor: trackColor }]}> 
+            <View style={[styles.nativeRingFill, { borderColor: ringColor }]} />
+          </View>
+        );
 
   return (
     <View style={styles.metricCard}>
-      <Text numberOfLines={1} style={[styles.metricValue, { color: textColor }]}>
-        {value}
-      </Text>
+      <View style={styles.donutWrap}>{donut}</View>
+      <Text style={[styles.metricValue, { color: textColor }]}>{percentText}</Text>
       <Text style={[styles.metricLabel, { color: mutedTextColor }]}>{label}</Text>
-      <View style={styles.metricTrack}>
-        {Platform.OS === "web"
-          ? createElement("div", {
-              style: {
-                ...webBarFillStyle,
-                width: `${Math.max(0, Math.min(100, fillRatio * 100))}%`,
-                background: `linear-gradient(90deg, ${barStart} 0%, ${barEnd} 100%)`,
-              },
-            })
-          : (
-              <View
-                style={[
-                  styles.nativeBarFill,
-                  {
-                    width: `${Math.max(0, Math.min(100, fillRatio * 100))}%`,
-                    backgroundColor: barStart,
-                  },
-                ]}
-              />
-            )}
-      </View>
-      <Text style={[styles.metricMeta, { color: mutedTextColor }]}>{percentLabel}</Text>
+      <Text numberOfLines={1} style={[styles.metricMeta, { color: mutedTextColor }]}>{valueLabel}</Text>
     </View>
   );
 }
@@ -225,6 +228,78 @@ function HorizontalMetricBar({
       </View>
     </View>
   );
+}
+
+function buildStorageMetric(rawValue: unknown, unit: RaspberryValueUnit): StorageMetric {
+  const numeric = normalizeNumber(rawValue);
+
+  if (typeof rawValue === "string" && rawValue.trim() && unit === "auto") {
+    return {
+      valueLabel: rawValue.trim(),
+      ratio: inferRatioFromString(rawValue),
+    };
+  }
+
+  if (numeric === null) {
+    return {
+      valueLabel: "n/a",
+      ratio: null,
+    };
+  }
+
+  if (unit === "percent") {
+    const normalizedPercent = clampNumber(numeric, 0, 100);
+    return {
+      valueLabel: `${normalizedPercent.toLocaleString("de-DE", { maximumFractionDigits: 1 })} %`,
+      ratio: normalizedPercent / 100,
+    };
+  }
+
+  if (unit === "auto") {
+    if (numeric >= 0 && numeric <= 100) {
+      const normalizedPercent = clampNumber(numeric, 0, 100);
+      return {
+        valueLabel: `${normalizedPercent.toLocaleString("de-DE", { maximumFractionDigits: 1 })} %`,
+        ratio: normalizedPercent / 100,
+      };
+    }
+
+    return {
+      valueLabel: formatBytes(numeric),
+      ratio: null,
+    };
+  }
+
+  const bytes = convertToBytes(numeric, unit);
+  return {
+    valueLabel: formatBytes(bytes),
+    ratio: null,
+  };
+}
+
+function convertToBytes(value: number, unit: Exclude<RaspberryValueUnit, "auto" | "percent">) {
+  if (unit === "B") {
+    return value;
+  }
+  if (unit === "kB") {
+    return value * 1024;
+  }
+  if (unit === "MB") {
+    return value * 1024 * 1024;
+  }
+  return value * 1024 * 1024 * 1024;
+}
+
+function inferRatioFromString(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized.includes("%")) {
+    return null;
+  }
+  const numeric = normalizeNumber(value);
+  if (numeric === null) {
+    return null;
+  }
+  return clampNumber(numeric / 100, 0, 1);
 }
 
 function normalizeBoolean(value: unknown) {
@@ -288,25 +363,10 @@ function normalizeTemperature(value: unknown) {
   return clampNumber(normalized, 0, 150);
 }
 
-function formatFreeValue(value: unknown, percentValue: number | null) {
-  if (typeof value === "string" && value.trim()) {
-    return value.trim();
-  }
-
-  const numeric = normalizeNumber(value);
-  if (numeric === null) {
-    return "n/a";
-  }
-
-  if (percentValue !== null && numeric >= 0 && numeric <= 100) {
-    return `${numeric.toLocaleString("de-DE", { maximumFractionDigits: 1 })} %`;
-  }
-
-  if (numeric >= 1024) {
-    return formatBytes(numeric);
-  }
-
-  return numeric.toLocaleString("de-DE", { maximumFractionDigits: 1 });
+function buildDonutGradient(ratio: number | null, activeColor: string, inactiveColor: string) {
+  const safeRatio = ratio === null ? 0 : clampNumber(ratio, 0, 1);
+  const splitDeg = Math.round(safeRatio * 360);
+  return `conic-gradient(${activeColor} 0deg ${splitDeg}deg, ${inactiveColor} ${splitDeg}deg 360deg)`;
 }
 
 function clampNumber(value: number, min: number, max: number) {
@@ -382,8 +442,29 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.08)",
     backgroundColor: "rgba(255,255,255,0.03)",
     padding: 9,
+    alignItems: "center",
+    gap: 2,
+  },
+  donutWrap: {
+    width: 74,
+    height: 74,
+    alignItems: "center",
     justifyContent: "center",
-    gap: 5,
+  },
+  nativeRing: {
+    width: 72,
+    height: 72,
+    borderRadius: 999,
+    borderWidth: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  nativeRingFill: {
+    width: 44,
+    height: 44,
+    borderRadius: 999,
+    borderWidth: 8,
+    transform: [{ rotate: "-90deg" }],
   },
   metricValue: {
     fontSize: 18,
@@ -392,14 +473,6 @@ const styles = StyleSheet.create({
   metricLabel: {
     fontSize: 11,
     fontWeight: "700",
-  },
-  metricTrack: {
-    height: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "rgba(255,255,255,0.06)",
-    overflow: "hidden",
   },
   metricMeta: {
     fontSize: 10,
@@ -444,6 +517,21 @@ const webGradientStyle = {
   position: "absolute" as const,
   inset: 0,
   pointerEvents: "none" as const,
+};
+
+const webDonutStyle = {
+  width: "72px",
+  height: "72px",
+  borderRadius: "999px",
+  position: "relative" as const,
+};
+
+const webDonutHoleStyle = {
+  position: "absolute" as const,
+  inset: "12px",
+  borderRadius: "999px",
+  background: "rgba(8, 14, 24, 0.92)",
+  border: "1px solid rgba(255,255,255,0.08)",
 };
 
 const webBarFillStyle = {

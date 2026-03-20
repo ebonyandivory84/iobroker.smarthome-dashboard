@@ -305,7 +305,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         cpuTempStateId: widget.cpuTempStateId || "0_userdata.0.NAS-pi.cpuTemp",
         cpuLoadStateId: widget.cpuLoadStateId || "0_userdata.0.NAS-pi.cpuLoad",
         ramFreeStateId: widget.ramFreeStateId || "0_userdata.0.NAS-pi.ramFree",
+        ramFreeUnit: widget.ramFreeUnit || "auto",
         diskFreeStateId: widget.diskFreeStateId || "0_userdata.0.NAS-pi.diskFree",
+        diskFreeUnit: widget.diskFreeUnit || "auto",
         onlineStateId: widget.onlineStateId || "0_userdata.0.NAS-pi.online",
         ...appearanceDraft,
       });
@@ -840,7 +842,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         cpuTempStateId: draft.cpuTempStateId?.trim() || widget.cpuTempStateId,
         cpuLoadStateId: draft.cpuLoadStateId?.trim() || widget.cpuLoadStateId,
         ramFreeStateId: draft.ramFreeStateId?.trim() || widget.ramFreeStateId,
+        ramFreeUnit: normalizeRaspberryDataUnit(draft.ramFreeUnit, widget.ramFreeUnit || "auto"),
         diskFreeStateId: draft.diskFreeStateId?.trim() || widget.diskFreeStateId,
+        diskFreeUnit: normalizeRaspberryDataUnit(draft.diskFreeUnit, widget.diskFreeUnit || "auto"),
         onlineStateId: draft.onlineStateId?.trim() || widget.onlineStateId,
         appearance,
       });
@@ -2122,11 +2126,25 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={draft.ramFreeStateId || ""}
                   />
                 </Field>
+                <Field label="RAM Einheit">
+                  <ChoiceRow
+                    options={["auto", "B", "kB", "MB", "GB", "percent"]}
+                    value={draft.ramFreeUnit || "auto"}
+                    onSelect={(value) => setDraft((current) => ({ ...current, ramFreeUnit: value }))}
+                  />
+                </Field>
                 <Field label="Disk frei">
                   <StateFieldInput
                     onBrowse={() => setPickerField("diskFreeStateId")}
                     onChangeText={(value) => setDraft((current) => ({ ...current, diskFreeStateId: value }))}
                     value={draft.diskFreeStateId || ""}
+                  />
+                </Field>
+                <Field label="Disk Einheit">
+                  <ChoiceRow
+                    options={["auto", "B", "kB", "MB", "GB", "percent"]}
+                    value={draft.diskFreeUnit || "auto"}
+                    onSelect={(value) => setDraft((current) => ({ ...current, diskFreeUnit: value }))}
                   />
                 </Field>
                 <Field label="Online">
@@ -4257,6 +4275,16 @@ function setCameraUrlByMode(
 function normalizeOptionalInput(value: string | undefined) {
   const normalized = (value || "").trim();
   return normalized || undefined;
+}
+
+function normalizeRaspberryDataUnit(
+  raw: string | undefined,
+  fallback: "auto" | "B" | "kB" | "MB" | "GB" | "percent"
+) {
+  if (raw === "auto" || raw === "B" || raw === "kB" || raw === "MB" || raw === "GB" || raw === "percent") {
+    return raw;
+  }
+  return fallback;
 }
 
 function normalizeHeatingOneTimeIcon(value: string | undefined) {

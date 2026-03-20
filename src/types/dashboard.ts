@@ -187,7 +187,9 @@ export type RaspberryPiStatsWidgetConfig = WidgetBase & {
   cpuTempStateId: string;
   cpuLoadStateId: string;
   ramFreeStateId: string;
+  ramFreeUnit?: "auto" | "B" | "kB" | "MB" | "GB" | "percent";
   diskFreeStateId: string;
+  diskFreeUnit?: "auto" | "B" | "kB" | "MB" | "GB" | "percent";
   onlineStateId: string;
 };
 
