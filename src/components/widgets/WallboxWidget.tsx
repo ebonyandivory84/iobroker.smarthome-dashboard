@@ -1329,7 +1329,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
             </Text>
           </View>
           <View style={[styles.metricCard, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
-            <Text numberOfLines={1} style={[styles.metricLabel, { color: mutedTextColor }]}>Gesamt</Text>
+            <Text numberOfLines={1} style={[styles.metricLabel, { color: mutedTextColor }]}>Gesamt (Session)</Text>
             <Text numberOfLines={1} style={[styles.metricValue, { color: textColor }]}>
               {formatEnergyKWh(chargedEnergyKWh)}
             </Text>
