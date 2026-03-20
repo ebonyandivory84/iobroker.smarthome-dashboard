@@ -40,7 +40,7 @@ export function WidgetFrame({
 }: WidgetFrameProps) {
   const { config } = useDashboardConfig();
   const linkBorderless =
-    widget.type === "link" &&
+    (widget.type === "link" || widget.type === "netflix") &&
     Boolean(widget.iconImage) &&
     widget.iconImageSizeMode === "maximized" &&
     widget.iconImageBorderless === true;

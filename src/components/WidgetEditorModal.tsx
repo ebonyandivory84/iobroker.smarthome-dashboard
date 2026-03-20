@@ -189,19 +189,19 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       return;
     }
 
-    if (widget.type === "link") {
+    if (widget.type === "link" || widget.type === "netflix") {
       setSoundDraft({
         press: resolveDraftSoundValue(
           widget.interactionSounds?.press,
-          config.uiSounds?.widgetTypeDefaults?.link?.press
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]?.press
         ),
         open: resolveDraftSoundValue(
           widget.interactionSounds?.open,
-          config.uiSounds?.widgetTypeDefaults?.link?.open
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]?.open
         ),
         close: resolveDraftSoundValue(
           widget.interactionSounds?.close,
-          config.uiSounds?.widgetTypeDefaults?.link?.close
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]?.close
         ),
       });
       setDraft({
@@ -779,7 +779,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ),
         appearance,
       });
-    } else if (widget.type === "link") {
+    } else if (widget.type === "link" || widget.type === "netflix") {
       onSave(widget.id, {
         title: draft.title,
         showTitle: draft.showTitle !== "false",
@@ -1064,6 +1064,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       widget.type !== "grafana" &&
       widget.type !== "numpad" &&
       widget.type !== "link" &&
+      widget.type !== "netflix" &&
       widget.type !== "log" &&
       widget.type !== "script" &&
       widget.type !== "wallbox" &&
@@ -1701,7 +1702,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 </EditorButtonPressable>
               </Field>
             ) : null}
-            {widget.type === "link" ? (
+            {widget.type === "link" || widget.type === "netflix" ? (
               <>
                 <Field label="URL">
                   <TextInput
@@ -1766,9 +1767,18 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     />
                   </Field>
                   <EditorButtonPressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
-                    <Text style={styles.inlineActionLabel}>Als Default fuer alle Link-Widgets verwenden</Text>
+                    <Text style={styles.inlineActionLabel}>
+                      {widget.type === "netflix"
+                        ? "Als Default fuer alle Netflix-Widgets verwenden"
+                        : "Als Default fuer alle Link-Widgets verwenden"}
+                    </Text>
                   </EditorButtonPressable>
                 </Field>
+                {widget.type === "netflix" ? (
+                  <Text style={styles.mappingHint}>
+                    Login-Daten werden absichtlich nicht im Widget gespeichert. Bitte einmal direkt bei Netflix anmelden.
+                  </Text>
+                ) : null}
               </>
             ) : null}
             {widget.type === "energy" ? (
@@ -3954,7 +3964,7 @@ function getWidgetAppearanceDefaults(
     };
   }
 
-  if (widget.type === "link") {
+  if (widget.type === "link" || widget.type === "netflix") {
     return {
       widgetColor: "rgba(18, 42, 78, 0.95)",
       widgetColor2: "rgba(10, 24, 46, 0.98)",
@@ -4357,6 +4367,7 @@ function buildStoredInteractionSounds(
     widgetType !== "grafana" &&
     widgetType !== "numpad" &&
     widgetType !== "link" &&
+    widgetType !== "netflix" &&
     widgetType !== "log" &&
     widgetType !== "script" &&
     widgetType !== "wallbox" &&

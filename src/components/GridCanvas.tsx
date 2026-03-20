@@ -641,6 +641,7 @@ function getAutoLayoutSpec(
       case "numpad":
         return { w: 1, h: roundGridUnit(3) };
       case "link":
+      case "netflix":
         return { w: 1, h: 1 };
       case "log":
         if (widget.manualHeightOverride) {
@@ -710,6 +711,7 @@ function getAutoLayoutSpec(
     case "numpad":
       return { w: mainColumnWidth, h: roundGridUnit(3.2) };
     case "link":
+    case "netflix":
       return { w: 1, h: 1 };
     case "log":
       if (widget.manualHeightOverride) {
@@ -994,7 +996,7 @@ function WebWidgetShell({
 }) {
   const [preview, setPreview] = useState(widget.position);
   const linkBorderless =
-    widget.type === "link" &&
+    (widget.type === "link" || widget.type === "netflix") &&
     Boolean(widget.iconImage) &&
     widget.iconImageSizeMode === "maximized" &&
     widget.iconImageBorderless === true;
@@ -1334,7 +1336,7 @@ function renderWidget(
     return <NumpadWidget config={effectiveWidget} />;
   }
 
-  if (effectiveWidget.type === "link") {
+  if (effectiveWidget.type === "link" || effectiveWidget.type === "netflix") {
     return <LinkWidget config={effectiveWidget} />;
   }
 
@@ -1631,7 +1633,7 @@ function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThe
       boxShadow: "0 16px 26px rgba(54, 28, 10, 0.28)",
     };
   }
-  if (type === "link") {
+  if (type === "link" || type === "netflix") {
     return {
       background: "linear-gradient(135deg, rgba(16, 34, 66, 0.94), rgba(10, 20, 40, 0.96))",
       border: "1px solid rgba(126, 168, 255, 0.24)",

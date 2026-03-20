@@ -830,6 +830,7 @@ function normalizeWidgetTypeSoundDefaults(
     weather: normalizeWidgetInteractionSounds(input.weather),
     numpad: normalizeWidgetInteractionSounds(input.numpad),
     link: normalizeWidgetInteractionSounds(input.link),
+    netflix: normalizeWidgetInteractionSounds(input.netflix),
     log: normalizeWidgetInteractionSounds(input.log),
     script: normalizeWidgetInteractionSounds(input.script),
     host: normalizeWidgetInteractionSounds(input.host),

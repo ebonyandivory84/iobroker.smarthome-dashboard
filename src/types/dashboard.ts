@@ -7,6 +7,7 @@ export type WidgetType =
   | "weather"
   | "numpad"
   | "link"
+  | "netflix"
   | "log"
   | "script"
   | "host"
@@ -150,6 +151,10 @@ export type LinkWidgetConfig = WidgetBase & {
   iconImageCrop?: "none" | "rounded" | "circle";
   iconImageSizeMode?: "standard" | "maximized";
   iconImageBorderless?: boolean;
+};
+
+export type NetflixWidgetConfig = Omit<LinkWidgetConfig, "type"> & {
+  type: "netflix";
 };
 
 export type LogWidgetSeverity = "silly" | "debug" | "info" | "warn" | "error";
@@ -417,6 +422,7 @@ export type WidgetConfig =
   | WeatherWidgetConfig
   | NumpadWidgetConfig
   | LinkWidgetConfig
+  | NetflixWidgetConfig
   | LogWidgetConfig
   | ScriptWidgetConfig
   | HostStatsWidgetConfig

@@ -65,6 +65,12 @@ const OPTIONS: Array<{
     icon: "link-variant",
   },
   {
+    type: "netflix",
+    title: "Netflix",
+    description: "Oeffnet Netflix im Widget-Fenster (Login weiterhin direkt bei Netflix).",
+    icon: "netflix",
+  },
+  {
     type: "log",
     title: "Log",
     description: "Zeigt Live-Logs aus ioBroker direkt im Dashboard an.",

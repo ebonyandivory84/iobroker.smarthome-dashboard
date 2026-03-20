@@ -1,11 +1,11 @@
 import { createElement, useState } from "react";
 import { Image, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { LinkWidgetConfig } from "../../types/dashboard";
+import { LinkWidgetConfig, NetflixWidgetConfig } from "../../types/dashboard";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
 import { palette } from "../../utils/theme";
 
 type LinkWidgetProps = {
-  config: LinkWidgetConfig;
+  config: LinkWidgetConfig | NetflixWidgetConfig;
 };
 
 export function LinkWidget({ config }: LinkWidgetProps) {

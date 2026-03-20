@@ -36,6 +36,8 @@ export function buildWidgetTemplate(
                       ? 4
                 : type === "numpad"
                   ? 6
+                : type === "netflix"
+                  ? 3
                 : 3,
     h:
       type === "camera"
@@ -62,6 +64,8 @@ export function buildWidgetTemplate(
                         ? 3
                 : type === "numpad"
                   ? 4
+                : type === "netflix"
+                  ? 2
                 : 2,
   };
 
@@ -171,6 +175,19 @@ export function buildWidgetTemplate(
       type: "link",
       title: `Link ${suffix}`,
       url: "",
+      position: {
+        ...basePosition,
+      },
+    };
+  }
+
+  if (type === "netflix") {
+    return {
+      id: `netflix-${suffix}`,
+      type: "netflix",
+      title: `Netflix ${suffix}`,
+      url: "https://www.netflix.com/browse",
+      iconImage: "",
       position: {
         ...basePosition,
       },
