@@ -10,6 +10,7 @@ export type WidgetType =
   | "log"
   | "script"
   | "host"
+  | "raspberryPiStats"
   | "wallbox"
   | "goe"
   | "heating"
@@ -177,6 +178,17 @@ export type HostStatsWidgetConfig = WidgetBase & {
   manualHeightOverride?: boolean;
   refreshMs?: number;
   hostLabel?: string;
+};
+
+export type RaspberryPiStatsWidgetConfig = WidgetBase & {
+  type: "raspberryPiStats";
+  manualHeightOverride?: boolean;
+  label?: string;
+  cpuTempStateId: string;
+  cpuLoadStateId: string;
+  ramFreeStateId: string;
+  diskFreeStateId: string;
+  onlineStateId: string;
 };
 
 export type WallboxWidgetConfig = WidgetBase & {
@@ -406,6 +418,7 @@ export type WidgetConfig =
   | LogWidgetConfig
   | ScriptWidgetConfig
   | HostStatsWidgetConfig
+  | RaspberryPiStatsWidgetConfig
   | WallboxWidgetConfig
   | GoEWidgetConfig
   | HeatingWidgetConfig

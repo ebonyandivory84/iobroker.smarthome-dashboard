@@ -48,6 +48,15 @@ const collectWidgetStateIds = (widget: WidgetConfig) => {
       widget.stats?.third?.stateId || "",
     ];
   }
+  if (widget.type === "raspberryPiStats") {
+    return [
+      widget.cpuTempStateId,
+      widget.cpuLoadStateId,
+      widget.ramFreeStateId,
+      widget.diskFreeStateId,
+      widget.onlineStateId,
+    ];
+  }
   return [];
 };
 

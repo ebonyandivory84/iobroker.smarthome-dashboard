@@ -19,6 +19,7 @@ import { HeatingWidgetV2 } from "./widgets/HeatingWidgetV2";
 import { LinkWidget } from "./widgets/LinkWidget";
 import { LogWidget } from "./widgets/LogWidget";
 import { NumpadWidget } from "./widgets/NumpadWidget";
+import { RaspberryPiStatsWidget } from "./widgets/RaspberryPiStatsWidget";
 import { ScriptWidget } from "./widgets/ScriptWidget";
 import { SolarWidget } from "./widgets/SolarWidget";
 import { resolveStateNextValue, StateWidget } from "./widgets/StateWidget";
@@ -195,6 +196,7 @@ export function GridCanvas({
                   widget.type === "log" ||
                   widget.type === "script" ||
                   widget.type === "host" ||
+                  widget.type === "raspberryPiStats" ||
                   widget.type === "wallbox" ||
                   widget.type === "goe" ||
                   widget.type === "heating" ||
@@ -651,6 +653,7 @@ function getAutoLayoutSpec(
         }
         return { w: 1, h: roundGridUnit(2.6) };
       case "host":
+      case "raspberryPiStats":
         if (widget.manualHeightOverride) {
           return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
         }
@@ -719,6 +722,7 @@ function getAutoLayoutSpec(
       }
       return { w: mainColumnWidth, h: roundGridUnit(2.6) };
     case "host":
+    case "raspberryPiStats":
       if (widget.manualHeightOverride) {
         return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(fallbackHeight)) };
       }
@@ -923,6 +927,7 @@ function WebGridCanvas({
             widget.type === "log" ||
             widget.type === "script" ||
             widget.type === "host" ||
+            widget.type === "raspberryPiStats" ||
             widget.type === "wallbox" ||
             widget.type === "goe" ||
             widget.type === "heating" ||
@@ -1030,6 +1035,7 @@ function WebWidgetShell({
           widget.type === "log" ||
           widget.type === "script" ||
           widget.type === "host" ||
+          widget.type === "raspberryPiStats" ||
           widget.type === "wallbox" ||
           widget.type === "goe" ||
           widget.type === "heating" ||
@@ -1047,7 +1053,7 @@ function WebWidgetShell({
           ...active.startPosition,
           x: clamp(active.startPosition.x + dx, 0, config.grid.columns - active.startPosition.w),
           y: Math.max(0, active.startPosition.y + dy),
-        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : widget.type === "grafana" || widget.type === "log" || widget.type === "script" || widget.type === "host" || widget.type === "wallbox" || widget.type === "goe" || widget.type === "heating" || widget.type === "heatingV2" ? { minHeight: 1, heightSnap: 0.1 } : undefined);
+        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : widget.type === "grafana" || widget.type === "log" || widget.type === "script" || widget.type === "host" || widget.type === "raspberryPiStats" || widget.type === "wallbox" || widget.type === "goe" || widget.type === "heating" || widget.type === "heatingV2" ? { minHeight: 1, heightSnap: 0.1 } : undefined);
         setPreview(nextPreview);
 
         if (isLayoutMode && onDragAcrossPageEdge) {
@@ -1078,6 +1084,7 @@ function WebWidgetShell({
           widget.type === "log" ||
           widget.type === "script" ||
           widget.type === "host" ||
+          widget.type === "raspberryPiStats" ||
           widget.type === "wallbox" ||
           widget.type === "goe" ||
           widget.type === "heating" ||
@@ -1354,6 +1361,10 @@ function renderWidget(
 
   if (effectiveWidget.type === "host") {
     return <HostStatsWidget client={client} config={effectiveWidget} />;
+  }
+
+  if (effectiveWidget.type === "raspberryPiStats") {
+    return <RaspberryPiStatsWidget config={effectiveWidget} states={states} />;
   }
 
   if (effectiveWidget.type === "wallbox" || effectiveWidget.type === "goe") {
@@ -1642,6 +1653,13 @@ function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThe
     };
   }
   if (type === "host") {
+    return {
+      background: "linear-gradient(140deg, rgba(15, 34, 66, 0.95), rgba(8, 18, 36, 0.98))",
+      border: "1px solid rgba(105, 182, 255, 0.24)",
+      boxShadow: "0 14px 24px rgba(5, 12, 24, 0.34)",
+    };
+  }
+  if (type === "raspberryPiStats") {
     return {
       background: "linear-gradient(140deg, rgba(15, 34, 66, 0.95), rgba(8, 18, 36, 0.98))",
       border: "1px solid rgba(105, 182, 255, 0.24)",

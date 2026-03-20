@@ -83,6 +83,12 @@ const OPTIONS: Array<{
     icon: "server-network",
   },
   {
+    type: "raspberryPiStats",
+    title: "raspberry-pi stats",
+    description: "Zeigt CPU, RAM, Disk und Online-Status ueber frei konfigurierbare Datenpunkte.",
+    icon: "raspberry-pi",
+  },
+  {
     type: "wallbox",
     title: "Wallbox",
     description: "Steuert go-e Lademodus, Netzstrom und 80%-Begrenzung in einer kompakten Card.",

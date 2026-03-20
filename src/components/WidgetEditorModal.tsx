@@ -294,6 +294,24 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       return;
     }
 
+    if (widget.type === "raspberryPiStats") {
+      setSoundDraft({});
+      setWeatherSuggestions([]);
+      setWeatherSearchBusy(false);
+      setDraft({
+        title: widget.title,
+        showTitle: widget.showTitle === false ? "false" : "true",
+        label: widget.label || "",
+        cpuTempStateId: widget.cpuTempStateId || "0_userdata.0.NAS-pi.cpuTemp",
+        cpuLoadStateId: widget.cpuLoadStateId || "0_userdata.0.NAS-pi.cpuLoad",
+        ramFreeStateId: widget.ramFreeStateId || "0_userdata.0.NAS-pi.ramFree",
+        diskFreeStateId: widget.diskFreeStateId || "0_userdata.0.NAS-pi.diskFree",
+        onlineStateId: widget.onlineStateId || "0_userdata.0.NAS-pi.online",
+        ...appearanceDraft,
+      });
+      return;
+    }
+
     if (widget.type === "wallbox" || widget.type === "goe") {
       const allowChargingWriteStateId =
         widget.stopWriteStateId || widget.allowChargingStateId || "go-e-gemini-adapter.0.control.allowCharging";
@@ -814,6 +832,18 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         hostLabel: draft.hostLabel?.trim() || undefined,
         appearance,
       });
+    } else if (widget.type === "raspberryPiStats") {
+      onSave(widget.id, {
+        title: draft.title,
+        showTitle: draft.showTitle !== "false",
+        label: draft.label?.trim() || undefined,
+        cpuTempStateId: draft.cpuTempStateId?.trim() || widget.cpuTempStateId,
+        cpuLoadStateId: draft.cpuLoadStateId?.trim() || widget.cpuLoadStateId,
+        ramFreeStateId: draft.ramFreeStateId?.trim() || widget.ramFreeStateId,
+        diskFreeStateId: draft.diskFreeStateId?.trim() || widget.diskFreeStateId,
+        onlineStateId: draft.onlineStateId?.trim() || widget.onlineStateId,
+        appearance,
+      });
     } else if (widget.type === "wallbox" || widget.type === "goe") {
       onSave(widget.id, {
         title: draft.title,
@@ -1204,7 +1234,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   </Field>
                 </>
               ) : null}
-              {widget.type === "host" ? (
+              {widget.type === "host" || widget.type === "raspberryPiStats" ? (
                 <>
                   <ColorInputRow
                     firstKey="cardColor"
@@ -2057,6 +2087,57 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 </Field>
                 <Text style={styles.mappingHint}>
                   Zeigt Festplatte, RAM, CPU-Auslastung, Prozessanzahl und CPU-Temperatur des ioBroker-Hosts.
+                </Text>
+              </>
+            ) : null}
+            {widget.type === "raspberryPiStats" ? (
+              <>
+                <Field label="Widget Label (optional)">
+                  <TextInput
+                    onChangeText={(value) => setDraft((current) => ({ ...current, label: value }))}
+                    placeholder="z. B. NAS Pi"
+                    placeholderTextColor={palette.textMuted}
+                    style={styles.input}
+                    value={draft.label || ""}
+                  />
+                </Field>
+                <Field label="CPU Temperatur">
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("cpuTempStateId")}
+                    onChangeText={(value) => setDraft((current) => ({ ...current, cpuTempStateId: value }))}
+                    value={draft.cpuTempStateId || ""}
+                  />
+                </Field>
+                <Field label="CPU Last">
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("cpuLoadStateId")}
+                    onChangeText={(value) => setDraft((current) => ({ ...current, cpuLoadStateId: value }))}
+                    value={draft.cpuLoadStateId || ""}
+                  />
+                </Field>
+                <Field label="RAM frei">
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("ramFreeStateId")}
+                    onChangeText={(value) => setDraft((current) => ({ ...current, ramFreeStateId: value }))}
+                    value={draft.ramFreeStateId || ""}
+                  />
+                </Field>
+                <Field label="Disk frei">
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("diskFreeStateId")}
+                    onChangeText={(value) => setDraft((current) => ({ ...current, diskFreeStateId: value }))}
+                    value={draft.diskFreeStateId || ""}
+                  />
+                </Field>
+                <Field label="Online">
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("onlineStateId")}
+                    onChangeText={(value) => setDraft((current) => ({ ...current, onlineStateId: value }))}
+                    value={draft.onlineStateId || ""}
+                  />
+                </Field>
+                <Text style={styles.mappingHint}>
+                  Design wie Host-Widget, aber voll ueber externe Datenpunkte steuerbar (z. B. Raspberry Pi im LAN).
                 </Text>
               </>
             ) : null}
@@ -3888,7 +3969,7 @@ function getWidgetAppearanceDefaults(
     };
   }
 
-  if (widget.type === "host") {
+  if (widget.type === "host" || widget.type === "raspberryPiStats") {
     return {
       widgetColor: "rgba(15, 34, 66, 0.95)",
       widgetColor2: "rgba(8, 18, 36, 0.98)",

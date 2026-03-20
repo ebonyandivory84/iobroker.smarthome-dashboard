@@ -286,6 +286,7 @@ export function DashboardScreen() {
           currentWidget.type === "log" ||
           currentWidget.type === "script" ||
           currentWidget.type === "host" ||
+          currentWidget.type === "raspberryPiStats" ||
           currentWidget.type === "wallbox" ||
           currentWidget.type === "goe" ||
           currentWidget.type === "heating" ||
@@ -308,6 +309,7 @@ export function DashboardScreen() {
         currentWidget.type === "log" ||
         currentWidget.type === "script" ||
         currentWidget.type === "host" ||
+        currentWidget.type === "raspberryPiStats" ||
         currentWidget.type === "wallbox" ||
         currentWidget.type === "goe" ||
         currentWidget.type === "heating" ||
@@ -332,6 +334,7 @@ export function DashboardScreen() {
         currentWidget.type === "log" ||
         currentWidget.type === "script" ||
         currentWidget.type === "host" ||
+        currentWidget.type === "raspberryPiStats" ||
         currentWidget.type === "wallbox" ||
         currentWidget.type === "goe" ||
         currentWidget.type === "heating" ||
@@ -355,6 +358,7 @@ export function DashboardScreen() {
                 currentWidget.type === "log" ||
                 currentWidget.type === "script" ||
                 currentWidget.type === "host" ||
+                currentWidget.type === "raspberryPiStats" ||
                 currentWidget.type === "wallbox" ||
                 currentWidget.type === "goe" ||
                 currentWidget.type === "heating" ||
@@ -371,6 +375,7 @@ export function DashboardScreen() {
         currentWidget.type === "log" ||
         currentWidget.type === "script" ||
         currentWidget.type === "host" ||
+        currentWidget.type === "raspberryPiStats" ||
         currentWidget.type === "wallbox" ||
         currentWidget.type === "goe" ||
         currentWidget.type === "heating" ||

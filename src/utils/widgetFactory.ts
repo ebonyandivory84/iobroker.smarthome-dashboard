@@ -26,6 +26,8 @@ export function buildWidgetTemplate(
                   ? 6
                     : type === "host"
                       ? 6
+                      : type === "raspberryPiStats"
+                        ? 6
                     : type === "wallbox" || type === "goe"
                       ? 6
                     : type === "heating" || type === "heatingV2"
@@ -50,6 +52,8 @@ export function buildWidgetTemplate(
                   ? 3
                     : type === "host"
                       ? 3
+                      : type === "raspberryPiStats"
+                        ? 3
                       : type === "wallbox" || type === "goe"
                         ? 3
                         : type === "heating" || type === "heatingV2"
@@ -213,6 +217,24 @@ export function buildWidgetTemplate(
       title: `Host ${suffix}`,
       refreshMs: 5000,
       hostLabel: "",
+      position: {
+        ...basePosition,
+        w: Math.min(6, grid.columns),
+      },
+    };
+  }
+
+  if (type === "raspberryPiStats") {
+    return {
+      id: `raspberry-pi-stats-${suffix}`,
+      type: "raspberryPiStats",
+      title: `Raspberry-Pi Stats ${suffix}`,
+      label: "NAS Pi",
+      cpuTempStateId: "0_userdata.0.NAS-pi.cpuTemp",
+      cpuLoadStateId: "0_userdata.0.NAS-pi.cpuLoad",
+      ramFreeStateId: "0_userdata.0.NAS-pi.ramFree",
+      diskFreeStateId: "0_userdata.0.NAS-pi.diskFree",
+      onlineStateId: "0_userdata.0.NAS-pi.online",
       position: {
         ...basePosition,
         w: Math.min(6, grid.columns),
