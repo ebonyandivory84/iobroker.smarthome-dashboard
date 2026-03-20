@@ -950,7 +950,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const chargingStatusText = emergencyStopDisplay
     ? "Emergency Stop aktiv"
     : liveCharging
-      ? `Laedt mit ${formatPowerKW(chargingPowerW)}`
+      ? `Laden mit ${formatPowerKW(chargingPowerW)}`
       : chargeCompleted
         ? "Ladevorgang abgeschlossen"
         : "Kein aktiver Ladevorgang";
