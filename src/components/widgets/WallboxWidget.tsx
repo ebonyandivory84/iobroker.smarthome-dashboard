@@ -58,6 +58,7 @@ const STATUS_DEFAULT_IDS = {
 } as const;
 
 const READ_DEFAULT_IDS = {
+  actualPhaseMode: "go-e-gemini-adapter.0.status.actualPhaseMode",
   actualPhaseCount: "go-e-gemini-adapter.0.status.enabledPhases",
   liveAmpere: "go-e-gemini-adapter.0.status.setCurrentA",
   car: "go-e-gemini-adapter.0.status.carState",
@@ -86,6 +87,7 @@ const LEGACY_STATUS_IDS = {
 } as const;
 
 const LEGACY_READ_IDS = {
+  actualPhaseMode: "go-e.0.phaseSwitchMode",
   actualPhaseCount: "go-e.0.phaseSwitchModeEnabled",
   liveAmpere: "go-e.0.ampere",
   car: "go-e.0.car",
@@ -183,6 +185,12 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       };
 
       const read = {
+        actualPhaseMode: resolveStateIdWithLegacy(
+          undefined,
+          resolveMappedStatusId(write.phaseCards, ".control.gridManual.phaseMode", ".status.actualPhaseMode") ||
+            READ_DEFAULT_IDS.actualPhaseMode,
+          LEGACY_READ_IDS.actualPhaseMode
+        ),
         actualPhaseCount: resolveStateIdWithLegacy(
           config.phaseSwitchModeEnabledStateId,
           READ_DEFAULT_IDS.actualPhaseCount,
@@ -375,7 +383,13 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       : pendingWrites["mode:pv:mode"] || pendingWrites["mode:pv:allowCharging"]
         ? "pv"
         : null;
-  const mode = modePendingDisplay ?? normalizeMode(rawMode) ?? "pv";
+  const controlAllowRaw = readValue(stateIds.write.stop);
+  const controlAllowConfigured =
+    controlAllowRaw === null || controlAllowRaw === undefined
+      ? null
+      : !typedValuesEqual(controlAllowRaw, stopDisabledWriteValue, modeWriteTypes.stop);
+  const externalManualOverride = modePendingDisplay === null && chargingAllowed && controlAllowConfigured === false;
+  const mode = modePendingDisplay ?? (externalManualOverride ? "grid" : normalizeMode(rawMode) ?? "pv");
   const isGridMode = mode === "grid";
   const targetMode = config.targetMode === "km" ? "km" : "soc";
 
@@ -384,7 +398,8 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   const targetKmValue = normalizeTargetKm(readValue(stateIds.write.targetKm)) ?? DEFAULT_TARGET_KM;
 
   const phaseCardRaw = readValue(stateIds.status.phaseCards);
-  const actualPhaseRaw = readValue(stateIds.read.actualPhaseCount);
+  const actualPhaseModeRaw = readValue(stateIds.read.actualPhaseMode);
+  const actualPhaseRaw = actualPhaseModeRaw ?? readValue(stateIds.read.actualPhaseCount);
   const phaseCardSelection = resolvePhaseSelection(phaseCardRaw);
   const actualPhaseSelection = resolvePhaseSelection(actualPhaseRaw) ?? phaseCardSelection;
   const displayedPhaseSelection = (isGridMode ? phaseCardSelection : actualPhaseSelection) ?? actualPhaseSelection;
@@ -1283,7 +1298,11 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
           </View>
 
           <Text numberOfLines={1} style={[styles.quickControlHint, { color: mutedTextColor }]}>
-            {isGridMode ? "Manuell steuerbar" : "Automatik aktiv (Ist-Werte)"}
+            {externalManualOverride
+              ? "Externe App steuert manuell (Ist-Werte)"
+              : isGridMode
+                ? "Manuell steuerbar"
+                : "Automatik aktiv (Ist-Werte)"}
           </Text>
         </View>
 
