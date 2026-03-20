@@ -693,12 +693,12 @@ function getAutoLayoutSpec(
       // while still leaving enough room for in-scene stat cards.
       return { w: mainColumnWidth, h: roundGridUnit(3.5) };
     case "grafana":
-      if (options?.stackPrimarySections && widget.manualHeightOverride) {
+      if (widget.manualHeightOverride) {
         return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(fallbackHeight)) };
       }
       return { w: mainColumnWidth, h: roundGridUnit(2.2) };
     case "weather":
-      if (options?.stackPrimarySections && widget.manualHeightOverride) {
+      if (widget.manualHeightOverride) {
         return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(fallbackHeight)) };
       }
       return { w: mainColumnWidth, h: roundGridUnit(2.2) };
