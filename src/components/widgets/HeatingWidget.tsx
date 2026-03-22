@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, ImageBackground, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { useDocumentVisibility } from "../../hooks/useDocumentVisibility";
 import { IoBrokerClient } from "../../services/iobroker";
 import { HeatingWidgetConfig, StateSnapshot } from "../../types/dashboard";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
@@ -9,6 +10,7 @@ import { palette } from "../../utils/theme";
 type HeatingWidgetProps = {
   config: HeatingWidgetConfig;
   client: IoBrokerClient;
+  isActivePage?: boolean;
 };
 
 type HeatingMode = "standby" | "dhw" | "dhwAndHeating";
@@ -59,7 +61,9 @@ const DEFAULT_IDS = {
   compressorSensorPower: "viessmannapi.0.299550.0.features.heating.compressors.0.sensors.power.properties.value.value",
 } as const;
 
-export function HeatingWidget({ config, client }: HeatingWidgetProps) {
+export function HeatingWidget({ config, client, isActivePage = true }: HeatingWidgetProps) {
+  const documentVisible = useDocumentVisibility();
+  const runtimeActive = isActivePage && documentVisible;
   const stateIds = useMemo(
     () => ({
       modeSet: resolveStateId(config.modeSetStateId, DEFAULT_IDS.modeSet),
@@ -118,6 +122,9 @@ export function HeatingWidget({ config, client }: HeatingWidgetProps) {
   const refreshMs = clampInt(config.refreshMs, DEFAULT_REFRESH_MS, MIN_REFRESH_MS);
 
   useEffect(() => {
+    if (!runtimeActive) {
+      return;
+    }
     let active = true;
     let inFlight = false;
     let pendingSync = false;
@@ -158,7 +165,7 @@ export function HeatingWidget({ config, client }: HeatingWidgetProps) {
       active = false;
       clearInterval(timer);
     };
-  }, [client, refreshMs, stateIds]);
+  }, [client, refreshMs, runtimeActive, stateIds]);
 
   const readValue = useCallback(
     (stateId: string) => {
@@ -229,6 +236,9 @@ export function HeatingWidget({ config, client }: HeatingWidgetProps) {
 
   useEffect(() => {
     tempBarGlowAnim.setValue(0);
+    if (!runtimeActive) {
+      return;
+    }
     const glowLoop = Animated.loop(
       Animated.timing(tempBarGlowAnim, {
         toValue: 1,
@@ -241,7 +251,7 @@ export function HeatingWidget({ config, client }: HeatingWidgetProps) {
     return () => {
       glowLoop.stop();
     };
-  }, [tempBarGlowAnim]);
+  }, [runtimeActive, tempBarGlowAnim]);
 
   const playPressSound = useCallback(
     (key: string) => {

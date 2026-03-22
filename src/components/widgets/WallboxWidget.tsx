@@ -1,5 +1,6 @@
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, ImageBackground, Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { useDocumentVisibility } from "../../hooks/useDocumentVisibility";
 import { IoBrokerClient } from "../../services/iobroker";
 import { GoEWidgetConfig, StateSnapshot, WallboxWidgetConfig } from "../../types/dashboard";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
@@ -8,6 +9,7 @@ import { palette } from "../../utils/theme";
 type WallboxWidgetProps = {
   config: WallboxWidgetConfig | GoEWidgetConfig;
   client: IoBrokerClient;
+  isActivePage?: boolean;
 };
 
 type WallboxMode = "stop" | "pv" | "pvPriority" | "grid";
@@ -97,7 +99,9 @@ const LEGACY_READ_IDS = {
   chargedEnergy: "go-e.0.eto",
 } as const;
 
-export function WallboxWidget({ config, client }: WallboxWidgetProps) {
+export function WallboxWidget({ config, client, isActivePage = true }: WallboxWidgetProps) {
+  const documentVisible = useDocumentVisibility();
+  const runtimeActive = isActivePage && documentVisible;
   const stateIds = useMemo(
     () => {
       const modeWriteBase = resolveStateIdWithLegacy(config.modeStateId, WRITE_DEFAULT_IDS.mode, LEGACY_WRITE_IDS.mode);
@@ -263,6 +267,9 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   );
 
   useEffect(() => {
+    if (!runtimeActive) {
+      return;
+    }
     let active = true;
     let inFlight = false;
     let pendingSync = false;
@@ -301,7 +308,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       active = false;
       clearInterval(timer);
     };
-  }, [client, readIds, refreshMs]);
+  }, [client, readIds, refreshMs, runtimeActive]);
 
   const readValue = useCallback(
     (stateId: string) => {
@@ -435,7 +442,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
         : "fast";
 
   useEffect(() => {
-    if (!liveCharging) {
+    if (!runtimeActive || !liveCharging) {
       setChargingPulseOn(true);
       return;
     }
@@ -443,10 +450,13 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
       setChargingPulseOn((current) => !current);
     }, CHARGING_INDICATOR_BLINK_MS);
     return () => clearInterval(timer);
-  }, [liveCharging]);
+  }, [liveCharging, runtimeActive]);
 
   useEffect(() => {
     barGlowAnim.setValue(0);
+    if (!runtimeActive) {
+      return;
+    }
     const glowLoop = Animated.loop(
       Animated.timing(barGlowAnim, {
         toValue: 1,
@@ -459,7 +469,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     return () => {
       glowLoop.stop();
     };
-  }, [barGlowAnim]);
+  }, [barGlowAnim, runtimeActive]);
 
   const titleText = (config.title || "Wallbox").trim() || "Wallbox";
   const subtitleText = useMemo(
@@ -611,6 +621,9 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
   }, [playConfirmSound, stateSnapshot]);
 
   useEffect(() => {
+    if (!runtimeActive) {
+      return;
+    }
     const timer = setInterval(() => {
       const now = Date.now();
       const expired: PendingConfirmation[] = [];
@@ -637,7 +650,7 @@ export function WallboxWidget({ config, client }: WallboxWidgetProps) {
     return () => {
       clearInterval(timer);
     };
-  }, []);
+  }, [runtimeActive]);
 
   const setMode = useCallback(
     (nextMode: WallboxMode) => {

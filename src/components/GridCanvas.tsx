@@ -1407,7 +1407,7 @@ function renderWidget(
   }
 
   if (effectiveWidget.type === "solar") {
-    return <SolarWidget config={effectiveWidget} states={states} theme={theme} />;
+    return <SolarWidget config={effectiveWidget} isActivePage={isActivePage} states={states} theme={theme} />;
   }
 
   if (effectiveWidget.type === "grafana") {
@@ -1456,15 +1456,15 @@ function renderWidget(
   }
 
   if (effectiveWidget.type === "wallbox" || effectiveWidget.type === "goe") {
-    return <WallboxWidget client={client} config={effectiveWidget} />;
+    return <WallboxWidget client={client} config={effectiveWidget} isActivePage={isActivePage} />;
   }
 
   if (effectiveWidget.type === "heating") {
-    return <HeatingWidget client={client} config={effectiveWidget} />;
+    return <HeatingWidget client={client} config={effectiveWidget} isActivePage={isActivePage} />;
   }
 
   if (effectiveWidget.type === "heatingV2") {
-    return <HeatingWidgetV2 client={client} config={effectiveWidget} />;
+    return <HeatingWidgetV2 client={client} config={effectiveWidget} isActivePage={isActivePage} />;
   }
 
   return null;

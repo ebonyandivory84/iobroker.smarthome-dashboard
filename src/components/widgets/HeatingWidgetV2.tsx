@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, ImageBackground, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { useDocumentVisibility } from "../../hooks/useDocumentVisibility";
 import { IoBrokerClient } from "../../services/iobroker";
 import { HeatingWidgetV2Config, StateSnapshot } from "../../types/dashboard";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
@@ -9,6 +10,7 @@ import { palette } from "../../utils/theme";
 type HeatingWidgetProps = {
   config: HeatingWidgetV2Config;
   client: IoBrokerClient;
+  isActivePage?: boolean;
 };
 
 type HeatingMode = "standby" | "dhw" | "dhwAndHeating";
@@ -87,7 +89,9 @@ const DEFAULT_IDS = {
   compressorSensorPower: "viessmannapi.0.299550.0.features.heating.compressors.0.sensors.power.properties.value.value",
 } as const;
 
-export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
+export function HeatingWidgetV2({ config, client, isActivePage = true }: HeatingWidgetProps) {
+  const documentVisible = useDocumentVisibility();
+  const runtimeActive = isActivePage && documentVisible;
   const stateIds = useMemo(
     () => ({
       modeSet: resolveStateId(config.modeSetStateId, DEFAULT_IDS.modeSet),
@@ -164,6 +168,9 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
   const detailsTickerSpeedPxPerS = clampTickerSpeed(config.detailsTickerSpeedPxPerS);
 
   useEffect(() => {
+    if (!runtimeActive) {
+      return;
+    }
     let active = true;
     let inFlight = false;
     let pendingSync = false;
@@ -204,7 +211,7 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
       active = false;
       clearInterval(timer);
     };
-  }, [client, refreshMs, stateIds]);
+  }, [client, refreshMs, runtimeActive, stateIds]);
 
   const readValue = useCallback(
     (stateId: string) => {
@@ -519,7 +526,7 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
 
     const startOffset = detailsTrackWidth + DETAILS_TICKER_ENTRY_OFFSET_PX;
 
-    if (!showDetailsTicker || detailsTrackWidth <= 0 || detailsContentWidth <= 0) {
+    if (!runtimeActive || !showDetailsTicker || detailsTrackWidth <= 0 || detailsContentWidth <= 0) {
       detailsTickerOffset.setValue(detailsTrackWidth > 0 ? startOffset : 0);
       return;
     }
@@ -553,7 +560,7 @@ export function HeatingWidgetV2({ config, client }: HeatingWidgetProps) {
     return () => {
       tickerLoop.stop();
     };
-  }, [detailsContentWidth, detailsTickerOffset, detailsTrackWidth, detailsTickerSpeedPxPerS, showDetailsTicker]);
+  }, [detailsContentWidth, detailsTickerOffset, detailsTrackWidth, detailsTickerSpeedPxPerS, runtimeActive, showDetailsTicker]);
 
   return (
     <View style={styles.container}>

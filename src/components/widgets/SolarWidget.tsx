@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { SolarLayoutConfig, SolarNodeLayout, SolarWidgetConfig, StateSnapshot, ThemeSettings } from "../../types/dashboard";
 import { useDashboardConfig } from "../../context/DashboardConfigContext";
+import { useDocumentVisibility } from "../../hooks/useDocumentVisibility";
 import { resolveThemeSettings } from "../../utils/themeConfig";
 import { palette } from "../../utils/theme";
 
@@ -24,6 +25,7 @@ type SolarWidgetProps = {
   config: SolarWidgetConfig;
   states: StateSnapshot;
   theme?: ThemeSettings;
+  isActivePage?: boolean;
 };
 
 type FlowDir = "toHome" | "fromHome" | "idle";
@@ -50,8 +52,10 @@ const SOLAR_DEFAULT_STAT_LABELS = [
   "Stat 6",
 ];
 
-export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
+export function SolarWidget({ config, states, theme, isActivePage = true }: SolarWidgetProps) {
   const { dashboardPages, setActivePage } = useDashboardConfig();
+  const documentVisible = useDocumentVisibility();
+  const runtimeActive = isActivePage && documentVisible;
   const resolvedTheme = resolveThemeSettings(theme);
   const widgetAppearance = config.appearance;
   const textColor = widgetAppearance?.textColor || palette.text;
@@ -262,6 +266,7 @@ export function SolarWidget({ config, states, theme }: SolarWidgetProps) {
           nodeLayout={config.nodeLayout}
           statTextScale={config.statTextScale}
           statCards={statCards}
+          runtimeActive={runtimeActive}
         />
       </View>
 
@@ -299,6 +304,7 @@ function SolarFlowScene({
   nodeLayout,
   statTextScale,
   statCards,
+  runtimeActive,
 }: {
   pvDir: FlowDir;
   pvNow: number | null;
@@ -322,11 +328,17 @@ function SolarFlowScene({
   nodeLayout?: Partial<SolarLayoutConfig>;
   statTextScale?: number;
   statCards: Array<{ label: string; value: string }>;
+  runtimeActive: boolean;
 }) {
   const progress = useRef(new Animated.Value(0)).current;
   const [sceneLayout, setSceneLayout] = useState({ width: SOLAR_SCENE_BASE_WIDTH, height: SOLAR_SCENE_BASE_HEIGHT });
 
   useEffect(() => {
+    progress.stopAnimation();
+    if (!runtimeActive) {
+      progress.setValue(0);
+      return;
+    }
     const loop = Animated.loop(
       Animated.timing(progress, {
         toValue: 1,
@@ -337,7 +349,7 @@ function SolarFlowScene({
     );
     loop.start();
     return () => loop.stop();
-  }, [progress]);
+  }, [progress, runtimeActive]);
 
   const fittedScene = useMemo(() => {
     const availableWidth = Math.max(1, sceneLayout.width);
