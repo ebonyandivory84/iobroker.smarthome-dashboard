@@ -26,6 +26,8 @@ import { configureUiSounds, playConfiguredUiSound, primeConfiguredSounds } from 
 import { buildWidgetTemplate } from "../utils/widgetFactory";
 import { palette } from "../utils/theme";
 
+const WEB_ACTIVE_PAGE_STORAGE_KEY = "smarthome-dashboard.activePageId";
+
 export function DashboardScreen() {
   const { width, height } = useWindowDimensions();
   const [isTouchCapableWeb, setIsTouchCapableWeb] = useState(false);
@@ -168,6 +170,50 @@ export function DashboardScreen() {
 
     horizontalPagerRef.current.scrollTo({ x: width * activePageIndex, animated: true });
   }, [activePageIndex, width]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") {
+      return;
+    }
+    if (!activePageId) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(WEB_ACTIVE_PAGE_STORAGE_KEY, activePageId);
+    } catch {
+      // Ignore browsers/environments where storage is unavailable.
+    }
+  }, [activePageId]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") {
+      return;
+    }
+    if (!dashboardPages.length) {
+      return;
+    }
+
+    let storedPageId = "";
+    try {
+      storedPageId = window.localStorage.getItem(WEB_ACTIVE_PAGE_STORAGE_KEY) || "";
+    } catch {
+      storedPageId = "";
+    }
+
+    if (!storedPageId || storedPageId === activePageId) {
+      return;
+    }
+
+    const storedPageIndex = dashboardPages.findIndex((page) => page.id === storedPageId);
+    if (storedPageIndex < 0) {
+      return;
+    }
+
+    committedPageIdRef.current = storedPageId;
+    setVisiblePageId(storedPageId);
+    setActivePage(storedPageId);
+    horizontalPagerRef.current?.scrollTo({ x: width * storedPageIndex, animated: false });
+  }, [activePageId, dashboardPages, setActivePage, width]);
 
   useEffect(() => {
     setVisiblePageId(activePageId);
