@@ -28,9 +28,10 @@ import { palette } from "../utils/theme";
 
 export function DashboardScreen() {
   const { width, height } = useWindowDimensions();
-  const isCompact = width < 700;
-  const activeLayoutTarget: "desktop" | "mobile" = isCompact ? "mobile" : "desktop";
   const [isTouchCapableWeb, setIsTouchCapableWeb] = useState(false);
+  const isPhoneLikeWeb = Platform.OS === "web" && isTouchCapableWeb && Math.max(width, height) < 1000;
+  const isCompact = width < 700 || isPhoneLikeWeb;
+  const activeLayoutTarget: "desktop" | "mobile" = isCompact ? "mobile" : "desktop";
   const isPhoneWeb = Platform.OS === "web" && isTouchCapableWeb && Math.min(width, height) <= 500;
   const isTouchLayout = width < 1100 || isTouchCapableWeb;
   const horizontalPagerRef = useRef<ScrollView | null>(null);
@@ -274,48 +275,29 @@ export function DashboardScreen() {
     if (!currentWidget) {
       return;
     }
+    const supportsManualHeightOverride =
+      currentWidget.type === "camera" ||
+      currentWidget.type === "solar" ||
+      currentWidget.type === "weather" ||
+      currentWidget.type === "grafana" ||
+      currentWidget.type === "log" ||
+      currentWidget.type === "script" ||
+      currentWidget.type === "host" ||
+      currentWidget.type === "raspberryPiStats" ||
+      currentWidget.type === "wallbox" ||
+      currentWidget.type === "goe" ||
+      currentWidget.type === "heating" ||
+      currentWidget.type === "heatingV2";
     if (partial.mobilePosition) {
-      if (activeLayoutTarget === "mobile") {
-        const currentMobile = resolveMobileWidget(currentWidget);
-        const nextMobileOverride = {
-          ...buildMobileOverrideFromWidget(currentMobile),
-          ...(currentWidget.type === "camera" ||
-          currentWidget.type === "solar" ||
-          currentWidget.type === "weather" ||
-          currentWidget.type === "grafana" ||
-          currentWidget.type === "log" ||
-          currentWidget.type === "script" ||
-          currentWidget.type === "host" ||
-          currentWidget.type === "raspberryPiStats" ||
-          currentWidget.type === "wallbox" ||
-          currentWidget.type === "goe" ||
-          currentWidget.type === "heating" ||
-          currentWidget.type === "heatingV2"
-            ? { manualHeightOverride: true }
-            : null),
-        };
-        updateWidget(widgetId, {
-          mobilePosition: partial.mobilePosition,
-          mobileOverride: nextMobileOverride,
-        });
-        return;
-      }
+      const currentMobile = resolveMobileWidget(currentWidget);
+      const nextMobileOverride = {
+        ...buildMobileOverrideFromWidget(currentMobile),
+        ...(supportsManualHeightOverride ? { manualHeightOverride: true } : null),
+      };
       updateWidget(widgetId, {
-        ...partial,
-        ...(currentWidget.type === "camera" ||
-        currentWidget.type === "solar" ||
-        currentWidget.type === "weather" ||
-        currentWidget.type === "grafana" ||
-        currentWidget.type === "log" ||
-        currentWidget.type === "script" ||
-        currentWidget.type === "host" ||
-        currentWidget.type === "raspberryPiStats" ||
-        currentWidget.type === "wallbox" ||
-        currentWidget.type === "goe" ||
-        currentWidget.type === "heating" ||
-        currentWidget.type === "heatingV2"
-          ? { manualHeightOverride: true }
-          : null),
+        mobilePosition: partial.mobilePosition,
+        mobileOverride: nextMobileOverride,
+        ...(supportsManualHeightOverride ? { manualHeightOverride: true } : null),
       });
       return;
     }
@@ -327,20 +309,7 @@ export function DashboardScreen() {
       } as WidgetConfig;
       const nextMobileOverride = {
         ...buildMobileOverrideFromWidget(nextMobileWidget),
-        ...(currentWidget.type === "camera" ||
-        currentWidget.type === "solar" ||
-        currentWidget.type === "weather" ||
-        currentWidget.type === "grafana" ||
-        currentWidget.type === "log" ||
-        currentWidget.type === "script" ||
-        currentWidget.type === "host" ||
-        currentWidget.type === "raspberryPiStats" ||
-        currentWidget.type === "wallbox" ||
-        currentWidget.type === "goe" ||
-        currentWidget.type === "heating" ||
-        currentWidget.type === "heatingV2"
-          ? { manualHeightOverride: true }
-          : null),
+        ...(supportsManualHeightOverride ? { manualHeightOverride: true } : null),
       };
       updateWidget(widgetId, {
         mobileOverride: nextMobileOverride,
@@ -368,20 +337,7 @@ export function DashboardScreen() {
       updateWidget(widgetId, {
         ...partial,
         position: constrainToPrimarySections(partial.position, config.grid.columns, positionConstraint),
-        ...(currentWidget.type === "camera" ||
-        currentWidget.type === "solar" ||
-        currentWidget.type === "weather" ||
-        currentWidget.type === "grafana" ||
-        currentWidget.type === "log" ||
-        currentWidget.type === "script" ||
-        currentWidget.type === "host" ||
-        currentWidget.type === "raspberryPiStats" ||
-        currentWidget.type === "wallbox" ||
-        currentWidget.type === "goe" ||
-        currentWidget.type === "heating" ||
-        currentWidget.type === "heatingV2"
-          ? { manualHeightOverride: true }
-          : null),
+        ...(supportsManualHeightOverride ? { manualHeightOverride: true } : null),
       });
       return;
     }
