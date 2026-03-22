@@ -1015,6 +1015,61 @@ function WebWidgetShell({
     startPosition: WidgetConfig["position"];
   } | null>(null);
   const edgeDirectionRef = useRef<"left" | "right" | null>(null);
+  const scrollBlockCleanupRef = useRef<(() => void) | null>(null);
+
+  const releaseScrollBlock = () => {
+    if (!scrollBlockCleanupRef.current) {
+      return;
+    }
+    scrollBlockCleanupRef.current();
+    scrollBlockCleanupRef.current = null;
+  };
+
+  const engageScrollBlock = () => {
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      return;
+    }
+    if (scrollBlockCleanupRef.current) {
+      return;
+    }
+
+    const body = document.body;
+    const html = document.documentElement;
+    const prevBodyTouchAction = body.style.touchAction;
+    const prevBodyOverscroll = body.style.overscrollBehavior;
+    const prevHtmlTouchAction = html.style.touchAction;
+    const prevHtmlOverscroll = html.style.overscrollBehavior;
+
+    body.style.touchAction = "none";
+    body.style.overscrollBehavior = "none";
+    html.style.touchAction = "none";
+    html.style.overscrollBehavior = "none";
+
+    const preventTouchMove = (event: TouchEvent) => {
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+      event.stopPropagation();
+    };
+    const preventWheel = (event: WheelEvent) => {
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+      event.stopPropagation();
+    };
+
+    window.addEventListener("touchmove", preventTouchMove, { capture: true, passive: false });
+    window.addEventListener("wheel", preventWheel, { capture: true, passive: false });
+
+    scrollBlockCleanupRef.current = () => {
+      window.removeEventListener("touchmove", preventTouchMove, true);
+      window.removeEventListener("wheel", preventWheel, true);
+      body.style.touchAction = prevBodyTouchAction;
+      body.style.overscrollBehavior = prevBodyOverscroll;
+      html.style.touchAction = prevHtmlTouchAction;
+      html.style.overscrollBehavior = prevHtmlOverscroll;
+    };
+  };
 
   useEffect(() => {
     setPreview(widget.position);
@@ -1114,6 +1169,7 @@ function WebWidgetShell({
         return;
       }
       interaction.current = null;
+      releaseScrollBlock();
       edgeDirectionRef.current = null;
       if (allowManualLayout) {
         onUpdateWidget(widget.id, {
@@ -1129,6 +1185,7 @@ function WebWidgetShell({
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
       window.removeEventListener("pointercancel", handleUp);
+      releaseScrollBlock();
     };
   }, [allowManualLayout, config.grid.columns, isLayoutMode, onDragAcrossPageEdge, onUpdateWidget, preview, sourceColumns, stepX, stepY, widget.id, widget.type]);
 
@@ -1144,6 +1201,7 @@ function WebWidgetShell({
         startY: event.clientY,
         startPosition: preview,
       };
+      engageScrollBlock();
       edgeDirectionRef.current = null;
     };
 
@@ -1209,7 +1267,20 @@ function WebWidgetShell({
 
   return (
     <div style={shellStyle}>
-      {isLayoutMode && allowManualLayout ? <div onPointerDown={begin("drag")} style={webWidgetDragSurfaceStyle} /> : null}
+      {isLayoutMode && allowManualLayout ? (
+        <div
+          onPointerDown={begin("drag")}
+          onTouchMove={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+          onTouchStart={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+          style={webWidgetDragSurfaceStyle}
+        />
+      ) : null}
       {showHeaderTitle ? (
         <div style={webTitleBadgeStyle}>
           <div style={{ ...webTitleStyle, color: widget.appearance?.textColor || palette.text }}>{widget.title}</div>
@@ -1250,7 +1321,19 @@ function WebWidgetShell({
       </View>
       {isLayoutMode && allowManualLayout && allowResize ? (
         <div style={webFooterOverlayStyle}>
-          <div onPointerDown={begin("resize")} style={webResizeHandleStyle} title="Skalieren" />
+          <div
+            onPointerDown={begin("resize")}
+            onTouchMove={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onTouchStart={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            style={webResizeHandleStyle}
+            title="Skalieren"
+          />
         </div>
       ) : null}
     </div>
@@ -1570,6 +1653,7 @@ const webResizeHandleStyle: CSSProperties = {
   userSelect: "none",
   WebkitUserSelect: "none",
   opacity: 0.7,
+  touchAction: "none",
 };
 
 function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThemeSettings>): CSSProperties {

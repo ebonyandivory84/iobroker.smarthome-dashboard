@@ -60,6 +60,7 @@ export function WidgetFrame({
   } | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [interactionMode, setInteractionMode] = useState<"drag" | "resize" | null>(null);
+  const scrollBlockCleanupRef = useRef<(() => void) | null>(null);
   const useFreeGridConstraint = columns <= 3;
   const isVerticalResizeWidget =
     widget.type === "camera" ||
@@ -74,6 +75,60 @@ export function WidgetFrame({
     widget.type === "goe" ||
     widget.type === "heating" ||
     widget.type === "heatingV2";
+
+  const releaseScrollBlock = () => {
+    if (!scrollBlockCleanupRef.current) {
+      return;
+    }
+    scrollBlockCleanupRef.current();
+    scrollBlockCleanupRef.current = null;
+  };
+
+  const engageScrollBlock = () => {
+    if (Platform.OS !== "web" || typeof window === "undefined" || typeof document === "undefined") {
+      return;
+    }
+    if (scrollBlockCleanupRef.current) {
+      return;
+    }
+
+    const body = document.body;
+    const html = document.documentElement;
+    const prevBodyTouchAction = body.style.touchAction;
+    const prevBodyOverscroll = body.style.overscrollBehavior;
+    const prevHtmlTouchAction = html.style.touchAction;
+    const prevHtmlOverscroll = html.style.overscrollBehavior;
+
+    body.style.touchAction = "none";
+    body.style.overscrollBehavior = "none";
+    html.style.touchAction = "none";
+    html.style.overscrollBehavior = "none";
+
+    const preventTouchMove = (event: TouchEvent) => {
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+      event.stopPropagation();
+    };
+    const preventWheel = (event: WheelEvent) => {
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+      event.stopPropagation();
+    };
+
+    window.addEventListener("touchmove", preventTouchMove, { capture: true, passive: false });
+    window.addEventListener("wheel", preventWheel, { capture: true, passive: false });
+
+    scrollBlockCleanupRef.current = () => {
+      window.removeEventListener("touchmove", preventTouchMove, true);
+      window.removeEventListener("wheel", preventWheel, true);
+      body.style.touchAction = prevBodyTouchAction;
+      body.style.overscrollBehavior = prevBodyOverscroll;
+      html.style.touchAction = prevHtmlTouchAction;
+      html.style.overscrollBehavior = prevHtmlOverscroll;
+    };
+  };
 
   useEffect(() => {
     if (Platform.OS !== "web") {
@@ -138,6 +193,7 @@ export function WidgetFrame({
       }
 
       interaction.current = null;
+      releaseScrollBlock();
       setInteractionMode(null);
       setDragOffset({ x: 0, y: 0 });
     };
@@ -150,6 +206,7 @@ export function WidgetFrame({
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
       window.removeEventListener("pointercancel", handlePointerUp);
+      releaseScrollBlock();
     };
   }, [cellWidth, columns, gap, isVerticalResizeWidget, onCommitPosition, rowHeight, useFreeGridConstraint, widget]);
 
@@ -160,6 +217,7 @@ export function WidgetFrame({
       startY: clientY,
       startPosition: widget.position,
     };
+    engageScrollBlock();
     setInteractionMode(mode);
   };
 
@@ -210,6 +268,14 @@ export function WidgetFrame({
         <div
           draggable={false}
           onDragStart={(event) => event.preventDefault()}
+          onTouchMove={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+          onTouchStart={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
           onPointerDown={handleWebPointerDown("drag")}
           style={webDragLayerStyle}
         />
@@ -241,6 +307,14 @@ export function WidgetFrame({
             <div
               draggable={false}
               onDragStart={(event) => event.preventDefault()}
+              onTouchMove={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onTouchStart={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
               onPointerDown={handleWebPointerDown("resize")}
               style={webResizeLayerStyle}
             />
