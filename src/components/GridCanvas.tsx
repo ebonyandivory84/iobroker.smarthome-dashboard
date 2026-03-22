@@ -1264,6 +1264,7 @@ function WebWidgetShell({
       : null,
     widget.type === "grafana" ? styles.webContentGrafana : null,
   ];
+  const dragSurfaceStyle = allowResize ? webWidgetDragSurfaceWithCornerReserveStyle : webWidgetDragSurfaceStyle;
 
   return (
     <div style={shellStyle}>
@@ -1278,7 +1279,7 @@ function WebWidgetShell({
             event.preventDefault();
             event.stopPropagation();
           }}
-          style={webWidgetDragSurfaceStyle}
+          style={dragSurfaceStyle}
         />
       ) : null}
       {showHeaderTitle ? (
@@ -1331,9 +1332,11 @@ function WebWidgetShell({
               event.preventDefault();
               event.stopPropagation();
             }}
-            style={webResizeHandleStyle}
+            style={webResizeHitAreaStyle}
             title="Skalieren"
-          />
+          >
+            <div style={webResizeHandleStyle} />
+          </div>
         </div>
       ) : null}
     </div>
@@ -1636,9 +1639,30 @@ const webFooterOverlayStyle: CSSProperties = {
 
 const webWidgetDragSurfaceStyle: CSSProperties = {
   position: "absolute",
-  inset: 0,
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
   cursor: "grab",
   zIndex: 2,
+  userSelect: "none",
+  WebkitUserSelect: "none",
+  touchAction: "none",
+};
+
+const webWidgetDragSurfaceWithCornerReserveStyle: CSSProperties = {
+  ...webWidgetDragSurfaceStyle,
+  right: 64,
+  bottom: 64,
+};
+
+const webResizeHitAreaStyle: CSSProperties = {
+  width: 58,
+  height: 58,
+  display: "flex",
+  alignItems: "flex-end",
+  justifyContent: "flex-end",
+  cursor: "nwse-resize",
   userSelect: "none",
   WebkitUserSelect: "none",
   touchAction: "none",
@@ -1649,11 +1673,11 @@ const webResizeHandleStyle: CSSProperties = {
   height: 18,
   borderRight: `2px solid ${palette.textMuted}`,
   borderBottom: `2px solid ${palette.textMuted}`,
-  cursor: "nwse-resize",
   userSelect: "none",
   WebkitUserSelect: "none",
   opacity: 0.7,
   touchAction: "none",
+  pointerEvents: "none",
 };
 
 function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThemeSettings>): CSSProperties {

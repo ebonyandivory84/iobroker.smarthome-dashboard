@@ -277,7 +277,7 @@ export function WidgetFrame({
             event.stopPropagation();
           }}
           onPointerDown={handleWebPointerDown("drag")}
-          style={webDragLayerStyle}
+          style={allowResize ? webDragLayerWithCornerReserveStyle : webDragLayerStyle}
         />
       ) : null}
       <View
@@ -409,8 +409,8 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 8,
     bottom: 8,
-    width: 50,
-    height: 50,
+    width: 64,
+    height: 64,
     alignItems: "flex-end",
     justifyContent: "flex-end",
     zIndex: 18,
@@ -444,14 +444,20 @@ const webDragLayerStyle: CSSProperties = {
   touchAction: "none",
 };
 
+const webDragLayerWithCornerReserveStyle: CSSProperties = {
+  ...webDragLayerStyle,
+  right: 64,
+  bottom: 64,
+};
+
 const webResizeLayerStyle: CSSProperties = {
   position: "absolute",
   top: "auto",
   right: 0,
   bottom: 0,
   left: "auto",
-  width: "50px",
-  height: "50px",
+  width: "64px",
+  height: "64px",
   cursor: "nwse-resize",
   zIndex: 30,
   userSelect: "none",
