@@ -900,6 +900,7 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "web"
       ? {
           overscrollBehaviorY: "contain" as const,
+          touchAction: "pan-x" as const,
         }
       : null),
   },
@@ -959,7 +960,7 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "web"
       ? {
           overscrollBehaviorY: "contain" as const,
-          touchAction: "pan-y" as const,
+          touchAction: "pan-x pan-y" as const,
         }
       : null),
   },
