@@ -60,27 +60,29 @@ export function GrafanaWidget({ config }: GrafanaWidgetProps) {
         },
         createElement("iframe", {
           src: iframeUrl,
-          style: {
-            ...webPreviewFrameStyle,
-            pointerEvents: interactionsAllowed ? "auto" : "none",
-          },
+          style: webPreviewFrameStyle,
           sandbox: sandboxValue,
           allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
           allowFullScreen: true,
           loading: "eager",
           referrerPolicy: "no-referrer",
-          onPointerDown: () => playConfiguredUiSound(config.interactionSounds?.press, "panel", `${config.id}:press`),
         }),
         createElement(
-          "button",
+          "div",
           {
-            type: "button",
-            onClick: openFullscreen,
-            style: webFullscreenButtonStyle,
+            onPointerDown: openFullscreen,
+            style: webFullscreenOverlayButtonStyle,
             title: "Grafana im Vollbild anzeigen",
             "aria-label": "Grafana im Vollbild anzeigen",
+            role: "button",
+            tabIndex: 0,
+            onKeyDown: (event: { key?: string }) => {
+              if (event.key === "Enter" || event.key === " ") {
+                openFullscreen();
+              }
+            },
           },
-          "Vollbild"
+          null
         )
       )}
       <Modal animationType={Platform.OS === "web" ? "fade" : "slide"} transparent visible={fullscreenOpen}>
@@ -248,7 +250,7 @@ const webPreviewFrameStyle = {
   borderRadius: "0",
   background: "transparent",
   display: "block",
-  pointerEvents: "auto",
+  pointerEvents: "none",
 };
 
 const webFullscreenFrameStyle = {
@@ -257,20 +259,14 @@ const webFullscreenFrameStyle = {
   border: "0",
   display: "block",
   background: "transparent",
-  touchAction: "none",
 };
 
-const webFullscreenButtonStyle = {
+const webFullscreenOverlayButtonStyle = {
   position: "absolute",
-  top: "10px",
-  right: "10px",
-  borderRadius: "999px",
-  border: "1px solid rgba(255,255,255,0.22)",
-  background: "rgba(4, 10, 18, 0.62)",
-  color: "#f4f8ff",
-  fontSize: "11px",
-  fontWeight: "700",
-  letterSpacing: "0.2px",
-  padding: "6px 10px",
+  inset: 0,
+  zIndex: 2,
+  border: "0",
+  background: "transparent",
   cursor: "zoom-in",
+  padding: 0,
 };
