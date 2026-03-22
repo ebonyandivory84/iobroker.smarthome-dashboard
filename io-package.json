@@ -23,7 +23,18 @@
     "platform": "Javascript/Node.js",
     "main": "main.js",
     "mode": "daemon",
-    "icon": "smarthome-dashboard.svg",
+    "icon": "icon.png",
+    "localLinks": {
+      "dashboard": {
+        "link": "%protocol%://%ip%:%port%/smarthome-dashboard",
+        "name": {
+          "en": "Open SmartHome Dashboard",
+          "de": "SmartHome Dashboard oeffnen"
+        },
+        "icon": "icon.png"
+      }
+    },
+    "localLink": "%protocol%://%ip%:%port%/smarthome-dashboard",
     "enabled": true,
     "type": "visualization",
     "compact": true,
