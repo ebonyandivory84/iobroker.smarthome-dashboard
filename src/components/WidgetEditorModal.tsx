@@ -162,6 +162,14 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           widget.interactionSounds?.press,
           config.uiSounds?.widgetTypeDefaults?.grafana?.press
         ),
+        open: resolveDraftSoundValue(
+          widget.interactionSounds?.open,
+          config.uiSounds?.widgetTypeDefaults?.grafana?.open
+        ),
+        close: resolveDraftSoundValue(
+          widget.interactionSounds?.close,
+          config.uiSounds?.widgetTypeDefaults?.grafana?.close
+        ),
       });
       setDraft({
         title: widget.title,
@@ -1839,10 +1847,24 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   />
                 </Field>
                 <Field label="Sounds bei Interaktion">
-                  <SoundPickerField
-                    onChange={(value) => setSoundDraft((current) => ({ ...current, press: value }))}
-                    value={soundDraft.press}
-                  />
+                  <Field label="Beim Tippen/Klicken">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, press: value }))}
+                      value={soundDraft.press}
+                    />
+                  </Field>
+                  <Field label="Beim Oeffnen Vollbild">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, open: value }))}
+                      value={soundDraft.open}
+                    />
+                  </Field>
+                  <Field label="Beim Schliessen">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, close: value }))}
+                      value={soundDraft.close}
+                    />
+                  </Field>
                   <EditorButtonPressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
                     <Text style={styles.inlineActionLabel}>Als Default fuer alle Grafana-Widgets verwenden</Text>
                   </EditorButtonPressable>

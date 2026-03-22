@@ -60,23 +60,27 @@ export function GrafanaWidget({ config }: GrafanaWidgetProps) {
         },
         createElement("iframe", {
           src: iframeUrl,
-          style: webPreviewFrameStyle,
+          style: {
+            ...webPreviewFrameStyle,
+            pointerEvents: interactionsAllowed ? "auto" : "none",
+          },
           sandbox: sandboxValue,
           allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
           allowFullScreen: true,
           loading: "eager",
           referrerPolicy: "no-referrer",
+          onPointerDown: () => playConfiguredUiSound(config.interactionSounds?.press, "panel", `${config.id}:press`),
         }),
         createElement(
           "button",
           {
             type: "button",
             onClick: openFullscreen,
-            style: webFullscreenOverlayButtonStyle,
+            style: webFullscreenButtonStyle,
             title: "Grafana im Vollbild anzeigen",
             "aria-label": "Grafana im Vollbild anzeigen",
           },
-          createElement("span", { style: webFullscreenBadgeStyle }, "Vollbild")
+          "Vollbild"
         )
       )}
       <Modal animationType={Platform.OS === "web" ? "fade" : "slide"} transparent visible={fullscreenOpen}>
@@ -244,7 +248,7 @@ const webPreviewFrameStyle = {
   borderRadius: "0",
   background: "transparent",
   display: "block",
-  pointerEvents: "none",
+  pointerEvents: "auto",
 };
 
 const webFullscreenFrameStyle = {
@@ -253,18 +257,10 @@ const webFullscreenFrameStyle = {
   border: "0",
   display: "block",
   background: "transparent",
+  touchAction: "none",
 };
 
-const webFullscreenOverlayButtonStyle = {
-  position: "absolute",
-  inset: 0,
-  border: "0",
-  background: "transparent",
-  cursor: "zoom-in",
-  padding: 0,
-};
-
-const webFullscreenBadgeStyle = {
+const webFullscreenButtonStyle = {
   position: "absolute",
   top: "10px",
   right: "10px",
@@ -274,6 +270,7 @@ const webFullscreenBadgeStyle = {
   color: "#f4f8ff",
   fontSize: "11px",
   fontWeight: "700",
-  padding: "6px 10px",
   letterSpacing: "0.2px",
+  padding: "6px 10px",
+  cursor: "zoom-in",
 };
