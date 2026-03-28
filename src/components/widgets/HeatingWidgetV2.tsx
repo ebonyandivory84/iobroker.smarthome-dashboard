@@ -37,6 +37,9 @@ const DETAILS_TICKER_ENTRY_OFFSET_PX = 18;
 const DETAILS_TICKER_RESTART_DELAY_MS = 1200;
 const DETAILS_TICKER_SEPARATOR = "\u00a0\u00a0\u00a0\u00a0•\u00a0\u00a0\u00a0\u00a0";
 const DETAILS_TICKER_END_GAP = "\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0";
+const HEATING_V2_BASE_CONTENT_WIDTH = 560;
+const HEATING_V2_BASE_CONTENT_HEIGHT = 292;
+const HEATING_V2_MIN_CONTENT_SCALE = 0.72;
 
 const ROOM_TEMP_COLOR_STOPS: TemperatureColorStop[] = [
   { temp: 16, color: "#1f49a5" },
@@ -92,6 +95,8 @@ const DEFAULT_IDS = {
 export function HeatingWidgetV2({ config, client, isActivePage = true }: HeatingWidgetProps) {
   const documentVisible = useDocumentVisibility();
   const runtimeActive = isActivePage && documentVisible;
+  const [widgetWidth, setWidgetWidth] = useState(0);
+  const [widgetHeight, setWidgetHeight] = useState(0);
   const stateIds = useMemo(
     () => ({
       modeSet: resolveStateId(config.modeSetStateId, DEFAULT_IDS.modeSet),
@@ -519,6 +524,17 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
 
   const liveBadgeText = error ? "Fehler" : writePending ? "Sync" : "";
   const footerStatusText = error ? error : writePending ? "Synchronisiere..." : "";
+  const contentScale = useMemo(
+    () =>
+      computeBoundedContentScale(
+        widgetWidth,
+        widgetHeight,
+        HEATING_V2_BASE_CONTENT_WIDTH,
+        HEATING_V2_BASE_CONTENT_HEIGHT,
+        HEATING_V2_MIN_CONTENT_SCALE
+      ),
+    [widgetHeight, widgetWidth]
+  );
 
   useEffect(() => {
     detailsTickerAnimationRef.current?.stop();
@@ -563,7 +579,15 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
   }, [detailsContentWidth, detailsTickerOffset, detailsTrackWidth, detailsTickerSpeedPxPerS, runtimeActive, showDetailsTicker]);
 
   return (
-    <View style={styles.container}>
+    <View
+      onLayout={(event) => {
+        const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
+        const nextHeight = Math.max(0, Math.round(event.nativeEvent.layout.height));
+        setWidgetWidth((current) => (current === nextWidth ? current : nextWidth));
+        setWidgetHeight((current) => (current === nextHeight ? current : nextHeight));
+      }}
+      style={styles.container}
+    >
       <View style={[styles.card, { backgroundColor: cardStart }]}>
         {config.backgroundImage ? (
           Platform.OS === "web" ? (
@@ -594,7 +618,8 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
             })
           : null}
 
-        <View style={styles.header}>
+        <View style={[styles.scaledContent, { transform: [{ scale: contentScale }] }]}>
+          <View style={styles.header}>
           {config.showTitle !== false ? (
             <Text numberOfLines={1} style={[styles.title, { color: textColor }]}>
               {(config.title || "Heizung").trim() || "Heizung"}
@@ -612,7 +637,7 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
               </View>
             ) : null}
           </View>
-        </View>
+          </View>
 
         {config.showStatusSubtitle !== false ? (
           <Text numberOfLines={2} style={[styles.subtitle, { color: mutedTextColor }]}>
@@ -952,11 +977,12 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
           </View>
         ) : null}
 
-        {footerStatusText ? (
-          <Text numberOfLines={1} style={[styles.footer, { color: error ? palette.danger : mutedTextColor }]}>
-            {footerStatusText}
-          </Text>
-        ) : null}
+          {footerStatusText ? (
+            <Text numberOfLines={1} style={[styles.footer, { color: error ? palette.danger : mutedTextColor }]}>
+              {footerStatusText}
+            </Text>
+          ) : null}
+        </View>
       </View>
     </View>
   );
@@ -1015,6 +1041,22 @@ function clampTickerSpeed(value: number | undefined) {
     MIN_DETAILS_TICKER_SPEED_PX_PER_S,
     Math.min(MAX_DETAILS_TICKER_SPEED_PX_PER_S, Math.round(value))
   );
+}
+
+function computeBoundedContentScale(
+  width: number,
+  height: number,
+  baseWidth: number,
+  baseHeight: number,
+  minScale: number
+) {
+  if (width <= 0 || height <= 0 || baseWidth <= 0 || baseHeight <= 0) {
+    return 1;
+  }
+  const widthScale = width / baseWidth;
+  const heightScale = height / baseHeight;
+  const raw = Math.min(widthScale, heightScale);
+  return Math.max(minScale, Math.min(1, raw));
 }
 
 function normalizeMode(value: unknown): HeatingMode | null {
@@ -1299,6 +1341,10 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     gap: 10,
     position: "relative",
+  },
+  scaledContent: {
+    flex: 1,
+    gap: 10,
   },
   widgetBackground: {
     ...StyleSheet.absoluteFillObject,

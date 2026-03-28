@@ -39,6 +39,9 @@ const CHARGING_BAR_MAX_POWER_W = 11000;
 const CHARGING_BAR_GLOW_CYCLE_MS = 2000;
 const AMPERE_PRESET_VALUES = [6, 10, 12, 14, 16] as const;
 const CONFIRMATION_TIMEOUT_MS = 12_000;
+const WALLBOX_BASE_CONTENT_WIDTH = 560;
+const WALLBOX_BASE_CONTENT_HEIGHT = 292;
+const WALLBOX_MIN_CONTENT_SCALE = 0.72;
 
 const WRITE_DEFAULT_IDS = {
   stop: "go-e-gemini-adapter.0.control.allowCharging",
@@ -102,6 +105,8 @@ const LEGACY_READ_IDS = {
 export function WallboxWidget({ config, client, isActivePage = true }: WallboxWidgetProps) {
   const documentVisible = useDocumentVisibility();
   const runtimeActive = isActivePage && documentVisible;
+  const [widgetWidth, setWidgetWidth] = useState(0);
+  const [widgetHeight, setWidgetHeight] = useState(0);
   const stateIds = useMemo(
     () => {
       const modeWriteBase = resolveStateIdWithLegacy(config.modeStateId, WRITE_DEFAULT_IDS.mode, LEGACY_WRITE_IDS.mode);
@@ -1019,6 +1024,17 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
   const targetMax = targetValues[targetValues.length - 1];
   const targetStep = targetMode === "km" ? 50 : 10;
   const targetLabel = targetMode === "km" ? "Ziel-km" : "Ziel-SoC";
+  const contentScale = useMemo(
+    () =>
+      computeBoundedContentScale(
+        widgetWidth,
+        widgetHeight,
+        WALLBOX_BASE_CONTENT_WIDTH,
+        WALLBOX_BASE_CONTENT_HEIGHT,
+        WALLBOX_MIN_CONTENT_SCALE
+      ),
+    [widgetHeight, widgetWidth]
+  );
 
   const modeItems: Array<{
     mode: WallboxMode;
@@ -1032,7 +1048,15 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
   ];
 
   return (
-    <View style={styles.container}>
+    <View
+      onLayout={(event) => {
+        const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
+        const nextHeight = Math.max(0, Math.round(event.nativeEvent.layout.height));
+        setWidgetWidth((current) => (current === nextWidth ? current : nextWidth));
+        setWidgetHeight((current) => (current === nextHeight ? current : nextHeight));
+      }}
+      style={styles.container}
+    >
       <View style={[styles.card, { backgroundColor: cardStart }]}>
         {config.backgroundImage ? (
           Platform.OS === "web" ? (
@@ -1062,15 +1086,16 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
             })
           : null}
 
-        <View style={styles.header}>
+        <View style={[styles.scaledContent, { transform: [{ scale: contentScale }] }]}>
+          <View style={styles.header}>
           {config.showTitle !== false ? (
             <Text numberOfLines={1} style={[styles.title, { color: textColor }]}>
               {titleText}
             </Text>
           ) : null}
-        </View>
+          </View>
 
-        <View style={[styles.allowChargingRow, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
+          <View style={[styles.allowChargingRow, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
           <Text numberOfLines={1} style={[styles.allowChargingLabel, { color: mutedTextColor }]}>
             Emergency Stop (global)
           </Text>
@@ -1080,16 +1105,16 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
             trackColor={{ false: "rgba(145, 164, 196, 0.34)", true: "rgba(239, 93, 107, 0.55)" }}
             value={emergencyStopDisplay}
           />
-        </View>
+          </View>
 
-        <View style={[styles.chargeStatusStrip, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
+          <View style={[styles.chargeStatusStrip, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
           <View style={[styles.chargeStatusDot, { backgroundColor: chargingIndicatorColor }]} />
           <Text numberOfLines={1} style={[styles.chargeStatusText, { color: textColor }]}>
             {chargingStatusText}
           </Text>
-        </View>
+          </View>
 
-        <View style={styles.block}>
+          <View style={styles.block}>
           <Text style={[styles.blockLabel, { color: mutedTextColor }]}>Betriebsart</Text>
           <View style={[styles.segmentShell, { backgroundColor: modePanelBackground, borderColor: panelBorderColor }]}>
             {modeItems.map((item) => {
@@ -1139,9 +1164,9 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
               );
             })}
           </View>
-        </View>
+          </View>
 
-        <View style={styles.block}>
+          <View style={styles.block}>
           <View style={styles.blockHeaderInline}>
             <Text style={[styles.blockLabel, { color: mutedTextColor }]}>{targetLabel}</Text>
             <Text style={[styles.quickControlValue, { color: textColor }]}>{`${activeTargetValue} ${activeTargetUnit}`}</Text>
@@ -1200,9 +1225,9 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
               </Text>
             </View>
           </View>
-        </View>
+          </View>
 
-        <View
+          <View
           style={[
             styles.quickControlPanel,
             { borderColor: panelBorderColor, backgroundColor: modePanelBackground },
@@ -1317,15 +1342,15 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
                 ? "Manuell steuerbar"
                 : "Automatik aktiv (Ist-Werte)"}
           </Text>
-        </View>
+          </View>
 
-        {config.showStatusSubtitle === true ? (
-          <Text numberOfLines={2} style={[styles.subtitleBottom, { color: mutedTextColor }]}>
-            {subtitleText}
-          </Text>
-        ) : null}
+          {config.showStatusSubtitle === true ? (
+            <Text numberOfLines={2} style={[styles.subtitleBottom, { color: mutedTextColor }]}>
+              {subtitleText}
+            </Text>
+          ) : null}
 
-        <View style={styles.metricsRow}>
+          <View style={styles.metricsRow}>
           <View
             style={[
               styles.metricCard,
@@ -1353,9 +1378,9 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
               {formatPercent(batterySoc)}
             </Text>
           </View>
-        </View>
+          </View>
 
-        <View style={styles.powerBarBlock}>
+          <View style={styles.powerBarBlock}>
           <View style={styles.powerBarHeader}>
             <Text numberOfLines={1} style={[styles.powerBarLabel, { color: mutedTextColor }]}>Ladeleistung 0-11 kW</Text>
             <Text numberOfLines={1} style={[styles.powerBarValue, { color: textColor }]}>
@@ -1412,21 +1437,22 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
             <Text style={[styles.powerBarScaleLabel, { color: mutedTextColor }]}>0 kW</Text>
             <Text style={[styles.powerBarScaleLabel, { color: mutedTextColor }]}>11 kW</Text>
           </View>
-        </View>
+          </View>
 
-        {footerStatusText ? (
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.footer,
-              {
-                color: error ? palette.danger : mutedTextColor,
-              },
-            ]}
-          >
-            {footerStatusText}
-          </Text>
-        ) : null}
+          {footerStatusText ? (
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.footer,
+                {
+                  color: error ? palette.danger : mutedTextColor,
+                },
+              ]}
+            >
+              {footerStatusText}
+            </Text>
+          ) : null}
+        </View>
       </View>
     </View>
   );
@@ -1579,6 +1605,22 @@ function clampInt(value: number | undefined, fallback: number, min: number) {
     return fallback;
   }
   return Math.max(min, Math.round(value));
+}
+
+function computeBoundedContentScale(
+  width: number,
+  height: number,
+  baseWidth: number,
+  baseHeight: number,
+  minScale: number
+) {
+  if (width <= 0 || height <= 0 || baseWidth <= 0 || baseHeight <= 0) {
+    return 1;
+  }
+  const widthScale = width / baseWidth;
+  const heightScale = height / baseHeight;
+  const raw = Math.min(widthScale, heightScale);
+  return Math.max(minScale, Math.min(1, raw));
 }
 
 function clampAmpere(value: number) {
@@ -2018,6 +2060,10 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     gap: 11,
     position: "relative",
+  },
+  scaledContent: {
+    flex: 1,
+    gap: 11,
   },
   widgetBackground: {
     ...StyleSheet.absoluteFillObject,
