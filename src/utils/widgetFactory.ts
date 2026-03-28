@@ -376,7 +376,7 @@ export function buildWidgetTemplate(
       oneTimeChargeActiveStateId: "viessmannapi.0.299550.0.features.heating.dhw.oneTimeCharge.properties.active.value",
       heatingModeActiveStateId: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.modes.active.properties.value.value",
       dhwChargingActiveStateId: "viessmannapi.0.299550.0.features.heating.dhw.charging.properties.active.value",
-      dhwChargingProgramStateId: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.active.properties.value.value",
+      dhwChargingProgramStateId: "viessmannapi.0.299550.0.features.heating.dhw.temperature.main.commands.setTargetTemperature.setValue",
       boostBlinkActiveStateId: "viessmannapi.0.299550.0.features.heating.dhw.oneTimeCharge.properties.active.value",
       ventilationAutoSetActiveStateId: "",
       ventilationAutoActiveStateId: "",

@@ -85,7 +85,7 @@ const DEFAULT_IDS = {
   oneTimeChargeActive: "viessmannapi.0.299550.0.features.heating.dhw.oneTimeCharge.properties.active.value",
   heatingModeActive: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.modes.active.properties.value.value",
   dhwChargingActive: "viessmannapi.0.299550.0.features.heating.dhw.charging.properties.active.value",
-  dhwChargingProgram: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.active.properties.value.value",
+  dhwChargingProgram: "viessmannapi.0.299550.0.features.heating.dhw.temperature.main.commands.setTargetTemperature.setValue",
   boostBlinkActive: "viessmannapi.0.299550.0.features.heating.dhw.oneTimeCharge.properties.active.value",
   ventilationAutoSetActive: "",
   ventilationAutoActive: "",
@@ -269,7 +269,7 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
   const oneTimeChargeActive = normalizeBoolean(readValue(stateIds.oneTimeChargeActive)) ?? false;
   const heatingModeBlinkActive = resolveHeatingModeBlinkActive(readValue(stateIds.heatingModeActive), mode);
   const dhwChargingBlinkActive = normalizeBoolean(readValue(stateIds.dhwChargingActive)) ?? false;
-  const dhwChargingProgram = resolveDhwChargeProgram(readValue(stateIds.dhwChargingProgram), activeProgram, dhwTarget);
+  const dhwChargingProgram = resolveDhwChargeProgram(readValue(stateIds.dhwChargingProgram), dhwTarget);
   const boostBlinkActive = normalizeBoolean(readValue(stateIds.boostBlinkActive)) ?? oneTimeChargeActive;
   const ventilationAutoActive =
     normalizeBoolean(readValue(stateIds.ventilationAutoActive)) ??
@@ -549,6 +549,7 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
   const dhwCardTextColor = resolveReadableTextColor(dhwCardBackgroundColor);
   const roomCardMutedTextColor = withAlpha(roomCardTextColor, 0.82);
   const dhwCardMutedTextColor = withAlpha(dhwCardTextColor, 0.82);
+  const activeRoomTarget = resolveActiveRoomTarget(activeProgram, normalTarget, reducedTarget, comfortTarget);
   const anyBlinkActive = heatingModeBlinkActive || dhwChargingBlinkActive || boostBlinkActive;
   const roomBlinkColor = withAlpha(roomCardTone, ROOM_BLINK_ALPHA);
   const dhwBlinkColor = withAlpha(
@@ -775,7 +776,7 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
             />
             <Text style={[styles.kpiLabel, { color: roomCardMutedTextColor }]}>Raum</Text>
             <Text style={[styles.kpiPrimary, { color: roomCardTextColor }]}>{roomTempDisplay}</Text>
-            <Text style={[styles.kpiSecondary, { color: roomCardMutedTextColor }]}>Soll {formatTemperature(normalTarget)}</Text>
+            <Text style={[styles.kpiSecondary, { color: roomCardMutedTextColor }]}>Soll {formatTemperature(activeRoomTarget)}</Text>
           </View>
           <View style={[styles.kpiCard, { borderColor: dhwCardBorderColor, backgroundColor: dhwCardBackgroundColor }]}>
             {Platform.OS === "web"
@@ -1251,25 +1252,34 @@ function resolveHeatingModeBlinkActive(value: unknown, fallbackMode: HeatingMode
   return fallbackMode === "dhwAndHeating";
 }
 
-function resolveDhwChargeProgram(
-  value: unknown,
-  fallbackProgram: ProgramMode | null,
-  fallbackDhwTarget: number
-): DhwChargeProgram {
-  const normalized = String(value ?? "").trim().toLowerCase();
+function resolveDhwChargeProgram(value: unknown, fallbackDhwTarget: number): DhwChargeProgram {
+  const normalized = String(value ?? "").trim().toLowerCase().replace(",", ".");
   if (normalized.includes("temp-2") || normalized.includes("temp2") || normalized.includes("reduced")) {
     return "temp2";
   }
   if (normalized.includes("normal")) {
     return "normal";
   }
-  if (fallbackProgram === "reduced") {
-    return "temp2";
-  }
-  if (fallbackProgram === "normal") {
-    return "normal";
+  const numeric = Number.parseFloat(normalized);
+  if (Number.isFinite(numeric)) {
+    return numeric >= 55 ? "temp2" : "normal";
   }
   return fallbackDhwTarget >= 55 ? "temp2" : "normal";
+}
+
+function resolveActiveRoomTarget(
+  activeProgram: ProgramMode | null,
+  normalTarget: number,
+  reducedTarget: number | null,
+  comfortTarget: number | null
+) {
+  if (activeProgram === "reduced" && reducedTarget !== null) {
+    return clampTemperature(reducedTarget, ROOM_TEMP_MIN, ROOM_TEMP_MAX, ROOM_TEMP_STEP);
+  }
+  if (activeProgram === "comfort" && comfortTarget !== null) {
+    return clampTemperature(comfortTarget, ROOM_TEMP_MIN, ROOM_TEMP_MAX, ROOM_TEMP_STEP);
+  }
+  return normalTarget;
 }
 
 function formatDhwChargeProgramLabel(program: DhwChargeProgram) {

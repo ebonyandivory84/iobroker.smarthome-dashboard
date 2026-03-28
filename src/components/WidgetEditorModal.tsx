@@ -512,8 +512,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           "viessmannapi.0.299550.0.features.heating.dhw.charging.properties.active.value",
         dhwChargingProgramStateId:
           widget.dhwChargingProgramStateId ||
-          widget.activeProgramStateId ||
-          "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.active.properties.value.value",
+          widget.dhwSetTempStateId ||
+          "viessmannapi.0.299550.0.features.heating.dhw.temperature.main.commands.setTargetTemperature.setValue",
         boostBlinkActiveStateId:
           widget.boostBlinkActiveStateId ||
           widget.oneTimeChargeActiveStateId ||
