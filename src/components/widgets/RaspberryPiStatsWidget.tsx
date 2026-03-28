@@ -148,7 +148,11 @@ function MetricDonut({
   textColor,
   mutedTextColor,
 }: MetricDonutProps) {
-  const percentText = ratio === null ? "n/a" : `${Math.round(ratio * 100)}%`;
+  const normalizedValue = valueLabel.trim();
+  const hasValue = normalizedValue.length > 0 && normalizedValue.toLowerCase() !== "n/a";
+  const hasRatio = ratio !== null;
+  const primaryText = hasRatio ? `${Math.round(ratio * 100)}%` : hasValue ? normalizedValue : "n/a";
+  const showMeta = hasRatio && hasValue;
 
   const donut =
     Platform.OS === "web"
@@ -171,9 +175,15 @@ function MetricDonut({
   return (
     <View style={styles.metricCard}>
       <View style={styles.donutWrap}>{donut}</View>
-      <Text style={[styles.metricValue, { color: textColor }]}>{percentText}</Text>
+      <Text style={[styles.metricValue, !hasRatio && hasValue ? styles.metricValueCompact : null, { color: textColor }]}>
+        {primaryText}
+      </Text>
       <Text style={[styles.metricLabel, { color: mutedTextColor }]}>{label}</Text>
-      <Text numberOfLines={1} style={[styles.metricMeta, { color: mutedTextColor }]}>{valueLabel}</Text>
+      {showMeta ? (
+        <Text numberOfLines={1} style={[styles.metricMeta, { color: mutedTextColor }]}>
+          {valueLabel}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -469,6 +479,9 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 18,
     fontWeight: "800",
+  },
+  metricValueCompact: {
+    fontSize: 16,
   },
   metricLabel: {
     fontSize: 11,
