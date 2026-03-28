@@ -252,10 +252,12 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
     normalizeBoolean(readValue(stateIds.ventilationAutoActive)) ??
     normalizeBoolean(readValue(stateIds.ventilationAutoSetActive)) ??
     false;
-  const ventilationLevelCurrent = clampVentilationLevel(
-    normalizeFloat(readValue(stateIds.ventilationLevel)) ??
-      normalizeFloat(readValue(stateIds.ventilationLevelSet)) ??
-      VENTILATION_LEVEL_MIN
+  const ventilationLevelActualRaw = normalizeFloat(readValue(stateIds.ventilationLevel));
+  const ventilationLevelSetRaw = normalizeFloat(readValue(stateIds.ventilationLevelSet));
+  const ventilationLevelActual =
+    ventilationLevelActualRaw === null ? null : clampVentilationLevel(ventilationLevelActualRaw);
+  const ventilationLevelSetpoint = clampVentilationLevel(
+    ventilationLevelSetRaw ?? ventilationLevelActualRaw ?? VENTILATION_LEVEL_MIN
   );
 
   const roomTemp = normalizeFloat(readValue(stateIds.roomTemp));
@@ -270,7 +272,8 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
 
   const normalSliderValue = normalDraft ?? normalTarget;
   const dhwSliderValue = dhwDraft ?? dhwTarget;
-  const ventilationSliderValue = clampVentilationLevel(ventilationLevelDraft ?? ventilationLevelCurrent);
+  const ventilationSliderValue = clampVentilationLevel(ventilationLevelDraft ?? ventilationLevelSetpoint);
+  const ventilationDisplayActual = ventilationLevelActual ?? ventilationLevelSetpoint;
   const ventilationAutoToggleAvailable = Boolean(stateIds.ventilationAutoSetActive);
   const ventilationSliderWritable = Boolean(stateIds.ventilationLevelSet);
   const ventilationManualControlEnabled = !ventilationAutoActive && ventilationSliderWritable;
@@ -291,10 +294,31 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
   }, [dhwTarget, pendingWrites, stateIds.dhwSetTemp]);
 
   useEffect(() => {
-    if (!pendingWrites[stateIds.ventilationLevelSet]) {
+    if (ventilationLevelDraft === null) {
+      return;
+    }
+
+    if (ventilationAutoActive || !stateIds.ventilationLevelSet) {
+      setVentilationLevelDraft(null);
+      return;
+    }
+
+    const writePendingForVentilation = pendingWrites[stateIds.ventilationLevelSet] === true;
+    const setpointReached = Math.abs(ventilationLevelSetpoint - ventilationLevelDraft) < 0.001;
+    const actualReached =
+      ventilationLevelActual !== null && Math.abs(ventilationLevelActual - ventilationLevelDraft) < 0.001;
+
+    if ((!writePendingForVentilation && setpointReached) || actualReached) {
       setVentilationLevelDraft(null);
     }
-  }, [pendingWrites, stateIds.ventilationLevelSet, ventilationLevelCurrent]);
+  }, [
+    pendingWrites,
+    stateIds.ventilationLevelSet,
+    ventilationAutoActive,
+    ventilationLevelActual,
+    ventilationLevelDraft,
+    ventilationLevelSetpoint,
+  ]);
 
   const playPressSound = useCallback(
     (key: string) => {
@@ -411,9 +435,10 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
         return;
       }
       const clamped = clampVentilationLevel(nextValue);
-      if (Math.abs(clamped - ventilationLevelCurrent) < 0.001) {
+      if (Math.abs(clamped - ventilationLevelSetpoint) < 0.001) {
         return;
       }
+      setVentilationLevelDraft(clamped);
       if (source === "slider") {
         playSliderSound(`ventilation:${clamped}`);
       } else {
@@ -426,7 +451,7 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
       playSliderSound,
       stateIds.ventilationLevelSet,
       ventilationAutoActive,
-      ventilationLevelCurrent,
+      ventilationLevelSetpoint,
       writeState,
     ]
   );
@@ -513,7 +538,11 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
     showInfoProgram ? `Programm ${formatProgramLabel(activeProgram)}` : null,
     showInfoTargets ? `Zielwerte ${targetValues.join(" | ")}` : null,
     ventilationAutoToggleAvailable ? `Lueftungsautomatik ${ventilationAutoActive ? "ein" : "aus"}` : null,
-    ventilationSliderWritable ? `Lueftungsstufe ${formatVentilationLevel(ventilationSliderValue)}` : null,
+    ventilationSliderWritable
+      ? `Lueftungsstufe Soll ${formatVentilationLevel(ventilationSliderValue)} | Ist ${formatVentilationLevel(
+          ventilationDisplayActual
+        )}`
+      : null,
     ...infoRows.filter((row) => row.value !== "-").map((row) => `${row.label} ${row.value}`),
   ].filter(Boolean) as string[];
   const showDetailsTicker = detailsSegments.length > 0;
@@ -847,7 +876,11 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
             <View style={styles.blockHeaderInline}>
               <Text style={[styles.blockLabel, { color: mutedTextColor }]}>Lueftung</Text>
               <Text style={[styles.valueText, { color: textColor }]}>
-                Stufe {formatVentilationLevel(ventilationSliderValue)}
+                {ventilationManualControlEnabled
+                  ? `Soll ${formatVentilationLevel(ventilationSliderValue)} | Ist ${formatVentilationLevel(
+                      ventilationDisplayActual
+                    )}`
+                  : `Ist ${formatVentilationLevel(ventilationDisplayActual)}`}
               </Text>
             </View>
             <Pressable
@@ -900,13 +933,13 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
                       disabled: !ventilationManualControlEnabled,
                       onInput: (event: { target: { value: string } }) => {
                         const next = clampVentilationLevel(
-                          Number.parseFloat(event.target.value) || ventilationLevelCurrent
+                          Number.parseFloat(event.target.value) || ventilationSliderValue
                         );
                         setVentilationLevelDraft(next);
                       },
                       onChange: (event: { target: { value: string } }) => {
                         const next = clampVentilationLevel(
-                          Number.parseFloat(event.target.value) || ventilationLevelCurrent
+                          Number.parseFloat(event.target.value) || ventilationSliderValue
                         );
                         setVentilationLevelDraft(next);
                         void setVentilationLevel(next, "slider");
