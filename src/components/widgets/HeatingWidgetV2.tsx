@@ -33,10 +33,8 @@ const DHW_TEMP_STEP = 1;
 const DEFAULT_DETAILS_TICKER_SPEED_PX_PER_S = 46;
 const MIN_DETAILS_TICKER_SPEED_PX_PER_S = 16;
 const MAX_DETAILS_TICKER_SPEED_PX_PER_S = 160;
-const DETAILS_TICKER_ENTRY_OFFSET_PX = 18;
-const DETAILS_TICKER_RESTART_DELAY_MS = 1200;
 const DETAILS_TICKER_SEPARATOR = "\u00a0\u00a0\u00a0\u00a0•\u00a0\u00a0\u00a0\u00a0";
-const DETAILS_TICKER_END_GAP = "\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0";
+const DETAILS_TICKER_LOOP_SEPARATOR = "\u00a0\u00a0.\u00a0.\u00a0\u00a0";
 const HEATING_V2_BASE_CONTENT_WIDTH = 560;
 const HEATING_V2_BASE_CONTENT_HEIGHT = 292;
 const HEATING_V2_MIN_CONTENT_SCALE = 0.72;
@@ -546,10 +544,9 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
     ...infoRows.filter((row) => row.value !== "-").map((row) => `${row.label} ${row.value}`),
   ].filter(Boolean) as string[];
   const showDetailsTicker = detailsSegments.length > 0;
-  const detailsTickerText = showDetailsTicker
-    ? `${detailsSegments.join(DETAILS_TICKER_SEPARATOR)}${DETAILS_TICKER_END_GAP}`
-    : "";
+  const detailsTickerText = showDetailsTicker ? detailsSegments.join(DETAILS_TICKER_SEPARATOR) : "";
   const detailsTickerRenderText = detailsTickerText.replace(/ /g, "\u00a0");
+  const detailsTickerLoopText = `${detailsTickerRenderText}${DETAILS_TICKER_LOOP_SEPARATOR}`;
 
   const liveBadgeText = error ? "Fehler" : writePending ? "Sync" : "";
   const footerStatusText = error ? error : writePending ? "Synchronisiere..." : "";
@@ -568,21 +565,22 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
   useEffect(() => {
     detailsTickerAnimationRef.current?.stop();
     detailsTickerAnimationRef.current = null;
-
-    const startOffset = detailsTrackWidth + DETAILS_TICKER_ENTRY_OFFSET_PX;
-
     if (!runtimeActive || !showDetailsTicker || detailsTrackWidth <= 0 || detailsContentWidth <= 0) {
-      detailsTickerOffset.setValue(detailsTrackWidth > 0 ? startOffset : 0);
+      detailsTickerOffset.setValue(0);
       return;
     }
 
-    const travelDistance = startOffset + detailsContentWidth;
+    if (detailsContentWidth <= detailsTrackWidth + 6) {
+      detailsTickerOffset.setValue(0);
+      return;
+    }
+
     const durationMs = Math.max(
       8000,
-      Math.round((travelDistance / detailsTickerSpeedPxPerS) * 1000)
+      Math.round((detailsContentWidth / detailsTickerSpeedPxPerS) * 1000)
     );
 
-    detailsTickerOffset.setValue(startOffset);
+    detailsTickerOffset.setValue(0);
     const tickerLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(detailsTickerOffset, {
@@ -592,11 +590,10 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
           useNativeDriver: true,
         }),
         Animated.timing(detailsTickerOffset, {
-          toValue: startOffset,
+          toValue: 0,
           duration: 0,
           useNativeDriver: true,
         }),
-        Animated.delay(DETAILS_TICKER_RESTART_DELAY_MS),
       ])
     );
     detailsTickerAnimationRef.current = tickerLoop;
@@ -1004,7 +1001,10 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
                   }}
                   style={[styles.detailsTickerText, { color: textColor }]}
                 >
-                  {detailsTickerRenderText}
+                  {detailsTickerLoopText}
+                </Text>
+                <Text numberOfLines={1} style={[styles.detailsTickerText, { color: textColor }]}>
+                  {detailsTickerLoopText}
                 </Text>
               </Animated.View>
             </View>
@@ -1621,6 +1621,8 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "center",
   },
   detailsTickerText: {
