@@ -40,8 +40,12 @@ export function RaspberryPiStatsWidget({ config, states }: RaspberryPiStatsWidge
 
   const ramMetric = buildStorageMetric(states[config.ramFreeStateId], config.ramFreeUnit || "auto", "ramFree");
   const diskMetric = buildStorageMetric(states[config.diskFreeStateId], config.diskFreeUnit || "auto", "diskFree");
-  const ramRatio = ramMetric.ratio ?? ratioFromCompanionPercentState(states, config.ramFreeStateId, "ramFree");
-  const diskRatio = diskMetric.ratio ?? ratioFromCompanionPercentState(states, config.diskFreeStateId, "diskFree");
+  const ramFreeRatio = ramMetric.ratio ?? ratioFromCompanionPercentState(states, config.ramFreeStateId, "ramFree");
+  const diskFreeRatio = diskMetric.ratio ?? ratioFromCompanionPercentState(states, config.diskFreeStateId, "diskFree");
+  const ramUsedRatio = ramFreeRatio === null ? null : clampNumber(1 - ramFreeRatio, 0, 1);
+  const diskUsedRatio = diskFreeRatio === null ? null : clampNumber(1 - diskFreeRatio, 0, 1);
+  const ramFreeLabel = ramMetric.valueLabel.toLowerCase() === "n/a" ? ramMetric.valueLabel : `${ramMetric.valueLabel} frei`;
+  const diskFreeLabel = diskMetric.valueLabel.toLowerCase() === "n/a" ? diskMetric.valueLabel : `${diskMetric.valueLabel} frei`;
 
   return (
     <View style={styles.container}>
@@ -84,22 +88,22 @@ export function RaspberryPiStatsWidget({ config, states }: RaspberryPiStatsWidge
 
         <View style={styles.topRow}>
           <MetricDonut
-            label="RAM frei"
-            ratio={ramRatio}
+            label="RAM genutzt"
+            ratio={ramUsedRatio}
             ringColor={ramRingColor}
             trackColor={ramTrackColor}
             textColor={textColor}
             mutedTextColor={mutedTextColor}
-            valueLabel={ramMetric.valueLabel}
+            valueLabel={ramFreeLabel}
           />
           <MetricDonut
-            label="Disk frei"
-            ratio={diskRatio}
+            label="Festplatte genutzt"
+            ratio={diskUsedRatio}
             ringColor={diskRingColor}
             trackColor={diskTrackColor}
             textColor={textColor}
             mutedTextColor={mutedTextColor}
-            valueLabel={diskMetric.valueLabel}
+            valueLabel={diskFreeLabel}
           />
         </View>
 
