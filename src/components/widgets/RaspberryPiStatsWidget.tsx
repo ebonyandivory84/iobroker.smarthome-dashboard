@@ -88,15 +88,6 @@ export function RaspberryPiStatsWidget({ config, states }: RaspberryPiStatsWidge
 
         <View style={styles.topRow}>
           <MetricDonut
-            label="RAM genutzt"
-            ratio={ramUsedRatio}
-            ringColor={ramRingColor}
-            trackColor={ramTrackColor}
-            textColor={textColor}
-            mutedTextColor={mutedTextColor}
-            valueLabel={ramFreeLabel}
-          />
-          <MetricDonut
             label="Festplatte genutzt"
             ratio={diskUsedRatio}
             ringColor={diskRingColor}
@@ -104,6 +95,15 @@ export function RaspberryPiStatsWidget({ config, states }: RaspberryPiStatsWidge
             textColor={textColor}
             mutedTextColor={mutedTextColor}
             valueLabel={diskFreeLabel}
+          />
+          <MetricDonut
+            label="RAM genutzt"
+            ratio={ramUsedRatio}
+            ringColor={ramRingColor}
+            trackColor={ramTrackColor}
+            textColor={textColor}
+            mutedTextColor={mutedTextColor}
+            valueLabel={ramFreeLabel}
           />
         </View>
 
