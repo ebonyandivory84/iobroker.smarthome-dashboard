@@ -38,8 +38,10 @@ export function RaspberryPiStatsWidget({ config, states }: RaspberryPiStatsWidge
   const cpuTempLabel = cpuTemp === null ? "n/a" : `${cpuTemp.toFixed(1)} C`;
   const headerLabel = (config.label || config.title || "Raspberry Pi").trim() || "Raspberry Pi";
 
-  const ramMetric = buildStorageMetric(states[config.ramFreeStateId], config.ramFreeUnit || "auto");
-  const diskMetric = buildStorageMetric(states[config.diskFreeStateId], config.diskFreeUnit || "auto");
+  const ramMetric = buildStorageMetric(states[config.ramFreeStateId], config.ramFreeUnit || "auto", "ramFree");
+  const diskMetric = buildStorageMetric(states[config.diskFreeStateId], config.diskFreeUnit || "auto", "diskFree");
+  const ramRatio = ramMetric.ratio ?? ratioFromCompanionPercentState(states, config.ramFreeStateId, "ramFree");
+  const diskRatio = diskMetric.ratio ?? ratioFromCompanionPercentState(states, config.diskFreeStateId, "diskFree");
 
   return (
     <View style={styles.container}>
@@ -83,7 +85,7 @@ export function RaspberryPiStatsWidget({ config, states }: RaspberryPiStatsWidge
         <View style={styles.topRow}>
           <MetricDonut
             label="RAM frei"
-            ratio={ramMetric.ratio}
+            ratio={ramRatio}
             ringColor={ramRingColor}
             trackColor={ramTrackColor}
             textColor={textColor}
@@ -92,7 +94,7 @@ export function RaspberryPiStatsWidget({ config, states }: RaspberryPiStatsWidge
           />
           <MetricDonut
             label="Disk frei"
-            ratio={diskMetric.ratio}
+            ratio={diskRatio}
             ringColor={diskRingColor}
             trackColor={diskTrackColor}
             textColor={textColor}
@@ -240,7 +242,11 @@ function HorizontalMetricBar({
   );
 }
 
-function buildStorageMetric(rawValue: unknown, unit: RaspberryValueUnit): StorageMetric {
+function buildStorageMetric(
+  rawValue: unknown,
+  unit: RaspberryValueUnit,
+  key: "ramFree" | "diskFree"
+): StorageMetric {
   const numeric = normalizeNumber(rawValue);
 
   if (typeof rawValue === "string" && rawValue.trim() && unit === "auto") {
@@ -280,24 +286,53 @@ function buildStorageMetric(rawValue: unknown, unit: RaspberryValueUnit): Storag
     };
   }
 
-  const bytes = convertToBytes(numeric, unit);
+  let displayValue = numeric;
+  // Legacy compatibility: many ioBroker scripts publish RAM in MB.
+  // If widget unit is set to GB and the value is unrealistically high for RAM-in-GB,
+  // treat it as MB and convert to GB for display.
+  if (key === "ramFree" && unit === "GB" && displayValue > 128) {
+    displayValue /= 1024;
+  }
+
   return {
-    valueLabel: formatBytes(bytes),
+    valueLabel: formatValueInUnit(displayValue, unit),
     ratio: null,
   };
 }
 
-function convertToBytes(value: number, unit: Exclude<RaspberryValueUnit, "auto" | "percent">) {
-  if (unit === "B") {
-    return value;
+function ratioFromCompanionPercentState(
+  states: StateSnapshot,
+  stateId: string,
+  key: "ramFree" | "diskFree"
+) {
+  const companionStateId = inferRaspberryPercentStateId(stateId, key);
+  if (!companionStateId) {
+    return null;
   }
-  if (unit === "kB") {
-    return value * 1024;
+
+  const percent = normalizePercent(states[companionStateId]);
+  if (percent === null) {
+    return null;
   }
-  if (unit === "MB") {
-    return value * 1024 * 1024;
+
+  return percent / 100;
+}
+
+function inferRaspberryPercentStateId(stateId: string, key: "ramFree" | "diskFree") {
+  const trimmed = stateId.trim();
+  if (!trimmed) {
+    return "";
   }
-  return value * 1024 * 1024 * 1024;
+  if (trimmed.toLowerCase().includes("percent")) {
+    return trimmed;
+  }
+
+  const suffix = `.${key}`;
+  if (trimmed.endsWith(suffix)) {
+    return `${trimmed}Percent`;
+  }
+
+  return "";
 }
 
 function inferRatioFromString(value: string) {
@@ -381,6 +416,15 @@ function buildDonutGradient(ratio: number | null, activeColor: string, inactiveC
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
+}
+
+function formatValueInUnit(value: number, unit: Exclude<RaspberryValueUnit, "auto" | "percent">) {
+  if (!Number.isFinite(value) || value < 0) {
+    return "n/a";
+  }
+
+  const maximumFractionDigits = unit === "B" ? 0 : value >= 100 ? 0 : value >= 10 ? 1 : 2;
+  return `${value.toLocaleString("de-DE", { maximumFractionDigits })} ${unit}`;
 }
 
 function formatBytes(value: number) {

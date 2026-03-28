@@ -10,6 +10,23 @@ export type StateWriteFeedback = {
   updatedAt: number;
 };
 
+function inferRaspberryPercentStateId(stateId: string, key: "ramFree" | "diskFree") {
+  const trimmed = stateId.trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (trimmed.toLowerCase().includes("percent")) {
+    return trimmed;
+  }
+
+  const suffix = `.${key}`;
+  if (trimmed.endsWith(suffix)) {
+    return `${trimmed}Percent`;
+  }
+
+  return "";
+}
+
 const collectWidgetStateIds = (widget: WidgetConfig) => {
   if (widget.type === "state") {
     return [widget.stateId];
@@ -54,6 +71,8 @@ const collectWidgetStateIds = (widget: WidgetConfig) => {
       widget.cpuLoadStateId,
       widget.ramFreeStateId,
       widget.diskFreeStateId,
+      inferRaspberryPercentStateId(widget.ramFreeStateId, "ramFree"),
+      inferRaspberryPercentStateId(widget.diskFreeStateId, "diskFree"),
       widget.onlineStateId,
     ];
   }
