@@ -997,6 +997,7 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
                 ]}
               >
                 <Text
+                  numberOfLines={1}
                   onLayout={(event) => {
                     const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
                     setDetailsContentWidth((current) => (current === nextWidth ? current : nextWidth));
@@ -1378,6 +1379,8 @@ const styles = StyleSheet.create({
   scaledContent: {
     flex: 1,
     gap: 10,
+    zIndex: 2,
+    position: "relative",
   },
   widgetBackground: {
     ...StyleSheet.absoluteFillObject,

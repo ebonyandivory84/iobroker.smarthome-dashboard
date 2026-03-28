@@ -2064,6 +2064,8 @@ const styles = StyleSheet.create({
   scaledContent: {
     flex: 1,
     gap: 11,
+    zIndex: 2,
+    position: "relative",
   },
   widgetBackground: {
     ...StyleSheet.absoluteFillObject,
