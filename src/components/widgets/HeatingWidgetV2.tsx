@@ -1627,9 +1627,10 @@ const styles = StyleSheet.create({
   },
   detailsTickerText: {
     fontSize: 12,
+    lineHeight: 16,
     fontWeight: "700",
     paddingHorizontal: 0,
-    alignSelf: "flex-start",
+    alignSelf: "center",
     flexShrink: 0,
   },
   footer: {
