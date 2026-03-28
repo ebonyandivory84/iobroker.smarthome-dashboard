@@ -503,6 +503,21 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ecoSetActiveStateId: widget.ecoSetActiveStateId || "",
         oneTimeChargeSetActiveStateId: widget.oneTimeChargeSetActiveStateId || "",
         oneTimeChargeActiveStateId: widget.oneTimeChargeActiveStateId || "",
+        heatingModeActiveStateId:
+          widget.heatingModeActiveStateId ||
+          widget.modeValueStateId ||
+          "viessmannapi.0.299550.0.features.heating.circuits.1.operating.modes.active.properties.value.value",
+        dhwChargingActiveStateId:
+          widget.dhwChargingActiveStateId ||
+          "viessmannapi.0.299550.0.features.heating.dhw.charging.properties.active.value",
+        dhwChargingProgramStateId:
+          widget.dhwChargingProgramStateId ||
+          widget.activeProgramStateId ||
+          "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.active.properties.value.value",
+        boostBlinkActiveStateId:
+          widget.boostBlinkActiveStateId ||
+          widget.oneTimeChargeActiveStateId ||
+          "viessmannapi.0.299550.0.features.heating.dhw.oneTimeCharge.properties.active.value",
         ventilationAutoSetActiveStateId: widget.ventilationAutoSetActiveStateId || "",
         ventilationAutoActiveStateId: widget.ventilationAutoActiveStateId || "",
         ventilationLevelSetStateId: widget.ventilationLevelSetStateId || "",
@@ -970,6 +985,10 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ecoSetActiveStateId: draft.ecoSetActiveStateId?.trim() || undefined,
         oneTimeChargeSetActiveStateId: draft.oneTimeChargeSetActiveStateId?.trim() || undefined,
         oneTimeChargeActiveStateId: draft.oneTimeChargeActiveStateId?.trim() || undefined,
+        heatingModeActiveStateId: draft.heatingModeActiveStateId?.trim() || undefined,
+        dhwChargingActiveStateId: draft.dhwChargingActiveStateId?.trim() || undefined,
+        dhwChargingProgramStateId: draft.dhwChargingProgramStateId?.trim() || undefined,
+        boostBlinkActiveStateId: draft.boostBlinkActiveStateId?.trim() || undefined,
         ventilationAutoSetActiveStateId: draft.ventilationAutoSetActiveStateId?.trim() || undefined,
         ventilationAutoActiveStateId: draft.ventilationAutoActiveStateId?.trim() || undefined,
         ventilationLevelSetStateId: draft.ventilationLevelSetStateId?.trim() || undefined,
@@ -2967,6 +2986,38 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                       onBrowse={() => setPickerField("activeProgramStateId")}
                       onChangeText={(value) => setDraft((current) => ({ ...current, activeProgramStateId: value }))}
                       value={draft.activeProgramStateId || ""}
+                    />
+                  </Field>
+                </View>
+                <View style={styles.splitRow}>
+                  <Field label="Blink: Heizmodus aktiv">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("heatingModeActiveStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, heatingModeActiveStateId: value }))}
+                      value={draft.heatingModeActiveStateId || ""}
+                    />
+                  </Field>
+                  <Field label="Blink: WW Aufbereitung aktiv">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("dhwChargingActiveStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, dhwChargingActiveStateId: value }))}
+                      value={draft.dhwChargingActiveStateId || ""}
+                    />
+                  </Field>
+                </View>
+                <View style={styles.splitRow}>
+                  <Field label="Blink: WW Programm normal/temp-2">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("dhwChargingProgramStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, dhwChargingProgramStateId: value }))}
+                      value={draft.dhwChargingProgramStateId || ""}
+                    />
+                  </Field>
+                  <Field label="Blink: Boost aktiv">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("boostBlinkActiveStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, boostBlinkActiveStateId: value }))}
+                      value={draft.boostBlinkActiveStateId || ""}
                     />
                   </Field>
                 </View>

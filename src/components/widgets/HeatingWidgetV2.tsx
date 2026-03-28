@@ -15,6 +15,7 @@ type HeatingWidgetProps = {
 
 type HeatingMode = "standby" | "dhw" | "dhwAndHeating";
 type ProgramMode = "normal" | "reduced" | "comfort" | "eco";
+type DhwChargeProgram = "normal" | "temp2";
 type TemperatureColorStop = { temp: number; color: string };
 
 const DEFAULT_REFRESH_MS = 3000;
@@ -58,6 +59,12 @@ const DHW_TEMP_COLOR_STOPS: TemperatureColorStop[] = [
   { temp: 60, color: "#911125" },
 ];
 
+const ROOM_BLINK_ALPHA = 0.92;
+const DHW_BLINK_ALPHA = 0.92;
+const BOOST_BLINK_COLOR = "#ea434a";
+const DHW_BLINK_NORMAL_COLOR = "#f2b23c";
+const DHW_BLINK_TEMP2_COLOR = "#e24647";
+
 const DEFAULT_IDS = {
   modeSet: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.modes.active.commands.setMode.setValue",
   modeValue: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.modes.active.properties.value.value",
@@ -76,6 +83,10 @@ const DEFAULT_IDS = {
   ecoSetActive: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.eco.commands.setActive.setValue",
   oneTimeChargeSetActive: "viessmannapi.0.299550.0.features.heating.dhw.oneTimeCharge.commands.setActive.setValue",
   oneTimeChargeActive: "viessmannapi.0.299550.0.features.heating.dhw.oneTimeCharge.properties.active.value",
+  heatingModeActive: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.modes.active.properties.value.value",
+  dhwChargingActive: "viessmannapi.0.299550.0.features.heating.dhw.charging.properties.active.value",
+  dhwChargingProgram: "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.active.properties.value.value",
+  boostBlinkActive: "viessmannapi.0.299550.0.features.heating.dhw.oneTimeCharge.properties.active.value",
   ventilationAutoSetActive: "",
   ventilationAutoActive: "",
   ventilationLevelSet: "",
@@ -109,6 +120,10 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
       ecoSetActive: resolveOptionalStateId(config.ecoSetActiveStateId, DEFAULT_IDS.ecoSetActive),
       oneTimeChargeSetActive: resolveOptionalStateId(config.oneTimeChargeSetActiveStateId, DEFAULT_IDS.oneTimeChargeSetActive),
       oneTimeChargeActive: resolveOptionalStateId(config.oneTimeChargeActiveStateId, DEFAULT_IDS.oneTimeChargeActive),
+      heatingModeActive: resolveOptionalStateId(config.heatingModeActiveStateId, DEFAULT_IDS.heatingModeActive),
+      dhwChargingActive: resolveOptionalStateId(config.dhwChargingActiveStateId, DEFAULT_IDS.dhwChargingActive),
+      dhwChargingProgram: resolveOptionalStateId(config.dhwChargingProgramStateId, DEFAULT_IDS.dhwChargingProgram),
+      boostBlinkActive: resolveOptionalStateId(config.boostBlinkActiveStateId, DEFAULT_IDS.boostBlinkActive),
       ventilationAutoSetActive: resolveOptionalStateId(
         config.ventilationAutoSetActiveStateId,
         DEFAULT_IDS.ventilationAutoSetActive
@@ -141,6 +156,10 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
       config.ecoSetActiveStateId,
       config.oneTimeChargeSetActiveStateId,
       config.oneTimeChargeActiveStateId,
+      config.heatingModeActiveStateId,
+      config.dhwChargingActiveStateId,
+      config.dhwChargingProgramStateId,
+      config.boostBlinkActiveStateId,
       config.ventilationAutoSetActiveStateId,
       config.ventilationAutoActiveStateId,
       config.ventilationLevelSetStateId,
@@ -166,6 +185,8 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
   const [detailsContentWidth, setDetailsContentWidth] = useState(0);
   const detailsTickerOffset = useRef(new Animated.Value(0)).current;
   const detailsTickerAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
+  const blinkPulse = useRef(new Animated.Value(0)).current;
+  const blinkAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
 
   const refreshMs = clampInt(config.refreshMs, DEFAULT_REFRESH_MS, MIN_REFRESH_MS);
   const detailsTickerSpeedPxPerS = clampTickerSpeed(config.detailsTickerSpeedPxPerS);
@@ -246,6 +267,10 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
     DHW_TEMP_STEP
   );
   const oneTimeChargeActive = normalizeBoolean(readValue(stateIds.oneTimeChargeActive)) ?? false;
+  const heatingModeBlinkActive = resolveHeatingModeBlinkActive(readValue(stateIds.heatingModeActive), mode);
+  const dhwChargingBlinkActive = normalizeBoolean(readValue(stateIds.dhwChargingActive)) ?? false;
+  const dhwChargingProgram = resolveDhwChargeProgram(readValue(stateIds.dhwChargingProgram), activeProgram, dhwTarget);
+  const boostBlinkActive = normalizeBoolean(readValue(stateIds.boostBlinkActive)) ?? oneTimeChargeActive;
   const ventilationAutoActive =
     normalizeBoolean(readValue(stateIds.ventilationAutoActive)) ??
     normalizeBoolean(readValue(stateIds.ventilationAutoSetActive)) ??
@@ -524,6 +549,25 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
   const dhwCardTextColor = resolveReadableTextColor(dhwCardBackgroundColor);
   const roomCardMutedTextColor = withAlpha(roomCardTextColor, 0.82);
   const dhwCardMutedTextColor = withAlpha(dhwCardTextColor, 0.82);
+  const anyBlinkActive = heatingModeBlinkActive || dhwChargingBlinkActive || boostBlinkActive;
+  const roomBlinkColor = withAlpha(roomCardTone, ROOM_BLINK_ALPHA);
+  const dhwBlinkColor = withAlpha(
+    dhwChargingProgram === "temp2" ? DHW_BLINK_TEMP2_COLOR : DHW_BLINK_NORMAL_COLOR,
+    DHW_BLINK_ALPHA
+  );
+  const cardBlinkOpacity = blinkPulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.12, 0.56],
+  });
+  const boostBlinkOpacity = blinkPulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.16, 0.68],
+  });
+  const heatingBlinkStatusText = heatingModeBlinkActive ? "Heizmodus aktiv" : "Heizmodus inaktiv";
+  const dhwBlinkStatusText = dhwChargingBlinkActive
+    ? `WW-Aufbereitung aktiv (${formatDhwChargeProgramLabel(dhwChargingProgram)})`
+    : "WW-Aufbereitung inaktiv";
+  const boostBlinkStatusText = boostBlinkActive ? "Boost aktiv" : "Boost inaktiv";
 
   const targetValues = [`N ${formatTemperature(normalTarget)}`];
   if (reducedTarget !== null) {
@@ -533,6 +577,9 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
     targetValues.push(`K ${formatTemperature(comfortTarget)}`);
   }
   const detailsSegments = [
+    heatingBlinkStatusText,
+    dhwBlinkStatusText,
+    boostBlinkStatusText,
     showInfoProgram ? `Programm ${formatProgramLabel(activeProgram)}` : null,
     showInfoTargets ? `Zielwerte ${targetValues.join(" | ")}` : null,
     ventilationAutoToggleAvailable ? `Lueftungsautomatik ${ventilationAutoActive ? "ein" : "aus"}` : null,
@@ -561,6 +608,40 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
       ),
     [widgetHeight, widgetWidth]
   );
+
+  useEffect(() => {
+    blinkAnimationRef.current?.stop();
+    blinkAnimationRef.current = null;
+
+    if (!runtimeActive || !anyBlinkActive) {
+      blinkPulse.setValue(0);
+      return;
+    }
+
+    blinkPulse.setValue(0);
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(blinkPulse, {
+          toValue: 1,
+          duration: 620,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(blinkPulse, {
+          toValue: 0,
+          duration: 620,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    blinkAnimationRef.current = loop;
+    loop.start();
+
+    return () => {
+      loop.stop();
+    };
+  }, [anyBlinkActive, blinkPulse, runtimeActive]);
 
   useEffect(() => {
     detailsTickerAnimationRef.current?.stop();
@@ -682,6 +763,16 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
                   },
                 })
               : <View style={[StyleSheet.absoluteFillObject, { borderRadius: 12, backgroundColor: roomCardFillEnd, opacity: 0.86 }]} />}
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.cardBlinkOverlay,
+                {
+                  backgroundColor: roomBlinkColor,
+                  opacity: heatingModeBlinkActive ? cardBlinkOpacity : 0,
+                },
+              ]}
+            />
             <Text style={[styles.kpiLabel, { color: roomCardMutedTextColor }]}>Raum</Text>
             <Text style={[styles.kpiPrimary, { color: roomCardTextColor }]}>{roomTempDisplay}</Text>
             <Text style={[styles.kpiSecondary, { color: roomCardMutedTextColor }]}>Soll {formatTemperature(normalTarget)}</Text>
@@ -696,6 +787,16 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
                   },
                 })
               : <View style={[StyleSheet.absoluteFillObject, { borderRadius: 12, backgroundColor: dhwCardFillEnd, opacity: 0.86 }]} />}
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.cardBlinkOverlay,
+                {
+                  backgroundColor: dhwBlinkColor,
+                  opacity: dhwChargingBlinkActive ? cardBlinkOpacity : 0,
+                },
+              ]}
+            />
             <Text style={[styles.kpiLabel, { color: dhwCardMutedTextColor }]}>Warmwasser</Text>
             <Text style={[styles.kpiPrimary, { color: dhwCardTextColor }]}>{dhwTempDisplay}</Text>
             <Text style={[styles.kpiSecondary, { color: dhwCardMutedTextColor }]}>Soll {formatTemperature(dhwTarget)}</Text>
@@ -748,15 +849,28 @@ export function HeatingWidgetV2({ config, client, isActivePage = true }: Heating
               ]}
             >
               {oneTimeChargeActive
-                ? Platform.OS === "web"
-                  ? createElement("div", {
-                      style: {
-                        ...webGradientLayerStyle,
-                        borderRadius: 11,
-                        background: `linear-gradient(135deg, ${oneTimeColor} 0%, rgba(255,255,255,0.08) 100%)`,
-                      },
-                    })
-                  : <View style={[StyleSheet.absoluteFillObject, { borderRadius: 11, backgroundColor: oneTimeColor }]} />
+                ? boostBlinkActive
+                  ? (
+                    <Animated.View
+                      pointerEvents="none"
+                      style={[
+                        styles.modeButtonBlinkOverlay,
+                        {
+                          backgroundColor: BOOST_BLINK_COLOR,
+                          opacity: boostBlinkOpacity,
+                        },
+                      ]}
+                    />
+                  )
+                  : Platform.OS === "web"
+                    ? createElement("div", {
+                        style: {
+                          ...webGradientLayerStyle,
+                          borderRadius: 11,
+                          background: `linear-gradient(135deg, ${oneTimeColor} 0%, rgba(255,255,255,0.08) 100%)`,
+                        },
+                      })
+                    : <View style={[StyleSheet.absoluteFillObject, { borderRadius: 11, backgroundColor: oneTimeColor }]} />
                 : null}
               <View style={styles.modeButtonContent}>
                 <MaterialCommunityIcons color={textColor} name={oneTimeChargeIcon as never} size={16} />
@@ -1115,6 +1229,53 @@ function normalizeProgram(value: unknown): ProgramMode | null {
   return null;
 }
 
+function resolveHeatingModeBlinkActive(value: unknown, fallbackMode: HeatingMode) {
+  const asBoolean = normalizeBoolean(value);
+  if (asBoolean !== null) {
+    return asBoolean;
+  }
+  const normalizedMode = normalizeMode(value);
+  if (normalizedMode) {
+    return normalizedMode === "dhwAndHeating";
+  }
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) {
+    return fallbackMode === "dhwAndHeating";
+  }
+  if (["active", "heating", "on", "normal", "temp-2", "temp2", "reduced", "comfort", "eco"].includes(normalized)) {
+    return true;
+  }
+  if (["inactive", "off", "standby", "dhw"].includes(normalized)) {
+    return false;
+  }
+  return fallbackMode === "dhwAndHeating";
+}
+
+function resolveDhwChargeProgram(
+  value: unknown,
+  fallbackProgram: ProgramMode | null,
+  fallbackDhwTarget: number
+): DhwChargeProgram {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (normalized.includes("temp-2") || normalized.includes("temp2") || normalized.includes("reduced")) {
+    return "temp2";
+  }
+  if (normalized.includes("normal")) {
+    return "normal";
+  }
+  if (fallbackProgram === "reduced") {
+    return "temp2";
+  }
+  if (fallbackProgram === "normal") {
+    return "normal";
+  }
+  return fallbackDhwTarget >= 55 ? "temp2" : "normal";
+}
+
+function formatDhwChargeProgramLabel(program: DhwChargeProgram) {
+  return program === "temp2" ? "temp-2" : "normal";
+}
+
 function normalizeBoolean(value: unknown) {
   if (typeof value === "boolean") {
     return value;
@@ -1464,6 +1625,10 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     position: "relative",
   },
+  cardBlinkOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 12,
+  },
   kpiLabel: {
     fontSize: 10,
     fontWeight: "700",
@@ -1517,6 +1682,10 @@ const styles = StyleSheet.create({
   },
   modeButtonActive: {
     borderColor: "rgba(173, 204, 246, 0.45)",
+  },
+  modeButtonBlinkOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 11,
   },
   controlGrid: {
     position: "relative",

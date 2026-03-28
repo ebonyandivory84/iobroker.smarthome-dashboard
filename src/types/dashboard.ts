@@ -304,6 +304,10 @@ export type HeatingWidgetConfig = WidgetBase & {
   ecoSetActiveStateId?: string;
   oneTimeChargeSetActiveStateId?: string;
   oneTimeChargeActiveStateId?: string;
+  heatingModeActiveStateId?: string;
+  dhwChargingActiveStateId?: string;
+  dhwChargingProgramStateId?: string;
+  boostBlinkActiveStateId?: string;
   ventilationAutoSetActiveStateId?: string;
   ventilationAutoActiveStateId?: string;
   ventilationLevelSetStateId?: string;
