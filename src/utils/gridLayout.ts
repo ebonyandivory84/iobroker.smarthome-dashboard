@@ -3,6 +3,8 @@ import { GridPosition, WidgetConfig } from "../types/dashboard";
 export const GRID_SNAP = 0.5;
 export const GRID_VERTICAL_SNAP = 0.1;
 export const PRIMARY_SECTION_COUNT = 3;
+const PRIMARY_SECTION_MIN_WIDTH_STEPS = 3;
+const PRIMARY_SECTION_SNAP_STEPS = 6;
 
 type SectionConstraintOptions = {
   minHeight?: number;
@@ -45,10 +47,10 @@ export function constrainToPrimarySections(
   options?: SectionConstraintOptions
 ): GridPosition {
   const sectionWidth = getPrimarySectionWidth(columns);
-  const subColumnWidth = sectionWidth / PRIMARY_SECTION_COUNT;
+  const snapStepWidth = sectionWidth / PRIMARY_SECTION_SNAP_STEPS;
   const maxWidth = sectionWidth;
-  const minWidth = Math.min(maxWidth, subColumnWidth);
-  const snappedWidth = snapToSubColumns(position.w, subColumnWidth, 1);
+  const minWidth = Math.min(maxWidth, sectionWidth / PRIMARY_SECTION_MIN_WIDTH_STEPS);
+  const snappedWidth = snapToSubColumns(position.w, snapStepWidth, 1);
   const w = clamp(snappedWidth, minWidth, maxWidth);
   const minHeight = options?.minHeight ?? 1;
   const heightSnap = options?.heightSnap ?? GRID_SNAP;
@@ -61,7 +63,7 @@ export function constrainToPrimarySections(
   const sectionStart = sectionIndex * sectionWidth;
   const sectionEnd = Math.min(columns, (sectionIndex + 1) * sectionWidth);
   const localX = clamp(tentativeX - sectionStart, 0, Math.max(0, sectionEnd - sectionStart - w));
-  const snappedLocalX = snapToSubColumns(localX, subColumnWidth, 0);
+  const snappedLocalX = snapToSubColumns(localX, snapStepWidth, 0);
   const x = clamp(sectionStart + snappedLocalX, sectionStart, Math.max(sectionStart, sectionEnd - w));
 
   return { x, y, w, h };
