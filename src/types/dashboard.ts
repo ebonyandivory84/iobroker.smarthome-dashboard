@@ -265,6 +265,7 @@ export type WallboxWidgetConfig = WidgetBase & {
   modeStateId: string;
   gridAmpereStateId: string;
   limit80StateId: string;
+  targetSocAutoApiStateId?: string;
   targetKmStateId?: string;
   allowChargingStateId?: string;
   emergencyStopStateId?: string;

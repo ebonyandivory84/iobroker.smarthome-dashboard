@@ -50,6 +50,7 @@ const WRITE_DEFAULT_IDS = {
   manualCurrent: "go-e-gemini-adapter.0.control.gridManual.currentA",
   phaseCards: "go-e-gemini-adapter.0.control.gridManual.phaseMode",
   targetSocPercent: "go-e-gemini-adapter.0.control.targetSocPercent",
+  targetSocAutoApi: "bmw.0.WBY11CF080CP51905.stream.vehicle.drivetrain.batteryManagement.maxEnergy.value",
   targetKm: "",
   targetSocEnabled: "go-e-gemini-adapter.0.control.targetSocEnabled",
 } as const;
@@ -404,6 +405,10 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
   const mode = modePendingDisplay ?? (externalManualOverride ? "grid" : normalizeMode(rawMode) ?? "pv");
   const isGridMode = mode === "grid";
   const targetMode = config.targetMode === "km" ? "km" : "soc";
+  const targetSocAutoApiStateId = useMemo(
+    () => resolveOptionalStateId(config.targetSocAutoApiStateId, WRITE_DEFAULT_IDS.targetSocAutoApi),
+    [config.targetSocAutoApiStateId]
+  );
 
   const gridAmpere = clampAmpere(normalizeAmpere(readValue(stateIds.status.manualCurrent)) ?? DEFAULT_GRID_AMPERE);
   const targetSocPercent = normalizeTargetSocPercent(readValue(stateIds.write.targetSocPercent)) ?? DEFAULT_TARGET_SOC;
@@ -865,25 +870,44 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
 
   const setTargetSoc = useCallback(
     (nextSoc: number) => {
-      if (!stateIds.write.targetSocPercent) {
-        return;
-      }
       const normalized = normalizeTargetSocPercent(nextSoc) ?? DEFAULT_TARGET_SOC;
-      if (normalized === targetSocPercent) {
+      const hasPrimaryTarget = Boolean(stateIds.write.targetSocPercent);
+      const hasAutoApiTarget = Boolean(targetSocAutoApiStateId);
+      const sameAsDisplayed = normalized === targetSocPercent;
+      const needsPrimaryWrite = hasPrimaryTarget && !sameAsDisplayed;
+      const needsAutoApiWrite =
+        hasAutoApiTarget &&
+        targetSocAutoApiStateId !== stateIds.write.targetSocPercent &&
+        (!sameAsDisplayed || !hasPrimaryTarget);
+
+      if (!needsPrimaryWrite && !needsAutoApiWrite) {
         return;
       }
       playPressSound(`targetSoc:${normalized}`);
-      const writeValue = castValueToType(normalized, targetChargeValueType);
-      void writeStateWithConfirmation({
-        writeStateId: stateIds.write.targetSocPercent,
-        value: writeValue,
-        pendingKey: `targetSoc:${normalized}`,
-        confirmStateId: stateIds.write.targetSocPercent,
-        confirmKey: `targetSoc:${normalized}`,
-        matcher: (value) => typedValuesEqual(value, writeValue, targetChargeValueType),
-      });
+      if (needsPrimaryWrite && stateIds.write.targetSocPercent) {
+        const writeValue = castValueToType(normalized, targetChargeValueType);
+        void writeStateWithConfirmation({
+          writeStateId: stateIds.write.targetSocPercent,
+          value: writeValue,
+          pendingKey: `targetSoc:${normalized}`,
+          confirmStateId: stateIds.write.targetSocPercent,
+          confirmKey: `targetSoc:${normalized}`,
+          matcher: (value) => typedValuesEqual(value, writeValue, targetChargeValueType),
+        });
+      }
+      if (needsAutoApiWrite && targetSocAutoApiStateId) {
+        void client.writeState(targetSocAutoApiStateId, normalized);
+      }
     },
-    [playPressSound, stateIds.write.targetSocPercent, targetChargeValueType, targetSocPercent, writeStateWithConfirmation]
+    [
+      client,
+      playPressSound,
+      stateIds.write.targetSocPercent,
+      targetChargeValueType,
+      targetSocAutoApiStateId,
+      targetSocPercent,
+      writeStateWithConfirmation,
+    ]
   );
 
   const setTargetKm = useCallback(

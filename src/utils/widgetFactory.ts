@@ -331,6 +331,7 @@ export function buildWidgetTemplate(
       modeStateId: "go-e-gemini-adapter.0.control.mode",
       gridAmpereStateId: "go-e-gemini-adapter.0.control.gridManual.currentA",
       limit80StateId: "go-e-gemini-adapter.0.control.targetSocPercent",
+      targetSocAutoApiStateId: "bmw.0.WBY11CF080CP51905.stream.vehicle.drivetrain.batteryManagement.maxEnergy.value",
       targetKmStateId: "",
       allowChargingStateId: "go-e-gemini-adapter.0.control.allowCharging",
       emergencyStopStateId: "go-e-gemini-adapter.0.control.emergencyStop",

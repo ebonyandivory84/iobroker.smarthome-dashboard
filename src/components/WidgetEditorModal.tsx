@@ -446,6 +446,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         modeStateId: widget.modeStateId || "go-e-gemini-adapter.0.control.mode",
         gridAmpereStateId: widget.gridAmpereStateId || "go-e-gemini-adapter.0.control.gridManual.currentA",
         limit80StateId: widget.limit80StateId || "go-e-gemini-adapter.0.control.targetSocPercent",
+        targetSocAutoApiStateId:
+          widget.targetSocAutoApiStateId ||
+          "bmw.0.WBY11CF080CP51905.stream.vehicle.drivetrain.batteryManagement.maxEnergy.value",
         targetKmStateId: widget.targetKmStateId || "",
         allowChargingStateId: allowChargingWriteStateId,
         emergencyStopStateId,
@@ -940,6 +943,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         gridAmpereStateId:
           draft.manualCurrentWriteStateId?.trim() || draft.gridAmpereStateId?.trim() || widget.gridAmpereStateId,
         limit80StateId: draft.limit80StateId?.trim() || widget.limit80StateId,
+        targetSocAutoApiStateId: draft.targetSocAutoApiStateId?.trim() || undefined,
         targetKmStateId: draft.targetKmStateId?.trim() || undefined,
         allowChargingStateId:
           draft.stopWriteStateId?.trim() ||
@@ -2744,10 +2748,17 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                         value={draft.targetKmStateId || ""}
                       />
                     </Field>
+                    <Field label="TargetSOC Auto-API (optional)">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("targetSocAutoApiStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, targetSocAutoApiStateId: value }))}
+                        value={draft.targetSocAutoApiStateId || ""}
+                      />
+                    </Field>
                   </View>
                   <Text style={styles.mappingHint}>
                     Fuer `control.targetSocPercent` gibt es keinen passenden Status-Spiegelwert. Dieser Datenpunkt wird
-                    deshalb als write only genutzt.
+                    deshalb als write only genutzt. Optional wird der Slider-Wert zusaetzlich an `TargetSOC Auto-API` geschrieben.
                   </Text>
                 </View>
 
