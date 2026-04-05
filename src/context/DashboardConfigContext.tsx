@@ -34,6 +34,7 @@ type DashboardConfigContextValue = {
   createDashboardPage: () => void;
   moveDashboardPage: (pageId: string, direction: "left" | "right") => void;
   renameDashboardPage: (pageId: string, title: string) => void;
+  deleteDashboardPage: (pageId: string) => void;
   refreshSavedDashboards: () => Promise<void>;
   saveNamedDashboard: (name: string) => Promise<{ ok: boolean; error?: string }>;
   loadNamedDashboard: (name: string) => Promise<{ ok: boolean; error?: string }>;
@@ -491,6 +492,39 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
 
         const activePage =
           nextPages.find((page) => page.id === (config.activePageId || "")) ||
+          nextPages[0];
+        if (!activePage) {
+          return;
+        }
+
+        persist({
+          ...config,
+          pages: nextPages,
+          activePageId: activePage.id,
+          title: activePage.title,
+          widgets: activePage.widgets,
+        });
+      },
+      deleteDashboardPage(pageId) {
+        const pages = config.pages || [];
+        if (pages.length <= 1) {
+          return;
+        }
+
+        const currentIndex = pages.findIndex((page) => page.id === pageId);
+        if (currentIndex < 0) {
+          return;
+        }
+
+        const nextPages = pages.filter((page) => page.id !== pageId);
+        if (!nextPages.length) {
+          return;
+        }
+
+        const fallbackIndex = Math.max(0, currentIndex - 1);
+        const fallbackPage = nextPages[Math.min(fallbackIndex, nextPages.length - 1)];
+        const activePage =
+          (config.activePageId === pageId ? fallbackPage : nextPages.find((page) => page.id === (config.activePageId || ""))) ||
           nextPages[0];
         if (!activePage) {
           return;

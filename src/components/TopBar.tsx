@@ -15,6 +15,7 @@ type TopBarProps = {
   onSelectPage: (pageId: string) => void;
   onMovePage?: (pageId: string, direction: "left" | "right") => void;
   onRenamePage?: (pageId: string) => void;
+  onDeletePage?: (pageId: string) => void;
   pageTabSounds?: string[];
   layoutToggleSounds?: string[];
   addWidgetSounds?: string[];
@@ -33,6 +34,7 @@ export function TopBar({
   onSelectPage,
   onMovePage,
   onRenamePage,
+  onDeletePage,
   pageTabSounds,
   layoutToggleSounds,
   addWidgetSounds,
@@ -44,6 +46,7 @@ export function TopBar({
     const activePage = page.id === activePageId;
     const canMoveLeft = index > 0;
     const canMoveRight = index < pageTitles.length - 1;
+    const canDelete = pageTitles.length > 1 && Boolean(onDeletePage);
     return (
       <View key={page.id} style={[styles.pageTab, activePage ? styles.pageTabActive : null, isLayoutMode ? styles.pageTabLayout : null]}>
         {isLayoutMode ? (
@@ -79,6 +82,18 @@ export function TopBar({
             style={[styles.pageMoveButton, !onRenamePage ? styles.pageMoveButtonDisabled : null]}
           >
             <MaterialCommunityIcons color={onRenamePage ? palette.text : palette.textMuted} name="pencil" size={12} />
+          </Pressable>
+        ) : null}
+        {isLayoutMode ? (
+          <Pressable
+            disabled={!canDelete}
+            onPress={() => {
+              playConfiguredUiSound(pageTabSounds, "panel", `page-tab:delete:${page.id}`);
+              onDeletePage?.(page.id);
+            }}
+            style={[styles.pageMoveButton, styles.pageDeleteButton, !canDelete ? styles.pageDeleteButtonDisabled : null]}
+          >
+            <MaterialCommunityIcons color={canDelete ? "#fda4af" : palette.textMuted} name="trash-can-outline" size={12} />
           </Pressable>
         ) : null}
         {isLayoutMode ? (
@@ -240,6 +255,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.08)",
   },
   pageMoveButtonDisabled: {
+    backgroundColor: "rgba(255,255,255,0.02)",
+  },
+  pageDeleteButton: {
+    backgroundColor: "rgba(220, 38, 38, 0.18)",
+  },
+  pageDeleteButtonDisabled: {
     backgroundColor: "rgba(255,255,255,0.02)",
   },
   pageTabLabel: {

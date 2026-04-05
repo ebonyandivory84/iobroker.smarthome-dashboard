@@ -70,6 +70,7 @@ export function DashboardScreen() {
     createDashboardPage,
     moveDashboardPage,
     renameDashboardPage,
+    deleteDashboardPage,
     moveWidgetToPage,
     removeWidget,
     replaceWidgets,
@@ -86,6 +87,7 @@ export function DashboardScreen() {
   const [visiblePageId, setVisiblePageId] = useState(activePageId);
   const [renamePageId, setRenamePageId] = useState<string | null>(null);
   const [renamePageTitle, setRenamePageTitle] = useState("");
+  const [deletePageId, setDeletePageId] = useState<string | null>(null);
   const lastContentScrollAt = useRef(0);
   const activePageIndex = Math.max(0, dashboardPages.findIndex((page) => page.id === activePageId));
   const visiblePageIndex = Math.max(0, dashboardPages.findIndex((page) => page.id === visiblePageId));
@@ -103,6 +105,10 @@ export function DashboardScreen() {
   const renameTargetPage = useMemo(
     () => dashboardPages.find((page) => page.id === renamePageId) || null,
     [dashboardPages, renamePageId]
+  );
+  const deleteTargetPage = useMemo(
+    () => dashboardPages.find((page) => page.id === deletePageId) || null,
+    [dashboardPages, deletePageId]
   );
 
   useEffect(() => {
@@ -415,6 +421,28 @@ export function DashboardScreen() {
     }
     renameDashboardPage(renamePageId, nextTitle);
     closeRenameDialog();
+  };
+
+  const closeDeleteDialog = () => {
+    setDeletePageId(null);
+  };
+
+  const openDeleteDialog = (pageId: string) => {
+    if (dashboardPages.length <= 1) {
+      return;
+    }
+    if (!dashboardPages.some((entry) => entry.id === pageId)) {
+      return;
+    }
+    setDeletePageId(pageId);
+  };
+
+  const submitDeleteDialog = () => {
+    if (!deletePageId) {
+      return;
+    }
+    deleteDashboardPage(deletePageId);
+    closeDeleteDialog();
   };
 
   const handleDragAcrossPageEdge = (
@@ -734,6 +762,9 @@ export function DashboardScreen() {
         onRenamePage={(pageId) => {
           openRenameDialog(pageId);
         }}
+        onDeletePage={(pageId) => {
+          openDeleteDialog(pageId);
+        }}
       />
       <ScrollView
         style={[styles.scroll, isCompact ? styles.scrollCompact : null]}
@@ -872,6 +903,30 @@ export function DashboardScreen() {
                 ]}
               >
                 <Text style={styles.renameButtonPrimaryLabel}>Speichern</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        animationType="fade"
+        onRequestClose={closeDeleteDialog}
+        transparent
+        visible={Boolean(deleteTargetPage)}
+      >
+        <View style={styles.renameBackdrop}>
+          <View style={styles.renameCard}>
+            <Text style={styles.deleteTitle}>Side-Page loeschen?</Text>
+            <Text style={styles.deleteHint}>
+              Die Seite "{deleteTargetPage?.title || ""}" wird entfernt. Dieser Schritt kann nicht rueckgaengig gemacht
+              werden.
+            </Text>
+            <View style={styles.deleteActions}>
+              <Pressable onPress={closeDeleteDialog} style={[styles.renameButton, styles.renameButtonSecondary]}>
+                <Text style={styles.renameButtonSecondaryLabel}>Abbrechen</Text>
+              </Pressable>
+              <Pressable onPress={submitDeleteDialog} style={[styles.renameButton, styles.deleteButtonDanger]}>
+                <Text style={styles.deleteButtonDangerLabel}>Loeschen</Text>
               </Pressable>
             </View>
           </View>
@@ -1076,6 +1131,32 @@ const styles = StyleSheet.create({
   },
   renameButtonPrimaryLabel: {
     color: "#041019",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  deleteTitle: {
+    color: palette.text,
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  deleteHint: {
+    color: palette.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "600",
+  },
+  deleteActions: {
+    marginTop: 6,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+  },
+  deleteButtonDanger: {
+    borderColor: "rgba(248, 113, 113, 0.45)",
+    backgroundColor: "rgba(220, 38, 38, 0.35)",
+  },
+  deleteButtonDangerLabel: {
+    color: "#fee2e2",
     fontSize: 12,
     fontWeight: "800",
   },
