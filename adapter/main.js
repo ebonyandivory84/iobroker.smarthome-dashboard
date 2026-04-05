@@ -24,9 +24,17 @@ const OBJECT_CACHE_TTL_MS = 5 * 60 * 1000;
 const CONFIG_STATE_ID = "dashboardConfig";
 const SAVED_DASHBOARDS_STATE_ID = "savedDashboards";
 const LOG_BUFFER_LIMIT = 2000;
+const STATE_STREAM_HEARTBEAT_MS = 25_000;
+const STATE_STREAM_BATCH_MS = 80;
 let webShellCache = null;
 let logEntriesBuffer = [];
 let logListenerRegistered = false;
+let stateStreamClientCounter = 0;
+let stateChangeListenerRegistered = false;
+let pendingStateStreamFlushTimer = null;
+const stateStreamClients = new Map();
+const stateStreamSubscriptionRefCounts = new Map();
+const pendingStateStreamUpdates = new Map();
 
 const LOG_LEVEL_ORDER = {
   silly: 0,
@@ -43,9 +51,9 @@ function startAdapter(options) {
     name: "smarthome-dashboard",
     ready: () => main(adapter),
     unload: (callback) => {
-      Promise.resolve(stopLogCapture(adapter))
+      Promise.all([Promise.resolve(stopLogCapture(adapter)), Promise.resolve(stopStateStreaming(adapter))])
         .catch((error) => {
-          adapter.log.warn(`Log capture cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
+          adapter.log.warn(`Adapter cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
         })
         .finally(() => callback());
     },
@@ -208,15 +216,58 @@ async function main(adapter) {
   });
 
   app.post("/smarthome-dashboard/api/states", async (req, res) => {
-    const stateIds = Array.isArray(req.body?.stateIds) ? req.body.stateIds : [];
-    const entries = await Promise.all(
-      stateIds.map(async (stateId) => {
-        const state = await adapter.getForeignStateAsync(stateId);
-        return [stateId, state ? state.val : null];
-      })
-    );
+    try {
+      const rawStateIds = Array.isArray(req.body?.stateIds) ? req.body.stateIds : [];
+      const stateIds = normalizeStateIdList(rawStateIds);
+      const snapshot = await readStateSnapshot(adapter, stateIds);
+      res.json(snapshot);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "State read failed" });
+    }
+  });
 
-    res.json(Object.fromEntries(entries));
+  app.get("/smarthome-dashboard/api/state-stream", async (req, res) => {
+    const stateIds = normalizeStateIdListFromQuery(req.query);
+
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    if (typeof res.flushHeaders === "function") {
+      res.flushHeaders();
+    }
+    if (typeof req.socket?.setKeepAlive === "function") {
+      req.socket.setKeepAlive(true);
+    }
+
+    const clientId = await registerStateStreamClient(adapter, res, stateIds);
+    writeStateStreamEvent(res, "ready", {
+      connected: true,
+      ts: Date.now(),
+      stateIds,
+    });
+
+    try {
+      const snapshot = await readStateSnapshot(adapter, stateIds);
+      if (stateStreamClients.has(clientId)) {
+        writeStateStreamEvent(res, "snapshot", {
+          ts: Date.now(),
+          states: snapshot,
+        });
+      }
+    } catch (error) {
+      writeStateStreamEvent(res, "error", {
+        ts: Date.now(),
+        message: error instanceof Error ? error.message : "Snapshot read failed",
+      });
+    }
+
+    const closeClient = () => {
+      void removeStateStreamClient(adapter, clientId);
+    };
+    req.on("close", closeClient);
+    req.on("aborted", closeClient);
+    res.on("close", closeClient);
   });
 
   app.put("/smarthome-dashboard/api/state", async (req, res) => {
@@ -913,6 +964,264 @@ function clampInt(raw, fallback, min, max) {
     return fallback;
   }
   return Math.max(min, Math.min(max, parsed));
+}
+
+function normalizeStateIdList(rawList) {
+  if (!Array.isArray(rawList)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      rawList
+        .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, "de"));
+}
+
+function normalizeStateIdListFromQuery(query) {
+  const raw = [];
+  const stateIdQuery = query?.stateId;
+  const stateIdsQuery = query?.stateIds;
+
+  if (typeof stateIdQuery === "string") {
+    raw.push(stateIdQuery);
+  } else if (Array.isArray(stateIdQuery)) {
+    raw.push(...stateIdQuery);
+  }
+
+  if (typeof stateIdsQuery === "string") {
+    raw.push(...stateIdsQuery.split(","));
+  } else if (Array.isArray(stateIdsQuery)) {
+    raw.push(...stateIdsQuery.flatMap((entry) => String(entry || "").split(",")));
+  }
+
+  return normalizeStateIdList(raw);
+}
+
+async function readStateSnapshot(adapter, stateIds) {
+  if (!Array.isArray(stateIds) || stateIds.length === 0) {
+    return {};
+  }
+
+  const entries = await Promise.all(
+    stateIds.map(async (stateId) => {
+      const state = await adapter.getForeignStateAsync(stateId);
+      return [stateId, state ? state.val : null];
+    })
+  );
+
+  return Object.fromEntries(entries);
+}
+
+function writeStateStreamEvent(res, eventName, payload) {
+  try {
+    const serializedPayload = JSON.stringify(payload || {});
+    res.write(`event: ${eventName}\n`);
+    res.write(`data: ${serializedPayload}\n\n`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function ensureStateChangeListener(adapter) {
+  if (stateChangeListenerRegistered) {
+    return;
+  }
+  adapter.on("stateChange", handleStateStreamStateChange);
+  stateChangeListenerRegistered = true;
+}
+
+function disableStateChangeListener(adapter) {
+  if (!stateChangeListenerRegistered || stateStreamSubscriptionRefCounts.size > 0) {
+    return;
+  }
+  adapter.removeListener("stateChange", handleStateStreamStateChange);
+  stateChangeListenerRegistered = false;
+}
+
+function handleStateStreamStateChange(stateId, state) {
+  if (!stateId || !stateStreamSubscriptionRefCounts.has(stateId)) {
+    return;
+  }
+
+  pendingStateStreamUpdates.set(stateId, state ? state.val : null);
+  scheduleStateStreamFlush();
+}
+
+function scheduleStateStreamFlush() {
+  if (pendingStateStreamFlushTimer || pendingStateStreamUpdates.size === 0) {
+    return;
+  }
+
+  pendingStateStreamFlushTimer = setTimeout(() => {
+    pendingStateStreamFlushTimer = null;
+    flushStateStreamUpdates();
+  }, STATE_STREAM_BATCH_MS);
+}
+
+function flushStateStreamUpdates() {
+  if (!pendingStateStreamUpdates.size) {
+    return;
+  }
+
+  const updateEntries = Array.from(pendingStateStreamUpdates.entries());
+  pendingStateStreamUpdates.clear();
+
+  if (!stateStreamClients.size) {
+    return;
+  }
+
+  const ts = Date.now();
+  for (const [clientId, client] of stateStreamClients.entries()) {
+    const states = {};
+    for (const [stateId, value] of updateEntries) {
+      if (client.stateIds.has(stateId)) {
+        states[stateId] = value;
+      }
+    }
+
+    if (!Object.keys(states).length) {
+      continue;
+    }
+
+    const written = writeStateStreamEvent(client.res, "state", {
+      ts,
+      states,
+    });
+
+    if (!written) {
+      if (runningAdapter) {
+        void removeStateStreamClient(runningAdapter, clientId);
+      } else {
+        stateStreamClients.delete(clientId);
+      }
+    }
+  }
+}
+
+async function registerStateStreamClient(adapter, res, stateIds) {
+  const normalizedStateIds = normalizeStateIdList(stateIds);
+  const clientId = ++stateStreamClientCounter;
+  const heartbeatTimer = setInterval(() => {
+    try {
+      res.write(`: keepalive ${Date.now()}\n\n`);
+    } catch {
+      void removeStateStreamClient(adapter, clientId);
+    }
+  }, STATE_STREAM_HEARTBEAT_MS);
+
+  stateStreamClients.set(clientId, {
+    res,
+    stateIds: new Set(normalizedStateIds),
+    heartbeatTimer,
+  });
+
+  await Promise.all(normalizedStateIds.map((stateId) => retainStateStreamSubscription(adapter, stateId)));
+  return clientId;
+}
+
+async function removeStateStreamClient(adapter, clientId) {
+  const client = stateStreamClients.get(clientId);
+  if (!client) {
+    return;
+  }
+
+  stateStreamClients.delete(clientId);
+  if (client.heartbeatTimer) {
+    clearInterval(client.heartbeatTimer);
+  }
+
+  const stateIds = Array.from(client.stateIds);
+  await Promise.all(stateIds.map((stateId) => releaseStateStreamSubscription(adapter, stateId)));
+}
+
+async function stopStateStreaming(adapter) {
+  if (pendingStateStreamFlushTimer) {
+    clearTimeout(pendingStateStreamFlushTimer);
+    pendingStateStreamFlushTimer = null;
+  }
+  pendingStateStreamUpdates.clear();
+
+  const connectedClientIds = Array.from(stateStreamClients.keys());
+  await Promise.all(connectedClientIds.map((clientId) => removeStateStreamClient(adapter, clientId)));
+
+  if (stateChangeListenerRegistered) {
+    adapter.removeListener("stateChange", handleStateStreamStateChange);
+    stateChangeListenerRegistered = false;
+  }
+}
+
+async function retainStateStreamSubscription(adapter, stateId) {
+  if (!stateId) {
+    return;
+  }
+
+  const currentCount = stateStreamSubscriptionRefCounts.get(stateId) || 0;
+  stateStreamSubscriptionRefCounts.set(stateId, currentCount + 1);
+  if (currentCount > 0) {
+    return;
+  }
+
+  try {
+    ensureStateChangeListener(adapter);
+    await subscribeToForeignState(adapter, stateId);
+  } catch (error) {
+    stateStreamSubscriptionRefCounts.delete(stateId);
+    runningAdapter?.log.warn(
+      `[state-stream] subscribe failed for ${stateId}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+async function releaseStateStreamSubscription(adapter, stateId) {
+  if (!stateId) {
+    return;
+  }
+
+  const currentCount = stateStreamSubscriptionRefCounts.get(stateId) || 0;
+  if (currentCount <= 0) {
+    return;
+  }
+  if (currentCount === 1) {
+    stateStreamSubscriptionRefCounts.delete(stateId);
+    try {
+      await unsubscribeFromForeignState(adapter, stateId);
+    } catch (error) {
+      runningAdapter?.log.warn(
+        `[state-stream] unsubscribe failed for ${stateId}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    } finally {
+      disableStateChangeListener(adapter);
+    }
+    return;
+  }
+
+  stateStreamSubscriptionRefCounts.set(stateId, currentCount - 1);
+}
+
+async function subscribeToForeignState(adapter, stateId) {
+  if (typeof adapter.subscribeForeignStatesAsync === "function") {
+    await adapter.subscribeForeignStatesAsync(stateId);
+    return;
+  }
+
+  if (typeof adapter.subscribeForeignStates === "function") {
+    await Promise.resolve(adapter.subscribeForeignStates(stateId));
+  }
+}
+
+async function unsubscribeFromForeignState(adapter, stateId) {
+  if (typeof adapter.unsubscribeForeignStatesAsync === "function") {
+    await adapter.unsubscribeForeignStatesAsync(stateId);
+    return;
+  }
+
+  if (typeof adapter.unsubscribeForeignStates === "function") {
+    await Promise.resolve(adapter.unsubscribeForeignStates(stateId));
+  }
 }
 
 function readBufferedLogs({ limit, minSeverity, source, contains }) {

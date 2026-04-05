@@ -135,6 +135,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         maximizeStateId: widget.maximizeStateId || "",
         maximizeTriggerFormat: widget.maximizeTriggerFormat || "boolean",
         maximizeTriggerValue: widget.maximizeTriggerValue || "",
+        personDetectedStateId: widget.personDetectedStateId || "",
         ...appearanceDraft,
       });
       return;
@@ -763,6 +764,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         maximizeStateId: draft.maximizeStateId || undefined,
         maximizeTriggerFormat: normalizeStateFormat(draft.maximizeTriggerFormat),
         maximizeTriggerValue: draft.maximizeTriggerValue || undefined,
+        personDetectedStateId: draft.personDetectedStateId || undefined,
         interactionSounds: buildStoredInteractionSounds(
           widget.type,
           soundDraft,
@@ -1688,6 +1690,14 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     style={styles.input}
                     value={draft.maximizeTriggerValue || ""}
                   />
+                </Field>
+                <Field label="Person erkannt (Blinkrahmen)">
+                  <StateFieldInput
+                    onBrowse={() => setPickerField("personDetectedStateId")}
+                    onChangeText={(value) => setDraft((current) => ({ ...current, personDetectedStateId: value }))}
+                    value={draft.personDetectedStateId || ""}
+                  />
+                  <Text style={styles.mappingHint}>Bool-State: Bei `true` blinkt der Vorschau-Rahmen rot.</Text>
                 </Field>
                 <Field label="Sounds bei Interaktion">
                   <Field label="Beim Tippen">
