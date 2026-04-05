@@ -31,14 +31,6 @@ const collectWidgetStateIds = (widget: WidgetConfig) => {
   if (widget.type === "state") {
     return [widget.stateId];
   }
-  if (widget.type === "camera") {
-    return [
-      widget.maximizeStateId || "",
-      widget.personDetectionStateId || "",
-      widget.carDetectionStateId || "",
-      widget.catDetectionStateId || "",
-    ];
-  }
   if (widget.type === "energy") {
     return [
       widget.pvStateId,

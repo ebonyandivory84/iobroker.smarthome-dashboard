@@ -102,19 +102,6 @@ export type CameraWidgetConfig = WidgetBase & {
   type: "camera";
   titleFontSize?: number;
   manualHeightOverride?: boolean;
-  showDetectionIcons?: boolean;
-  personDetectionStateId?: string;
-  personDetectionIconType?: "material" | "icon-file";
-  personDetectionMaterialIcon?: string;
-  personDetectionIconImage?: string;
-  carDetectionStateId?: string;
-  carDetectionIconType?: "material" | "icon-file";
-  carDetectionMaterialIcon?: string;
-  carDetectionIconImage?: string;
-  catDetectionStateId?: string;
-  catDetectionIconType?: "material" | "icon-file";
-  catDetectionMaterialIcon?: string;
-  catDetectionIconImage?: string;
   previewSourceMode?: "snapshot" | "mjpeg" | "flv" | "fmp4";
   fullscreenSourceMode?: "snapshot" | "mjpeg" | "flv" | "fmp4";
   snapshotUrl?: string;
@@ -291,7 +278,6 @@ export type WallboxWidgetConfig = WidgetBase & {
   carRangeStateId?: string;
   chargePowerStateId?: string;
   chargedEnergyStateId?: string;
-  chargedEnergyDisplayMode?: "session" | "daily";
   stopChargeingAtCarSoc80StateId?: string;
 };
 

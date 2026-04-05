@@ -1381,11 +1381,6 @@ function renderWidget(
       <CameraWidget
         config={effectiveWidget}
         maximizeStateValue={effectiveWidget.maximizeStateId ? states[effectiveWidget.maximizeStateId] : undefined}
-        personDetectionStateValue={
-          effectiveWidget.personDetectionStateId ? states[effectiveWidget.personDetectionStateId] : undefined
-        }
-        carDetectionStateValue={effectiveWidget.carDetectionStateId ? states[effectiveWidget.carDetectionStateId] : undefined}
-        catDetectionStateValue={effectiveWidget.catDetectionStateId ? states[effectiveWidget.catDetectionStateId] : undefined}
         onFullscreenSwipeClose={onCameraFullscreenSwipeClose}
         onFullscreenVisibilityChange={(open) => onCameraFullscreenVisibilityChange?.(effectiveWidget.id, open)}
         onAspectRatioDetected={(ratio) => {

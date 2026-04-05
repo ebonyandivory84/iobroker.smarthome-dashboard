@@ -33,9 +33,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
   }>>([]);
   const [weatherSearchBusy, setWeatherSearchBusy] = useState(false);
   const [pickerField, setPickerField] = useState<string | null>(null);
-  const [imagePickerField, setImagePickerField] = useState<
-    "backgroundImage" | "iconImage" | "personDetectionIconImage" | "carDetectionIconImage" | "catDetectionIconImage" | null
-  >(null);
+  const [imagePickerField, setImagePickerField] = useState<"backgroundImage" | "iconImage" | null>(null);
   const theme = resolveThemeSettings(config.theme);
   const iconPreview = useMemo(() => {
     const active = (draft.iconActive || widget?.iconPair?.active || "toggle-switch-outline") as keyof typeof MaterialCommunityIcons.glyphMap;
@@ -134,19 +132,6 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         fmp4Url: widget.fmp4Url || widget.fullscreenFmp4Url || "",
         refreshMs: String(widget.refreshMs || widget.fullscreenRefreshMs || 2000),
         audioEnabled: widget.audioEnabled === true ? "true" : "false",
-        showDetectionIcons: widget.showDetectionIcons === false ? "false" : "true",
-        personDetectionStateId: widget.personDetectionStateId || "",
-        personDetectionIconType: normalizeCameraDetectionIconType(widget.personDetectionIconType, "material"),
-        personDetectionMaterialIcon: widget.personDetectionMaterialIcon || "account",
-        personDetectionIconImage: widget.personDetectionIconImage || "person_icon_transparent.png",
-        carDetectionStateId: widget.carDetectionStateId || "",
-        carDetectionIconType: normalizeCameraDetectionIconType(widget.carDetectionIconType, "material"),
-        carDetectionMaterialIcon: widget.carDetectionMaterialIcon || "car",
-        carDetectionIconImage: widget.carDetectionIconImage || "car_icon_transparent.png",
-        catDetectionStateId: widget.catDetectionStateId || "",
-        catDetectionIconType: normalizeCameraDetectionIconType(widget.catDetectionIconType, "material"),
-        catDetectionMaterialIcon: widget.catDetectionMaterialIcon || "cat",
-        catDetectionIconImage: widget.catDetectionIconImage || "cat_icon_transparent.png",
         maximizeStateId: widget.maximizeStateId || "",
         maximizeTriggerFormat: widget.maximizeTriggerFormat || "boolean",
         maximizeTriggerValue: widget.maximizeTriggerValue || "",
@@ -477,7 +462,6 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         carRangeStateId: widget.carRangeStateId || "",
         chargePowerStateId: widget.chargePowerStateId || "go-e-gemini-adapter.0.status.chargerPowerW",
         chargedEnergyStateId: widget.chargedEnergyStateId || "go-e.0.eto",
-        chargedEnergyDisplayMode: widget.chargedEnergyDisplayMode === "daily" ? "daily" : "session",
         stopChargeingAtCarSoc80StateId:
           widget.stopChargeingAtCarSoc80StateId || "go-e-gemini-adapter.0.control.targetSocEnabled",
         ...appearanceDraft,
@@ -774,19 +758,6 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 250),
         fullscreenRefreshMs: undefined,
         audioEnabled: draft.audioEnabled === "true",
-        showDetectionIcons: draft.showDetectionIcons !== "false",
-        personDetectionStateId: draft.personDetectionStateId || undefined,
-        personDetectionIconType: normalizeCameraDetectionIconType(draft.personDetectionIconType, "material"),
-        personDetectionMaterialIcon: normalizeMaterialIconName(draft.personDetectionMaterialIcon, "account"),
-        personDetectionIconImage: normalizeOptionalInput(draft.personDetectionIconImage),
-        carDetectionStateId: draft.carDetectionStateId || undefined,
-        carDetectionIconType: normalizeCameraDetectionIconType(draft.carDetectionIconType, "material"),
-        carDetectionMaterialIcon: normalizeMaterialIconName(draft.carDetectionMaterialIcon, "car"),
-        carDetectionIconImage: normalizeOptionalInput(draft.carDetectionIconImage),
-        catDetectionStateId: draft.catDetectionStateId || undefined,
-        catDetectionIconType: normalizeCameraDetectionIconType(draft.catDetectionIconType, "material"),
-        catDetectionMaterialIcon: normalizeMaterialIconName(draft.catDetectionMaterialIcon, "cat"),
-        catDetectionIconImage: normalizeOptionalInput(draft.catDetectionIconImage),
         manualHeightOverride: cameraSourceChanged ? false : widget.manualHeightOverride,
         snapshotAspectRatio: cameraSourceChanged ? undefined : widget.snapshotAspectRatio,
         maximizeStateId: draft.maximizeStateId || undefined,
@@ -989,10 +960,6 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         carRangeStateId: draft.carRangeStateId?.trim() || undefined,
         chargePowerStateId: draft.chargePowerStateId?.trim() || undefined,
         chargedEnergyStateId: draft.chargedEnergyStateId?.trim() || undefined,
-        chargedEnergyDisplayMode: normalizeWallboxEnergyDisplayMode(
-          draft.chargedEnergyDisplayMode,
-          widget.chargedEnergyDisplayMode || "session"
-        ),
         stopChargeingAtCarSoc80StateId: draft.stopChargeingAtCarSoc80StateId?.trim() || undefined,
         interactionSounds: buildStoredInteractionSounds(
           widget.type,
@@ -1692,151 +1659,6 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     Hinweis: Browser erlauben Autoplay mit Ton oft erst nach einer Nutzerinteraktion.
                   </Text>
                 </Field>
-                <Field label="Erkennungs-Icons anzeigen">
-                  <ChoiceRow
-                    options={["true", "false"]}
-                    value={draft.showDetectionIcons || "true"}
-                    onSelect={(value) => setDraft((current) => ({ ...current, showDetectionIcons: value }))}
-                  />
-                </Field>
-                <Field label="Person-Erkennung Datenpunkt">
-                  <StateFieldInput
-                    onBrowse={() => setPickerField("personDetectionStateId")}
-                    onChangeText={(value) => setDraft((current) => ({ ...current, personDetectionStateId: value }))}
-                    value={draft.personDetectionStateId || ""}
-                  />
-                </Field>
-                <Field label="Person Icon Quelle">
-                  <ChoiceRow
-                    options={["material", "icon-file"]}
-                    value={draft.personDetectionIconType || "material"}
-                    onSelect={(value) => setDraft((current) => ({ ...current, personDetectionIconType: value }))}
-                  />
-                </Field>
-                {(draft.personDetectionIconType || "material") === "material" ? (
-                  <Field label="Person Material Icon">
-                    <TextInput
-                      autoCapitalize="none"
-                      onChangeText={(value) => setDraft((current) => ({ ...current, personDetectionMaterialIcon: value }))}
-                      placeholder="z. B. account"
-                      placeholderTextColor={palette.textMuted}
-                      style={styles.input}
-                      value={draft.personDetectionMaterialIcon || "account"}
-                    />
-                    <View style={styles.materialIconPreviewRow}>
-                      <MaterialCommunityIcons
-                        color={palette.text}
-                        name={resolveMaterialIconName(draft.personDetectionMaterialIcon, "account") as never}
-                        size={18}
-                      />
-                      <Text style={styles.mappingHint}>
-                        Vorschau: {resolveMaterialIconName(draft.personDetectionMaterialIcon, "account")}
-                      </Text>
-                    </View>
-                  </Field>
-                ) : (
-                  <Field label="Person Icon-Datei">
-                    <View style={styles.stateFieldRow}>
-                      <TextInput editable={false} style={[styles.input, styles.stateFieldInput]} value={draft.personDetectionIconImage || ""} />
-                      <EditorButtonPressable onPress={() => setImagePickerField("personDetectionIconImage")} style={styles.stateBrowseButton}>
-                        <Text style={styles.stateBrowseLabel}>Bild waehlen</Text>
-                      </EditorButtonPressable>
-                    </View>
-                  </Field>
-                )}
-                <Field label="Auto-Erkennung Datenpunkt">
-                  <StateFieldInput
-                    onBrowse={() => setPickerField("carDetectionStateId")}
-                    onChangeText={(value) => setDraft((current) => ({ ...current, carDetectionStateId: value }))}
-                    value={draft.carDetectionStateId || ""}
-                  />
-                </Field>
-                <Field label="Auto Icon Quelle">
-                  <ChoiceRow
-                    options={["material", "icon-file"]}
-                    value={draft.carDetectionIconType || "material"}
-                    onSelect={(value) => setDraft((current) => ({ ...current, carDetectionIconType: value }))}
-                  />
-                </Field>
-                {(draft.carDetectionIconType || "material") === "material" ? (
-                  <Field label="Auto Material Icon">
-                    <TextInput
-                      autoCapitalize="none"
-                      onChangeText={(value) => setDraft((current) => ({ ...current, carDetectionMaterialIcon: value }))}
-                      placeholder="z. B. car"
-                      placeholderTextColor={palette.textMuted}
-                      style={styles.input}
-                      value={draft.carDetectionMaterialIcon || "car"}
-                    />
-                    <View style={styles.materialIconPreviewRow}>
-                      <MaterialCommunityIcons
-                        color={palette.text}
-                        name={resolveMaterialIconName(draft.carDetectionMaterialIcon, "car") as never}
-                        size={18}
-                      />
-                      <Text style={styles.mappingHint}>
-                        Vorschau: {resolveMaterialIconName(draft.carDetectionMaterialIcon, "car")}
-                      </Text>
-                    </View>
-                  </Field>
-                ) : (
-                  <Field label="Auto Icon-Datei">
-                    <View style={styles.stateFieldRow}>
-                      <TextInput editable={false} style={[styles.input, styles.stateFieldInput]} value={draft.carDetectionIconImage || ""} />
-                      <EditorButtonPressable onPress={() => setImagePickerField("carDetectionIconImage")} style={styles.stateBrowseButton}>
-                        <Text style={styles.stateBrowseLabel}>Bild waehlen</Text>
-                      </EditorButtonPressable>
-                    </View>
-                  </Field>
-                )}
-                <Field label="Katzen-Erkennung Datenpunkt">
-                  <StateFieldInput
-                    onBrowse={() => setPickerField("catDetectionStateId")}
-                    onChangeText={(value) => setDraft((current) => ({ ...current, catDetectionStateId: value }))}
-                    value={draft.catDetectionStateId || ""}
-                  />
-                </Field>
-                <Field label="Katzen Icon Quelle">
-                  <ChoiceRow
-                    options={["material", "icon-file"]}
-                    value={draft.catDetectionIconType || "material"}
-                    onSelect={(value) => setDraft((current) => ({ ...current, catDetectionIconType: value }))}
-                  />
-                </Field>
-                {(draft.catDetectionIconType || "material") === "material" ? (
-                  <Field label="Katzen Material Icon">
-                    <TextInput
-                      autoCapitalize="none"
-                      onChangeText={(value) => setDraft((current) => ({ ...current, catDetectionMaterialIcon: value }))}
-                      placeholder="z. B. cat"
-                      placeholderTextColor={palette.textMuted}
-                      style={styles.input}
-                      value={draft.catDetectionMaterialIcon || "cat"}
-                    />
-                    <View style={styles.materialIconPreviewRow}>
-                      <MaterialCommunityIcons
-                        color={palette.text}
-                        name={resolveMaterialIconName(draft.catDetectionMaterialIcon, "cat") as never}
-                        size={18}
-                      />
-                      <Text style={styles.mappingHint}>
-                        Vorschau: {resolveMaterialIconName(draft.catDetectionMaterialIcon, "cat")}
-                      </Text>
-                    </View>
-                  </Field>
-                ) : (
-                  <Field label="Katzen Icon-Datei">
-                    <View style={styles.stateFieldRow}>
-                      <TextInput editable={false} style={[styles.input, styles.stateFieldInput]} value={draft.catDetectionIconImage || ""} />
-                      <EditorButtonPressable onPress={() => setImagePickerField("catDetectionIconImage")} style={styles.stateBrowseButton}>
-                        <Text style={styles.stateBrowseLabel}>Bild waehlen</Text>
-                      </EditorButtonPressable>
-                    </View>
-                  </Field>
-                )}
-                <Text style={styles.mappingHint}>
-                  Bei `true` wird das jeweilige Symbol 2 Sekunden angezeigt; ein neues `true` verlaengert die Anzeige.
-                </Text>
                 <Field label="Maximieren per Datenpunkt">
                   <StateFieldInput
                     onBrowse={() => setPickerField("maximizeStateId")}
@@ -3000,15 +2822,6 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                         value={draft.chargedEnergyStateId || ""}
                       />
                     </Field>
-                    <Field label="Energieanzeige">
-                      <ChoiceRow
-                        options={["session", "daily"]}
-                        value={draft.chargedEnergyDisplayMode || "session"}
-                        onSelect={(value) => setDraft((current) => ({ ...current, chargedEnergyDisplayMode: value }))}
-                      />
-                    </Field>
-                  </View>
-                  <View style={styles.splitRow}>
                     <Field label="Legacy: solarLoadOnly (optional)">
                       <StateFieldInput
                         onBrowse={() => setPickerField("solarLoadOnlyStateId")}
@@ -3019,8 +2832,6 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   </View>
                   <Text style={styles.mappingHint}>
                     `status.carSocPercent` und optional `Fahrzeug-km` dienen als Ist-Werte fuer Auto-Stop.
-                    Bei `daily` wird die Tages-kWh im Widget aus `chargedEnergy` per Delta-Berechnung ermittelt
-                    und im Adapter persistiert (geraeteuebergreifend).
                   </Text>
                 </View>
 
@@ -3758,12 +3569,6 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
             ? widget?.type === "state"
               ? "State-Bild waehlen"
               : "Link-Icon waehlen"
-            : imagePickerField === "personDetectionIconImage"
-              ? "Person-Erkennungsicon waehlen"
-              : imagePickerField === "carDetectionIconImage"
-                ? "Auto-Erkennungsicon waehlen"
-                : imagePickerField === "catDetectionIconImage"
-                  ? "Katzen-Erkennungsicon waehlen"
             : widget?.type === "wallbox" || widget?.type === "goe"
               ? "Wallbox-Hintergrund waehlen"
               : (widget?.type === "heating" || widget?.type === "heatingV2")
@@ -3771,10 +3576,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
               : "Solar-Hintergrund waehlen"
         }
         helperText={
-          imagePickerField === "iconImage" ||
-          imagePickerField === "personDetectionIconImage" ||
-          imagePickerField === "carDetectionIconImage" ||
-          imagePickerField === "catDetectionIconImage"
+          imagePickerField === "iconImage"
             ? "Waehle eine Bilddatei aus dem Ordner `assets/`."
             : widget?.type === "wallbox" || widget?.type === "goe"
               ? "Waehle ein Hintergrundbild. Drag&Drop, Datei-Upload und Browser-Auswahl sind verfuegbar."
@@ -3789,27 +3591,6 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
               return {
                 ...current,
                 iconImage: entry.name,
-              };
-            }
-            if (imagePickerField === "personDetectionIconImage") {
-              return {
-                ...current,
-                personDetectionIconType: "icon-file",
-                personDetectionIconImage: entry.name,
-              };
-            }
-            if (imagePickerField === "carDetectionIconImage") {
-              return {
-                ...current,
-                carDetectionIconType: "icon-file",
-                carDetectionIconImage: entry.name,
-              };
-            }
-            if (imagePickerField === "catDetectionIconImage") {
-              return {
-                ...current,
-                catDetectionIconType: "icon-file",
-                catDetectionIconImage: entry.name,
               };
             }
             if (widget?.type === "wallbox" || widget?.type === "goe") {
@@ -3832,17 +3613,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           });
           setImagePickerField(null);
         }}
-        selectedName={
-          imagePickerField === "iconImage"
-            ? draft.iconImage
-            : imagePickerField === "personDetectionIconImage"
-              ? draft.personDetectionIconImage
-              : imagePickerField === "carDetectionIconImage"
-                ? draft.carDetectionIconImage
-                : imagePickerField === "catDetectionIconImage"
-                  ? draft.catDetectionIconImage
-                  : draft.backgroundImage
-        }
+        selectedName={imagePickerField === "iconImage" ? draft.iconImage : draft.backgroundImage}
         visible={Boolean(imagePickerField)}
       />
     </Modal>
@@ -4548,16 +4319,6 @@ function normalizeWallboxValueType(raw: string | undefined, fallback: "boolean" 
   return fallback;
 }
 
-function normalizeWallboxEnergyDisplayMode(raw: string | undefined, fallback: "session" | "daily") {
-  if (raw === "daily") {
-    return "daily";
-  }
-  if (raw === "session") {
-    return "session";
-  }
-  return fallback;
-}
-
 function normalizeLogSeverity(raw: string | undefined) {
   if (raw === "silly" || raw === "debug" || raw === "warn" || raw === "error") {
     return raw;
@@ -4570,28 +4331,6 @@ function normalizeCameraSourceMode(raw: string | undefined) {
     return raw;
   }
   return "snapshot";
-}
-
-function normalizeCameraDetectionIconType(raw: string | undefined, fallback: "material" | "icon-file") {
-  if (raw === "icon-file") {
-    return "icon-file";
-  }
-  if (raw === "material") {
-    return "material";
-  }
-  return fallback;
-}
-
-function resolveMaterialIconName(raw: string | undefined, fallback: string) {
-  const candidate = (raw || "").trim();
-  if (candidate && MaterialCommunityIcons.glyphMap[candidate as keyof typeof MaterialCommunityIcons.glyphMap]) {
-    return candidate;
-  }
-  return fallback;
-}
-
-function normalizeMaterialIconName(raw: string | undefined, fallback: string) {
-  return resolveMaterialIconName(raw, fallback);
 }
 
 function getCameraUrlByMode(
@@ -4970,11 +4709,6 @@ const styles = StyleSheet.create({
     color: palette.textMuted,
     fontSize: 12,
     lineHeight: 18,
-  },
-  materialIconPreviewRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
   },
   mappingEditor: {
     minHeight: 110,
