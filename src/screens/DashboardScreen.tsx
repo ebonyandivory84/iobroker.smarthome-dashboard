@@ -37,6 +37,7 @@ export function DashboardScreen() {
   const isPhoneWeb = Platform.OS === "web" && isTouchCapableWeb && Math.min(width, height) <= 500;
   const isTouchLayout = width < 1100 || isTouchCapableWeb;
   const horizontalPagerRef = useRef<ScrollView | null>(null);
+  const webActivePageRestoreDoneRef = useRef(Platform.OS !== "web");
   const horizontalOffsetRef = useRef(0);
   const pageOffsetsRef = useRef<Record<string, number>>({});
   const pullRefreshBlockedUntilRef = useRef(0);
@@ -178,6 +179,9 @@ export function DashboardScreen() {
     if (!activePageId) {
       return;
     }
+    if (!webActivePageRestoreDoneRef.current) {
+      return;
+    }
     try {
       window.localStorage.setItem(WEB_ACTIVE_PAGE_STORAGE_KEY, activePageId);
     } catch {
@@ -192,6 +196,9 @@ export function DashboardScreen() {
     if (!dashboardPages.length) {
       return;
     }
+    if (webActivePageRestoreDoneRef.current) {
+      return;
+    }
 
     let storedPageId = "";
     try {
@@ -199,6 +206,8 @@ export function DashboardScreen() {
     } catch {
       storedPageId = "";
     }
+
+    webActivePageRestoreDoneRef.current = true;
 
     if (!storedPageId || storedPageId === activePageId) {
       return;
