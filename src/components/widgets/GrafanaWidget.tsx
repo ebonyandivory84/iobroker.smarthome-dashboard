@@ -6,12 +6,11 @@ import { palette } from "../../utils/theme";
 
 type GrafanaWidgetProps = {
   config: GrafanaWidgetConfig;
-  isActivePage?: boolean;
 };
 
-export function GrafanaWidget({ config, isActivePage = true }: GrafanaWidgetProps) {
+export function GrafanaWidget({ config }: GrafanaWidgetProps) {
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
-  const [previewEnabled, setPreviewEnabled] = useState(false);
+  const [previewReady, setPreviewReady] = useState(false);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const resolvedUrl = normalizeGrafanaUrl(config.url);
@@ -20,19 +19,20 @@ export function GrafanaWidget({ config, isActivePage = true }: GrafanaWidgetProp
   const sandboxValue = interactionsAllowed ? undefined : "allow-same-origin allow-scripts";
 
   useEffect(() => {
-    if (Platform.OS !== "web") {
+    if (Platform.OS !== "web" || !resolvedUrl) {
+      setPreviewReady(false);
       return;
     }
-    if (!isActivePage && fullscreenOpen) {
-      setFullscreenOpen(false);
-    }
-  }, [fullscreenOpen, isActivePage]);
+
+    const timer = setTimeout(() => setPreviewReady(true), 700);
+    return () => clearTimeout(timer);
+  }, [resolvedUrl]);
 
   const openFullscreen = () => {
     if (!resolvedUrl) {
       return;
     }
-    setPreviewEnabled(true);
+    setPreviewReady(true);
     playConfiguredUiSound(config.interactionSounds?.press, "panel", `${config.id}:press`);
     playConfiguredUiSound(config.interactionSounds?.open, "open", `${config.id}:open`);
     setFullscreenOpen(true);
@@ -63,8 +63,6 @@ export function GrafanaWidget({ config, isActivePage = true }: GrafanaWidgetProp
     );
   }
 
-  const previewSrc = previewEnabled && isActivePage ? iframeUrl : "about:blank";
-
   return (
     <>
       {createElement(
@@ -73,7 +71,7 @@ export function GrafanaWidget({ config, isActivePage = true }: GrafanaWidgetProp
           style: webFrameWrapStyle,
         },
         createElement("iframe", {
-          src: previewSrc,
+          src: previewReady ? iframeUrl : "about:blank",
           style: webPreviewFrameStyle,
           sandbox: sandboxValue,
           allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
@@ -81,21 +79,6 @@ export function GrafanaWidget({ config, isActivePage = true }: GrafanaWidgetProp
           loading: "lazy",
           referrerPolicy: "no-referrer",
         }),
-        !previewEnabled
-          ? createElement(
-              "button",
-              {
-                type: "button",
-                style: webPreviewLoadButtonStyle,
-                onClick: (event: { stopPropagation?: () => void }) => {
-                  event.stopPropagation?.();
-                  playConfiguredUiSound(config.interactionSounds?.press, "panel", `${config.id}:press`);
-                  setPreviewEnabled(true);
-                },
-              },
-              "Vorschau laden"
-            )
-          : null,
         createElement(
           "div",
           {
@@ -298,19 +281,4 @@ const webFullscreenOverlayButtonStyle = {
   background: "transparent",
   cursor: "zoom-in",
   padding: 0,
-};
-
-const webPreviewLoadButtonStyle = {
-  position: "absolute",
-  right: "12px",
-  bottom: "12px",
-  zIndex: 3,
-  borderRadius: "10px",
-  border: "1px solid rgba(255,255,255,0.24)",
-  background: "rgba(4,10,18,0.72)",
-  color: "#e8eef8",
-  fontSize: "11px",
-  fontWeight: 700,
-  padding: "6px 10px",
-  cursor: "pointer",
 };

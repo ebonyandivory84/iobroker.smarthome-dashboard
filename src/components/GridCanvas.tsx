@@ -1496,7 +1496,7 @@ function renderWidget(
   }
 
   if (effectiveWidget.type === "grafana") {
-    return <GrafanaWidget config={effectiveWidget} isActivePage={isActivePage} />;
+    return <GrafanaWidget config={effectiveWidget} />;
   }
 
   if (effectiveWidget.type === "weather") {
