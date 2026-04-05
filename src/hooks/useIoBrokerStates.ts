@@ -127,7 +127,6 @@ export function useIoBrokerStates() {
           for (const stateId of watchedStateIds) {
             if (!Object.is(previous[stateId], next[stateId])) {
               changedIds.push(stateId);
-              streamStampRef.current[stateId] = Date.now();
             }
           }
           if (changedIds.length) {
