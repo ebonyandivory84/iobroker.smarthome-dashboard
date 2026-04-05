@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDashboardConfig } from "../context/DashboardConfigContext";
-import { IoBrokerClient, IoBrokerStateStreamEvent } from "../services/iobroker";
+import { IoBrokerClient } from "../services/iobroker";
 import { StateSnapshot, WidgetConfig } from "../types/dashboard";
 import { resolveMobileWidget } from "../utils/mobileWidget";
 
@@ -99,14 +99,11 @@ const normalizeStateIds = (stateIds: string[]) =>
 export function useIoBrokerStates() {
   const { config } = useDashboardConfig();
   const [states, setStates] = useState<StateSnapshot>({});
-  const [stateVersions, setStateVersions] = useState<Record<string, number>>({});
   const [stateWrites, setStateWrites] = useState<Record<string, StateWriteFeedback>>({});
   const [error, setError] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(false);
   const client = useMemo(() => new IoBrokerClient(config), [config]);
   const watchedStateIds = useMemo(() => normalizeStateIds(pickStateIds(config.widgets)), [config.widgets]);
-  const statesRef = useRef<StateSnapshot>({});
-  const streamStampRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     let active = true;
@@ -122,24 +119,6 @@ export function useIoBrokerStates() {
       try {
         const next = await client.readStates(watchedStateIds);
         if (active) {
-          const previous = statesRef.current;
-          const changedIds: string[] = [];
-          for (const stateId of watchedStateIds) {
-            if (!Object.is(previous[stateId], next[stateId])) {
-              changedIds.push(stateId);
-              streamStampRef.current[stateId] = Date.now();
-            }
-          }
-          if (changedIds.length) {
-            setStateVersions((current) => {
-            const nextVersions = { ...current };
-            changedIds.forEach((stateId) => {
-              nextVersions[stateId] = (nextVersions[stateId] || 0) + 1;
-            });
-            return nextVersions;
-          });
-          }
-          statesRef.current = next;
           setStates(next);
           setStateWrites((current) => resolveStateWriteFeedback(current, next));
           setError(null);
@@ -168,98 +147,6 @@ export function useIoBrokerStates() {
     return () => {
       active = false;
       clearInterval(timer);
-    };
-  }, [client, config.pollingMs, watchedStateIds]);
-
-  useEffect(() => {
-    if (!watchedStateIds.length) {
-      return;
-    }
-
-    let active = true;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    const abortController = new AbortController();
-    const reconnectDelayMs = Math.max(800, Math.min(4000, Math.round(config.pollingMs / 2)));
-
-    const applyStreamEvent = (event: IoBrokerStateStreamEvent) => {
-      const stateId = (event.id || "").trim();
-      if (!stateId) {
-        return;
-      }
-
-      const stamp = Number.isFinite(event.lc) && event.lc > 0
-        ? event.lc
-        : Number.isFinite(event.ts) && event.ts > 0
-          ? event.ts
-          : Date.now();
-      const previousStamp = streamStampRef.current[stateId] || 0;
-      if (stamp && stamp < previousStamp) {
-        return;
-      }
-      streamStampRef.current[stateId] = stamp;
-
-      setStateVersions((current) => {
-        return {
-          ...current,
-          [stateId]: (current[stateId] || 0) + 1,
-        };
-      });
-
-      const currentValue = statesRef.current[stateId];
-      if (Object.is(currentValue, event.val)) {
-        return;
-      }
-
-      statesRef.current = {
-        ...statesRef.current,
-        [stateId]: event.val,
-      };
-      setStates((current) => ({
-        ...current,
-        [stateId]: event.val,
-      }));
-    };
-
-    const connect = async () => {
-      while (active) {
-        try {
-          await client.openStateStream(watchedStateIds, {
-            signal: abortController.signal,
-            onState: applyStreamEvent,
-          });
-        } catch (streamError) {
-          if (!active || abortController.signal.aborted) {
-            return;
-          }
-          const message = streamError instanceof Error ? streamError.message : String(streamError);
-          if (
-            message.includes("unsupported") ||
-            message.includes("unavailable (404)")
-          ) {
-            return;
-          }
-        }
-
-        if (!active || abortController.signal.aborted) {
-          return;
-        }
-        await new Promise<void>((resolve) => {
-          reconnectTimer = setTimeout(() => {
-            reconnectTimer = null;
-            resolve();
-          }, reconnectDelayMs);
-        });
-      }
-    };
-
-    void connect();
-
-    return () => {
-      active = false;
-      abortController.abort();
-      if (reconnectTimer) {
-        clearTimeout(reconnectTimer);
-      }
     };
   }, [client, config.pollingMs, watchedStateIds]);
 
@@ -295,7 +182,6 @@ export function useIoBrokerStates() {
     error,
     isOnline,
     states,
-    stateVersions,
     stateWrites,
     writeStateTracked,
   };

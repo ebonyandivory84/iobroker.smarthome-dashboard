@@ -23,12 +23,10 @@ let runningAdapter = null;
 const OBJECT_CACHE_TTL_MS = 5 * 60 * 1000;
 const CONFIG_STATE_ID = "dashboardConfig";
 const SAVED_DASHBOARDS_STATE_ID = "savedDashboards";
-const WALLBOX_DAILY_ENERGY_STATE_ID = "wallboxDailyEnergy";
 const LOG_BUFFER_LIMIT = 2000;
 let webShellCache = null;
 let logEntriesBuffer = [];
 let logListenerRegistered = false;
-let stateEventShutdown = null;
 
 const LOG_LEVEL_ORDER = {
   silly: 0,
@@ -46,7 +44,6 @@ function startAdapter(options) {
     ready: () => main(adapter),
     unload: (callback) => {
       Promise.resolve(stopLogCapture(adapter))
-        .then(() => (stateEventShutdown ? stateEventShutdown() : undefined))
         .catch((error) => {
           adapter.log.warn(`Log capture cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
         })
@@ -92,153 +89,10 @@ async function main(adapter) {
     native: {},
   });
 
-  await adapter.setObjectNotExistsAsync(WALLBOX_DAILY_ENERGY_STATE_ID, {
-    type: "state",
-    common: {
-      name: "Persisted wallbox daily energy runtime values",
-      type: "string",
-      role: "json",
-      read: true,
-      write: true,
-      def: "{}",
-    },
-    native: {},
-  });
-
   refreshObjectEntries(adapter).catch((error) => {
     adapter.log.warn(`Object cache warmup failed: ${error instanceof Error ? error.message : String(error)}`);
   });
   startLogCapture(adapter);
-  const stateEventClients = new Set();
-  const stateSubscriptionRefCounts = new Map();
-
-  const subscribeForeignState = async (stateId) => {
-    if (typeof adapter.subscribeForeignStatesAsync === "function") {
-      await adapter.subscribeForeignStatesAsync(stateId);
-      return;
-    }
-    adapter.subscribeForeignStates(stateId);
-  };
-
-  const unsubscribeForeignState = async (stateId) => {
-    if (typeof adapter.unsubscribeForeignStatesAsync === "function") {
-      await adapter.unsubscribeForeignStatesAsync(stateId);
-      return;
-    }
-    adapter.unsubscribeForeignStates(stateId);
-  };
-
-  const ensureStateSubscriptions = async (stateIds) => {
-    const nextIds = Array.from(new Set((stateIds || []).filter(Boolean)));
-    if (!nextIds.length) {
-      return;
-    }
-
-    for (const stateId of nextIds) {
-      const previousCount = stateSubscriptionRefCounts.get(stateId) || 0;
-      if (previousCount === 0) {
-        await subscribeForeignState(stateId);
-      }
-      stateSubscriptionRefCounts.set(stateId, previousCount + 1);
-    }
-  };
-
-  const releaseStateSubscriptions = async (stateIds) => {
-    const nextIds = Array.from(new Set((stateIds || []).filter(Boolean)));
-    if (!nextIds.length) {
-      return;
-    }
-
-    for (const stateId of nextIds) {
-      const currentCount = stateSubscriptionRefCounts.get(stateId) || 0;
-      if (currentCount <= 1) {
-        stateSubscriptionRefCounts.delete(stateId);
-        try {
-          await unsubscribeForeignState(stateId);
-        } catch (error) {
-          adapter.log.warn(
-            `State unsubscribe failed for ${stateId}: ${error instanceof Error ? error.message : String(error)}`
-          );
-        }
-        continue;
-      }
-      stateSubscriptionRefCounts.set(stateId, currentCount - 1);
-    }
-  };
-
-  const writeStateEvent = (res, stateId, state) => {
-    const payload = JSON.stringify({
-      id: stateId,
-      val: state ? state.val : null,
-      ack: state ? state.ack === true : false,
-      ts: Number.isFinite(Number(state?.ts)) ? Number(state.ts) : 0,
-      lc: Number.isFinite(Number(state?.lc)) ? Number(state.lc) : 0,
-    });
-    res.write(`event: state\ndata: ${payload}\n\n`);
-  };
-
-  const handleStateEvent = (stateId, state) => {
-    if (!stateId || !stateEventClients.size) {
-      return;
-    }
-
-    const staleClients = [];
-    for (const client of stateEventClients) {
-      if (!client.stateIdSet.has(stateId)) {
-        continue;
-      }
-      try {
-        writeStateEvent(client.res, stateId, state);
-      } catch {
-        client.closed = true;
-        staleClients.push(client);
-      }
-    }
-
-    staleClients.forEach((client) => {
-      stateEventClients.delete(client);
-      if (client.heartbeat) {
-        clearInterval(client.heartbeat);
-        client.heartbeat = null;
-      }
-      void releaseStateSubscriptions(client.stateIds);
-      try {
-        client.res.end();
-      } catch {
-        // Ignore already-closed sockets.
-      }
-    });
-  };
-
-  adapter.on("stateChange", handleStateEvent);
-  stateEventShutdown = async () => {
-    adapter.removeListener("stateChange", handleStateEvent);
-    const activeClients = Array.from(stateEventClients);
-    stateEventClients.clear();
-
-    for (const client of activeClients) {
-      if (client.heartbeat) {
-        clearInterval(client.heartbeat);
-      }
-      try {
-        client.res.end();
-      } catch {
-        // Ignore already-closed sockets.
-      }
-    }
-
-    const remainingStateIds = Array.from(stateSubscriptionRefCounts.keys());
-    stateSubscriptionRefCounts.clear();
-    await Promise.all(
-      remainingStateIds.map(async (stateId) => {
-        try {
-          await unsubscribeForeignState(stateId);
-        } catch {
-          // Ignore shutdown unsubscription errors.
-        }
-      })
-    );
-  };
 
   app.get("/smarthome-dashboard/api/config", async (_req, res) => {
     try {
@@ -353,47 +207,6 @@ async function main(adapter) {
     }
   });
 
-  app.get("/smarthome-dashboard/api/wallbox-daily-energy/:widgetId", async (req, res) => {
-    const widgetId = normalizeRuntimeWidgetId(req.params?.widgetId);
-    if (!widgetId) {
-      res.status(400).json({ error: "widgetId missing" });
-      return;
-    }
-
-    try {
-      const store = await readWallboxDailyEnergyStore(adapter);
-      res.json({ entry: store[widgetId] || null });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Wallbox daily energy read failed" });
-    }
-  });
-
-  app.put("/smarthome-dashboard/api/wallbox-daily-energy/:widgetId", async (req, res) => {
-    const widgetId = normalizeRuntimeWidgetId(req.params?.widgetId);
-    if (!widgetId) {
-      res.status(400).json({ error: "widgetId missing" });
-      return;
-    }
-
-    const normalizedEntry = normalizeWallboxDailyEnergyEntry(req.body);
-    if (!normalizedEntry) {
-      res.status(400).json({ error: "Invalid wallbox daily energy payload" });
-      return;
-    }
-
-    try {
-      const store = await readWallboxDailyEnergyStore(adapter);
-      store[widgetId] = {
-        ...normalizedEntry,
-        updatedAt: Date.now(),
-      };
-      await writeWallboxDailyEnergyStore(adapter, store);
-      res.json({ ok: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Wallbox daily energy save failed" });
-    }
-  });
-
   app.post("/smarthome-dashboard/api/states", async (req, res) => {
     const stateIds = Array.isArray(req.body?.stateIds) ? req.body.stateIds : [];
     const entries = await Promise.all(
@@ -406,91 +219,6 @@ async function main(adapter) {
     res.json(Object.fromEntries(entries));
   });
 
-  app.get("/smarthome-dashboard/api/state-events", async (req, res) => {
-    const stateIds = normalizeStateEventIds(req.query);
-    if (!stateIds.length) {
-      res.status(400).json({ error: "stateId missing" });
-      return;
-    }
-
-    try {
-      await ensureStateSubscriptions(stateIds);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "State stream subscribe failed" });
-      return;
-    }
-
-    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.setHeader("Connection", "keep-alive");
-    res.setHeader("X-Accel-Buffering", "no");
-    if (typeof res.flushHeaders === "function") {
-      res.flushHeaders();
-    }
-
-    const client = {
-      closed: false,
-      heartbeat: null,
-      res,
-      stateIdSet: new Set(stateIds),
-      stateIds,
-    };
-    stateEventClients.add(client);
-
-    res.write("event: ready\ndata: {}\n\n");
-    void Promise.all(
-      stateIds.map(async (stateId) => {
-        const state = await adapter.getForeignStateAsync(stateId);
-        return [stateId, state];
-      })
-    )
-      .then((entries) => {
-        if (client.closed) {
-          return;
-        }
-        entries.forEach(([stateId, state]) => {
-          if (!client.stateIdSet.has(stateId)) {
-            return;
-          }
-          writeStateEvent(client.res, stateId, state);
-        });
-      })
-      .catch(() => {
-        // Initial bootstrap is best-effort; polling fallback keeps dashboard consistent.
-      });
-    client.heartbeat = setInterval(() => {
-      if (client.closed) {
-        return;
-      }
-      try {
-        client.res.write(": ping\n\n");
-      } catch {
-        client.closed = true;
-      }
-    }, 20000);
-
-    const cleanup = () => {
-      if (client.closed) {
-        return;
-      }
-      client.closed = true;
-      stateEventClients.delete(client);
-      if (client.heartbeat) {
-        clearInterval(client.heartbeat);
-        client.heartbeat = null;
-      }
-      void releaseStateSubscriptions(client.stateIds);
-      try {
-        client.res.end();
-      } catch {
-        // ignore
-      }
-    };
-
-    req.on("aborted", cleanup);
-    req.on("close", cleanup);
-  });
-
   app.put("/smarthome-dashboard/api/state", async (req, res) => {
     const { stateId, value } = req.body || {};
     if (!stateId) {
@@ -498,19 +226,8 @@ async function main(adapter) {
       return;
     }
 
-    try {
-      const object = await adapter.getForeignObjectAsync(stateId);
-      const writable = object && object.common ? object.common.write !== false : true;
-      if (!writable) {
-        res.status(400).json({ error: `State is read-only: ${stateId}` });
-        return;
-      }
-
-      await adapter.setForeignStateAsync(stateId, value, false);
-      res.json({ ok: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "State write failed" });
-    }
+    await adapter.setForeignStateAsync(stateId, value, false);
+    res.json({ ok: true });
   });
 
   app.post("/smarthome-dashboard/api/objects", async (req, res) => {
@@ -700,41 +417,6 @@ async function main(adapter) {
 
 function normalizeDashboardName(value) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function normalizeRuntimeWidgetId(value) {
-  if (typeof value !== "string") {
-    return "";
-  }
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.length > 160) {
-    return "";
-  }
-  return trimmed;
-}
-
-function normalizeStateEventIds(query) {
-  const rawValues = [];
-
-  if (Array.isArray(query?.stateId)) {
-    rawValues.push(...query.stateId);
-  } else if (typeof query?.stateId === "string") {
-    rawValues.push(query.stateId);
-  }
-
-  if (Array.isArray(query?.stateIds)) {
-    rawValues.push(...query.stateIds);
-  } else if (typeof query?.stateIds === "string") {
-    rawValues.push(...query.stateIds.split(","));
-  }
-
-  return Array.from(
-    new Set(
-      rawValues
-        .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
-        .filter(Boolean)
-    )
-  );
 }
 
 function buildCameraRequestConfig(rawUrl) {
@@ -1515,40 +1197,6 @@ function toFiniteNumber(value) {
   return parsed;
 }
 
-function normalizeWallboxDailyEnergyDayKey(value) {
-  if (typeof value !== "string") {
-    return "";
-  }
-  const trimmed = value.trim();
-  return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : "";
-}
-
-function normalizeWallboxDailyEnergyEntry(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-
-  const dayKey = normalizeWallboxDailyEnergyDayKey(value.dayKey);
-  const dailyKWh = toFiniteNumber(value.dailyKWh);
-  const lastMeterKWhRaw = value.lastMeterKWh;
-  const lastMeterKWh = lastMeterKWhRaw === null ? null : toFiniteNumber(lastMeterKWhRaw);
-
-  if (!dayKey || dailyKWh === null || dailyKWh < 0) {
-    return null;
-  }
-
-  if (lastMeterKWh !== null && (!Number.isFinite(lastMeterKWh) || lastMeterKWh < 0)) {
-    return null;
-  }
-
-  return {
-    dayKey,
-    dailyKWh,
-    lastMeterKWh,
-    updatedAt: Date.now(),
-  };
-}
-
 function clampNumber(value, min, max) {
   if (!Number.isFinite(value)) {
     return min;
@@ -1577,41 +1225,6 @@ async function readSavedDashboards(adapter) {
   } catch {
     return {};
   }
-}
-
-async function readWallboxDailyEnergyStore(adapter) {
-  const state = await adapter.getStateAsync(WALLBOX_DAILY_ENERGY_STATE_ID);
-  const raw = typeof state?.val === "string" ? state.val : "";
-  if (!raw) {
-    return {};
-  }
-
-  try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return {};
-    }
-
-    const normalizedStore = {};
-    Object.entries(parsed).forEach(([widgetId, entry]) => {
-      const normalizedWidgetId = normalizeRuntimeWidgetId(widgetId);
-      const normalizedEntry = normalizeWallboxDailyEnergyEntry(entry);
-      if (!normalizedWidgetId || !normalizedEntry) {
-        return;
-      }
-      normalizedStore[normalizedWidgetId] = normalizedEntry;
-    });
-    return normalizedStore;
-  } catch {
-    return {};
-  }
-}
-
-async function writeWallboxDailyEnergyStore(adapter, store) {
-  await adapter.setStateAsync(WALLBOX_DAILY_ENERGY_STATE_ID, {
-    val: JSON.stringify(store, null, 2),
-    ack: true,
-  });
 }
 
 async function writeSavedDashboards(adapter, dashboards) {

@@ -77,7 +77,7 @@ export function DashboardScreen() {
     updateWidget,
   } = useDashboardConfig();
   const committedPageIdRef = useRef(activePageId);
-  const { client, error, isOnline, states, stateVersions, stateWrites, writeStateTracked } = useIoBrokerStates();
+  const { client, error, isOnline, states, stateWrites, writeStateTracked } = useIoBrokerStates();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
@@ -816,7 +816,6 @@ export function DashboardScreen() {
                     }}
                     stateWrites={stateWrites}
                     states={states}
-                    stateVersions={stateVersions}
                   />
                 </ScrollView>
               ) : (
