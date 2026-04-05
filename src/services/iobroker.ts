@@ -29,7 +29,6 @@ export type IoBrokerStateStreamEvent = {
 };
 
 const OBJECT_CACHE_TTL_MS = 5 * 60 * 1000;
-const STATE_STREAM_IDLE_TIMEOUT_MS = 45_000;
 const objectCache = new Map<string, ObjectCacheEntry>();
 
 const buildAuthHeader = (settings: DashboardSettings) => {
@@ -137,26 +136,6 @@ export class IoBrokerClient {
     let buffer = "";
     let eventName = "";
     let dataLines: string[] = [];
-    let idleTimer: ReturnType<typeof setTimeout> | null = null;
-    let idleTimedOut = false;
-
-    const clearIdleTimer = () => {
-      if (!idleTimer) {
-        return;
-      }
-      clearTimeout(idleTimer);
-      idleTimer = null;
-    };
-
-    const armIdleTimer = () => {
-      clearIdleTimer();
-      idleTimer = setTimeout(() => {
-        idleTimedOut = true;
-        void reader.cancel().catch(() => {
-          // Ignore best-effort stream cancel errors.
-        });
-      }, STATE_STREAM_IDLE_TIMEOUT_MS);
-    };
 
     const flushEvent = () => {
       if (!dataLines.length) {
@@ -189,50 +168,36 @@ export class IoBrokerClient {
       }
     };
 
-    armIdleTimer();
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          break;
-        }
-        armIdleTimer();
-        buffer += decoder.decode(value, { stream: true });
-
-        let lineBreakIndex = buffer.indexOf("\n");
-        while (lineBreakIndex >= 0) {
-          let line = buffer.slice(0, lineBreakIndex);
-          buffer = buffer.slice(lineBreakIndex + 1);
-          if (line.endsWith("\r")) {
-            line = line.slice(0, -1);
-          }
-
-          if (!line) {
-            flushEvent();
-          } else if (line.startsWith(":")) {
-            // Heartbeat/comment line.
-          } else if (line.startsWith("event:")) {
-            eventName = line.slice(6).trim();
-          } else if (line.startsWith("data:")) {
-            dataLines.push(line.slice(5).trimStart());
-          }
-
-          lineBreakIndex = buffer.indexOf("\n");
-        }
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
       }
-      flushEvent();
-    } finally {
-      clearIdleTimer();
-      try {
-        reader.releaseLock();
-      } catch {
-        // Ignore reader release failures.
+      buffer += decoder.decode(value, { stream: true });
+
+      let lineBreakIndex = buffer.indexOf("\n");
+      while (lineBreakIndex >= 0) {
+        let line = buffer.slice(0, lineBreakIndex);
+        buffer = buffer.slice(lineBreakIndex + 1);
+        if (line.endsWith("\r")) {
+          line = line.slice(0, -1);
+        }
+
+        if (!line) {
+          flushEvent();
+        } else if (line.startsWith(":")) {
+          // Heartbeat/comment line.
+        } else if (line.startsWith("event:")) {
+          eventName = line.slice(6).trim();
+        } else if (line.startsWith("data:")) {
+          dataLines.push(line.slice(5).trimStart());
+        }
+
+        lineBreakIndex = buffer.indexOf("\n");
       }
     }
 
-    if (idleTimedOut) {
-      throw new Error("State stream idle timeout");
-    }
+    flushEvent();
   }
 
   async writeState(stateId: string, value: unknown) {

@@ -480,6 +480,18 @@ async function main(adapter) {
     };
     stateEventClients.add(client);
 
+    res.write("event: ready\ndata: {}\n\n");
+    client.heartbeat = setInterval(() => {
+      if (client.closed) {
+        return;
+      }
+      try {
+        client.res.write(": ping\n\n");
+      } catch {
+        client.closed = true;
+      }
+    }, 20000);
+
     const cleanup = () => {
       if (client.closed) {
         return;
@@ -498,27 +510,8 @@ async function main(adapter) {
       }
     };
 
-    try {
-      res.write("event: ready\ndata: {}\n\n");
-    } catch {
-      cleanup();
-      return;
-    }
-
-    client.heartbeat = setInterval(() => {
-      if (client.closed) {
-        return;
-      }
-      try {
-        client.res.write(": ping\n\n");
-      } catch {
-        cleanup();
-      }
-    }, 20000);
-
     req.on("aborted", cleanup);
     req.on("close", cleanup);
-    res.on("close", cleanup);
   });
 
   app.put("/smarthome-dashboard/api/state", async (req, res) => {
