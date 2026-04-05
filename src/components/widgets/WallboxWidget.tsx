@@ -37,8 +37,6 @@ const FAST_CHARGING_THRESHOLD_W = 5000;
 const CHARGING_INDICATOR_BLINK_MS = 720;
 const CHARGING_BAR_MAX_POWER_W = 11000;
 const CHARGING_BAR_GLOW_CYCLE_MS = 2000;
-const ENERGY_DELTA_TOLERANCE_KWH = 0.02;
-const DAILY_ENERGY_PERSIST_MIN_INTERVAL_MS = 8000;
 const AMPERE_PRESET_VALUES = [6, 10, 12, 14, 16] as const;
 const CONFIRMATION_TIMEOUT_MS = 12_000;
 const WALLBOX_BASE_CONTENT_WIDTH = 560;
@@ -261,31 +259,7 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
   const [powerBarTrackWidth, setPowerBarTrackWidth] = useState(0);
   const barGlowAnim = useRef(new Animated.Value(0)).current;
   const autoStopMarkerRef = useRef("");
-  const dailyEnergyPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dailyEnergyRef = useRef<{
-    dayKey: string;
-    dailyKWh: number;
-    lastMeterKWh: number | null;
-    hasReading: boolean;
-  }>({
-    dayKey: getLocalDayKey(new Date()),
-    dailyKWh: 0,
-    lastMeterKWh: null,
-    hasReading: false,
-  });
-  const dailyEnergyPersistenceRef = useRef<{
-    loaded: boolean;
-    lastPersistAt: number;
-    lastPersistKey: string;
-  }>({
-    loaded: false,
-    lastPersistAt: 0,
-    lastPersistKey: "",
-  });
   const pendingConfirmationsRef = useRef<Record<string, PendingConfirmation>>({});
-  const [currentDayKey, setCurrentDayKey] = useState(() => getLocalDayKey(new Date()));
-  const [dailyEnergyPersistenceReady, setDailyEnergyPersistenceReady] = useState(false);
-  const [dailyChargedEnergyKWh, setDailyChargedEnergyKWh] = useState<number | null>(null);
   const refreshMs = clampInt(config.refreshMs, DEFAULT_REFRESH_MS, MIN_REFRESH_MS);
   const readIds = useMemo(
     () =>
@@ -297,118 +271,6 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
       ]),
     [stateIds]
   );
-
-  const maybePersistDailyEnergy = useCallback(
-    (tracker: { dayKey: string; dailyKWh: number; lastMeterKWh: number | null }, force = false) => {
-      const widgetId = String(config.id || "").trim();
-      if (!widgetId || !dailyEnergyPersistenceRef.current.loaded) {
-        return;
-      }
-
-      const dailyKWh = Math.max(0, tracker.dailyKWh);
-      const lastMeterKWh =
-        tracker.lastMeterKWh === null || !Number.isFinite(tracker.lastMeterKWh)
-          ? null
-          : Math.max(0, tracker.lastMeterKWh);
-      const persistKey = `${tracker.dayKey}:${dailyKWh.toFixed(4)}:${lastMeterKWh === null ? "null" : lastMeterKWh.toFixed(4)}`;
-      const now = Date.now();
-      const persistence = dailyEnergyPersistenceRef.current;
-
-      if (!force && persistKey === persistence.lastPersistKey) {
-        return;
-      }
-      if (!force && now - persistence.lastPersistAt < DAILY_ENERGY_PERSIST_MIN_INTERVAL_MS) {
-        if (dailyEnergyPersistTimerRef.current) {
-          clearTimeout(dailyEnergyPersistTimerRef.current);
-        }
-        const waitMs = Math.max(100, DAILY_ENERGY_PERSIST_MIN_INTERVAL_MS - (now - persistence.lastPersistAt));
-        dailyEnergyPersistTimerRef.current = setTimeout(() => {
-          dailyEnergyPersistTimerRef.current = null;
-          maybePersistDailyEnergy(dailyEnergyRef.current, true);
-        }, waitMs);
-        return;
-      }
-
-      if (dailyEnergyPersistTimerRef.current) {
-        clearTimeout(dailyEnergyPersistTimerRef.current);
-        dailyEnergyPersistTimerRef.current = null;
-      }
-
-      persistence.lastPersistAt = now;
-      persistence.lastPersistKey = persistKey;
-
-      void client
-        .writeWallboxDailyEnergy(widgetId, {
-          dayKey: tracker.dayKey,
-          dailyKWh: Number(dailyKWh.toFixed(6)),
-          lastMeterKWh: lastMeterKWh === null ? null : Number(lastMeterKWh.toFixed(6)),
-        })
-        .catch(() => {});
-    },
-    [client, config.id]
-  );
-
-  useEffect(() => {
-    let active = true;
-    const widgetId = String(config.id || "").trim();
-    const today = getLocalDayKey(new Date());
-    const tracker = dailyEnergyRef.current;
-    tracker.dayKey = today;
-    tracker.dailyKWh = 0;
-    tracker.lastMeterKWh = null;
-    tracker.hasReading = false;
-    dailyEnergyPersistenceRef.current = {
-      loaded: false,
-      lastPersistAt: 0,
-      lastPersistKey: "",
-    };
-    setCurrentDayKey(today);
-    setDailyChargedEnergyKWh(null);
-    setDailyEnergyPersistenceReady(false);
-
-    if (!widgetId) {
-      dailyEnergyPersistenceRef.current.loaded = true;
-      setDailyEnergyPersistenceReady(true);
-      return () => {
-        active = false;
-      };
-    }
-
-    void (async () => {
-      try {
-        const persisted = await client.readWallboxDailyEnergy(widgetId);
-        if (!active || !persisted) {
-          return;
-        }
-
-        const normalizedDailyKWh = Math.max(0, persisted.dailyKWh);
-        const normalizedLastMeterKWh =
-          persisted.lastMeterKWh === null || !Number.isFinite(persisted.lastMeterKWh)
-            ? null
-            : Math.max(0, persisted.lastMeterKWh);
-
-        tracker.dayKey = persisted.dayKey || today;
-        tracker.dailyKWh = normalizedDailyKWh;
-        tracker.lastMeterKWh = normalizedLastMeterKWh;
-        tracker.hasReading = normalizedLastMeterKWh !== null || normalizedDailyKWh > 0;
-        setDailyChargedEnergyKWh(tracker.hasReading ? normalizedDailyKWh : null);
-        dailyEnergyPersistenceRef.current.lastPersistKey = `${tracker.dayKey}:${tracker.dailyKWh.toFixed(4)}:${
-          tracker.lastMeterKWh === null ? "null" : tracker.lastMeterKWh.toFixed(4)
-        }`;
-      } catch {
-        // keep local fallback tracker
-      } finally {
-        if (active) {
-          dailyEnergyPersistenceRef.current.loaded = true;
-          setDailyEnergyPersistenceReady(true);
-        }
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [client, config.id]);
 
   useEffect(() => {
     if (!runtimeActive) {
@@ -543,7 +405,6 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
   const mode = modePendingDisplay ?? (externalManualOverride ? "grid" : normalizeMode(rawMode) ?? "pv");
   const isGridMode = mode === "grid";
   const targetMode = config.targetMode === "km" ? "km" : "soc";
-  const chargedEnergyDisplayMode = config.chargedEnergyDisplayMode === "daily" ? "daily" : "session";
   const targetSocAutoApiStateId = useMemo(
     () => resolveOptionalStateId(config.targetSocAutoApiStateId, WRITE_DEFAULT_IDS.targetSocAutoApi),
     [config.targetSocAutoApiStateId]
@@ -568,8 +429,6 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
   const batterySoc = normalizeFloat(readValue(stateIds.read.batterySoc));
   const carRangeKm = normalizeFloat(readValue(stateIds.read.carRange));
   const chargedEnergyKWh = normalizeEnergyToKWh(readValue(stateIds.read.chargedEnergy));
-  const displayedChargedEnergyKWh = chargedEnergyDisplayMode === "daily" ? dailyChargedEnergyKWh : chargedEnergyKWh;
-  const chargedEnergyLabel = chargedEnergyDisplayMode === "daily" ? "Auto geladen (heute)" : "Gesamt (Session)";
   const directChargingPowerW = normalizePowerToWatts(readValue(stateIds.read.chargePower));
   const estimatedChargingPowerW = estimateChargingPowerW(liveAmpere, actualPhaseSelection);
   const chargingPowerW = directChargingPowerW ?? estimatedChargingPowerW;
@@ -621,69 +480,6 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
       glowLoop.stop();
     };
   }, [barGlowAnim, runtimeActive]);
-
-  useEffect(() => {
-    if (!runtimeActive) {
-      return;
-    }
-    const syncDayKey = () => {
-      const nextDayKey = getLocalDayKey(new Date());
-      setCurrentDayKey((current) => (current === nextDayKey ? current : nextDayKey));
-    };
-    syncDayKey();
-    const timer = setInterval(() => {
-      syncDayKey();
-    }, 30_000);
-    return () => clearInterval(timer);
-  }, [runtimeActive]);
-
-  useEffect(() => {
-    if (!dailyEnergyPersistenceReady) {
-      return;
-    }
-    const tracker = dailyEnergyRef.current;
-    if (tracker.dayKey !== currentDayKey) {
-      tracker.dayKey = currentDayKey;
-      tracker.dailyKWh = 0;
-      tracker.lastMeterKWh = null;
-      tracker.hasReading = false;
-    }
-
-    if (chargedEnergyKWh === null || !Number.isFinite(chargedEnergyKWh) || chargedEnergyKWh < 0) {
-      setDailyChargedEnergyKWh(tracker.hasReading ? Math.max(0, tracker.dailyKWh) : null);
-      maybePersistDailyEnergy(tracker);
-      return;
-    }
-
-    if (!tracker.hasReading || tracker.lastMeterKWh === null || !Number.isFinite(tracker.lastMeterKWh)) {
-      tracker.hasReading = true;
-      tracker.lastMeterKWh = chargedEnergyKWh;
-      tracker.dailyKWh = Math.max(0, tracker.dailyKWh);
-      setDailyChargedEnergyKWh(tracker.dailyKWh);
-      maybePersistDailyEnergy(tracker);
-      return;
-    }
-
-    const delta = chargedEnergyKWh - tracker.lastMeterKWh;
-    if (delta > ENERGY_DELTA_TOLERANCE_KWH) {
-      tracker.dailyKWh += delta;
-    }
-    tracker.lastMeterKWh = chargedEnergyKWh;
-    tracker.dailyKWh = Math.max(0, tracker.dailyKWh);
-    setDailyChargedEnergyKWh(tracker.dailyKWh);
-    maybePersistDailyEnergy(tracker);
-  }, [chargedEnergyKWh, currentDayKey, dailyEnergyPersistenceReady, maybePersistDailyEnergy]);
-
-  useEffect(
-    () => () => {
-      if (dailyEnergyPersistTimerRef.current) {
-        clearTimeout(dailyEnergyPersistTimerRef.current);
-        dailyEnergyPersistTimerRef.current = null;
-      }
-      maybePersistDailyEnergy(dailyEnergyRef.current, true);
-    },
-    [maybePersistDailyEnergy]
-  );
 
   const titleText = (config.title || "Wallbox").trim() || "Wallbox";
   const subtitleText = useMemo(
@@ -1595,9 +1391,9 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
             </Text>
           </View>
           <View style={[styles.metricCard, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
-            <Text numberOfLines={1} style={[styles.metricLabel, { color: mutedTextColor }]}>{chargedEnergyLabel}</Text>
+            <Text numberOfLines={1} style={[styles.metricLabel, { color: mutedTextColor }]}>Gesamt (Session)</Text>
             <Text numberOfLines={1} style={[styles.metricValue, { color: textColor }]}>
-              {formatEnergyKWh(displayedChargedEnergyKWh)}
+              {formatEnergyKWh(chargedEnergyKWh)}
             </Text>
           </View>
           <View style={[styles.metricCard, { borderColor: panelBorderColor, backgroundColor: modePanelBackground }]}>
@@ -2175,13 +1971,6 @@ function formatEnergyKWh(energyKWh: number | null) {
     return `${(energyKWh / 1000).toFixed(2)} MWh`;
   }
   return `${energyKWh.toFixed(1)} kWh`;
-}
-
-function getLocalDayKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 function formatPercent(value: number | null) {
