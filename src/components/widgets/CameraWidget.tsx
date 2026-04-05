@@ -14,6 +14,9 @@ declare global {
 type CameraWidgetProps = {
   config: CameraWidgetConfig;
   maximizeStateValue?: unknown;
+  personDetectionStateValue?: unknown;
+  carDetectionStateValue?: unknown;
+  catDetectionStateValue?: unknown;
   onAspectRatioDetected?: (ratio: number) => void;
   onFullscreenSwipeClose?: () => void;
   onFullscreenVisibilityChange?: (open: boolean) => void;
@@ -33,11 +36,16 @@ const STREAM_ERROR_GRACE_MS = 2500;
 const STREAM_ERROR_AUTO_HIDE_MS = 5000;
 const WEB_FULLSCREEN_MIN_ZOOM = 1;
 const WEB_FULLSCREEN_MAX_ZOOM = 4;
+const DETECTION_ICON_VISIBLE_MS = 2000;
+type DetectionKind = "person" | "car" | "cat";
 let flvLoaderPromise: Promise<boolean> | null = null;
 
 export function CameraWidget({
   config,
   maximizeStateValue,
+  personDetectionStateValue,
+  carDetectionStateValue,
+  catDetectionStateValue,
   onAspectRatioDetected,
   onFullscreenSwipeClose,
   onFullscreenVisibilityChange,
@@ -65,6 +73,11 @@ export function CameraWidget({
   const [audioEnabled, setAudioEnabled] = useState(config.audioEnabled === true);
   const [previewMjpegLoaded, setPreviewMjpegLoaded] = useState(false);
   const [fullscreenMjpegLoaded, setFullscreenMjpegLoaded] = useState(false);
+  const [detectionVisible, setDetectionVisible] = useState<Record<DetectionKind, boolean>>({
+    person: false,
+    car: false,
+    cat: false,
+  });
   const hasReportedAspectRatio = useRef(false);
   const lastTriggerMatchRef = useRef(false);
   const activeLayerRef = useRef<0 | 1>(0);
@@ -81,9 +94,15 @@ export function CameraWidget({
   const webPinchingRef = useRef(false);
   const previewMjpegReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewMjpegReconnectAttemptsRef = useRef(0);
+  const detectionTimerRefs = useRef<Record<DetectionKind, ReturnType<typeof setTimeout> | null>>({
+    person: null,
+    car: null,
+    cat: null,
+  });
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const titleFontSize = Math.max(11, Math.min(28, Math.round(config.titleFontSize || 14)));
+  const showDetectionIcons = config.showDetectionIcons !== false;
   const displayUrl = layerUrls[activeLayer];
   const previewSnapshotBaseUrl = (config.snapshotUrl || config.fullscreenSnapshotUrl || "").trim() || null;
   const fullscreenSnapshotBaseUrl = previewSnapshotBaseUrl;
@@ -194,10 +213,105 @@ export function CameraWidget({
   const showNativeFullscreenAudioToggle = showNativeFullscreenModal && fullscreenSupportsAudio;
   const previewMuted = !(audioEnabled && showInPlaceFullscreen && previewSupportsAudio);
   const fullscreenMuted = !(audioEnabled && showNativeFullscreenModal && fullscreenSupportsAudio);
+  const visibleDetectionBadges = useMemo(() => {
+    if (!showDetectionIcons) {
+      return [];
+    }
+    const badges: Array<{
+      key: DetectionKind;
+      mode: "material" | "icon-file";
+      materialIcon: string;
+      imageUri: string | null;
+    }> = [];
+    if (detectionVisible.person) {
+      badges.push({ key: "person", ...resolveDetectionIconAppearance(config, "person") });
+    }
+    if (detectionVisible.car) {
+      badges.push({ key: "car", ...resolveDetectionIconAppearance(config, "car") });
+    }
+    if (detectionVisible.cat) {
+      badges.push({ key: "cat", ...resolveDetectionIconAppearance(config, "cat") });
+    }
+    return badges;
+  }, [config, detectionVisible.car, detectionVisible.cat, detectionVisible.person, showDetectionIcons]);
 
   useEffect(() => {
     setAudioEnabled(config.audioEnabled === true);
   }, [config.audioEnabled, config.id]);
+
+  const clearDetectionTimer = useCallback((kind: DetectionKind) => {
+    const timer = detectionTimerRefs.current[kind];
+    if (timer) {
+      clearTimeout(timer);
+      detectionTimerRefs.current[kind] = null;
+    }
+  }, []);
+
+  const clearAllDetectionTimers = useCallback(() => {
+    clearDetectionTimer("person");
+    clearDetectionTimer("car");
+    clearDetectionTimer("cat");
+  }, [clearDetectionTimer]);
+
+  const triggerDetectionBadge = useCallback((kind: DetectionKind) => {
+    setDetectionVisible((current) => (current[kind] ? current : { ...current, [kind]: true }));
+    clearDetectionTimer(kind);
+    detectionTimerRefs.current[kind] = setTimeout(() => {
+      detectionTimerRefs.current[kind] = null;
+      setDetectionVisible((current) => (current[kind] ? { ...current, [kind]: false } : current));
+    }, DETECTION_ICON_VISIBLE_MS);
+  }, [clearDetectionTimer]);
+
+  useEffect(() => {
+    return () => {
+      clearAllDetectionTimers();
+    };
+  }, [clearAllDetectionTimers]);
+
+  useEffect(() => {
+    clearAllDetectionTimers();
+    setDetectionVisible({ person: false, car: false, cat: false });
+  }, [
+    clearAllDetectionTimers,
+    config.id,
+    config.personDetectionStateId,
+    config.carDetectionStateId,
+    config.catDetectionStateId,
+  ]);
+
+  useEffect(() => {
+    if (!showDetectionIcons) {
+      clearAllDetectionTimers();
+      setDetectionVisible({ person: false, car: false, cat: false });
+    }
+  }, [clearAllDetectionTimers, showDetectionIcons]);
+
+  useEffect(() => {
+    if (!showDetectionIcons) {
+      return;
+    }
+    if (normalizeBoolean(personDetectionStateValue) === true) {
+      triggerDetectionBadge("person");
+    }
+  }, [personDetectionStateValue, showDetectionIcons, triggerDetectionBadge]);
+
+  useEffect(() => {
+    if (!showDetectionIcons) {
+      return;
+    }
+    if (normalizeBoolean(carDetectionStateValue) === true) {
+      triggerDetectionBadge("car");
+    }
+  }, [carDetectionStateValue, showDetectionIcons, triggerDetectionBadge]);
+
+  useEffect(() => {
+    if (!showDetectionIcons) {
+      return;
+    }
+    if (normalizeBoolean(catDetectionStateValue) === true) {
+      triggerDetectionBadge("cat");
+    }
+  }, [catDetectionStateValue, showDetectionIcons, triggerDetectionBadge]);
 
   const clearPreviewMjpegReconnectTimer = useCallback(() => {
     if (previewMjpegReconnectTimerRef.current) {
@@ -999,6 +1113,37 @@ export function CameraWidget({
                     </View>
                   )
               : null}
+            {visibleDetectionBadges.length ? (
+              <View
+                pointerEvents="none"
+                style={showInPlaceFullscreen ? styles.detectionOverlayFullscreen : styles.detectionOverlayPreview}
+              >
+                {visibleDetectionBadges.map((badge, index) => (
+                  <View
+                    key={`preview-detection-${badge.key}`}
+                    style={[
+                      showInPlaceFullscreen ? styles.detectionBadgeFullscreen : styles.detectionBadgePreview,
+                      badge.mode === "material" ? styles.detectionBadgeMaterialBackdrop : null,
+                      index > 0 ? styles.detectionBadgeSpacing : null,
+                    ]}
+                  >
+                    {badge.mode === "icon-file" && badge.imageUri ? (
+                      <Image
+                        resizeMode="contain"
+                        source={{ uri: badge.imageUri }}
+                        style={showInPlaceFullscreen ? styles.detectionIconFullscreen : styles.detectionIconPreview}
+                      />
+                    ) : (
+                      <MaterialCommunityIcons
+                        color="#ffffff"
+                        name={badge.materialIcon as never}
+                        size={showInPlaceFullscreen ? 17 : 23}
+                      />
+                    )}
+                  </View>
+                ))}
+              </View>
+            ) : null}
             {config.showTitle !== false && config.title ? (
               <View style={styles.titleBadge}>
                 <Text numberOfLines={1} style={[styles.titleBadgeLabel, { color: textColor, fontSize: titleFontSize }]}>
@@ -1247,6 +1392,26 @@ export function CameraWidget({
                     </View>
                   )
               : null}
+            {visibleDetectionBadges.length ? (
+              <View pointerEvents="none" style={styles.detectionOverlayFullscreen}>
+                {visibleDetectionBadges.map((badge, index) => (
+                  <View
+                    key={`fullscreen-detection-${badge.key}`}
+                    style={[
+                      styles.detectionBadgeFullscreen,
+                      badge.mode === "material" ? styles.detectionBadgeMaterialBackdrop : null,
+                      index > 0 ? styles.detectionBadgeSpacing : null,
+                    ]}
+                  >
+                    {badge.mode === "icon-file" && badge.imageUri ? (
+                      <Image resizeMode="contain" source={{ uri: badge.imageUri }} style={styles.detectionIconFullscreen} />
+                    ) : (
+                      <MaterialCommunityIcons color="#ffffff" name={badge.materialIcon as never} size={17} />
+                    )}
+                  </View>
+                ))}
+              </View>
+            ) : null}
           </View>
           {config.showTitle !== false && config.title ? (
             <View style={styles.fullscreenTitle}>
@@ -1318,6 +1483,75 @@ function normalizeBoolean(value: unknown) {
   }
 
   return null;
+}
+
+function normalizeDetectionIconType(
+  value: CameraWidgetConfig["personDetectionIconType"]
+): "material" | "icon-file" {
+  if (value === "icon-file") {
+    return "icon-file";
+  }
+  return "material";
+}
+
+function normalizeMaterialDetectionIcon(value: string | undefined, fallback: string) {
+  const candidate = (value || "").trim();
+  if (candidate && MaterialCommunityIcons.glyphMap[candidate as keyof typeof MaterialCommunityIcons.glyphMap]) {
+    return candidate;
+  }
+  return fallback;
+}
+
+function resolveWidgetImageUri(name: string | undefined) {
+  const trimmed = (name || "").trim();
+  if (!trimmed) {
+    return null;
+  }
+  return `/smarthome-dashboard/widget-assets/${encodeURIComponent(trimmed)}`;
+}
+
+function resolveDetectionIconAppearance(config: CameraWidgetConfig, kind: DetectionKind) {
+  const defaults =
+    kind === "person"
+      ? { materialIcon: "account", imageName: "person_icon_transparent.png" }
+      : kind === "car"
+        ? { materialIcon: "car", imageName: "car_icon_transparent.png" }
+        : { materialIcon: "cat", imageName: "cat_icon_transparent.png" };
+  const iconTypeRaw =
+    kind === "person"
+      ? config.personDetectionIconType
+      : kind === "car"
+        ? config.carDetectionIconType
+        : config.catDetectionIconType;
+  const materialIconRaw =
+    kind === "person"
+      ? config.personDetectionMaterialIcon
+      : kind === "car"
+        ? config.carDetectionMaterialIcon
+        : config.catDetectionMaterialIcon;
+  const iconImageRaw =
+    kind === "person"
+      ? config.personDetectionIconImage
+      : kind === "car"
+        ? config.carDetectionIconImage
+        : config.catDetectionIconImage;
+  const materialIcon = normalizeMaterialDetectionIcon(materialIconRaw, defaults.materialIcon);
+  const iconType = normalizeDetectionIconType(iconTypeRaw);
+  const imageUri = resolveWidgetImageUri(iconImageRaw || defaults.imageName);
+
+  if (iconType === "icon-file" && imageUri) {
+    return {
+      mode: "icon-file" as const,
+      materialIcon,
+      imageUri,
+    };
+  }
+
+  return {
+    mode: "material" as const,
+    materialIcon,
+    imageUri: null,
+  };
 }
 
 function resolveCameraFeed(input: {
@@ -2210,6 +2444,51 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 14,
     fontWeight: "700",
+  },
+  detectionOverlayPreview: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 13,
+    flexDirection: "row",
+  },
+  detectionOverlayFullscreen: {
+    position: "absolute",
+    top: 76,
+    right: 24,
+    zIndex: 32,
+    flexDirection: "row",
+  },
+  detectionBadgePreview: {
+    width: 52,
+    height: 52,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detectionBadgeFullscreen: {
+    width: 34,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detectionBadgeMaterialBackdrop: {
+    borderRadius: 999,
+    backgroundColor: "rgba(4, 8, 14, 0.58)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  detectionIconPreview: {
+    width: 52,
+    height: 52,
+    opacity: 0.96,
+  },
+  detectionIconFullscreen: {
+    width: 34,
+    height: 34,
+    opacity: 0.94,
+  },
+  detectionBadgeSpacing: {
+    marginLeft: 8,
   },
   imageLayer: {
     position: "absolute",
