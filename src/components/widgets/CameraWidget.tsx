@@ -40,6 +40,7 @@ const STREAM_ERROR_AUTO_HIDE_MS = 5000;
 const WEB_FULLSCREEN_MIN_ZOOM = 1;
 const WEB_FULLSCREEN_MAX_ZOOM = 4;
 const DETECTION_ICON_VISIBLE_MS = 2000;
+const DETECTION_ICON_REFRESH_WHILE_TRUE_MS = 1200;
 type DetectionKind = "person" | "car" | "cat";
 let flvLoaderPromise: Promise<boolean> | null = null;
 
@@ -318,6 +319,39 @@ export function CameraWidget({
       triggerDetectionBadge("cat");
     }
   }, [catDetectionStateValue, catDetectionStateVersion, showDetectionIcons, triggerDetectionBadge]);
+
+  useEffect(() => {
+    if (!showDetectionIcons || normalizeBoolean(personDetectionStateValue) !== true) {
+      return;
+    }
+    triggerDetectionBadge("person");
+    const timer = setInterval(() => {
+      triggerDetectionBadge("person");
+    }, DETECTION_ICON_REFRESH_WHILE_TRUE_MS);
+    return () => clearInterval(timer);
+  }, [personDetectionStateValue, showDetectionIcons, triggerDetectionBadge]);
+
+  useEffect(() => {
+    if (!showDetectionIcons || normalizeBoolean(carDetectionStateValue) !== true) {
+      return;
+    }
+    triggerDetectionBadge("car");
+    const timer = setInterval(() => {
+      triggerDetectionBadge("car");
+    }, DETECTION_ICON_REFRESH_WHILE_TRUE_MS);
+    return () => clearInterval(timer);
+  }, [carDetectionStateValue, showDetectionIcons, triggerDetectionBadge]);
+
+  useEffect(() => {
+    if (!showDetectionIcons || normalizeBoolean(catDetectionStateValue) !== true) {
+      return;
+    }
+    triggerDetectionBadge("cat");
+    const timer = setInterval(() => {
+      triggerDetectionBadge("cat");
+    }, DETECTION_ICON_REFRESH_WHILE_TRUE_MS);
+    return () => clearInterval(timer);
+  }, [catDetectionStateValue, showDetectionIcons, triggerDetectionBadge]);
 
   const clearPreviewMjpegReconnectTimer = useCallback(() => {
     if (previewMjpegReconnectTimerRef.current) {

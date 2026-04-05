@@ -109,14 +109,14 @@ export class IoBrokerClient {
       return;
     }
 
-    const params = new URLSearchParams();
-    uniqueStateIds.forEach((stateId) => params.append("stateId", stateId));
-    const response = await fetch(this.endpoint(`/state-events?${params.toString()}`), {
-      method: "GET",
+    const response = await fetch(this.endpoint("/state-events"), {
+      method: "POST",
       headers: {
+        "Content-Type": "application/json",
         Accept: "text/event-stream",
         ...buildAuthHeader(this.settings),
       },
+      body: JSON.stringify({ stateIds: uniqueStateIds }),
       cache: "no-store",
       signal: options.signal,
     });

@@ -25,6 +25,7 @@ const CONFIG_STATE_ID = "dashboardConfig";
 const SAVED_DASHBOARDS_STATE_ID = "savedDashboards";
 const WALLBOX_DAILY_ENERGY_STATE_ID = "wallboxDailyEnergy";
 const LOG_BUFFER_LIMIT = 2000;
+const STATE_EVENT_UNSUBSCRIBE_GRACE_MS = 15000;
 let webShellCache = null;
 let logEntriesBuffer = [];
 let logListenerRegistered = false;
@@ -111,6 +112,7 @@ async function main(adapter) {
   startLogCapture(adapter);
   const stateEventClients = new Set();
   const stateSubscriptionRefCounts = new Map();
+  const pendingStateUnsubscribeTimers = new Map();
 
   const subscribeForeignState = async (stateId) => {
     if (typeof adapter.subscribeForeignStatesAsync === "function") {
@@ -134,12 +136,36 @@ async function main(adapter) {
       return;
     }
 
+    const toSubscribe = [];
     for (const stateId of nextIds) {
+      const pendingTimer = pendingStateUnsubscribeTimers.get(stateId);
+      if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        pendingStateUnsubscribeTimers.delete(stateId);
+      }
       const previousCount = stateSubscriptionRefCounts.get(stateId) || 0;
       if (previousCount === 0) {
-        await subscribeForeignState(stateId);
+        toSubscribe.push(stateId);
       }
       stateSubscriptionRefCounts.set(stateId, previousCount + 1);
+    }
+
+    if (!toSubscribe.length) {
+      return;
+    }
+
+    try {
+      await Promise.all(toSubscribe.map((stateId) => subscribeForeignState(stateId)));
+    } catch (error) {
+      toSubscribe.forEach((stateId) => {
+        const currentCount = stateSubscriptionRefCounts.get(stateId) || 0;
+        if (currentCount <= 1) {
+          stateSubscriptionRefCounts.delete(stateId);
+        } else {
+          stateSubscriptionRefCounts.set(stateId, currentCount - 1);
+        }
+      });
+      throw error;
     }
   };
 
@@ -150,16 +176,26 @@ async function main(adapter) {
     }
 
     for (const stateId of nextIds) {
+      const pendingTimer = pendingStateUnsubscribeTimers.get(stateId);
+      if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        pendingStateUnsubscribeTimers.delete(stateId);
+      }
       const currentCount = stateSubscriptionRefCounts.get(stateId) || 0;
       if (currentCount <= 1) {
         stateSubscriptionRefCounts.delete(stateId);
-        try {
-          await unsubscribeForeignState(stateId);
-        } catch (error) {
-          adapter.log.warn(
-            `State unsubscribe failed for ${stateId}: ${error instanceof Error ? error.message : String(error)}`
-          );
-        }
+        const timer = setTimeout(() => {
+          pendingStateUnsubscribeTimers.delete(stateId);
+          if ((stateSubscriptionRefCounts.get(stateId) || 0) > 0) {
+            return;
+          }
+          void unsubscribeForeignState(stateId).catch((error) => {
+            adapter.log.warn(
+              `State unsubscribe failed for ${stateId}: ${error instanceof Error ? error.message : String(error)}`
+            );
+          });
+        }, STATE_EVENT_UNSUBSCRIBE_GRACE_MS);
+        pendingStateUnsubscribeTimers.set(stateId, timer);
         continue;
       }
       stateSubscriptionRefCounts.set(stateId, currentCount - 1);
@@ -227,7 +263,14 @@ async function main(adapter) {
       }
     }
 
-    const remainingStateIds = Array.from(stateSubscriptionRefCounts.keys());
+    const remainingStateIds = Array.from(
+      new Set([
+        ...stateSubscriptionRefCounts.keys(),
+        ...pendingStateUnsubscribeTimers.keys(),
+      ])
+    );
+    pendingStateUnsubscribeTimers.forEach((timer) => clearTimeout(timer));
+    pendingStateUnsubscribeTimers.clear();
     stateSubscriptionRefCounts.clear();
     await Promise.all(
       remainingStateIds.map(async (stateId) => {
@@ -406,8 +449,8 @@ async function main(adapter) {
     res.json(Object.fromEntries(entries));
   });
 
-  app.get("/smarthome-dashboard/api/state-events", async (req, res) => {
-    const stateIds = normalizeStateEventIds(req.query);
+  app.all("/smarthome-dashboard/api/state-events", async (req, res) => {
+    const stateIds = normalizeStateEventIds(req.query, req.body);
     if (!stateIds.length) {
       res.status(400).json({ error: "stateId missing" });
       return;
@@ -438,26 +481,6 @@ async function main(adapter) {
     stateEventClients.add(client);
 
     res.write("event: ready\ndata: {}\n\n");
-    void Promise.all(
-      stateIds.map(async (stateId) => {
-        const state = await adapter.getForeignStateAsync(stateId);
-        return [stateId, state];
-      })
-    )
-      .then((entries) => {
-        if (client.closed) {
-          return;
-        }
-        entries.forEach(([stateId, state]) => {
-          if (!client.stateIdSet.has(stateId)) {
-            return;
-          }
-          writeStateEvent(client.res, stateId, state);
-        });
-      })
-      .catch(() => {
-        // Initial bootstrap is best-effort; polling fallback keeps dashboard consistent.
-      });
     client.heartbeat = setInterval(() => {
       if (client.closed) {
         return;
@@ -713,7 +736,7 @@ function normalizeRuntimeWidgetId(value) {
   return trimmed;
 }
 
-function normalizeStateEventIds(query) {
+function normalizeStateEventIds(query, body) {
   const rawValues = [];
 
   if (Array.isArray(query?.stateId)) {
@@ -726,6 +749,12 @@ function normalizeStateEventIds(query) {
     rawValues.push(...query.stateIds);
   } else if (typeof query?.stateIds === "string") {
     rawValues.push(...query.stateIds.split(","));
+  }
+
+  if (Array.isArray(body?.stateIds)) {
+    rawValues.push(...body.stateIds);
+  } else if (typeof body?.stateIds === "string") {
+    rawValues.push(...body.stateIds.split(","));
   }
 
   return Array.from(
