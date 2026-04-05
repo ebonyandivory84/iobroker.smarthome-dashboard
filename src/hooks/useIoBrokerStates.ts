@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { IoBrokerClient, IoBrokerStateStreamEvent } from "../services/iobroker";
-import { StateSnapshot, WidgetConfig } from "../types/dashboard";
+import { SolarWidgetConfig, StateSnapshot, WidgetConfig } from "../types/dashboard";
 import { resolveMobileWidget } from "../utils/mobileWidget";
 
 export type StateWriteFeedback = {
@@ -48,8 +48,16 @@ const collectWidgetStateIds = (widget: WidgetConfig) => {
     ];
   }
   if (widget.type === "solar") {
-    const prefix = widget.statePrefix;
-    const withPrefix = (key?: string) => (key ? `${prefix}.${key}` : "");
+    const prefix = typeof widget.statePrefix === "string" ? widget.statePrefix.trim() : "";
+    const keys: Partial<SolarWidgetConfig["keys"]> =
+      widget.keys && typeof widget.keys === "object" ? widget.keys : {};
+    const withPrefix = (key?: string) => {
+      const normalizedKey = typeof key === "string" ? key.trim() : "";
+      if (!normalizedKey) {
+        return "";
+      }
+      return prefix ? `${prefix}.${normalizedKey}` : normalizedKey;
+    };
     return [
       widget.wallboxCarStateId || "",
       widget.wallboxChargePowerStateId || "",
@@ -57,17 +65,17 @@ const collectWidgetStateIds = (widget: WidgetConfig) => {
       widget.wallboxPhaseModeStateId || "",
       widget.wallboxCarSocStateId || "",
       widget.wallboxCarRangeStateId || "",
-      withPrefix(widget.keys.pvNow),
-      withPrefix(widget.keys.homeNow),
-      withPrefix(widget.keys.gridIn),
-      withPrefix(widget.keys.gridOut),
-      withPrefix(widget.keys.soc),
-      withPrefix(widget.keys.battIn),
-      withPrefix(widget.keys.battOut),
-      withPrefix(widget.keys.dayConsumed),
-      withPrefix(widget.keys.daySelf),
-      withPrefix(widget.keys.pvTotal),
-      withPrefix(widget.keys.battTemp),
+      withPrefix(keys.pvNow),
+      withPrefix(keys.homeNow),
+      withPrefix(keys.gridIn),
+      withPrefix(keys.gridOut),
+      withPrefix(keys.soc),
+      withPrefix(keys.battIn),
+      withPrefix(keys.battOut),
+      withPrefix(keys.dayConsumed),
+      withPrefix(keys.daySelf),
+      withPrefix(keys.pvTotal),
+      withPrefix(keys.battTemp),
       widget.stats?.first?.stateId || "",
       widget.stats?.second?.stateId || "",
       widget.stats?.third?.stateId || "",

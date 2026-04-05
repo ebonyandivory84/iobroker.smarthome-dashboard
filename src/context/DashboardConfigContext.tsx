@@ -6,7 +6,14 @@ import {
   useMemo,
   useState,
 } from "react";
-import { CameraWidgetConfig, DashboardPage, DashboardSettings, UiSoundSettings, WidgetConfig } from "../types/dashboard";
+import {
+  CameraWidgetConfig,
+  DashboardPage,
+  DashboardSettings,
+  SolarWidgetConfig,
+  UiSoundSettings,
+  WidgetConfig,
+} from "../types/dashboard";
 import { defaultConfig } from "../utils/defaultConfig";
 import { normalizeSoundSelection } from "../utils/lcarsSounds";
 import { buildMobileOverrideFromWidget, resolveMobileWidget, stripMobileWidgetMeta } from "../utils/mobileWidget";
@@ -43,18 +50,34 @@ type DashboardConfigContextValue = {
 const LEGACY_DEMO_BASE_URL = "http://127.0.0.1:8087";
 const REMOTE_CONFIG_ENDPOINT = "/smarthome-dashboard/api/config";
 const SAVED_DASHBOARDS_ENDPOINT = "/smarthome-dashboard/api/dashboards";
+const SOLAR_DEFAULT_STATE_PREFIX = "0_userdata.0.solar";
+const SOLAR_DEFAULT_KEYS: Required<SolarWidgetConfig["keys"]> = {
+  pvNow: "pv_now",
+  homeNow: "home_now",
+  gridIn: "grid_in",
+  gridOut: "grid_out",
+  soc: "soc",
+  battIn: "battery_charge",
+  battOut: "battery_discharge",
+  dayConsumed: "day_consumed",
+  daySelf: "day_self",
+  pvTotal: "pv_total",
+  battTemp: "battery_temp",
+};
 
 const DashboardConfigContext = createContext<DashboardConfigContextValue | null>(null);
 
 function migrateConfig(input: DashboardSettings): DashboardSettings {
+  const iobrokerInput = input.iobroker || defaultConfig.iobroker;
+  const inputWidgets = Array.isArray(input.widgets) ? input.widgets : [];
   const nextConfig: DashboardSettings = {
     ...input,
     uiSounds: normalizeUiSoundSettings(input.uiSounds),
     iobroker: {
-      ...input.iobroker,
-      baseUrl: input.iobroker.baseUrl === LEGACY_DEMO_BASE_URL ? "" : input.iobroker.baseUrl,
+      ...iobrokerInput,
+      baseUrl: iobrokerInput.baseUrl === LEGACY_DEMO_BASE_URL ? "" : iobrokerInput.baseUrl,
     },
-    widgets: input.widgets.map((widget) => {
+    widgets: inputWidgets.map((widget) => {
       const normalizedInteractionSounds = normalizeWidgetInteractionSounds(widget.interactionSounds);
 
       if (widget.type !== "camera") {
@@ -167,6 +190,33 @@ function normalizeCameraAudioEnabled(value: unknown) {
     .trim()
     .toLowerCase();
   return ["true", "1", "on", "yes"].includes(normalized);
+}
+
+function normalizeTextOrFallback(value: unknown, fallback: string) {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function normalizeSolarWidgetConfig(widget: SolarWidgetConfig): SolarWidgetConfig {
+  const keysInput: Partial<SolarWidgetConfig["keys"]> =
+    widget.keys && typeof widget.keys === "object" ? widget.keys : {};
+
+  return {
+    ...widget,
+    statePrefix: normalizeTextOrFallback(widget.statePrefix, SOLAR_DEFAULT_STATE_PREFIX),
+    keys: {
+      pvNow: normalizeTextOrFallback(keysInput.pvNow, SOLAR_DEFAULT_KEYS.pvNow),
+      homeNow: normalizeTextOrFallback(keysInput.homeNow, SOLAR_DEFAULT_KEYS.homeNow),
+      gridIn: normalizeTextOrFallback(keysInput.gridIn, SOLAR_DEFAULT_KEYS.gridIn),
+      gridOut: normalizeTextOrFallback(keysInput.gridOut, SOLAR_DEFAULT_KEYS.gridOut),
+      soc: normalizeTextOrFallback(keysInput.soc, SOLAR_DEFAULT_KEYS.soc),
+      battIn: normalizeTextOrFallback(keysInput.battIn, SOLAR_DEFAULT_KEYS.battIn),
+      battOut: normalizeTextOrFallback(keysInput.battOut, SOLAR_DEFAULT_KEYS.battOut),
+      dayConsumed: normalizeTextOrFallback(keysInput.dayConsumed, SOLAR_DEFAULT_KEYS.dayConsumed),
+      daySelf: normalizeTextOrFallback(keysInput.daySelf, SOLAR_DEFAULT_KEYS.daySelf),
+      pvTotal: normalizeTextOrFallback(keysInput.pvTotal, SOLAR_DEFAULT_KEYS.pvTotal),
+      battTemp: normalizeTextOrFallback(keysInput.battTemp, SOLAR_DEFAULT_KEYS.battTemp),
+    },
+  };
 }
 
 export function DashboardConfigProvider({ children }: PropsWithChildren) {
@@ -850,7 +900,9 @@ function normalizeWidgetConfigList(input: DashboardSettings["widgets"] | undefin
   const usedIds = new Set<string>();
 
   return input.map((widget, index) => {
-    const baseId = (widget.id || `${widget.type}-${index + 1}`).trim();
+    const normalizedWidget = widget.type === "solar" ? normalizeSolarWidgetConfig(widget) : widget;
+    const rawId = typeof normalizedWidget.id === "string" ? normalizedWidget.id : `${normalizedWidget.type}-${index + 1}`;
+    const baseId = rawId.trim();
     let nextId = baseId || `${widget.type}-${index + 1}`;
     let suffix = 2;
 
@@ -862,9 +914,9 @@ function normalizeWidgetConfigList(input: DashboardSettings["widgets"] | undefin
     usedIds.add(nextId);
 
     return {
-      ...widget,
+      ...normalizedWidget,
       id: nextId,
-      interactionSounds: normalizeWidgetInteractionSounds(widget.interactionSounds),
+      interactionSounds: normalizeWidgetInteractionSounds(normalizedWidget.interactionSounds),
     };
   });
 }

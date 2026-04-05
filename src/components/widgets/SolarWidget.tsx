@@ -85,20 +85,21 @@ export function SolarWidget({ config, states, theme, isActivePage = true }: Sola
     }
     return snapshot[`${config.statePrefix}.${key}`];
   };
+  const keys: Partial<SolarWidgetConfig["keys"]> = config.keys && typeof config.keys === "object" ? config.keys : {};
 
   const incomingSnapshot = useMemo(
     () => ({
-      pvNow: asNumber(getValue(states, config.keys.pvNow)),
-      homeNow: asNumber(getValue(states, config.keys.homeNow)),
-      gridIn: asNumber(getValue(states, config.keys.gridIn)),
-      gridOut: asNumber(getValue(states, config.keys.gridOut)),
-      soc: asNumber(getValue(states, config.keys.soc)),
-      battIn: asNumber(getValue(states, config.keys.battIn)),
-      battOut: asNumber(getValue(states, config.keys.battOut)),
-      battTemp: asNumber(getValue(states, config.keys.battTemp)),
-      pvTotalKWh: normalizeEnergyToKWh(getValue(states, config.keys.pvTotal), config.dailyEnergyUnit),
-      dayConsumedKWh: normalizeEnergyToKWh(getValue(states, config.keys.dayConsumed), config.dailyEnergyUnit),
-      daySelfKWh: normalizeEnergyToKWh(getValue(states, config.keys.daySelf), config.dailyEnergyUnit),
+      pvNow: asNumber(getValue(states, keys.pvNow)),
+      homeNow: asNumber(getValue(states, keys.homeNow)),
+      gridIn: asNumber(getValue(states, keys.gridIn)),
+      gridOut: asNumber(getValue(states, keys.gridOut)),
+      soc: asNumber(getValue(states, keys.soc)),
+      battIn: asNumber(getValue(states, keys.battIn)),
+      battOut: asNumber(getValue(states, keys.battOut)),
+      battTemp: asNumber(getValue(states, keys.battTemp)),
+      pvTotalKWh: normalizeEnergyToKWh(getValue(states, keys.pvTotal), config.dailyEnergyUnit),
+      dayConsumedKWh: normalizeEnergyToKWh(getValue(states, keys.dayConsumed), config.dailyEnergyUnit),
+      daySelfKWh: normalizeEnergyToKWh(getValue(states, keys.daySelf), config.dailyEnergyUnit),
       wallboxCarCodeRaw: asNumber(states[wallboxStateIds.carState]),
       wallboxChargePowerRaw: states[wallboxStateIds.chargePower],
       wallboxAmpere: asNumber(states[wallboxStateIds.ampere]),
@@ -106,7 +107,7 @@ export function SolarWidget({ config, states, theme, isActivePage = true }: Sola
       wallboxCarSocRaw: asNumber(states[wallboxStateIds.carSoc]),
       wallboxCarRangeRaw: asNumber(states[wallboxStateIds.carRange]),
     }),
-    [config.dailyEnergyUnit, config.keys, config.statePrefix, states, wallboxStateIds]
+    [config.dailyEnergyUnit, config.statePrefix, keys, states, wallboxStateIds]
   );
 
   const [displaySnapshot, setDisplaySnapshot] = useState(incomingSnapshot);
