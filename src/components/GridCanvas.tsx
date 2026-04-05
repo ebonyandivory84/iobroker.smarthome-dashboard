@@ -1,5 +1,5 @@
-import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import { Component, createElement, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { StateWriteFeedback } from "../hooks/useIoBrokerStates";
 import { IoBrokerClient } from "../services/iobroker";
@@ -44,62 +44,6 @@ type GridCanvasProps = {
   onDragAcrossPageEdge?: (direction: "left" | "right", widgetId: string, position: WidgetConfig["position"]) => void;
   onWidgetScrollFocusChange?: (widgetId: string, active: boolean) => void;
 };
-
-type WidgetRenderBoundaryProps = {
-  widgetId: string;
-  widgetType: WidgetType;
-  children: ReactNode;
-};
-
-type WidgetRenderBoundaryState = {
-  failed: boolean;
-  errorMessage: string;
-};
-
-class WidgetRenderBoundary extends Component<WidgetRenderBoundaryProps, WidgetRenderBoundaryState> {
-  state: WidgetRenderBoundaryState = {
-    failed: false,
-    errorMessage: "",
-  };
-
-  static getDerivedStateFromError(error: unknown): WidgetRenderBoundaryState {
-    return {
-      failed: true,
-      errorMessage: error instanceof Error ? error.message : String(error || "Unknown error"),
-    };
-  }
-
-  componentDidCatch(error: unknown) {
-    const reason = error instanceof Error ? error.stack || error.message : String(error || "Unknown error");
-    console.error(
-      `[widget-error] id=${this.props.widgetId} type=${this.props.widgetType} render failed: ${reason}`
-    );
-  }
-
-  componentDidUpdate(prevProps: WidgetRenderBoundaryProps) {
-    if (this.state.failed && (prevProps.widgetId !== this.props.widgetId || prevProps.widgetType !== this.props.widgetType)) {
-      this.setState({ failed: false, errorMessage: "" });
-    }
-  }
-
-  render() {
-    if (!this.state.failed) {
-      return this.props.children;
-    }
-
-    return (
-      <View style={styles.widgetErrorFallback}>
-        <Text style={styles.widgetErrorTitle}>Widget konnte nicht geladen werden</Text>
-        <Text style={styles.widgetErrorMeta}>
-          {this.props.widgetType}:{this.props.widgetId}
-        </Text>
-        <Text numberOfLines={3} style={styles.widgetErrorMeta}>
-          {this.state.errorMessage || "Unbekannter Fehler"}
-        </Text>
-      </View>
-    );
-  }
-}
 
 export function GridCanvas({
   config,
@@ -282,23 +226,21 @@ export function GridCanvas({
                 rowHeight={renderRowHeight}
                 widget={widget}
               >
-                <WidgetRenderBoundary widgetId={widget.id} widgetType={widget.type}>
-                  {renderWidget(
-                    widget,
-                    states,
-                    client,
-                    onUpdateWidget,
-                    onWriteState,
-                    displayConfig.theme,
-                    stateWrites,
-                    displayConfig.uiSounds?.widgetTypeDefaults,
-                    onCameraFullscreenSwipeClose,
-                    onCameraFullscreenVisibilityChange,
-                    onWidgetScrollFocusChange,
-                    isActivePage,
-                    stateVersions
-                  )}
-                </WidgetRenderBoundary>
+                {renderWidget(
+                  widget,
+                  states,
+                  client,
+                  onUpdateWidget,
+                  onWriteState,
+                  displayConfig.theme,
+                  stateWrites,
+                  displayConfig.uiSounds?.widgetTypeDefaults,
+                  onCameraFullscreenSwipeClose,
+                  onCameraFullscreenVisibilityChange,
+                  onWidgetScrollFocusChange,
+                  isActivePage,
+                  stateVersions
+                )}
               </WidgetFrame>
             </View>
           );
@@ -1372,23 +1314,21 @@ function WebWidgetShell({
         </div>
       ) : null}
       <View style={contentStyle}>
-        <WidgetRenderBoundary widgetId={widget.id} widgetType={widget.type}>
-          {renderWidget(
-            widget,
-            states,
-            client,
-            onUpdateWidget,
-            onWriteState,
-            config.theme,
-            stateWrites,
-            config.uiSounds?.widgetTypeDefaults,
-            undefined,
-            undefined,
-            onWidgetScrollFocusChange,
-            isActivePage,
-            stateVersions
-          )}
-        </WidgetRenderBoundary>
+        {renderWidget(
+          widget,
+          states,
+          client,
+          onUpdateWidget,
+          onWriteState,
+          config.theme,
+          stateWrites,
+          config.uiSounds?.widgetTypeDefaults,
+          undefined,
+          undefined,
+          onWidgetScrollFocusChange,
+          isActivePage,
+          stateVersions
+        )}
       </View>
       {isLayoutMode && allowManualLayout && allowResize ? (
         <div style={webFooterOverlayStyle}>
@@ -1602,25 +1542,6 @@ const styles = StyleSheet.create({
   webContentBleed: {
     width: "100%",
     height: "100%",
-  },
-  widgetErrorFallback: {
-    flex: 1,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,120,120,0.45)",
-    backgroundColor: "rgba(120,0,0,0.16)",
-    padding: 12,
-    justifyContent: "center",
-    gap: 6,
-  },
-  widgetErrorTitle: {
-    color: "#ffd0d0",
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  widgetErrorMeta: {
-    color: "#ffb5b5",
-    fontSize: 12,
   },
 });
 

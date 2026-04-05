@@ -1,4 +1,4 @@
-import { createElement, useEffect, useState } from "react";
+import { createElement, useState } from "react";
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { GrafanaWidgetConfig } from "../../types/dashboard";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
@@ -10,7 +10,6 @@ type GrafanaWidgetProps = {
 
 export function GrafanaWidget({ config }: GrafanaWidgetProps) {
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
-  const [previewReady, setPreviewReady] = useState(false);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const resolvedUrl = normalizeGrafanaUrl(config.url);
@@ -18,21 +17,10 @@ export function GrafanaWidget({ config }: GrafanaWidgetProps) {
   const interactionsAllowed = config.allowInteractions !== false;
   const sandboxValue = interactionsAllowed ? undefined : "allow-same-origin allow-scripts";
 
-  useEffect(() => {
-    if (Platform.OS !== "web" || !resolvedUrl) {
-      setPreviewReady(false);
-      return;
-    }
-
-    const timer = setTimeout(() => setPreviewReady(true), 700);
-    return () => clearTimeout(timer);
-  }, [resolvedUrl]);
-
   const openFullscreen = () => {
     if (!resolvedUrl) {
       return;
     }
-    setPreviewReady(true);
     playConfiguredUiSound(config.interactionSounds?.press, "panel", `${config.id}:press`);
     playConfiguredUiSound(config.interactionSounds?.open, "open", `${config.id}:open`);
     setFullscreenOpen(true);
@@ -71,12 +59,12 @@ export function GrafanaWidget({ config }: GrafanaWidgetProps) {
           style: webFrameWrapStyle,
         },
         createElement("iframe", {
-          src: previewReady ? iframeUrl : "about:blank",
+          src: iframeUrl,
           style: webPreviewFrameStyle,
           sandbox: sandboxValue,
           allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
           allowFullScreen: true,
-          loading: "lazy",
+          loading: "eager",
           referrerPolicy: "no-referrer",
         }),
         createElement(
