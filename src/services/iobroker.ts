@@ -14,13 +14,6 @@ type ObjectCacheEntry = {
   timestamp: number;
 };
 
-type StateStreamHandlers = {
-  onConnected?: () => void;
-  onSnapshot?: (states: StateSnapshot) => void;
-  onStatePatch?: (states: StateSnapshot) => void;
-  onError?: (message: string) => void;
-};
-
 const OBJECT_CACHE_TTL_MS = 5 * 60 * 1000;
 const objectCache = new Map<string, ObjectCacheEntry>();
 
@@ -68,27 +61,6 @@ export class IoBrokerClient {
     return this.endpoint("/objects");
   }
 
-  canStreamStates() {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    const EventSourceCtor = (globalThis as { EventSource?: unknown }).EventSource;
-    if (typeof EventSourceCtor !== "function") {
-      return false;
-    }
-
-    // Native EventSource does not support custom Authorization headers.
-    if (this.settings.iobroker.token) {
-      return false;
-    }
-    if (this.settings.iobroker.username && this.settings.iobroker.password) {
-      return false;
-    }
-
-    return true;
-  }
-
   async readStates(stateIds: string[]): Promise<StateSnapshot> {
     const uniqueStateIds = [...new Set(stateIds.filter(Boolean))];
     if (uniqueStateIds.length === 0) {
@@ -128,69 +100,6 @@ export class IoBrokerClient {
     } catch (error) {
       console.warn("ioBroker writeState failed", error);
     }
-  }
-
-  streamStates(stateIds: string[], handlers: StateStreamHandlers): (() => void) | null {
-    const uniqueStateIds = [...new Set(stateIds.map((entry) => entry.trim()).filter(Boolean))];
-    if (!uniqueStateIds.length || !this.canStreamStates()) {
-      return null;
-    }
-
-    const EventSourceCtor = (globalThis as { EventSource?: new (url: string, init?: { withCredentials?: boolean }) => any })
-      .EventSource;
-    if (typeof EventSourceCtor !== "function") {
-      return null;
-    }
-
-    const params = new URLSearchParams();
-    uniqueStateIds.forEach((stateId) => params.append("stateId", stateId));
-    const streamUrl = `${this.endpoint("/state-stream")}?${params.toString()}`;
-    const source = new EventSourceCtor(streamUrl, { withCredentials: true });
-
-    const parseStatesPayload = (rawData: unknown): StateSnapshot | null => {
-      if (typeof rawData !== "string" || !rawData) {
-        return null;
-      }
-
-      try {
-        const payload = JSON.parse(rawData) as { states?: StateSnapshot } | null;
-        if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-          return null;
-        }
-        if (!payload.states || typeof payload.states !== "object" || Array.isArray(payload.states)) {
-          return null;
-        }
-        return payload.states;
-      } catch {
-        return null;
-      }
-    };
-
-    source.addEventListener("ready", () => {
-      handlers.onConnected?.();
-    });
-
-    source.addEventListener("snapshot", (event: { data?: string }) => {
-      const nextStates = parseStatesPayload(event?.data);
-      if (nextStates) {
-        handlers.onSnapshot?.(nextStates);
-      }
-    });
-
-    source.addEventListener("state", (event: { data?: string }) => {
-      const patch = parseStatesPayload(event?.data);
-      if (patch) {
-        handlers.onStatePatch?.(patch);
-      }
-    });
-
-    source.addEventListener("error", () => {
-      handlers.onError?.("SSE state stream disconnected");
-    });
-
-    return () => {
-      source.close();
-    };
   }
 
   async listObjects(query = ""): Promise<IoBrokerObjectEntry[]> {

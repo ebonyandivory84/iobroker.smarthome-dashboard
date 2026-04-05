@@ -28,13 +28,27 @@ function inferRaspberryPercentStateId(stateId: string, key: "ramFree" | "diskFre
 }
 
 const collectWidgetStateIds = (widget: WidgetConfig) => {
-  const directStateIds = collectStateIdsDeep(widget);
-
+  if (widget.type === "state") {
+    return [widget.stateId];
+  }
+  if (widget.type === "energy") {
+    return [
+      widget.pvStateId,
+      widget.houseStateId,
+      widget.batteryStateId || "",
+      widget.gridStateId || "",
+    ];
+  }
   if (widget.type === "solar") {
     const prefix = widget.statePrefix;
     const withPrefix = (key?: string) => (key ? `${prefix}.${key}` : "");
     return [
-      ...directStateIds,
+      widget.wallboxCarStateId || "",
+      widget.wallboxChargePowerStateId || "",
+      widget.wallboxAmpereStateId || "",
+      widget.wallboxPhaseModeStateId || "",
+      widget.wallboxCarSocStateId || "",
+      widget.wallboxCarRangeStateId || "",
       withPrefix(widget.keys.pvNow),
       withPrefix(widget.keys.homeNow),
       withPrefix(widget.keys.gridIn),
@@ -46,11 +60,13 @@ const collectWidgetStateIds = (widget: WidgetConfig) => {
       withPrefix(widget.keys.daySelf),
       withPrefix(widget.keys.pvTotal),
       withPrefix(widget.keys.battTemp),
+      widget.stats?.first?.stateId || "",
+      widget.stats?.second?.stateId || "",
+      widget.stats?.third?.stateId || "",
     ];
   }
   if (widget.type === "raspberryPiStats") {
     return [
-      ...directStateIds,
       widget.cpuTempStateId,
       widget.cpuLoadStateId,
       widget.ramFreeStateId,
@@ -60,45 +76,8 @@ const collectWidgetStateIds = (widget: WidgetConfig) => {
       widget.onlineStateId,
     ];
   }
-  return directStateIds;
+  return [];
 };
-
-function collectStateIdsDeep(value: unknown): string[] {
-  const collected = new Set<string>();
-  const visited = new WeakSet<object>();
-
-  const visit = (entry: unknown, key?: string) => {
-    if (typeof entry === "string") {
-      if (key && /stateid$/i.test(key)) {
-        const normalized = entry.trim();
-        if (normalized) {
-          collected.add(normalized);
-        }
-      }
-      return;
-    }
-
-    if (!entry || typeof entry !== "object") {
-      return;
-    }
-    if (visited.has(entry)) {
-      return;
-    }
-    visited.add(entry);
-
-    if (Array.isArray(entry)) {
-      entry.forEach((item) => visit(item));
-      return;
-    }
-
-    Object.entries(entry).forEach(([childKey, childValue]) => {
-      visit(childValue, childKey);
-    });
-  };
-
-  visit(value);
-  return Array.from(collected);
-}
 
 const pickStateIds = (widgets: ReturnType<typeof useDashboardConfig>["config"]["widgets"]) =>
   widgets.flatMap((widget) => {
@@ -122,9 +101,6 @@ export function useIoBrokerStates() {
     let active = true;
     let syncInFlight = false;
     let syncPending = false;
-    let stopStream: (() => void) | null = null;
-    const streamEnabled = client.canStreamStates() && watchedStateIds.length > 0;
-    const pollIntervalMs = streamEnabled ? Math.max(10_000, config.pollingMs * 10) : Math.max(250, config.pollingMs);
 
     const sync = async () => {
       if (syncInFlight) {
@@ -156,58 +132,12 @@ export function useIoBrokerStates() {
 
     void sync();
     client.primeObjectCache();
-    if (streamEnabled) {
-      stopStream = client.streamStates(watchedStateIds, {
-        onConnected: () => {
-          if (!active) {
-            return;
-          }
-          setError(null);
-          setIsOnline(true);
-        },
-        onSnapshot: (snapshot) => {
-          if (!active) {
-            return;
-          }
-          setStates(snapshot);
-          setStateWrites((current) => resolveStateWriteFeedback(current, snapshot));
-          setError(null);
-          setIsOnline(true);
-        },
-        onStatePatch: (patch) => {
-          if (!active) {
-            return;
-          }
-          setStates((current) => {
-            const merged = {
-              ...current,
-              ...patch,
-            };
-            setStateWrites((existing) => resolveStateWriteFeedback(existing, merged));
-            return merged;
-          });
-          setError(null);
-          setIsOnline(true);
-        },
-        onError: (message) => {
-          if (!active) {
-            return;
-          }
-          setError(message);
-          setIsOnline(false);
-        },
-      });
-    }
-
     const timer = setInterval(() => {
       void sync();
-    }, pollIntervalMs);
+    }, Math.max(250, config.pollingMs));
 
     return () => {
       active = false;
-      if (stopStream) {
-        stopStream();
-      }
       clearInterval(timer);
     };
   }, [client, config.pollingMs, watchedStateIds]);

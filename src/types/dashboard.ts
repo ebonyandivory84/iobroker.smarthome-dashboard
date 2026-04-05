@@ -119,7 +119,6 @@ export type CameraWidgetConfig = WidgetBase & {
   maximizeStateId?: string;
   maximizeTriggerFormat?: "boolean" | "number" | "text";
   maximizeTriggerValue?: string;
-  personDetectedStateId?: string;
 };
 
 export type GrafanaWidgetConfig = WidgetBase & {

@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Image, Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { CameraWidgetConfig } from "../../types/dashboard";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
 import { palette } from "../../utils/theme";
@@ -14,7 +14,6 @@ declare global {
 type CameraWidgetProps = {
   config: CameraWidgetConfig;
   maximizeStateValue?: unknown;
-  personDetectedStateValue?: unknown;
   onAspectRatioDetected?: (ratio: number) => void;
   onFullscreenSwipeClose?: () => void;
   onFullscreenVisibilityChange?: (open: boolean) => void;
@@ -32,17 +31,13 @@ const FLV_RECONNECT_DELAY_MS = 1800;
 const FMP4_RECONNECT_DELAY_MS = 1800;
 const STREAM_ERROR_GRACE_MS = 2500;
 const STREAM_ERROR_AUTO_HIDE_MS = 5000;
-const PERSON_DETECTION_BLINK_MS = 420;
-const PERSON_DETECTION_MIN_OPACITY = 0.24;
 const WEB_FULLSCREEN_MIN_ZOOM = 1;
 const WEB_FULLSCREEN_MAX_ZOOM = 4;
-const personDetectionColor = "#ff3b30";
 let flvLoaderPromise: Promise<boolean> | null = null;
 
 export function CameraWidget({
   config,
   maximizeStateValue,
-  personDetectedStateValue,
   onAspectRatioDetected,
   onFullscreenSwipeClose,
   onFullscreenVisibilityChange,
@@ -86,7 +81,6 @@ export function CameraWidget({
   const webPinchingRef = useRef(false);
   const previewMjpegReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewMjpegReconnectAttemptsRef = useRef(0);
-  const personAlertOpacity = useRef(new Animated.Value(0)).current;
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const titleFontSize = Math.max(11, Math.min(28, Math.round(config.titleFontSize || 14)));
@@ -200,42 +194,10 @@ export function CameraWidget({
   const showNativeFullscreenAudioToggle = showNativeFullscreenModal && fullscreenSupportsAudio;
   const previewMuted = !(audioEnabled && showInPlaceFullscreen && previewSupportsAudio);
   const fullscreenMuted = !(audioEnabled && showNativeFullscreenModal && fullscreenSupportsAudio);
-  const personDetectedActive = normalizeBoolean(personDetectedStateValue) === true;
-  const showPersonDetectedAlert = personDetectedActive && !showInPlaceFullscreen && !showNativeFullscreenModal;
 
   useEffect(() => {
     setAudioEnabled(config.audioEnabled === true);
   }, [config.audioEnabled, config.id]);
-
-  useEffect(() => {
-    personAlertOpacity.stopAnimation();
-    if (!showPersonDetectedAlert) {
-      personAlertOpacity.setValue(0);
-      return;
-    }
-
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(personAlertOpacity, {
-          toValue: 1,
-          duration: PERSON_DETECTION_BLINK_MS,
-          useNativeDriver: true,
-        }),
-        Animated.timing(personAlertOpacity, {
-          toValue: PERSON_DETECTION_MIN_OPACITY,
-          duration: PERSON_DETECTION_BLINK_MS,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    loop.start();
-
-    return () => {
-      loop.stop();
-      personAlertOpacity.stopAnimation();
-      personAlertOpacity.setValue(0);
-    };
-  }, [personAlertOpacity, showPersonDetectedAlert]);
 
   const clearPreviewMjpegReconnectTimer = useCallback(() => {
     if (previewMjpegReconnectTimerRef.current) {
@@ -1043,9 +1005,6 @@ export function CameraWidget({
                   {config.title}
                 </Text>
               </View>
-            ) : null}
-            {showPersonDetectedAlert ? (
-              <Animated.View pointerEvents="none" style={[styles.personDetectedBorder, { opacity: personAlertOpacity }]} />
             ) : null}
           </View>
         ) : (
@@ -2251,20 +2210,6 @@ const styles = StyleSheet.create({
     color: palette.text,
     fontSize: 14,
     fontWeight: "700",
-  },
-  personDetectedBorder: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 18,
-    borderWidth: 3,
-    borderColor: personDetectionColor,
-    shadowColor: personDetectionColor,
-    shadowOpacity: 0.82,
-    shadowRadius: 10,
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
-    elevation: 7,
   },
   imageLayer: {
     position: "absolute",
