@@ -29,6 +29,7 @@ import { WeatherWidget } from "./widgets/WeatherWidget";
 type GridCanvasProps = {
   config: DashboardSettings;
   states: StateSnapshot;
+  stateVersions?: Record<string, number>;
   client: IoBrokerClient;
   isActivePage?: boolean;
   isLayoutMode: boolean;
@@ -47,6 +48,7 @@ type GridCanvasProps = {
 export function GridCanvas({
   config,
   states,
+  stateVersions = {},
   client,
   isActivePage = true,
   isLayoutMode,
@@ -170,6 +172,7 @@ export function GridCanvas({
         onWidgetScrollFocusChange={onWidgetScrollFocusChange}
         stateWrites={stateWrites}
         states={states}
+        stateVersions={stateVersions}
       />
     ) : (
       <View style={[styles.canvas, { height: canvasHeight }]}>
@@ -235,7 +238,8 @@ export function GridCanvas({
                   onCameraFullscreenSwipeClose,
                   onCameraFullscreenVisibilityChange,
                   onWidgetScrollFocusChange,
-                  isActivePage
+                  isActivePage,
+                  stateVersions
                 )}
               </WidgetFrame>
             </View>
@@ -867,6 +871,7 @@ function WebGridCanvas({
   sourceColumns,
   theme,
   states,
+  stateVersions,
   client,
   cellWidth,
   canvasHeight,
@@ -886,6 +891,7 @@ function WebGridCanvas({
   sourceColumns: number;
   theme: ReturnType<typeof resolveThemeSettings>;
   states: StateSnapshot;
+  stateVersions: Record<string, number>;
   client: IoBrokerClient;
   cellWidth: number;
   canvasHeight: number;
@@ -938,6 +944,7 @@ function WebGridCanvas({
           mainColumnExtraGap={mainColumnExtraGap}
           sourceColumns={sourceColumns}
           states={states}
+          stateVersions={stateVersions}
           stepX={stepX}
           stepY={stepY}
           widget={widget}
@@ -954,6 +961,7 @@ function WebWidgetShell({
   rowHeight,
   theme,
   states,
+  stateVersions,
   client,
   stepX,
   stepY,
@@ -977,6 +985,7 @@ function WebWidgetShell({
   rowHeight: number;
   theme: ReturnType<typeof resolveThemeSettings>;
   states: StateSnapshot;
+  stateVersions: Record<string, number>;
   client: IoBrokerClient;
   stepX: number;
   stepY: number;
@@ -1317,7 +1326,8 @@ function WebWidgetShell({
           undefined,
           undefined,
           onWidgetScrollFocusChange,
-          isActivePage
+          isActivePage,
+          stateVersions
         )}
       </View>
       {isLayoutMode && allowManualLayout && allowResize ? (
@@ -1355,7 +1365,8 @@ function renderWidget(
   onCameraFullscreenSwipeClose?: () => void,
   onCameraFullscreenVisibilityChange?: (widgetId: string, open: boolean) => void,
   onWidgetScrollFocusChange?: (widgetId: string, active: boolean) => void,
-  isActivePage: boolean = true
+  isActivePage: boolean = true,
+  stateVersions: Record<string, number> = {}
 ) {
   const effectiveWidget = mergeWidgetInteractionSounds(widget, widgetTypeDefaults?.[widget.type]);
 
@@ -1386,6 +1397,15 @@ function renderWidget(
         }
         carDetectionStateValue={effectiveWidget.carDetectionStateId ? states[effectiveWidget.carDetectionStateId] : undefined}
         catDetectionStateValue={effectiveWidget.catDetectionStateId ? states[effectiveWidget.catDetectionStateId] : undefined}
+        personDetectionStateVersion={
+          effectiveWidget.personDetectionStateId ? stateVersions[effectiveWidget.personDetectionStateId] : undefined
+        }
+        carDetectionStateVersion={
+          effectiveWidget.carDetectionStateId ? stateVersions[effectiveWidget.carDetectionStateId] : undefined
+        }
+        catDetectionStateVersion={
+          effectiveWidget.catDetectionStateId ? stateVersions[effectiveWidget.catDetectionStateId] : undefined
+        }
         onFullscreenSwipeClose={onCameraFullscreenSwipeClose}
         onFullscreenVisibilityChange={(open) => onCameraFullscreenVisibilityChange?.(effectiveWidget.id, open)}
         onAspectRatioDetected={(ratio) => {

@@ -17,6 +17,9 @@ type CameraWidgetProps = {
   personDetectionStateValue?: unknown;
   carDetectionStateValue?: unknown;
   catDetectionStateValue?: unknown;
+  personDetectionStateVersion?: number;
+  carDetectionStateVersion?: number;
+  catDetectionStateVersion?: number;
   onAspectRatioDetected?: (ratio: number) => void;
   onFullscreenSwipeClose?: () => void;
   onFullscreenVisibilityChange?: (open: boolean) => void;
@@ -46,6 +49,9 @@ export function CameraWidget({
   personDetectionStateValue,
   carDetectionStateValue,
   catDetectionStateValue,
+  personDetectionStateVersion,
+  carDetectionStateVersion,
+  catDetectionStateVersion,
   onAspectRatioDetected,
   onFullscreenSwipeClose,
   onFullscreenVisibilityChange,
@@ -293,7 +299,7 @@ export function CameraWidget({
     if (normalizeBoolean(personDetectionStateValue) === true) {
       triggerDetectionBadge("person");
     }
-  }, [personDetectionStateValue, showDetectionIcons, triggerDetectionBadge]);
+  }, [personDetectionStateValue, personDetectionStateVersion, showDetectionIcons, triggerDetectionBadge]);
 
   useEffect(() => {
     if (!showDetectionIcons) {
@@ -302,7 +308,7 @@ export function CameraWidget({
     if (normalizeBoolean(carDetectionStateValue) === true) {
       triggerDetectionBadge("car");
     }
-  }, [carDetectionStateValue, showDetectionIcons, triggerDetectionBadge]);
+  }, [carDetectionStateValue, carDetectionStateVersion, showDetectionIcons, triggerDetectionBadge]);
 
   useEffect(() => {
     if (!showDetectionIcons) {
@@ -311,7 +317,7 @@ export function CameraWidget({
     if (normalizeBoolean(catDetectionStateValue) === true) {
       triggerDetectionBadge("cat");
     }
-  }, [catDetectionStateValue, showDetectionIcons, triggerDetectionBadge]);
+  }, [catDetectionStateValue, catDetectionStateVersion, showDetectionIcons, triggerDetectionBadge]);
 
   const clearPreviewMjpegReconnectTimer = useCallback(() => {
     if (previewMjpegReconnectTimerRef.current) {
