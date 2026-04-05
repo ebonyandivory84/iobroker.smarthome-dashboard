@@ -61,14 +61,7 @@ function startAdapter(options) {
 async function main(adapter) {
   runningAdapter = adapter;
   const app = express();
-  app.use(express.json({ limit: "10mb" }));
-  app.use((error, _req, res, next) => {
-    if (error && (error.type === "entity.too.large" || error.status === 413)) {
-      res.status(413).json({ error: "Payload too large (max 10mb)" });
-      return;
-    }
-    next(error);
-  });
+  app.use(express.json());
   const webRoot = resolveWebRoot(adapter);
   const widgetAssetsRoot = path.resolve(__dirname, "..", "assets");
   const devServerUrl =

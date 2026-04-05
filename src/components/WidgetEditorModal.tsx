@@ -584,7 +584,6 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     }
 
     const solarStatDraft = buildSolarStatEditorDraft(widget.stats);
-    const solarKeys = resolveSolarKeys(widget.keys);
     setSoundDraft({});
     setWeatherSuggestions([]);
     setWeatherSearchBusy(false);
@@ -603,17 +602,17 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       statePrefix: widget.statePrefix,
       dailyEnergyUnit: widget.dailyEnergyUnit || "auto",
       statValueUnit: widget.statValueUnit || "none",
-      keyPvNow: solarKeys.pvNow,
-      keyHomeNow: solarKeys.homeNow,
-      keyGridIn: solarKeys.gridIn,
-      keyGridOut: solarKeys.gridOut,
-      keySoc: solarKeys.soc || "",
-      keyBattIn: solarKeys.battIn || "",
-      keyBattOut: solarKeys.battOut || "",
-      keyDayConsumed: solarKeys.dayConsumed,
-      keyDaySelf: solarKeys.daySelf,
-      keyPvTotal: solarKeys.pvTotal || "",
-      keyBattTemp: solarKeys.battTemp || "",
+      keyPvNow: widget.keys.pvNow,
+      keyHomeNow: widget.keys.homeNow,
+      keyGridIn: widget.keys.gridIn,
+      keyGridOut: widget.keys.gridOut,
+      keySoc: widget.keys.soc || "",
+      keyBattIn: widget.keys.battIn || "",
+      keyBattOut: widget.keys.battOut || "",
+      keyDayConsumed: widget.keys.dayConsumed,
+      keyDaySelf: widget.keys.daySelf,
+      keyPvTotal: widget.keys.pvTotal || "",
+      keyBattTemp: widget.keys.battTemp || "",
       statTextScalePct: String(Math.round((widget.statTextScale ?? 1) * 100)),
       statCount: String(solarStatDraft.count),
       stat1Label: solarStatDraft.cards[0].label,
@@ -1072,7 +1071,6 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         appearance,
       });
     } else {
-      const solarKeys = resolveSolarKeys(widget.keys);
       onSave(widget.id, {
         title: draft.title,
         showTitle: draft.showTitle !== "false",
@@ -1096,15 +1094,15 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
             ? draft.statValueUnit
             : "none",
         keys: {
-          pvNow: draft.keyPvNow || solarKeys.pvNow,
-          homeNow: draft.keyHomeNow || solarKeys.homeNow,
-          gridIn: draft.keyGridIn || solarKeys.gridIn,
-          gridOut: draft.keyGridOut || solarKeys.gridOut,
+          pvNow: draft.keyPvNow || widget.keys.pvNow,
+          homeNow: draft.keyHomeNow || widget.keys.homeNow,
+          gridIn: draft.keyGridIn || widget.keys.gridIn,
+          gridOut: draft.keyGridOut || widget.keys.gridOut,
           soc: draft.keySoc || undefined,
           battIn: draft.keyBattIn || undefined,
           battOut: draft.keyBattOut || undefined,
-          dayConsumed: draft.keyDayConsumed || solarKeys.dayConsumed,
-          daySelf: draft.keyDaySelf || solarKeys.daySelf,
+          dayConsumed: draft.keyDayConsumed || widget.keys.dayConsumed,
+          daySelf: draft.keyDaySelf || widget.keys.daySelf,
           pvTotal: draft.keyPvTotal || undefined,
           battTemp: draft.keyBattTemp || undefined,
         },
@@ -4087,19 +4085,6 @@ const SOLAR_DEFAULT_STAT_LABELS = [
   "Stat 5",
   "Stat 6",
 ];
-const SOLAR_DEFAULT_KEYS = {
-  pvNow: "pv_now",
-  homeNow: "home_now",
-  gridIn: "grid_in",
-  gridOut: "grid_out",
-  soc: "soc",
-  battIn: "battery_charge",
-  battOut: "battery_discharge",
-  dayConsumed: "day_consumed",
-  daySelf: "day_self",
-  pvTotal: "pv_total",
-  battTemp: "battery_temp",
-} as const;
 
 function clampSolarStatCount(raw: string | number | undefined, fallback = 2) {
   const parsed = typeof raw === "number" ? raw : Number.parseInt(raw || "", 10);
@@ -4129,26 +4114,6 @@ function buildSolarStatEditorDraft(stats: Extract<WidgetConfig, { type: "solar" 
   });
 
   return { count, cards };
-}
-
-function resolveSolarKeys(input: Extract<WidgetConfig, { type: "solar" }>["keys"] | undefined) {
-  const source: Partial<Extract<WidgetConfig, { type: "solar" }>["keys"]> =
-    input && typeof input === "object" ? input : {};
-  const read = (value: unknown, fallback: string) =>
-    typeof value === "string" && value.trim() ? value.trim() : fallback;
-  return {
-    pvNow: read(source.pvNow, SOLAR_DEFAULT_KEYS.pvNow),
-    homeNow: read(source.homeNow, SOLAR_DEFAULT_KEYS.homeNow),
-    gridIn: read(source.gridIn, SOLAR_DEFAULT_KEYS.gridIn),
-    gridOut: read(source.gridOut, SOLAR_DEFAULT_KEYS.gridOut),
-    soc: read(source.soc, SOLAR_DEFAULT_KEYS.soc),
-    battIn: read(source.battIn, SOLAR_DEFAULT_KEYS.battIn),
-    battOut: read(source.battOut, SOLAR_DEFAULT_KEYS.battOut),
-    dayConsumed: read(source.dayConsumed, SOLAR_DEFAULT_KEYS.dayConsumed),
-    daySelf: read(source.daySelf, SOLAR_DEFAULT_KEYS.daySelf),
-    pvTotal: read(source.pvTotal, SOLAR_DEFAULT_KEYS.pvTotal),
-    battTemp: read(source.battTemp, SOLAR_DEFAULT_KEYS.battTemp),
-  };
 }
 
 function buildSolarStats(draft: Record<string, string>) {
