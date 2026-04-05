@@ -1659,14 +1659,21 @@ async function writeSavedDashboards(adapter, dashboards) {
 
 async function sendWebShell(webRoot, res, next) {
   try {
-    if (!webShellCache) {
-      const indexPath = path.join(webRoot, "index.html");
+    const indexPath = path.join(webRoot, "index.html");
+    const stat = await fs.promises.stat(indexPath);
+    const mtimeMs = Number(stat.mtimeMs) || 0;
+
+    if (!webShellCache || webShellCache.path !== indexPath || webShellCache.mtimeMs !== mtimeMs) {
       const html = await fs.promises.readFile(indexPath, "utf8");
-      webShellCache = injectStandaloneMeta(html);
+      webShellCache = {
+        html: injectStandaloneMeta(html),
+        mtimeMs,
+        path: indexPath,
+      };
     }
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(webShellCache);
+    res.send(webShellCache.html);
   } catch (error) {
     next(error);
   }
