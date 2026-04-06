@@ -125,6 +125,78 @@ export function DashboardScreen() {
   }, []);
 
   useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") {
+      return;
+    }
+
+    const html = document.documentElement;
+    const body = document.body;
+    const styleTagId = "smarthome-dashboard-ios-web-fixes";
+    const viewportMeta = document.querySelector('meta[name="viewport"]');
+    const previousViewport = viewportMeta?.getAttribute("content") ?? null;
+    const previousHtmlWebkitTextAdjust = html.style.getPropertyValue("-webkit-text-size-adjust");
+    const previousHtmlTextAdjust = html.style.getPropertyValue("text-size-adjust");
+    const previousBodyWebkitTextAdjust = body.style.getPropertyValue("-webkit-text-size-adjust");
+    const previousBodyTextAdjust = body.style.getPropertyValue("text-size-adjust");
+
+    html.style.setProperty("-webkit-text-size-adjust", "100%");
+    html.style.setProperty("text-size-adjust", "100%");
+    body.style.setProperty("-webkit-text-size-adjust", "100%");
+    body.style.setProperty("text-size-adjust", "100%");
+
+    if (viewportMeta) {
+      const normalized = previousViewport || "width=device-width, initial-scale=1";
+      const hasViewportFit = /viewport-fit\s*=\s*cover/i.test(normalized);
+      const nextViewport = hasViewportFit ? normalized : `${normalized}, viewport-fit=cover`;
+      viewportMeta.setAttribute("content", nextViewport);
+    }
+
+    let injectedStyle: HTMLStyleElement | null = null;
+    const isIosWeb =
+      typeof navigator !== "undefined" &&
+      (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+    if (isIosWeb && !document.getElementById(styleTagId)) {
+      injectedStyle = document.createElement("style");
+      injectedStyle.id = styleTagId;
+      injectedStyle.textContent = `
+        input, textarea, select {
+          font-size: 16px !important;
+        }
+      `;
+      document.head.appendChild(injectedStyle);
+    }
+
+    return () => {
+      if (viewportMeta && previousViewport !== null) {
+        viewportMeta.setAttribute("content", previousViewport);
+      }
+      if (previousHtmlWebkitTextAdjust) {
+        html.style.setProperty("-webkit-text-size-adjust", previousHtmlWebkitTextAdjust);
+      } else {
+        html.style.removeProperty("-webkit-text-size-adjust");
+      }
+      if (previousHtmlTextAdjust) {
+        html.style.setProperty("text-size-adjust", previousHtmlTextAdjust);
+      } else {
+        html.style.removeProperty("text-size-adjust");
+      }
+      if (previousBodyWebkitTextAdjust) {
+        body.style.setProperty("-webkit-text-size-adjust", previousBodyWebkitTextAdjust);
+      } else {
+        body.style.removeProperty("-webkit-text-size-adjust");
+      }
+      if (previousBodyTextAdjust) {
+        body.style.setProperty("text-size-adjust", previousBodyTextAdjust);
+      } else {
+        body.style.removeProperty("text-size-adjust");
+      }
+      if (injectedStyle?.parentNode) {
+        injectedStyle.parentNode.removeChild(injectedStyle);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined" || typeof document === "undefined" || !isPhoneWeb) {
       return;
     }
@@ -722,8 +794,6 @@ export function DashboardScreen() {
           minHeight: "100dvh",
           paddingTop: "env(safe-area-inset-top)",
           paddingBottom: "env(safe-area-inset-bottom)",
-          paddingLeft: "env(safe-area-inset-left)",
-          paddingRight: "env(safe-area-inset-right)",
         } as any)
       : null;
 
