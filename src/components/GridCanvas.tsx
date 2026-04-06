@@ -73,8 +73,8 @@ export function GridCanvas({
   const isCompactViewport = windowWidth < 700 || isPhoneLikeWeb;
   const isCompactWeb = Platform.OS === "web" && isCompactViewport;
   const isTabletLikeWeb = Platform.OS === "web" && windowWidth >= 700 && windowWidth < 1100;
-  const isPhoneWeb = Platform.OS === "web" && isPhoneLikeWeb && Math.min(windowWidth, windowHeight) <= 500;
-  const displayColumns = isCompactViewport ? 3 : 9;
+  const isPhoneSingleColumn = Platform.OS === "web" && isPhoneLikeWeb && Math.min(windowWidth, windowHeight) <= 500;
+  const displayColumns = isPhoneSingleColumn ? 1 : isCompactViewport ? 3 : 9;
   const effectiveLayoutMode = isLayoutMode;
   const displayGap = Platform.OS === "web" && !isCompactWeb ? Math.max(config.grid.gap, 18) : config.grid.gap;
   const mainColumnExtraGap = Platform.OS === "web" && !isCompactWeb ? displayGap * 2 : 0;
@@ -87,6 +87,7 @@ export function GridCanvas({
       const next = buildResponsiveAutoLayoutConfig(renderConfig, displayColumns, {
         isTabletLikeWeb,
         stackPrimarySections: isCompactViewport,
+        singleColumnSectionStack: isPhoneSingleColumn,
       });
       return {
         ...next,
@@ -96,10 +97,10 @@ export function GridCanvas({
         },
       };
     },
-    [displayColumns, displayGap, isCompactViewport, isTabletLikeWeb, renderConfig]
+    [displayColumns, displayGap, isCompactViewport, isPhoneSingleColumn, isTabletLikeWeb, renderConfig]
   );
   const useStructuredGridSizing = true;
-  const canvasInset = Platform.OS === "web" ? (isPhoneWeb ? 14 : 64) : 60;
+  const canvasInset = Platform.OS === "web" ? (isPhoneSingleColumn ? 14 : 64) : 60;
   const availableWidth = containerWidth > 0 ? containerWidth : windowWidth;
   const canvasWidth = Math.max(320, availableWidth - canvasInset);
   const cellWidth = useMemo(() => {
@@ -107,9 +108,16 @@ export function GridCanvas({
     const totalMainExtraGap = mainColumnExtraGap * 2;
     return (canvasWidth - totalGap - totalMainExtraGap) / displayConfig.grid.columns;
   }, [canvasWidth, displayConfig.grid.columns, displayConfig.grid.gap, mainColumnExtraGap]);
-  const compactSizingCellWidth = useMemo(() => cellWidth, [cellWidth]);
+  const compactSizingCellWidth = useMemo(() => {
+    if (!isPhoneSingleColumn) {
+      return cellWidth;
+    }
+    const sizingColumns = 3;
+    const sizingGap = (sizingColumns - 1) * displayConfig.grid.gap;
+    return (canvasWidth - sizingGap) / sizingColumns;
+  }, [canvasWidth, cellWidth, displayConfig.grid.gap, isPhoneSingleColumn]);
   const renderRowHeight = useStructuredGridSizing
-    ? (isCompactViewport ? Math.max(isPhoneWeb ? 78 : 0, compactSizingCellWidth * 0.72) : cellWidth)
+    ? (isCompactViewport ? compactSizingCellWidth * 0.72 : cellWidth)
     : displayConfig.grid.rowHeight;
 
   const canvasHeight = useMemo(() => {
@@ -121,7 +129,7 @@ export function GridCanvas({
   }, [displayConfig.grid.gap, displayConfig.widgets, renderRowHeight]);
 
   useEffect(() => {
-    if (!isCompactViewport) {
+    if (!isCompactViewport || isPhoneSingleColumn) {
       return;
     }
 
@@ -133,7 +141,7 @@ export function GridCanvas({
       }
       onUpdateWidget(displayWidget.id, { mobilePosition: displayWidget.position });
     }
-  }, [config.widgets, displayConfig.widgets, isCompactViewport, onUpdateWidget]);
+  }, [config.widgets, displayConfig.widgets, isCompactViewport, isPhoneSingleColumn, onUpdateWidget]);
 
   const handleLayout = (event: LayoutChangeEvent) => {
     const nextWidth = event.nativeEvent.layout.width;
