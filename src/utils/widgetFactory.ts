@@ -26,8 +26,10 @@ export function buildWidgetTemplate(
                   ? 6
                     : type === "host"
                       ? 6
-                      : type === "raspberryPiStats"
-                        ? 6
+                    : type === "raspberryPiStats"
+                      ? 6
+                    : type === "coco"
+                      ? 6
                     : type === "wallbox" || type === "goe"
                       ? 6
                     : type === "heating" || type === "heatingV2"
@@ -55,6 +57,8 @@ export function buildWidgetTemplate(
                     : type === "host"
                       ? 3
                       : type === "raspberryPiStats"
+                        ? 3
+                      : type === "coco"
                         ? 3
                       : type === "wallbox" || type === "goe"
                         ? 3
@@ -254,6 +258,40 @@ export function buildWidgetTemplate(
       diskFreeStateId: "0_userdata.0.NAS-pi.diskFreePercent",
       diskFreeUnit: "percent",
       onlineStateId: "0_userdata.0.NAS-pi.online",
+      position: {
+        ...basePosition,
+        w: Math.min(6, grid.columns),
+      },
+    };
+  }
+
+  if (type === "coco") {
+    return {
+      id: `coco-${suffix}`,
+      type: "coco",
+      title: "Coco",
+      catName: "Coco",
+      refreshMs: 30000,
+      insideStateId: "sureflap.0.Home.pets.Coco.inside",
+      lastDirectionStateId: "sureflap.0.Home.pets.Coco.movement.last_direction",
+      lastFlapStateId: "sureflap.0.Home.pets.Coco.movement.last_flap",
+      lastTimeStateId: "sureflap.0.Home.pets.Coco.movement.last_time",
+      timesOutsideStateId: "sureflap.0.Home.pets.Coco.movement.times_outside",
+      timeSpentOutsideStateId: "sureflap.0.Home.pets.Coco.movement.time_spent_outside",
+      flapBatteryStateId: "sureflap.0.Home.Coco.Coco_Klappe.battery_percentage",
+      flapOnlineStateId: "sureflap.0.Home.Coco.Coco_Klappe.online",
+      hubOnlineStateId: "sureflap.0.Home.Coco.online",
+      adapterConnectedStateId: "sureflap.0.info.connection",
+      allDevicesOnlineStateId: "sureflap.0.info.all_devices_online",
+      offlineDevicesStateId: "sureflap.0.info.offline_devices",
+      lockModeStateId: "",
+      lockWriteStateId: "",
+      lockValueType: "number",
+      lockUnlockedValue: "0",
+      lockInOnlyValue: "1",
+      lockOutOnlyValue: "2",
+      lockLockedValue: "3",
+      snapshotUrl: "",
       position: {
         ...basePosition,
         w: Math.min(6, grid.columns),

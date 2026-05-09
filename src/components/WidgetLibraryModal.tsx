@@ -95,6 +95,12 @@ const OPTIONS: Array<{
     icon: "raspberry-pi",
   },
   {
+    type: "coco",
+    title: "Coco",
+    description: "SureFlap-Status, Lock-Modus und Snapshot der Katzenklappe in einem Widget.",
+    icon: "cat",
+  },
+  {
     type: "wallbox",
     title: "Wallbox",
     description: "Steuert go-e Lademodus, Netzstrom und 80%-Begrenzung in einer kompakten Card.",

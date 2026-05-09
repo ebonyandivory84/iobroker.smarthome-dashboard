@@ -76,6 +76,24 @@ const collectWidgetStateIds = (widget: WidgetConfig) => {
       widget.onlineStateId,
     ];
   }
+  if (widget.type === "coco") {
+    return [
+      widget.insideStateId,
+      widget.lastDirectionStateId || "",
+      widget.lastFlapStateId || "",
+      widget.lastTimeStateId,
+      widget.timesOutsideStateId || "",
+      widget.timeSpentOutsideStateId || "",
+      widget.flapBatteryStateId || "",
+      widget.flapOnlineStateId || "",
+      widget.hubOnlineStateId || "",
+      widget.adapterConnectedStateId || "",
+      widget.allDevicesOnlineStateId || "",
+      widget.offlineDevicesStateId || "",
+      widget.lockModeStateId || "",
+      widget.lockWriteStateId || "",
+    ];
+  }
   return [];
 };
 

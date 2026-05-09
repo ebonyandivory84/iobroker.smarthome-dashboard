@@ -322,6 +322,57 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       return;
     }
 
+    if (widget.type === "coco") {
+      setSoundDraft({
+        press: resolveDraftSoundValue(
+          widget.interactionSounds?.press,
+          config.uiSounds?.widgetTypeDefaults?.coco?.press
+        ),
+        confirm: resolveDraftSoundValue(
+          widget.interactionSounds?.confirm,
+          config.uiSounds?.widgetTypeDefaults?.coco?.confirm
+        ),
+        open: resolveDraftSoundValue(
+          widget.interactionSounds?.open,
+          config.uiSounds?.widgetTypeDefaults?.coco?.open
+        ),
+        close: resolveDraftSoundValue(
+          widget.interactionSounds?.close,
+          config.uiSounds?.widgetTypeDefaults?.coco?.close
+        ),
+      });
+      setWeatherSuggestions([]);
+      setWeatherSearchBusy(false);
+      setDraft({
+        title: widget.title,
+        showTitle: widget.showTitle === false ? "false" : "true",
+        catName: widget.catName || widget.title || "Coco",
+        refreshMs: String(widget.refreshMs || 30000),
+        insideStateId: widget.insideStateId || "sureflap.0.Home.pets.Coco.inside",
+        lastDirectionStateId: widget.lastDirectionStateId || "sureflap.0.Home.pets.Coco.movement.last_direction",
+        lastFlapStateId: widget.lastFlapStateId || "sureflap.0.Home.pets.Coco.movement.last_flap",
+        lastTimeStateId: widget.lastTimeStateId || "sureflap.0.Home.pets.Coco.movement.last_time",
+        timesOutsideStateId: widget.timesOutsideStateId || "sureflap.0.Home.pets.Coco.movement.times_outside",
+        timeSpentOutsideStateId: widget.timeSpentOutsideStateId || "sureflap.0.Home.pets.Coco.movement.time_spent_outside",
+        flapBatteryStateId: widget.flapBatteryStateId || "sureflap.0.Home.Coco.Coco_Klappe.battery_percentage",
+        flapOnlineStateId: widget.flapOnlineStateId || "sureflap.0.Home.Coco.Coco_Klappe.online",
+        hubOnlineStateId: widget.hubOnlineStateId || "sureflap.0.Home.Coco.online",
+        adapterConnectedStateId: widget.adapterConnectedStateId || "sureflap.0.info.connection",
+        allDevicesOnlineStateId: widget.allDevicesOnlineStateId || "sureflap.0.info.all_devices_online",
+        offlineDevicesStateId: widget.offlineDevicesStateId || "sureflap.0.info.offline_devices",
+        lockModeStateId: widget.lockModeStateId || "",
+        lockWriteStateId: widget.lockWriteStateId || "",
+        lockValueType: widget.lockValueType || "number",
+        lockUnlockedValue: widget.lockUnlockedValue || "0",
+        lockInOnlyValue: widget.lockInOnlyValue || "1",
+        lockOutOnlyValue: widget.lockOutOnlyValue || "2",
+        lockLockedValue: widget.lockLockedValue || "3",
+        snapshotUrl: widget.snapshotUrl || "",
+        ...appearanceDraft,
+      });
+      return;
+    }
+
     if (widget.type === "wallbox" || widget.type === "goe") {
       const allowChargingWriteStateId =
         widget.stopWriteStateId || widget.allowChargingStateId || "go-e-gemini-adapter.0.control.allowCharging";
@@ -872,6 +923,39 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         diskFreeStateId: draft.diskFreeStateId?.trim() || widget.diskFreeStateId,
         diskFreeUnit: normalizeRaspberryDataUnit(draft.diskFreeUnit, widget.diskFreeUnit || "percent"),
         onlineStateId: draft.onlineStateId?.trim() || widget.onlineStateId,
+        appearance,
+      });
+    } else if (widget.type === "coco") {
+      onSave(widget.id, {
+        title: draft.title,
+        showTitle: draft.showTitle !== "false",
+        catName: draft.catName?.trim() || undefined,
+        refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 30000, 1000),
+        insideStateId: draft.insideStateId?.trim() || widget.insideStateId,
+        lastDirectionStateId: draft.lastDirectionStateId?.trim() || undefined,
+        lastFlapStateId: draft.lastFlapStateId?.trim() || undefined,
+        lastTimeStateId: draft.lastTimeStateId?.trim() || widget.lastTimeStateId,
+        timesOutsideStateId: draft.timesOutsideStateId?.trim() || undefined,
+        timeSpentOutsideStateId: draft.timeSpentOutsideStateId?.trim() || undefined,
+        flapBatteryStateId: draft.flapBatteryStateId?.trim() || undefined,
+        flapOnlineStateId: draft.flapOnlineStateId?.trim() || undefined,
+        hubOnlineStateId: draft.hubOnlineStateId?.trim() || undefined,
+        adapterConnectedStateId: draft.adapterConnectedStateId?.trim() || undefined,
+        allDevicesOnlineStateId: draft.allDevicesOnlineStateId?.trim() || undefined,
+        offlineDevicesStateId: draft.offlineDevicesStateId?.trim() || undefined,
+        lockModeStateId: draft.lockModeStateId?.trim() || undefined,
+        lockWriteStateId: draft.lockWriteStateId?.trim() || undefined,
+        lockValueType: draft.lockValueType === "string" ? "string" : "number",
+        lockUnlockedValue: draft.lockUnlockedValue?.trim() || undefined,
+        lockInOnlyValue: draft.lockInOnlyValue?.trim() || undefined,
+        lockOutOnlyValue: draft.lockOutOnlyValue?.trim() || undefined,
+        lockLockedValue: draft.lockLockedValue?.trim() || undefined,
+        snapshotUrl: draft.snapshotUrl?.trim() || undefined,
+        interactionSounds: buildStoredInteractionSounds(
+          widget.type,
+          soundDraft,
+          config.uiSounds?.widgetTypeDefaults?.[widget.type]
+        ),
         appearance,
       });
     } else if (widget.type === "wallbox" || widget.type === "goe") {
@@ -2212,6 +2296,208 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 <Text style={styles.mappingHint}>
                   Design wie Host-Widget, aber voll ueber externe Datenpunkte steuerbar (z. B. Raspberry Pi im LAN).
                 </Text>
+              </>
+            ) : null}
+            {widget.type === "coco" ? (
+              <>
+                <View style={styles.splitRow}>
+                  <Field label="Name">
+                    <TextInput
+                      onChangeText={(value) => setDraft((current) => ({ ...current, catName: value }))}
+                      style={styles.input}
+                      value={draft.catName || "Coco"}
+                    />
+                  </Field>
+                  <Field label="Refresh (ms)">
+                    <TextInput
+                      keyboardType="numeric"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, refreshMs: value }))}
+                      style={styles.input}
+                      value={draft.refreshMs || "30000"}
+                    />
+                  </Field>
+                </View>
+                <View style={styles.groupCard}>
+                  <Text style={styles.groupTitle}>SureFlap States</Text>
+                  <Field label="Inside">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("insideStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, insideStateId: value }))}
+                      value={draft.insideStateId || ""}
+                    />
+                  </Field>
+                  <Field label="Last Time">
+                    <StateFieldInput
+                      onBrowse={() => setPickerField("lastTimeStateId")}
+                      onChangeText={(value) => setDraft((current) => ({ ...current, lastTimeStateId: value }))}
+                      value={draft.lastTimeStateId || ""}
+                    />
+                  </Field>
+                  <View style={styles.splitRow}>
+                    <Field label="Last Direction">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("lastDirectionStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, lastDirectionStateId: value }))}
+                        value={draft.lastDirectionStateId || ""}
+                      />
+                    </Field>
+                    <Field label="Last Flap">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("lastFlapStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, lastFlapStateId: value }))}
+                        value={draft.lastFlapStateId || ""}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Times Outside">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("timesOutsideStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, timesOutsideStateId: value }))}
+                        value={draft.timesOutsideStateId || ""}
+                      />
+                    </Field>
+                    <Field label="Time Spent Outside">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("timeSpentOutsideStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, timeSpentOutsideStateId: value }))}
+                        value={draft.timeSpentOutsideStateId || ""}
+                      />
+                    </Field>
+                  </View>
+                </View>
+                <View style={styles.groupCard}>
+                  <Text style={styles.groupTitle}>Status</Text>
+                  <View style={styles.splitRow}>
+                    <Field label="Klappen-Batterie">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("flapBatteryStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, flapBatteryStateId: value }))}
+                        value={draft.flapBatteryStateId || ""}
+                      />
+                    </Field>
+                    <Field label="Klappe Online">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("flapOnlineStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, flapOnlineStateId: value }))}
+                        value={draft.flapOnlineStateId || ""}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Hub Online">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("hubOnlineStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, hubOnlineStateId: value }))}
+                        value={draft.hubOnlineStateId || ""}
+                      />
+                    </Field>
+                    <Field label="Adapter verbunden">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("adapterConnectedStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, adapterConnectedStateId: value }))}
+                        value={draft.adapterConnectedStateId || ""}
+                      />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Alle Devices Online">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("allDevicesOnlineStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, allDevicesOnlineStateId: value }))}
+                        value={draft.allDevicesOnlineStateId || ""}
+                      />
+                    </Field>
+                    <Field label="Offline Devices">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("offlineDevicesStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, offlineDevicesStateId: value }))}
+                        value={draft.offlineDevicesStateId || ""}
+                      />
+                    </Field>
+                  </View>
+                </View>
+                <View style={styles.groupCard}>
+                  <Text style={styles.groupTitle}>Lock-Modus</Text>
+                  <View style={styles.splitRow}>
+                    <Field label="Lock Status State">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("lockModeStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, lockModeStateId: value }))}
+                        value={draft.lockModeStateId || ""}
+                      />
+                    </Field>
+                    <Field label="Lock Write State">
+                      <StateFieldInput
+                        onBrowse={() => setPickerField("lockWriteStateId")}
+                        onChangeText={(value) => setDraft((current) => ({ ...current, lockWriteStateId: value }))}
+                        value={draft.lockWriteStateId || ""}
+                      />
+                    </Field>
+                  </View>
+                  <Field label="Wertetyp">
+                    <ChoiceRow
+                      options={["number", "string"]}
+                      value={draft.lockValueType || "number"}
+                      onSelect={(value) => setDraft((current) => ({ ...current, lockValueType: value }))}
+                    />
+                  </Field>
+                  <View style={styles.splitRow}>
+                    <Field label="Offen">
+                      <TextInput onChangeText={(value) => setDraft((current) => ({ ...current, lockUnlockedValue: value }))} style={styles.input} value={draft.lockUnlockedValue || "0"} />
+                    </Field>
+                    <Field label="Nur rein">
+                      <TextInput onChangeText={(value) => setDraft((current) => ({ ...current, lockInOnlyValue: value }))} style={styles.input} value={draft.lockInOnlyValue || "1"} />
+                    </Field>
+                  </View>
+                  <View style={styles.splitRow}>
+                    <Field label="Nur raus">
+                      <TextInput onChangeText={(value) => setDraft((current) => ({ ...current, lockOutOnlyValue: value }))} style={styles.input} value={draft.lockOutOnlyValue || "2"} />
+                    </Field>
+                    <Field label="Gesperrt">
+                      <TextInput onChangeText={(value) => setDraft((current) => ({ ...current, lockLockedValue: value }))} style={styles.input} value={draft.lockLockedValue || "3"} />
+                    </Field>
+                  </View>
+                </View>
+                <Field label="Snapshot URL">
+                  <TextInput
+                    autoCapitalize="none"
+                    onChangeText={(value) => setDraft((current) => ({ ...current, snapshotUrl: value }))}
+                    placeholder="http://..."
+                    placeholderTextColor={palette.textMuted}
+                    style={styles.input}
+                    value={draft.snapshotUrl || ""}
+                  />
+                </Field>
+                <Field label="Sounds bei Interaktion">
+                  <Field label="Lock Button">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, press: value }))}
+                      value={soundDraft.press}
+                    />
+                  </Field>
+                  <Field label="Lock bestaetigt">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, confirm: value }))}
+                      value={soundDraft.confirm}
+                    />
+                  </Field>
+                  <Field label="Snapshot Vollbild">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, open: value }))}
+                      value={soundDraft.open}
+                    />
+                  </Field>
+                  <Field label="Snapshot schliessen">
+                    <SoundPickerField
+                      onChange={(value) => setSoundDraft((current) => ({ ...current, close: value }))}
+                      value={soundDraft.close}
+                    />
+                  </Field>
+                  <EditorButtonPressable onPress={saveSoundsAsTypeDefault} style={styles.inlineActionButton}>
+                    <Text style={styles.inlineActionLabel}>Als Default fuer alle Coco-Widgets verwenden</Text>
+                  </EditorButtonPressable>
+                </Field>
               </>
             ) : null}
             {widget.type === "wallbox" || widget.type === "goe" ? (
@@ -4116,6 +4402,19 @@ function getWidgetAppearanceDefaults(
       iconColor2: "#5f8cf0",
       inactiveWidgetColor: "#f5bd6c",
       inactiveWidgetColor2: "#e69b56",
+    };
+  }
+
+  if (widget.type === "coco") {
+    return {
+      widgetColor: "rgba(20, 30, 44, 0.96)",
+      widgetColor2: "rgba(10, 16, 27, 0.98)",
+      textColor: "#f5f8ff",
+      mutedTextColor: "rgba(214, 224, 244, 0.76)",
+      cardColor: "rgba(255,255,255,0.05)",
+      activeWidgetColor: "#58d68d",
+      inactiveWidgetColor: "#f2bd66",
+      iconColor: "#7eb9ff",
     };
   }
 

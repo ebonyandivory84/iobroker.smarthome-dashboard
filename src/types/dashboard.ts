@@ -12,6 +12,7 @@ export type WidgetType =
   | "script"
   | "host"
   | "raspberryPiStats"
+  | "coco"
   | "wallbox"
   | "goe"
   | "heating"
@@ -196,6 +197,35 @@ export type RaspberryPiStatsWidgetConfig = WidgetBase & {
   diskFreeStateId: string;
   diskFreeUnit?: "auto" | "B" | "kB" | "MB" | "GB" | "percent";
   onlineStateId: string;
+};
+
+export type CocoLockValueType = "number" | "string";
+
+export type CocoWidgetConfig = WidgetBase & {
+  type: "coco";
+  manualHeightOverride?: boolean;
+  refreshMs?: number;
+  catName?: string;
+  insideStateId: string;
+  lastDirectionStateId?: string;
+  lastFlapStateId?: string;
+  lastTimeStateId: string;
+  timesOutsideStateId?: string;
+  timeSpentOutsideStateId?: string;
+  flapBatteryStateId?: string;
+  flapOnlineStateId?: string;
+  hubOnlineStateId?: string;
+  adapterConnectedStateId?: string;
+  allDevicesOnlineStateId?: string;
+  offlineDevicesStateId?: string;
+  lockModeStateId?: string;
+  lockWriteStateId?: string;
+  lockValueType?: CocoLockValueType;
+  lockUnlockedValue?: string;
+  lockInOnlyValue?: string;
+  lockOutOnlyValue?: string;
+  lockLockedValue?: string;
+  snapshotUrl?: string;
 };
 
 export type WallboxWidgetConfig = WidgetBase & {
@@ -432,6 +462,7 @@ export type WidgetConfig =
   | ScriptWidgetConfig
   | HostStatsWidgetConfig
   | RaspberryPiStatsWidgetConfig
+  | CocoWidgetConfig
   | WallboxWidgetConfig
   | GoEWidgetConfig
   | HeatingWidgetConfig

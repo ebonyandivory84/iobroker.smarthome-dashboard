@@ -11,6 +11,7 @@ import { resolveThemeSettings } from "../utils/themeConfig";
 import { palette } from "../utils/theme";
 import { WidgetFrame } from "./WidgetFrame";
 import { CameraWidget } from "./widgets/CameraWidget";
+import { CocoWidget } from "./widgets/CocoWidget";
 import { EnergyWidget } from "./widgets/EnergyWidget";
 import { GrafanaWidget } from "./widgets/GrafanaWidget";
 import { HostStatsWidget } from "./widgets/HostStatsWidget";
@@ -197,6 +198,7 @@ export function GridCanvas({
                   widget.type === "script" ||
                   widget.type === "host" ||
                   widget.type === "raspberryPiStats" ||
+                  widget.type === "coco" ||
                   widget.type === "wallbox" ||
                   widget.type === "goe" ||
                   widget.type === "heating" ||
@@ -655,6 +657,7 @@ function getAutoLayoutSpec(
         return { w: 1, h: roundGridUnit(2.6) };
       case "host":
       case "raspberryPiStats":
+      case "coco":
         if (widget.manualHeightOverride) {
           return { w: 1, h: Math.max(1, roundGridUnit(fallbackHeight)) };
         }
@@ -725,6 +728,7 @@ function getAutoLayoutSpec(
       return { w: mainColumnWidth, h: roundGridUnit(2.6) };
     case "host":
     case "raspberryPiStats":
+    case "coco":
       if (widget.manualHeightOverride) {
         return { w: mainColumnWidth, h: Math.max(1, roundGridUnit(fallbackHeight)) };
       }
@@ -930,6 +934,7 @@ function WebGridCanvas({
             widget.type === "script" ||
             widget.type === "host" ||
             widget.type === "raspberryPiStats" ||
+            widget.type === "coco" ||
             widget.type === "wallbox" ||
             widget.type === "goe" ||
             widget.type === "heating" ||
@@ -1004,6 +1009,7 @@ function WebWidgetShell({
     widget.type !== "camera" &&
     widget.type !== "wallbox" &&
     widget.type !== "goe" &&
+    widget.type !== "coco" &&
     widget.type !== "heating" &&
     widget.type !== "heatingV2" &&
     widget.showTitle !== false &&
@@ -1093,6 +1099,7 @@ function WebWidgetShell({
           widget.type === "script" ||
           widget.type === "host" ||
           widget.type === "raspberryPiStats" ||
+          widget.type === "coco" ||
           widget.type === "wallbox" ||
           widget.type === "goe" ||
           widget.type === "heating" ||
@@ -1110,7 +1117,7 @@ function WebWidgetShell({
           ...active.startPosition,
           x: clamp(active.startPosition.x + dx, 0, config.grid.columns - active.startPosition.w),
           y: Math.max(0, active.startPosition.y + dy),
-        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : widget.type === "grafana" || widget.type === "log" || widget.type === "script" || widget.type === "host" || widget.type === "raspberryPiStats" || widget.type === "wallbox" || widget.type === "goe" || widget.type === "heating" || widget.type === "heatingV2" ? { minHeight: 1, heightSnap: 0.1 } : undefined);
+        }, config.grid.columns, widget.type === "camera" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : widget.type === "grafana" || widget.type === "log" || widget.type === "script" || widget.type === "host" || widget.type === "raspberryPiStats" || widget.type === "coco" || widget.type === "wallbox" || widget.type === "goe" || widget.type === "heating" || widget.type === "heatingV2" ? { minHeight: 1, heightSnap: 0.1 } : undefined);
         setPreview(nextPreview);
 
         if (isLayoutMode && onDragAcrossPageEdge) {
@@ -1142,6 +1149,7 @@ function WebWidgetShell({
           widget.type === "script" ||
           widget.type === "host" ||
           widget.type === "raspberryPiStats" ||
+          widget.type === "coco" ||
           widget.type === "wallbox" ||
           widget.type === "goe" ||
           widget.type === "heating" ||
@@ -1255,6 +1263,7 @@ function WebWidgetShell({
     widget.type !== "state" &&
     widget.type !== "wallbox" &&
     widget.type !== "goe" &&
+    widget.type !== "coco" &&
     widget.type !== "heating" &&
     widget.type !== "heatingV2" &&
     widget.type !== "numpad" &&
@@ -1453,6 +1462,10 @@ function renderWidget(
 
   if (effectiveWidget.type === "raspberryPiStats") {
     return <RaspberryPiStatsWidget config={effectiveWidget} states={states} />;
+  }
+
+  if (effectiveWidget.type === "coco") {
+    return <CocoWidget client={client} config={effectiveWidget} states={states} />;
   }
 
   if (effectiveWidget.type === "wallbox" || effectiveWidget.type === "goe") {
@@ -1683,7 +1696,7 @@ const webResizeHandleStyle: CSSProperties = {
 function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThemeSettings>): CSSProperties {
   const appearance = widget.appearance;
   if (appearance?.widgetColor) {
-    if (widget.type === "wallbox" || widget.type === "goe" || widget.type === "heating" || widget.type === "heatingV2") {
+    if (widget.type === "wallbox" || widget.type === "goe" || widget.type === "coco" || widget.type === "heating" || widget.type === "heatingV2") {
       return {
         background: buildGradientBackground(appearance.widgetColor, appearance.widgetColor2),
         border: "none",
@@ -1774,6 +1787,13 @@ function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThe
       background: "linear-gradient(140deg, rgba(15, 34, 66, 0.95), rgba(8, 18, 36, 0.98))",
       border: "1px solid rgba(105, 182, 255, 0.24)",
       boxShadow: "0 14px 24px rgba(5, 12, 24, 0.34)",
+    };
+  }
+  if (type === "coco") {
+    return {
+      background: "linear-gradient(145deg, rgba(20, 30, 44, 0.96), rgba(10, 16, 27, 0.98))",
+      border: "none",
+      boxShadow: "0 16px 28px rgba(5, 10, 19, 0.34)",
     };
   }
   if (type === "wallbox" || type === "goe") {

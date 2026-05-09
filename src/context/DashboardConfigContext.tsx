@@ -869,6 +869,7 @@ function normalizeWidgetTypeSoundDefaults(
     script: normalizeWidgetInteractionSounds(input.script),
     host: normalizeWidgetInteractionSounds(input.host),
     raspberryPiStats: normalizeWidgetInteractionSounds(input.raspberryPiStats),
+    coco: normalizeWidgetInteractionSounds(input.coco),
     wallbox: normalizeWidgetInteractionSounds(input.wallbox),
     goe: normalizeWidgetInteractionSounds(input.goe),
     heating: normalizeWidgetInteractionSounds(input.heating),
