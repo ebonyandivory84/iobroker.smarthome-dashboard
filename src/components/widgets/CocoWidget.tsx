@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useEffect, useMemo, useState } from "react";
-import { Image, Modal, Pressable, StyleSheet, Text, View, type DimensionValue } from "react-native";
+import { createElement, useEffect, useMemo, useState } from "react";
+import { Image, Modal, Platform, Pressable, StyleSheet, Text, View, type DimensionValue } from "react-native";
 import { IoBrokerClient } from "../../services/iobroker";
 import { CocoWidgetConfig, StateSnapshot } from "../../types/dashboard";
 import { palette } from "../../utils/theme";
@@ -46,7 +46,10 @@ export function CocoWidget({ client, config, states }: CocoWidgetProps) {
   const lockModeValue = config.lockModeStateId ? states[config.lockModeStateId] : undefined;
   const lockOptions = useMemo(() => buildLockOptions(config), [config]);
   const snapshotUrl = (config.snapshotUrl || "").trim();
+  const streamUrl = (config.streamUrl || "").trim();
+  const fullscreenMediaMode = config.fullscreenMediaMode || "snapshot";
   const snapshotUri = snapshotUrl ? appendCacheBuster(snapshotUrl, now) : "";
+  const fullscreenMediaUrl = fullscreenMediaMode === "snapshot" ? snapshotUri : streamUrl;
   const locationLabel = inside === null ? "Unbekannt" : inside ? "Drinnen" : "Draußen";
   const locationIcon = inside === false ? "weather-night" : "home-heart";
   const statusSince = lastTime ? formatDuration((now - lastTime.getTime()) / 1000) : "keine Zeit";
@@ -84,7 +87,7 @@ export function CocoWidget({ client, config, states }: CocoWidgetProps) {
   };
 
   const openSnapshot = () => {
-    if (!snapshotUri) {
+    if (!snapshotUri && !streamUrl) {
       return;
     }
     playConfiguredUiSound(config.interactionSounds?.open || config.interactionSounds?.press, "tap", `${config.id}:snapshot-open`);
@@ -190,7 +193,13 @@ export function CocoWidget({ client, config, states }: CocoWidgetProps) {
           <Pressable onPress={closeSnapshot} style={styles.fullscreenClose}>
             <MaterialCommunityIcons color="#fff" name="close" size={28} />
           </Pressable>
-          {snapshotUri ? <Image resizeMode="contain" source={{ uri: snapshotUri }} style={styles.fullscreenImage} /> : null}
+          <FullscreenMedia
+            mode={fullscreenMediaMode}
+            mutedTextColor={mutedTextColor}
+            snapshotUri={snapshotUri}
+            textColor={textColor}
+            url={fullscreenMediaUrl}
+          />
         </View>
       </Modal>
     </View>
@@ -244,6 +253,61 @@ function StatusPill({ online }: { online: boolean }) {
     <View style={[styles.statusPill, { backgroundColor: online ? "rgba(88,214,141,0.16)" : "rgba(255,107,122,0.16)" }]}>
       <View style={[styles.statusDot, { backgroundColor: online ? palette.success : palette.danger }]} />
       <Text style={[styles.statusText, { color: online ? palette.success : palette.danger }]}>{online ? "Online" : "Warnung"}</Text>
+    </View>
+  );
+}
+
+function FullscreenMedia({
+  mode,
+  mutedTextColor,
+  snapshotUri,
+  textColor,
+  url,
+}: {
+  mode: CocoWidgetConfig["fullscreenMediaMode"];
+  mutedTextColor: string;
+  snapshotUri: string;
+  textColor: string;
+  url: string;
+}) {
+  const mediaMode = mode || "snapshot";
+
+  if (!url) {
+    return (
+      <View style={styles.fullscreenFallback}>
+        <MaterialCommunityIcons color={mutedTextColor} name="camera-off-outline" size={42} />
+        <Text style={[styles.fullscreenFallbackText, { color: mutedTextColor }]}>Keine Snapshot- oder Stream-URL gesetzt</Text>
+      </View>
+    );
+  }
+
+  if (mediaMode === "mjpeg" || mediaMode === "snapshot") {
+    return <Image resizeMode="contain" source={{ uri: mediaMode === "snapshot" ? snapshotUri || url : url }} style={styles.fullscreenImage} />;
+  }
+
+  if (Platform.OS === "web" && mediaMode === "iframe") {
+    return createElement("iframe", {
+      allow: "autoplay; fullscreen; picture-in-picture",
+      src: url,
+      style: webFullscreenFrameStyle,
+    });
+  }
+
+  if (Platform.OS === "web" && mediaMode === "video") {
+    return createElement("video", {
+      autoPlay: true,
+      controls: true,
+      muted: true,
+      playsInline: true,
+      src: url,
+      style: webFullscreenVideoStyle,
+    });
+  }
+
+  return (
+    <View style={styles.fullscreenFallback}>
+      <MaterialCommunityIcons color={textColor} name="video-outline" size={42} />
+      <Text style={[styles.fullscreenFallbackText, { color: mutedTextColor }]}>Dieser Stream-Typ wird nur im Web-Browser angezeigt.</Text>
     </View>
   );
 }
@@ -565,4 +629,29 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  fullscreenFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    padding: 24,
+  },
+  fullscreenFallbackText: {
+    fontSize: 14,
+    fontWeight: "800",
+    textAlign: "center",
+  },
 });
+
+const webFullscreenVideoStyle = {
+  width: "100%",
+  height: "100%",
+  objectFit: "contain",
+  background: "#000",
+} as const;
+
+const webFullscreenFrameStyle = {
+  width: "100%",
+  height: "100%",
+  border: "0",
+  background: "#000",
+} as const;

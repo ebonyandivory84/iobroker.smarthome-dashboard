@@ -207,6 +207,7 @@ export type CocoWidgetConfig = WidgetBase & {
   refreshMs?: number;
   catName?: string;
   profileImage?: string;
+  fullscreenMediaMode?: "snapshot" | "mjpeg" | "video" | "iframe";
   insideStateId: string;
   lastDirectionStateId?: string;
   lastFlapStateId?: string;
@@ -227,6 +228,7 @@ export type CocoWidgetConfig = WidgetBase & {
   lockOutOnlyValue?: string;
   lockLockedValue?: string;
   snapshotUrl?: string;
+  streamUrl?: string;
 };
 
 export type WallboxWidgetConfig = WidgetBase & {

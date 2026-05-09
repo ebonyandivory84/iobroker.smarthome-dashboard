@@ -293,6 +293,8 @@ export function buildWidgetTemplate(
       lockOutOnlyValue: "2",
       lockLockedValue: "3",
       snapshotUrl: "",
+      streamUrl: "",
+      fullscreenMediaMode: "snapshot",
       position: {
         ...basePosition,
         w: Math.min(6, grid.columns),

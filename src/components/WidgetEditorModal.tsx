@@ -369,6 +369,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         lockOutOnlyValue: widget.lockOutOnlyValue || "2",
         lockLockedValue: widget.lockLockedValue || "3",
         snapshotUrl: widget.snapshotUrl || "",
+        streamUrl: widget.streamUrl || "",
+        fullscreenMediaMode: widget.fullscreenMediaMode || "snapshot",
         ...appearanceDraft,
       });
       return;
@@ -953,6 +955,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         lockOutOnlyValue: draft.lockOutOnlyValue?.trim() || undefined,
         lockLockedValue: draft.lockLockedValue?.trim() || undefined,
         snapshotUrl: draft.snapshotUrl?.trim() || undefined,
+        streamUrl: draft.streamUrl?.trim() || undefined,
+        fullscreenMediaMode: normalizeCocoFullscreenMediaMode(draft.fullscreenMediaMode),
         interactionSounds: buildStoredInteractionSounds(
           widget.type,
           soundDraft,
@@ -2486,6 +2490,30 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={draft.snapshotUrl || ""}
                   />
                 </Field>
+                <View style={styles.groupCard}>
+                  <Text style={styles.groupTitle}>Vollbild / Stream</Text>
+                  <Field label="Vollbild Quelle">
+                    <ChoiceRow
+                      options={["snapshot", "mjpeg", "video", "iframe"]}
+                      value={draft.fullscreenMediaMode || "snapshot"}
+                      onSelect={(value) => setDraft((current) => ({ ...current, fullscreenMediaMode: value }))}
+                    />
+                  </Field>
+                  <Field label="Stream URL">
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, streamUrl: value }))}
+                      placeholder="http://... (MJPEG, fMP4/HLS/MP4 oder Embed-URL)"
+                      placeholderTextColor={palette.textMuted}
+                      style={styles.input}
+                      value={draft.streamUrl || ""}
+                    />
+                  </Field>
+                  <Text style={styles.mappingHint}>
+                    Snapshot bleibt die Vorschau. Im Vollbild wird bei `mjpeg`, `video` oder `iframe` die Stream URL verwendet.
+                    RTSP-URLs sind im Browser nicht direkt abspielbar.
+                  </Text>
+                </View>
                 <Field label="Sounds bei Interaktion">
                   <Field label="Lock Button">
                     <SoundPickerField
@@ -4660,6 +4688,13 @@ function normalizeLogSeverity(raw: string | undefined) {
 
 function normalizeCameraSourceMode(raw: string | undefined) {
   if (raw === "mjpeg" || raw === "flv" || raw === "fmp4") {
+    return raw;
+  }
+  return "snapshot";
+}
+
+function normalizeCocoFullscreenMediaMode(raw: string | undefined) {
+  if (raw === "mjpeg" || raw === "video" || raw === "iframe") {
     return raw;
   }
   return "snapshot";
