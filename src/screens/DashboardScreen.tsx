@@ -78,6 +78,7 @@ export function DashboardScreen() {
     updateWidget,
   } = useDashboardConfig();
   const committedPageIdRef = useRef(activePageId);
+  const restoredStoredPageRef = useRef(false);
   const { client, error, isOnline, states, stateWrites, writeStateTracked } = useIoBrokerStates();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -253,6 +254,9 @@ export function DashboardScreen() {
     if (Platform.OS !== "web" || typeof window === "undefined") {
       return;
     }
+    if (!restoredStoredPageRef.current) {
+      return;
+    }
     if (!activePageId) {
       return;
     }
@@ -270,6 +274,11 @@ export function DashboardScreen() {
     if (!dashboardPages.length) {
       return;
     }
+    if (restoredStoredPageRef.current) {
+      return;
+    }
+
+    restoredStoredPageRef.current = true;
 
     let storedPageId = "";
     try {
