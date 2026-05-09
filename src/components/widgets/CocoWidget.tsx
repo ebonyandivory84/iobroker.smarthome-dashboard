@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useEffect, useMemo, useState } from "react";
-import { Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Modal, Pressable, StyleSheet, Text, View, type DimensionValue } from "react-native";
 import { IoBrokerClient } from "../../services/iobroker";
 import { CocoWidgetConfig, StateSnapshot } from "../../types/dashboard";
 import { palette } from "../../utils/theme";
@@ -37,8 +37,6 @@ export function CocoWidget({ client, config, states }: CocoWidgetProps) {
   const adapterConnected = config.adapterConnectedStateId ? parseBooleanState(states[config.adapterConnectedStateId]) : null;
   const allDevicesOnline = config.allDevicesOnlineStateId ? parseBooleanState(states[config.allDevicesOnlineStateId]) : null;
   const offlineDevices = config.offlineDevicesStateId ? stringifyState(states[config.offlineDevicesStateId]) : "";
-  const lastFlap = config.lastFlapStateId ? stringifyState(states[config.lastFlapStateId]) : "";
-  const lastDirection = config.lastDirectionStateId ? stringifyState(states[config.lastDirectionStateId]) : "";
   const timesOutside = config.timesOutsideStateId ? parseNumber(states[config.timesOutsideStateId]) : null;
   const timeSpentOutside = config.timeSpentOutsideStateId ? parseNumber(states[config.timeSpentOutsideStateId]) : null;
   const lockModeValue = config.lockModeStateId ? states[config.lockModeStateId] : undefined;
@@ -108,54 +106,69 @@ export function CocoWidget({ client, config, states }: CocoWidgetProps) {
             </Text>
           </View>
         </View>
-        <StatusPill online={onlineOk} />
+        <View style={styles.headerActions}>
+          <BatteryPill value={battery} />
+          <StatusPill online={onlineOk} />
+        </View>
       </View>
 
       <View style={styles.body}>
-        <View style={styles.leftColumn}>
-          <View style={[styles.metricGrid, { backgroundColor: cardColor }]}>
-            <Metric label="Heute raus" value={timesOutside === null ? "-" : `${Math.round(timesOutside)}x`} color={textColor} muted={mutedTextColor} />
-            <Metric label="Draußen ges." value={timeSpentOutside === null ? "-" : formatDuration(timeSpentOutside)} color={textColor} muted={mutedTextColor} />
-            <Metric label="Batterie" value={battery === null ? "-" : `${Math.round(battery)}%`} color={battery !== null && battery < 20 ? palette.danger : textColor} muted={mutedTextColor} />
-            <Metric label="Letzte Klappe" value={lastFlap || lastDirection || "-"} color={textColor} muted={mutedTextColor} />
+        <View style={styles.overviewRow}>
+          <View style={styles.metricCards}>
+            <MetricCard
+              backgroundColor={cardColor}
+              color={textColor}
+              icon="paw"
+              label="Heute raus"
+              muted={mutedTextColor}
+              value={timesOutside === null ? "-" : `${Math.round(timesOutside)}x`}
+            />
+            <MetricCard
+              backgroundColor={cardColor}
+              color={textColor}
+              icon="timer-outline"
+              label="Draußen gesamt"
+              muted={mutedTextColor}
+              value={timeSpentOutside === null ? "-" : formatDuration(timeSpentOutside)}
+            />
           </View>
 
-          <View style={styles.lockRow}>
-            {lockOptions.map((option) => {
-              const active = activeLockKey === option.key;
-              const pending = pendingLock === option.key;
-              return (
-                <Pressable
-                  key={option.key}
-                  onPress={() => void writeLockMode(option)}
-                  style={[
-                    styles.lockButton,
-                    { backgroundColor: active ? accent : "rgba(255,255,255,0.045)" },
-                    pending ? styles.lockButtonPending : null,
-                  ]}
-                >
-                  <MaterialCommunityIcons color={active ? "#07111e" : textColor} name={option.icon} size={18} />
-                  <Text numberOfLines={1} style={[styles.lockLabel, { color: active ? "#07111e" : textColor }]}>
-                    {pending ? "..." : option.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <Pressable onPress={openSnapshot} style={[styles.snapshot, { backgroundColor: cardColor }]}>
+            {snapshotUri ? (
+              <Image resizeMode="cover" source={{ uri: snapshotUri }} style={styles.snapshotImage} />
+            ) : (
+              <View style={styles.snapshotPlaceholder}>
+                <MaterialCommunityIcons color={mutedTextColor} name="camera-off-outline" size={24} />
+              </View>
+            )}
+            <View style={styles.snapshotBadge}>
+              <MaterialCommunityIcons color={textColor} name="arrow-expand-all" size={14} />
+            </View>
+          </Pressable>
         </View>
 
-        <Pressable onPress={openSnapshot} style={[styles.snapshot, { backgroundColor: cardColor }]}>
-          {snapshotUri ? (
-            <Image resizeMode="cover" source={{ uri: snapshotUri }} style={styles.snapshotImage} />
-          ) : (
-            <View style={styles.snapshotPlaceholder}>
-              <MaterialCommunityIcons color={mutedTextColor} name="camera-off-outline" size={24} />
-            </View>
-          )}
-          <View style={styles.snapshotBadge}>
-            <MaterialCommunityIcons color={textColor} name="arrow-expand-all" size={14} />
-          </View>
-        </Pressable>
+        <View style={styles.lockRow}>
+          {lockOptions.map((option) => {
+            const active = activeLockKey === option.key;
+            const pending = pendingLock === option.key;
+            return (
+              <Pressable
+                key={option.key}
+                onPress={() => void writeLockMode(option)}
+                style={[
+                  styles.lockButton,
+                  { backgroundColor: active ? accent : "rgba(255,255,255,0.045)" },
+                  pending ? styles.lockButtonPending : null,
+                ]}
+              >
+                <MaterialCommunityIcons color={active ? "#07111e" : textColor} name={option.icon} size={18} />
+                <Text numberOfLines={1} style={[styles.lockLabel, { color: active ? "#07111e" : textColor }]}>
+                  {pending ? "..." : option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
       {!onlineOk ? (
@@ -176,11 +189,44 @@ export function CocoWidget({ client, config, states }: CocoWidgetProps) {
   );
 }
 
-function Metric({ label, value, color, muted }: { label: string; value: string; color: string; muted: string }) {
+function MetricCard({
+  backgroundColor,
+  color,
+  icon,
+  label,
+  muted,
+  value,
+}: {
+  backgroundColor: string;
+  color: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  label: string;
+  muted: string;
+  value: string;
+}) {
   return (
-    <View style={styles.metric}>
-      <Text numberOfLines={1} style={[styles.metricLabel, { color: muted }]}>{label}</Text>
+    <View style={[styles.metricCard, { backgroundColor }]}>
+      <View style={styles.metricHeader}>
+        <MaterialCommunityIcons color={muted} name={icon} size={15} />
+        <Text numberOfLines={1} style={[styles.metricLabel, { color: muted }]}>{label}</Text>
+      </View>
       <Text numberOfLines={1} style={[styles.metricValue, { color }]}>{value}</Text>
+    </View>
+  );
+}
+
+function BatteryPill({ value }: { value: number | null }) {
+  const level = value === null ? null : Math.max(0, Math.min(100, Math.round(value)));
+  const color = resolveBatteryColor(level);
+  const fillWidth = `${level ?? 0}%` as DimensionValue;
+
+  return (
+    <View style={[styles.batteryPill, { backgroundColor: withAlpha(color, 0.16) }]}>
+      <View style={[styles.batteryIcon, { borderColor: color }]}>
+        <View style={[styles.batteryFill, { backgroundColor: color, width: fillWidth }]} />
+      </View>
+      <View style={[styles.batteryTip, { backgroundColor: color }]} />
+      <Text style={[styles.batteryText, { color }]}>{level === null ? "-" : `${level}%`}</Text>
     </View>
   );
 }
@@ -275,6 +321,32 @@ function formatDuration(secondsRaw: number) {
   return `${hours} Std. ${minutes} Min.`;
 }
 
+function resolveBatteryColor(level: number | null) {
+  if (level === null) {
+    return "rgba(214, 224, 244, 0.76)";
+  }
+  if (level >= 55) {
+    return "#58d68d";
+  }
+  if (level >= 35) {
+    return "#f3d46b";
+  }
+  if (level >= 20) {
+    return "#f59e42";
+  }
+  return palette.danger;
+}
+
+function withAlpha(color: string, alpha: number) {
+  if (!color.startsWith("#") || color.length !== 7) {
+    return color;
+  }
+  const r = Number.parseInt(color.slice(1, 3), 16);
+  const g = Number.parseInt(color.slice(3, 5), 16);
+  const b = Number.parseInt(color.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -305,6 +377,11 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   name: {
     fontSize: 20,
     fontWeight: "900",
@@ -331,32 +408,62 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "900",
   },
+  batteryPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+  },
+  batteryIcon: {
+    width: 23,
+    height: 12,
+    borderRadius: 3,
+    borderWidth: 2,
+    overflow: "hidden",
+    padding: 1,
+  },
+  batteryFill: {
+    height: "100%",
+    borderRadius: 1,
+  },
+  batteryTip: {
+    width: 3,
+    height: 7,
+    borderRadius: 2,
+    marginLeft: -3,
+  },
+  batteryText: {
+    fontSize: 11,
+    fontWeight: "900",
+  },
   body: {
     flexGrow: 1,
     minHeight: 0,
-    flexDirection: "row",
-    alignItems: "flex-start",
     gap: 12,
   },
-  leftColumn: {
+  overviewRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 12,
+  },
+  metricCards: {
     flex: 1,
     minWidth: 0,
     gap: 10,
   },
-  metricGrid: {
-    flexGrow: 0,
-    minHeight: 124,
+  metricCard: {
+    flex: 1,
+    minHeight: 72,
     borderRadius: 8,
-    flexDirection: "row",
-    flexWrap: "wrap",
     paddingHorizontal: 14,
     paddingVertical: 12,
-    gap: 10,
   },
-  metric: {
-    flexBasis: "47%",
-    flexGrow: 1,
-    minWidth: 72,
+  metricHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   metricLabel: {
     fontSize: 11,
@@ -364,8 +471,8 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   metricValue: {
-    marginTop: 4,
-    fontSize: 17,
+    marginTop: 8,
+    fontSize: 20,
     fontWeight: "900",
   },
   lockRow: {
@@ -391,9 +498,8 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   snapshot: {
-    width: "34%",
-    minWidth: 160,
-    maxWidth: 300,
+    flex: 1.35,
+    minWidth: 210,
     aspectRatio: 16 / 9,
     borderRadius: 8,
     overflow: "hidden",
