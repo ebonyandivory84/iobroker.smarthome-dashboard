@@ -206,6 +206,7 @@ export type CocoWidgetConfig = WidgetBase & {
   manualHeightOverride?: boolean;
   refreshMs?: number;
   catName?: string;
+  profileImage?: string;
   insideStateId: string;
   lastDirectionStateId?: string;
   lastFlapStateId?: string;

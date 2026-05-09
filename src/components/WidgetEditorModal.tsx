@@ -33,7 +33,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
   }>>([]);
   const [weatherSearchBusy, setWeatherSearchBusy] = useState(false);
   const [pickerField, setPickerField] = useState<string | null>(null);
-  const [imagePickerField, setImagePickerField] = useState<"backgroundImage" | "iconImage" | null>(null);
+  const [imagePickerField, setImagePickerField] = useState<"backgroundImage" | "iconImage" | "cocoProfileImage" | null>(null);
   const theme = resolveThemeSettings(config.theme);
   const iconPreview = useMemo(() => {
     const active = (draft.iconActive || widget?.iconPair?.active || "toggle-switch-outline") as keyof typeof MaterialCommunityIcons.glyphMap;
@@ -347,6 +347,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         title: widget.title,
         showTitle: widget.showTitle === false ? "false" : "true",
         catName: widget.catName || widget.title || "Coco",
+        profileImage: widget.profileImage || "coco-face.jpg",
         refreshMs: String(widget.refreshMs || 30000),
         insideStateId: widget.insideStateId || "sureflap.0.Home.pets.Coco.inside",
         lastDirectionStateId: widget.lastDirectionStateId || "sureflap.0.Home.pets.Coco.movement.last_direction",
@@ -930,6 +931,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         title: draft.title,
         showTitle: draft.showTitle !== "false",
         catName: draft.catName?.trim() || undefined,
+        profileImage: draft.profileImage?.trim() || undefined,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 30000, 1000),
         insideStateId: draft.insideStateId?.trim() || widget.insideStateId,
         lastDirectionStateId: draft.lastDirectionStateId?.trim() || undefined,
@@ -2317,6 +2319,21 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     />
                   </Field>
                 </View>
+                <Field label="Profilbild">
+                  <View style={styles.stateFieldRow}>
+                    <TextInput
+                      editable={false}
+                      style={[styles.input, styles.stateFieldInput]}
+                      value={draft.profileImage || ""}
+                    />
+                    <EditorButtonPressable onPress={() => setImagePickerField("cocoProfileImage")} style={styles.stateBrowseButton}>
+                      <Text style={styles.stateBrowseLabel}>Bild waehlen</Text>
+                    </EditorButtonPressable>
+                  </View>
+                  <Text style={styles.mappingHint}>
+                    Das Bild wird im Widget rund zugeschnitten. Ohne Auswahl wird `coco-face.jpg` verwendet.
+                  </Text>
+                </Field>
                 <View style={styles.groupCard}>
                   <Text style={styles.groupTitle}>SureFlap States</Text>
                   <Field label="Inside">
@@ -3851,7 +3868,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       <ImagePickerModal
         client={client}
         title={
-          imagePickerField === "iconImage"
+          imagePickerField === "cocoProfileImage"
+            ? "Coco-Profilbild waehlen"
+            : imagePickerField === "iconImage"
             ? widget?.type === "state"
               ? "State-Bild waehlen"
               : "Link-Icon waehlen"
@@ -3862,7 +3881,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
               : "Solar-Hintergrund waehlen"
         }
         helperText={
-          imagePickerField === "iconImage"
+          imagePickerField === "cocoProfileImage"
+            ? "Waehle ein rund zugeschnittenes Profilbild aus dem Ordner `assets/` oder lade ein neues Bild hoch."
+            : imagePickerField === "iconImage"
             ? "Waehle eine Bilddatei aus dem Ordner `assets/`."
             : widget?.type === "wallbox" || widget?.type === "goe"
               ? "Waehle ein Hintergrundbild. Drag&Drop, Datei-Upload und Browser-Auswahl sind verfuegbar."
@@ -3873,6 +3894,12 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         onClose={() => setImagePickerField(null)}
         onSelect={(entry) => {
           setDraft((current) => {
+            if (imagePickerField === "cocoProfileImage") {
+              return {
+                ...current,
+                profileImage: entry.name,
+              };
+            }
             if (imagePickerField === "iconImage") {
               return {
                 ...current,
@@ -3899,7 +3926,13 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
           });
           setImagePickerField(null);
         }}
-        selectedName={imagePickerField === "iconImage" ? draft.iconImage : draft.backgroundImage}
+        selectedName={
+          imagePickerField === "cocoProfileImage"
+            ? draft.profileImage
+            : imagePickerField === "iconImage"
+              ? draft.iconImage
+              : draft.backgroundImage
+        }
         visible={Boolean(imagePickerField)}
       />
     </Modal>

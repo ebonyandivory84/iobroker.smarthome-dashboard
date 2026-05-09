@@ -271,6 +271,7 @@ export function buildWidgetTemplate(
       type: "coco",
       title: "Coco",
       catName: "Coco",
+      profileImage: "coco-face.jpg",
       refreshMs: 30000,
       insideStateId: "sureflap.0.Home.pets.Coco.inside",
       lastDirectionStateId: "sureflap.0.Home.pets.Coco.movement.last_direction",

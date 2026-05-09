@@ -29,6 +29,10 @@ export function CocoWidget({ client, config, states }: CocoWidgetProps) {
   const cardColor = config.appearance?.cardColor || "rgba(255,255,255,0.05)";
   const accent = config.appearance?.activeWidgetColor || "#58d68d";
   const warn = config.appearance?.inactiveWidgetColor || "#f2bd66";
+  const profileImage = (config.profileImage || "coco-face.jpg").trim();
+  const profileImageUri = profileImage
+    ? `/smarthome-dashboard/widget-assets/${encodeURIComponent(profileImage)}`
+    : "";
   const inside = parseBooleanState(states[config.insideStateId]);
   const lastTime = parseDate(states[config.lastTimeStateId]);
   const battery = config.flapBatteryStateId ? parseNumber(states[config.flapBatteryStateId]) : null;
@@ -97,7 +101,11 @@ export function CocoWidget({ client, config, states }: CocoWidgetProps) {
       <View style={styles.header}>
         <View style={styles.locationBlock}>
           <View style={[styles.locationIcon, { backgroundColor: inside === false ? warn : accent }]}>
-            <MaterialCommunityIcons color="#07111e" name={locationIcon} size={24} />
+            {profileImageUri ? (
+              <Image resizeMode="cover" source={{ uri: profileImageUri }} style={styles.profileImage} />
+            ) : (
+              <MaterialCommunityIcons color="#07111e" name={locationIcon} size={24} />
+            )}
           </View>
           <View style={styles.headerText}>
             <Text numberOfLines={1} style={[styles.name, { color: textColor }]}>{catName}</Text>
@@ -372,6 +380,13 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  profileImage: {
+    width: "100%",
+    height: "100%",
   },
   headerText: {
     flex: 1,
