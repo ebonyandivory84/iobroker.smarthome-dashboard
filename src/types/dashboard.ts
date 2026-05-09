@@ -207,7 +207,7 @@ export type CocoWidgetConfig = WidgetBase & {
   refreshMs?: number;
   catName?: string;
   profileImage?: string;
-  fullscreenMediaMode?: "snapshot" | "mjpeg" | "video" | "iframe";
+  fullscreenMediaMode?: "snapshot" | "mjpeg" | "flv" | "video" | "iframe";
   insideStateId: string;
   lastDirectionStateId?: string;
   lastFlapStateId?: string;

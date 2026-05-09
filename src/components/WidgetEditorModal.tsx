@@ -2494,7 +2494,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   <Text style={styles.groupTitle}>Vollbild / Stream</Text>
                   <Field label="Vollbild Quelle">
                     <ChoiceRow
-                      options={["snapshot", "mjpeg", "video", "iframe"]}
+                      options={["snapshot", "mjpeg", "flv", "video", "iframe"]}
                       value={draft.fullscreenMediaMode || "snapshot"}
                       onSelect={(value) => setDraft((current) => ({ ...current, fullscreenMediaMode: value }))}
                     />
@@ -4694,7 +4694,7 @@ function normalizeCameraSourceMode(raw: string | undefined) {
 }
 
 function normalizeCocoFullscreenMediaMode(raw: string | undefined) {
-  if (raw === "mjpeg" || raw === "video" || raw === "iframe") {
+  if (raw === "mjpeg" || raw === "flv" || raw === "video" || raw === "iframe") {
     return raw;
   }
   return "snapshot";

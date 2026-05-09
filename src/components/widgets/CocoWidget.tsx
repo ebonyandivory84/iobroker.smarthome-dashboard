@@ -1,10 +1,16 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { createElement, useEffect, useMemo, useState } from "react";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { Image, Modal, Platform, Pressable, StyleSheet, Text, View, type DimensionValue } from "react-native";
 import { IoBrokerClient } from "../../services/iobroker";
 import { CocoWidgetConfig, StateSnapshot } from "../../types/dashboard";
 import { palette } from "../../utils/theme";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
+
+declare global {
+  interface Window {
+    flvjs?: any;
+  }
+}
 
 type CocoWidgetProps = {
   client: IoBrokerClient;
@@ -18,6 +24,10 @@ type LockOption = {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   value: string;
 };
+
+const FLV_SCRIPT_SRC = "https://cdn.jsdelivr.net/npm/flv.js@1.6.2/dist/flv.min.js";
+const FLV_SCRIPT_LOAD_TIMEOUT_MS = 8000;
+let flvLoaderPromise: Promise<boolean> | null = null;
 
 export function CocoWidget({ client, config, states }: CocoWidgetProps) {
   const [now, setNow] = useState(Date.now());
@@ -261,6 +271,18 @@ function PreviewMedia({ mode, url }: { mode: CocoWidgetConfig["fullscreenMediaMo
     });
   }
 
+  if (Platform.OS === "web" && mediaMode === "flv") {
+    return (
+      <FlvStreamVideo
+        controls={false}
+        muted
+        objectFit="cover"
+        style={webPreviewVideoStyle}
+        url={buildCocoStreamProxyUrl(url, "flv")}
+      />
+    );
+  }
+
   return <Image resizeMode="cover" source={{ uri: url }} style={styles.snapshotImage} />;
 }
 
@@ -336,12 +358,170 @@ function FullscreenMedia({
     });
   }
 
+  if (Platform.OS === "web" && mediaMode === "flv") {
+    return (
+      <FlvStreamVideo
+        controls
+        muted
+        objectFit="contain"
+        style={webFullscreenVideoStyle}
+        url={buildCocoStreamProxyUrl(url, "flv")}
+      />
+    );
+  }
+
   return (
     <View style={styles.fullscreenFallback}>
       <MaterialCommunityIcons color={textColor} name="video-outline" size={42} />
       <Text style={[styles.fullscreenFallbackText, { color: mutedTextColor }]}>Dieser Stream-Typ wird nur im Web-Browser angezeigt.</Text>
     </View>
   );
+}
+
+function FlvStreamVideo({
+  controls,
+  muted,
+  objectFit,
+  style,
+  url,
+}: {
+  controls: boolean;
+  muted: boolean;
+  objectFit: "cover" | "contain";
+  style: Record<string, string | number>;
+  url: string;
+}) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || !url) {
+      return;
+    }
+
+    let disposed = false;
+    let player: any = null;
+    const videoElement = videoRef.current;
+    if (!videoElement) {
+      return;
+    }
+
+    void ensureFlvJsLoaded().then((loaded) => {
+      if (disposed || !loaded || !window.flvjs) {
+        return;
+      }
+      if (!window.flvjs.isSupported?.()) {
+        return;
+      }
+
+      player = window.flvjs.createPlayer({
+        type: "flv",
+        url,
+        isLive: true,
+        hasAudio: false,
+      });
+      player.attachMediaElement(videoElement);
+      player.load();
+      void videoElement.play().catch(() => {
+        // Browser autoplay can still fail until the user interacts.
+      });
+    });
+
+    return () => {
+      disposed = true;
+      try {
+        player?.unload?.();
+        player?.detachMediaElement?.();
+        player?.destroy?.();
+      } catch {
+        // ignore best-effort cleanup errors
+      }
+      videoElement.removeAttribute("src");
+      videoElement.load();
+    };
+  }, [url]);
+
+  return createElement("video", {
+    autoPlay: true,
+    controls,
+    muted,
+    playsInline: true,
+    ref: videoRef,
+    style: {
+      ...style,
+      objectFit,
+    },
+  });
+}
+
+async function ensureFlvJsLoaded() {
+  if (Platform.OS !== "web" || typeof window === "undefined" || typeof document === "undefined") {
+    return false;
+  }
+
+  if (window.flvjs) {
+    return true;
+  }
+
+  try {
+    const imported = await import("flv.js");
+    const maybeFlv = (imported as { default?: any }).default || imported;
+    if (maybeFlv) {
+      window.flvjs = maybeFlv;
+      return true;
+    }
+  } catch {
+    // fallback to CDN loader below
+  }
+
+  if (!flvLoaderPromise) {
+    flvLoaderPromise = new Promise<boolean>((resolve) => {
+      let settled = false;
+      const settle = (value: boolean) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        resolve(value);
+      };
+      const timeout = setTimeout(() => settle(Boolean(window.flvjs)), FLV_SCRIPT_LOAD_TIMEOUT_MS);
+      const existing = document.querySelector(`script[data-flvjs-src="${FLV_SCRIPT_SRC}"]`) as HTMLScriptElement | null;
+      if (existing) {
+        existing.addEventListener("load", () => {
+          clearTimeout(timeout);
+          settle(Boolean(window.flvjs));
+        }, { once: true });
+        existing.addEventListener("error", () => {
+          clearTimeout(timeout);
+          settle(false);
+        }, { once: true });
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = FLV_SCRIPT_SRC;
+      script.async = true;
+      script.dataset.flvjsSrc = FLV_SCRIPT_SRC;
+      script.onload = () => {
+        clearTimeout(timeout);
+        settle(Boolean(window.flvjs));
+      };
+      script.onerror = () => {
+        clearTimeout(timeout);
+        settle(false);
+      };
+      document.head.appendChild(script);
+    });
+  }
+
+  return flvLoaderPromise;
+}
+
+function buildCocoStreamProxyUrl(url: string, streamType: "flv" | "mjpeg") {
+  if (Platform.OS !== "web" || typeof window === "undefined") {
+    return url;
+  }
+
+  return `${window.location.origin}/smarthome-dashboard/api/camera-stream?streamType=${streamType}&url=${encodeURIComponent(url)}`;
 }
 
 function buildLockOptions(config: CocoWidgetConfig): LockOption[] {
