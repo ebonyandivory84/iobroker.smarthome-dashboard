@@ -49,7 +49,10 @@ export function CocoWidget({ client, config, states }: CocoWidgetProps) {
   const streamUrl = (config.streamUrl || "").trim();
   const fullscreenMediaMode = config.fullscreenMediaMode || "snapshot";
   const snapshotUri = snapshotUrl ? appendCacheBuster(snapshotUrl, now) : "";
-  const fullscreenMediaUrl = fullscreenMediaMode === "snapshot" ? snapshotUri : streamUrl;
+  const previewMode = snapshotUri ? "snapshot" : fullscreenMediaMode;
+  const previewUrl = snapshotUri || streamUrl;
+  const fullscreenMode = streamUrl ? fullscreenMediaMode : "snapshot";
+  const fullscreenMediaUrl = streamUrl || snapshotUri;
   const locationLabel = inside === null ? "Unbekannt" : inside ? "Drinnen" : "Draußen";
   const locationIcon = inside === false ? "weather-night" : "home-heart";
   const statusSince = lastTime ? formatDuration((now - lastTime.getTime()) / 1000) : "keine Zeit";
@@ -145,8 +148,8 @@ export function CocoWidget({ client, config, states }: CocoWidgetProps) {
           </View>
 
           <Pressable onPress={openSnapshot} style={[styles.snapshot, { backgroundColor: cardColor }]}>
-            {snapshotUri ? (
-              <Image resizeMode="cover" source={{ uri: snapshotUri }} style={styles.snapshotImage} />
+            {previewUrl ? (
+              <PreviewMedia mode={previewMode} url={previewUrl} />
             ) : (
               <View style={styles.snapshotPlaceholder}>
                 <MaterialCommunityIcons color={mutedTextColor} name="camera-off-outline" size={24} />
@@ -194,7 +197,7 @@ export function CocoWidget({ client, config, states }: CocoWidgetProps) {
             <MaterialCommunityIcons color="#fff" name="close" size={28} />
           </Pressable>
           <FullscreenMedia
-            mode={fullscreenMediaMode}
+            mode={fullscreenMode}
             mutedTextColor={mutedTextColor}
             snapshotUri={snapshotUri}
             textColor={textColor}
@@ -230,6 +233,35 @@ function MetricCard({
       <Text numberOfLines={1} style={[styles.metricValue, { color }]}>{value}</Text>
     </View>
   );
+}
+
+function PreviewMedia({ mode, url }: { mode: CocoWidgetConfig["fullscreenMediaMode"]; url: string }) {
+  const mediaMode = mode || "snapshot";
+
+  if (mediaMode === "mjpeg" || mediaMode === "snapshot") {
+    return <Image resizeMode="cover" source={{ uri: url }} style={styles.snapshotImage} />;
+  }
+
+  if (Platform.OS === "web" && mediaMode === "iframe") {
+    return createElement("iframe", {
+      allow: "autoplay; fullscreen; picture-in-picture",
+      src: url,
+      style: webPreviewFrameStyle,
+    });
+  }
+
+  if (Platform.OS === "web" && mediaMode === "video") {
+    return createElement("video", {
+      autoPlay: true,
+      controls: false,
+      muted: true,
+      playsInline: true,
+      src: url,
+      style: webPreviewVideoStyle,
+    });
+  }
+
+  return <Image resizeMode="cover" source={{ uri: url }} style={styles.snapshotImage} />;
 }
 
 function BatteryPill({ value }: { value: number | null }) {
@@ -654,4 +686,21 @@ const webFullscreenFrameStyle = {
   height: "100%",
   border: "0",
   background: "#000",
+} as const;
+
+const webPreviewVideoStyle = {
+  width: "100%",
+  height: "100%",
+  objectFit: "cover",
+  background: "#000",
+  display: "block",
+} as const;
+
+const webPreviewFrameStyle = {
+  width: "100%",
+  height: "100%",
+  border: "0",
+  background: "#000",
+  display: "block",
+  pointerEvents: "none",
 } as const;
