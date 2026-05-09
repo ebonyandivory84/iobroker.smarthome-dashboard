@@ -332,9 +332,10 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   body: {
-    flex: 1,
+    flexGrow: 1,
     minHeight: 0,
     flexDirection: "row",
+    alignItems: "flex-start",
     gap: 10,
   },
   leftColumn: {
@@ -343,13 +344,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   metricGrid: {
-    flex: 1,
-    minHeight: 86,
+    flexGrow: 0,
+    minHeight: 0,
     borderRadius: 8,
     flexDirection: "row",
     flexWrap: "wrap",
-    padding: 8,
-    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    gap: 8,
   },
   metric: {
     flexBasis: "47%",
@@ -389,7 +391,10 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   snapshot: {
-    width: 116,
+    width: "28%",
+    minWidth: 132,
+    maxWidth: 220,
+    aspectRatio: 16 / 9,
     borderRadius: 8,
     overflow: "hidden",
   },
