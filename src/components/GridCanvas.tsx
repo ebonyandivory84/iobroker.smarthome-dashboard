@@ -208,16 +208,15 @@ export function GridCanvas({
                 onCommitPosition={(widgetId, position) =>
                   onUpdateWidget(
                     widgetId,
-                    isCompactViewport
-                      ? { mobilePosition: position }
-                      : {
-                          position: mapDisplayPositionToSourceHint(position, displayConfig.grid.columns, config.grid.columns, {
-                            stackPrimarySections: isCompactViewport,
-                            displayCurrent: widget.position,
-                            sourceCurrent: config.widgets.find((entry) => entry.id === widgetId)?.position,
-                            widgetType: widget.type,
-                          }),
-                        }
+                    buildPositionUpdatePayload(
+                      widget,
+                      widgetId,
+                      position,
+                      isCompactViewport,
+                      displayConfig.grid.columns,
+                      config.grid.columns,
+                      config.widgets
+                    )
                   )
                 }
                 onEdit={onEditWidget}
@@ -1182,6 +1181,9 @@ function WebWidgetShell({
       if (allowManualLayout) {
         onUpdateWidget(widget.id, {
           position: mapDisplayPositionToSourceHint(preview, config.grid.columns, sourceColumns),
+          ...(active.mode === "resize" && supportsManualHeightOverride(widget.type)
+            ? { manualHeightOverride: true }
+            : null),
         });
       }
     };
@@ -1481,6 +1483,52 @@ function renderWidget(
   }
 
   return null;
+}
+
+function buildPositionUpdatePayload(
+  widget: WidgetConfig,
+  widgetId: string,
+  position: WidgetConfig["position"],
+  isCompactViewport: boolean,
+  displayColumns: number,
+  sourceColumns: number,
+  sourceWidgets: WidgetConfig[]
+): Partial<WidgetConfig> {
+  if (isCompactViewport) {
+    return { mobilePosition: position };
+  }
+
+  const sourceCurrent = sourceWidgets.find((entry) => entry.id === widgetId)?.position;
+  const mappedPosition = mapDisplayPositionToSourceHint(position, displayColumns, sourceColumns, {
+    stackPrimarySections: isCompactViewport,
+    displayCurrent: widget.position,
+    sourceCurrent,
+    widgetType: widget.type,
+  });
+  const heightChanged = Math.abs((sourceCurrent?.h ?? widget.position.h) - mappedPosition.h) > 0.01;
+
+  return {
+    position: mappedPosition,
+    ...(heightChanged && supportsManualHeightOverride(widget.type) ? { manualHeightOverride: true } : null),
+  } as Partial<WidgetConfig>;
+}
+
+function supportsManualHeightOverride(type: WidgetType) {
+  return (
+    type === "camera" ||
+    type === "solar" ||
+    type === "grafana" ||
+    type === "weather" ||
+    type === "log" ||
+    type === "script" ||
+    type === "host" ||
+    type === "raspberryPiStats" ||
+    type === "coco" ||
+    type === "wallbox" ||
+    type === "goe" ||
+    type === "heating" ||
+    type === "heatingV2"
+  );
 }
 
 const styles = StyleSheet.create({

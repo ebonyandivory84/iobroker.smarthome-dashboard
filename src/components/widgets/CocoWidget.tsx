@@ -278,8 +278,8 @@ function formatDuration(secondsRaw: number) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 14,
-    gap: 10,
+    padding: 16,
+    gap: 12,
   },
   header: {
     flexDirection: "row",
@@ -295,9 +295,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   locationIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -306,12 +306,12 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   name: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "900",
   },
   location: {
     marginTop: 2,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "700",
   },
   statusPill: {
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
     minHeight: 0,
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 10,
+    gap: 12,
   },
   leftColumn: {
     flex: 1,
@@ -345,13 +345,13 @@ const styles = StyleSheet.create({
   },
   metricGrid: {
     flexGrow: 0,
-    minHeight: 0,
+    minHeight: 124,
     borderRadius: 8,
     flexDirection: "row",
     flexWrap: "wrap",
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 10,
   },
   metric: {
     flexBasis: "47%",
@@ -359,23 +359,23 @@ const styles = StyleSheet.create({
     minWidth: 72,
   },
   metricLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "800",
     textTransform: "uppercase",
   },
   metricValue: {
-    marginTop: 3,
-    fontSize: 15,
+    marginTop: 4,
+    fontSize: 17,
     fontWeight: "900",
   },
   lockRow: {
     flexDirection: "row",
-    gap: 6,
+    gap: 8,
   },
   lockButton: {
     flex: 1,
     minWidth: 0,
-    minHeight: 42,
+    minHeight: 50,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
@@ -387,13 +387,13 @@ const styles = StyleSheet.create({
     opacity: 0.72,
   },
   lockLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "900",
   },
   snapshot: {
-    width: "28%",
-    minWidth: 132,
-    maxWidth: 220,
+    width: "34%",
+    minWidth: 160,
+    maxWidth: 300,
     aspectRatio: 16 / 9,
     borderRadius: 8,
     overflow: "hidden",
