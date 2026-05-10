@@ -417,6 +417,7 @@ async function main(adapter) {
         sessionId: invite.sessionId,
         timestamp: invite.initialTimestamp,
         aencFormat: invite.aencFormat || "pcm16",
+        audioSampleRate: invite.audioSampleRate || 16000,
       });
       adapter.log.info(`[instar-talk] start ok session=${invite.sessionId} token=${token.slice(0, 8)}... codec=${invite.aencFormat || "pcm16"} frameSize=${invite.frameSize || 640}`);
       res.json({ ok: true, token, frameSize: invite.frameSize || 640 });
@@ -445,7 +446,9 @@ async function main(adapter) {
         res.json({ ok: true, sent: 0 });
         return;
       }
-      const payload = session.aencFormat === "pcma" ? pcm16le16kToPcma8k(pcm) : pcm;
+      const payload = session.aencFormat === "pcma"
+        ? pcm16leToPcma(pcm, session.audioSampleRate === 8000 ? 2 : 1)
+        : pcm;
 
       let offset = 0;
       let sent = 0;
@@ -459,8 +462,8 @@ async function main(adapter) {
         );
         session.ws.send(Buffer.concat([header, chunk]));
         const durationMs = session.aencFormat === "pcma"
-          ? Math.max(1, Math.round((size / 8000) * 1000))
-          : Math.max(1, Math.round((size / 2 / 16000) * 1000));
+          ? Math.max(1, Math.round((size / (session.audioSampleRate || 16000)) * 1000))
+          : Math.max(1, Math.round((size / 2 / (session.audioSampleRate || 16000)) * 1000));
         session.timestamp += durationMs;
         offset += size;
         sent += size;
@@ -589,31 +592,42 @@ async function requestInstarCallInvite(cameraBaseUrl, username, password, allowI
   const aencRaw = (aencMatch ? aencMatch[1] : "").trim().toLowerCase();
   const frameSize = frameSizeMatch ? Number(frameSizeMatch[1]) : 640;
   let aencFormat = /a-?law|pcma|g\.?711a/.test(aencRaw) ? "pcma" : "pcm16";
+  let audioSampleRate = 16000;
   // INSTAR often reports Frame-Size 640 for wideband PCM frames. In that case,
   // forcing PCMA transcode can produce chipmunk-like playback. Keep PCM16 path.
-  if (Number.isFinite(frameSize) && frameSize >= 640) {
-    aencFormat = "pcm16";
+  if (aencFormat === "pcma") {
+    // For G.711 payload cameras, Frame-Size can indicate 8k vs 16k framing.
+    // 640 bytes commonly maps to 16kHz @ 40ms, 320 bytes to 8kHz @ 40ms.
+    audioSampleRate = Number.isFinite(frameSize) && frameSize >= 640 ? 16000 : 8000;
+  } else if (Number.isFinite(frameSize) && frameSize <= 320) {
+    audioSampleRate = 8000;
   }
   return {
     sessionId: Number(sessionMatch[1]),
     frameSize,
     initialTimestamp: Math.floor(Date.now() / 10),
     aencFormat,
+    audioSampleRate,
   };
 }
 
-function pcm16le16kToPcma8k(input) {
+function pcm16leToPcma(input, downsampleFactor = 2) {
   if (!Buffer.isBuffer(input) || input.length < 4) {
     return Buffer.alloc(0);
   }
+  const factor = downsampleFactor === 1 ? 1 : 2;
   const sampleCount = Math.floor(input.length / 2);
-  const outCount = Math.floor(sampleCount / 2);
+  const outCount = Math.floor(sampleCount / factor);
   const out = Buffer.allocUnsafe(outCount);
   let o = 0;
+  if (factor === 1) {
+    for (let i = 0; i + 1 < input.length; i += 2) {
+      out[o++] = linearToALaw(input.readInt16LE(i));
+    }
+    return out;
+  }
   for (let i = 0; i + 3 < input.length; i += 4) {
-    const s0 = input.readInt16LE(i);
-    const s1 = input.readInt16LE(i + 2);
-    const avg = (s0 + s1) >> 1;
+    const avg = (input.readInt16LE(i) + input.readInt16LE(i + 2)) >> 1;
     out[o++] = linearToALaw(avg);
   }
   return out;
