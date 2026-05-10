@@ -486,6 +486,65 @@ async function main(adapter) {
     closeInstarTalkSession(token);
     res.json({ ok: true });
   });
+  app.post("/smarthome-dashboard/api/instar-control", async (req, res) => {
+    const cameraBaseUrl = normalizeUrl(req.body?.cameraBaseUrl);
+    const username = String(req.body?.username || "");
+    const password = String(req.body?.password || "");
+    const allowInsecure = req.body?.allowInsecure !== false;
+    const query = req.body?.query && typeof req.body.query === "object" ? req.body.query : null;
+    const cmd = typeof query?.cmd === "string" ? query.cmd.trim() : "";
+    const allowedCommands = new Set([
+      "ptzmove",
+      "getptzstate",
+      "gotoRelPosition",
+      "getaudioattr",
+      "setaudioattr",
+      "setalarmattr",
+      "setaudioaction",
+      "playalarmsound",
+      "stopalarmsound",
+      "setmutealarm",
+    ]);
+
+    if (!cameraBaseUrl || !username || !password || !query || !cmd) {
+      res.status(400).json({ error: "cameraBaseUrl, username, password and query.cmd required" });
+      return;
+    }
+    if (!allowedCommands.has(cmd)) {
+      res.status(400).json({ error: `unsupported cmd: ${cmd}` });
+      return;
+    }
+
+    try {
+      const url = new URL(`${cameraBaseUrl}/param.cgi`);
+      Object.entries(query).forEach(([key, value]) => {
+        if (value === undefined || value === null) {
+          return;
+        }
+        url.searchParams.set(key, String(value));
+      });
+      // Add both auth methods for better compatibility with INSTAR firmware variants.
+      url.searchParams.set("user", username);
+      url.searchParams.set("pwd", password);
+      const authHeader = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: {
+          Accept: "*/*",
+          Authorization: authHeader,
+        },
+        ...(allowInsecure ? buildCameraFetchOptions(url.toString()) : { redirect: "follow" }),
+      });
+      const text = await response.text();
+      if (!response.ok) {
+        res.status(response.status).json({ error: text || `instar control failed (${response.status})` });
+        return;
+      }
+      res.json({ ok: true, cmd, response: text });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "instar control failed" });
+    }
+  });
 
   app.use("/smarthome-dashboard/widget-assets", express.static(widgetAssetsRoot));
 

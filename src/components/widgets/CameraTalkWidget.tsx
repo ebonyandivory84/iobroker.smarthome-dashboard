@@ -64,6 +64,9 @@ export function CameraTalkWidget({
   const [fullscreenFmp4SourceIndex, setFullscreenFmp4SourceIndex] = useState(0);
   const [audioEnabled, setAudioEnabled] = useState(config.audioEnabled === true);
   const [talkbackActive, setTalkbackActive] = useState(false);
+  const [instarSpeakerVolume, setInstarSpeakerVolume] = useState(70);
+  const [instarAlarmArmed, setInstarAlarmArmed] = useState<boolean | null>(null);
+  const [instarControlBusy, setInstarControlBusy] = useState(false);
   const [previewMjpegLoaded, setPreviewMjpegLoaded] = useState(false);
   const [fullscreenMjpegLoaded, setFullscreenMjpegLoaded] = useState(false);
   const hasReportedAspectRatio = useRef(false);
@@ -154,6 +157,7 @@ export function CameraTalkWidget({
   const talkbackPushToTalk = config.talkbackPushToTalk !== false;
   const talkbackShowVideo = config.talkbackAutoEnableVideo === true;
   const talkbackIframeEnabled = Boolean(talkbackWebrtcUrl) && !instarTalkbackConfigured;
+  const showInstarControls = instarTalkbackConfigured;
   const activeFeed = previewFeed;
   const activeSnapshotBaseUrl = activeFeed?.kind === "snapshot" ? activeFeed.url : null;
   const previewMjpegSources = useMemo(
@@ -423,6 +427,86 @@ export function CameraTalkWidget({
     }, 80);
   }, [instarBaseUrl, instarPassword, instarTalkbackAvailable, instarUsername, stopInstarTalkback]);
 
+  const callInstarControl = useCallback(
+    async (query: Record<string, string | number>) => {
+      if (!instarTalkbackConfigured) {
+        setPreviewStreamDebug("INSTAR-Steuerung nicht konfiguriert.");
+        return null;
+      }
+      setInstarControlBusy(true);
+      try {
+        const response = await fetch("/smarthome-dashboard/api/instar-control", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cameraBaseUrl: instarBaseUrl,
+            username: instarUsername,
+            password: instarPassword,
+            allowInsecure: true,
+            query,
+          }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error || `INSTAR control failed (${response.status})`);
+        }
+        return payload;
+      } catch (error) {
+        setPreviewStreamDebug(error instanceof Error ? error.message : "INSTAR control failed");
+        return null;
+      } finally {
+        setInstarControlBusy(false);
+      }
+    },
+    [instarBaseUrl, instarPassword, instarTalkbackConfigured, instarUsername]
+  );
+
+  const sendPtz = useCallback(
+    async (direction: "up" | "right" | "down" | "left" | "zoomin" | "zoomout") => {
+      const result = await callInstarControl({
+        cmd: "ptzmove",
+        [direction]: 1,
+        speed: 5,
+        timeout: 1,
+      });
+      if (result) {
+        setPreviewStreamDebug(`INSTAR: ${direction}`);
+      }
+    },
+    [callInstarControl]
+  );
+
+  const setAlarmArmed = useCallback(
+    async (armed: boolean) => {
+      const result = await callInstarControl({
+        cmd: "setalarmattr",
+        armed: armed ? 1 : 0,
+      });
+      if (result) {
+        setInstarAlarmArmed(armed);
+        setPreviewStreamDebug(`Alarm ${armed ? "ON" : "OFF"}`);
+      }
+    },
+    [callInstarControl]
+  );
+
+  const updateSpeakerVolume = useCallback(
+    async (volume: number) => {
+      const clamped = Math.max(1, Math.min(100, Math.round(volume)));
+      setInstarSpeakerVolume(clamped);
+      const result = await callInstarControl({
+        cmd: "setaudioattr",
+        type: "out",
+        enable: 1,
+        volume: clamped,
+      });
+      if (result) {
+        setPreviewStreamDebug(`Lautsprecher ${clamped}%`);
+      }
+    },
+    [callInstarControl]
+  );
+
   const enableTalkback = useCallback(() => {
     if (!talkbackAvailable) {
       setPreviewStreamDebug("Talkback nicht konfiguriert. Bitte INSTAR-Daten oder WebRTC-URL setzen.");
@@ -509,6 +593,21 @@ export function CameraTalkWidget({
     }
     setTalkbackActive(false);
   }, [fullscreenOpen]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || !talkbackPushToTalk || !talkbackActive) {
+      return;
+    }
+    const release = () => disableTalkback();
+    window.addEventListener("mouseup", release);
+    window.addEventListener("touchend", release);
+    window.addEventListener("touchcancel", release);
+    return () => {
+      window.removeEventListener("mouseup", release);
+      window.removeEventListener("touchend", release);
+      window.removeEventListener("touchcancel", release);
+    };
+  }, [disableTalkback, talkbackActive, talkbackPushToTalk]);
 
   useEffect(() => {
     if ((!useInPlaceFullscreen && fullscreenOpen) || previewFeed?.kind !== "mjpeg") {
@@ -1001,6 +1100,104 @@ export function CameraTalkWidget({
     scheduleLoad(snapshotUrl);
   }, [layerUrls, scheduleLoad, snapshotUrl]);
 
+  const renderFullscreenControls = () => (
+    <View pointerEvents="box-none" style={styles.fullscreenControlsWrap}>
+      <View style={styles.fullscreenControlsBar}>
+        <View style={styles.ptzPad}>
+          <Pressable onPress={() => void sendPtz("up")} style={[styles.ptzButton, styles.ptzButtonTop]}>
+            <MaterialCommunityIcons color={palette.text} name="chevron-up" size={18} />
+          </Pressable>
+          <Pressable onPress={() => void sendPtz("right")} style={[styles.ptzButton, styles.ptzButtonRight]}>
+            <MaterialCommunityIcons color={palette.text} name="chevron-right" size={18} />
+          </Pressable>
+          <Pressable onPress={() => void sendPtz("down")} style={[styles.ptzButton, styles.ptzButtonBottom]}>
+            <MaterialCommunityIcons color={palette.text} name="chevron-down" size={18} />
+          </Pressable>
+          <Pressable onPress={() => void sendPtz("left")} style={[styles.ptzButton, styles.ptzButtonLeft]}>
+            <MaterialCommunityIcons color={palette.text} name="chevron-left" size={18} />
+          </Pressable>
+        </View>
+
+        <View style={styles.controlColumn}>
+          <Pressable onPress={() => void sendPtz("zoomin")} style={styles.fullscreenActionButton}>
+            <MaterialCommunityIcons color={palette.text} name="magnify-plus-outline" size={18} />
+          </Pressable>
+          <Pressable onPress={() => void sendPtz("zoomout")} style={styles.fullscreenActionButton}>
+            <MaterialCommunityIcons color={palette.text} name="magnify-minus-outline" size={18} />
+          </Pressable>
+        </View>
+
+        <View style={styles.controlColumn}>
+          <Pressable onPress={() => void setAlarmArmed(true)} style={[styles.fullscreenActionButton, instarAlarmArmed === true ? styles.fullscreenAudioActive : null]}>
+            <MaterialCommunityIcons color={instarAlarmArmed === true ? pinnedColor : palette.text} name="shield-check-outline" size={18} />
+          </Pressable>
+          <Pressable onPress={() => void setAlarmArmed(false)} style={[styles.fullscreenActionButton, instarAlarmArmed === false ? styles.fullscreenAudioActive : null]}>
+            <MaterialCommunityIcons color={instarAlarmArmed === false ? pinnedColor : palette.text} name="shield-off-outline" size={18} />
+          </Pressable>
+        </View>
+
+        <View style={styles.volumeColumn}>
+          <Pressable onPress={() => void updateSpeakerVolume(instarSpeakerVolume + 5)} style={styles.volumeAdjustBtn}>
+            <MaterialCommunityIcons color={palette.text} name="plus" size={16} />
+          </Pressable>
+          <View style={styles.volumeTrack}>
+            <View style={[styles.volumeFill, { height: `${instarSpeakerVolume}%` }]} />
+          </View>
+          <Pressable onPress={() => void updateSpeakerVolume(instarSpeakerVolume - 5)} style={styles.volumeAdjustBtn}>
+            <MaterialCommunityIcons color={palette.text} name="minus" size={16} />
+          </Pressable>
+        </View>
+
+        <View style={styles.controlColumn}>
+          {talkbackControlVisible ? (
+            <Pressable
+              onPress={talkbackPushToTalk ? undefined : toggleTalkback}
+              onPressIn={talkbackPushToTalk ? enableTalkback : undefined}
+              onPressOut={talkbackPushToTalk ? disableTalkback : undefined}
+              onTouchEnd={talkbackPushToTalk ? disableTalkback : undefined}
+              onTouchCancel={talkbackPushToTalk ? disableTalkback : undefined}
+              style={[
+                styles.fullscreenActionButton,
+                talkbackActive ? styles.fullscreenAudioActive : null,
+                !talkbackAvailable ? styles.fullscreenActionDisabled : null,
+              ]}
+            >
+              <MaterialCommunityIcons
+                color={!talkbackAvailable ? palette.textMuted : talkbackActive ? pinnedColor : palette.text}
+                name={talkbackActive ? "microphone" : "microphone-outline"}
+                size={18}
+              />
+            </Pressable>
+          ) : null}
+          <Pressable
+            onPress={() => setPinned((current) => !current)}
+            style={[styles.fullscreenActionButton, pinned ? styles.fullscreenPinActive : null]}
+          >
+            <MaterialCommunityIcons
+              color={pinned ? pinnedColor : palette.text}
+              name={pinned ? "pin" : "pin-outline"}
+              size={18}
+            />
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              playConfiguredUiSound(config.interactionSounds?.close, "close", `${config.id}:close`);
+              closeFullscreen();
+            }}
+            style={styles.fullscreenActionButton}
+          >
+            <MaterialCommunityIcons color={palette.text} name="close" size={18} />
+          </Pressable>
+        </View>
+      </View>
+      {instarControlBusy ? (
+        <View style={styles.controlBusyBadge}>
+          <Text style={styles.controlBusyText}>INSTAR ...</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+
   return (
     <>
       <View ref={inPlaceFullscreenHostRef} style={[styles.container, showFixedFallbackFullscreen ? webInPlaceFullscreenHostStyle : null]}>
@@ -1214,58 +1411,7 @@ export function CameraTalkWidget({
         </Pressable>
         {showInPlaceFullscreen ? (
           <View pointerEvents="box-none" style={styles.inPlaceFullscreenHud}>
-            <View style={styles.fullscreenActions}>
-              {showWebFullscreenAudioToggle ? (
-                <Pressable
-                  onPress={toggleAudio}
-                  style={[styles.fullscreenActionButton, styles.fullscreenActionSpacing, audioEnabled ? styles.fullscreenAudioActive : null]}
-                >
-                  <MaterialCommunityIcons
-                    color={audioEnabled ? pinnedColor : palette.text}
-                    name={audioEnabled ? "volume-high" : "volume-mute"}
-                    size={18}
-                  />
-                </Pressable>
-              ) : null}
-              {talkbackControlVisible ? (
-                <Pressable
-                  onPress={talkbackPushToTalk ? undefined : toggleTalkback}
-                  onPressIn={talkbackPushToTalk ? enableTalkback : undefined}
-                  onPressOut={talkbackPushToTalk ? disableTalkback : undefined}
-                  style={[
-                    styles.fullscreenActionButton,
-                    styles.fullscreenActionSpacing,
-                    talkbackActive ? styles.fullscreenAudioActive : null,
-                    !talkbackAvailable ? styles.fullscreenActionDisabled : null,
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    color={!talkbackAvailable ? palette.textMuted : talkbackActive ? pinnedColor : palette.text}
-                    name={talkbackActive ? "microphone" : "microphone-outline"}
-                    size={18}
-                  />
-                </Pressable>
-              ) : null}
-              <Pressable
-                onPress={() => setPinned((current) => !current)}
-                style={[styles.fullscreenActionButton, styles.fullscreenActionSpacing, pinned ? styles.fullscreenPinActive : null]}
-              >
-                <MaterialCommunityIcons
-                  color={pinned ? pinnedColor : palette.text}
-                  name={pinned ? "pin" : "pin-outline"}
-                  size={18}
-                />
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  playConfiguredUiSound(config.interactionSounds?.close, "close", `${config.id}:close`);
-                  closeFullscreen();
-                }}
-                style={styles.fullscreenActionButton}
-              >
-                <MaterialCommunityIcons color={palette.text} name="close" size={20} />
-              </Pressable>
-            </View>
+            {renderFullscreenControls()}
             {talkbackIframeEnabled && talkbackActive
               ? createElement("iframe", {
                   allow: "autoplay; microphone; camera",
@@ -1296,58 +1442,7 @@ export function CameraTalkWidget({
           visible
         >
         <View style={styles.fullscreenBackdrop}>
-          <View style={styles.fullscreenActions}>
-            {showNativeFullscreenAudioToggle ? (
-              <Pressable
-                onPress={toggleAudio}
-                style={[styles.fullscreenActionButton, styles.fullscreenActionSpacing, audioEnabled ? styles.fullscreenAudioActive : null]}
-              >
-                <MaterialCommunityIcons
-                  color={audioEnabled ? pinnedColor : palette.text}
-                  name={audioEnabled ? "volume-high" : "volume-mute"}
-                  size={18}
-                />
-              </Pressable>
-            ) : null}
-            {talkbackControlVisible ? (
-              <Pressable
-                onPress={talkbackPushToTalk ? undefined : toggleTalkback}
-                onPressIn={talkbackPushToTalk ? enableTalkback : undefined}
-                onPressOut={talkbackPushToTalk ? disableTalkback : undefined}
-                style={[
-                  styles.fullscreenActionButton,
-                  styles.fullscreenActionSpacing,
-                  talkbackActive ? styles.fullscreenAudioActive : null,
-                  !talkbackAvailable ? styles.fullscreenActionDisabled : null,
-                ]}
-              >
-                <MaterialCommunityIcons
-                  color={!talkbackAvailable ? palette.textMuted : talkbackActive ? pinnedColor : palette.text}
-                  name={talkbackActive ? "microphone" : "microphone-outline"}
-                  size={18}
-                />
-              </Pressable>
-            ) : null}
-            <Pressable
-              onPress={() => setPinned((current) => !current)}
-              style={[styles.fullscreenActionButton, styles.fullscreenActionSpacing, pinned ? styles.fullscreenPinActive : null]}
-            >
-              <MaterialCommunityIcons
-                color={pinned ? pinnedColor : palette.text}
-                name={pinned ? "pin" : "pin-outline"}
-                size={18}
-              />
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                playConfiguredUiSound(config.interactionSounds?.close, "close", `${config.id}:close`);
-                closeFullscreen();
-              }}
-              style={styles.fullscreenActionButton}
-            >
-              <MaterialCommunityIcons color={palette.text} name="close" size={20} />
-            </Pressable>
-          </View>
+          {renderFullscreenControls()}
           {talkbackIframeEnabled && talkbackActive
             ? createElement("iframe", {
                 allow: "autoplay; microphone; camera",
@@ -2607,12 +2702,25 @@ const styles = StyleSheet.create({
     zIndex: 2600,
     pointerEvents: "box-none",
   },
-  fullscreenActions: {
+  fullscreenControlsWrap: {
     position: "absolute",
-    top: 24,
-    right: 24,
+    left: 12,
+    right: 12,
+    bottom: 12,
     zIndex: 30,
+    alignItems: "center",
+    gap: 8,
+  },
+  fullscreenControlsBar: {
     flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 18,
+    backgroundColor: "rgba(8, 12, 20, 0.58)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   fullscreenActionButton: {
     width: 40,
@@ -2622,8 +2730,65 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(4, 8, 14, 0.54)",
   },
-  fullscreenActionSpacing: {
-    marginRight: 10,
+  controlColumn: {
+    gap: 6,
+  },
+  ptzPad: {
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  ptzButton: {
+    position: "absolute",
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(4, 8, 14, 0.6)",
+  },
+  ptzButtonTop: {
+    top: 2,
+    left: 28,
+  },
+  ptzButtonRight: {
+    top: 28,
+    right: 2,
+  },
+  ptzButtonBottom: {
+    bottom: 2,
+    left: 28,
+  },
+  ptzButtonLeft: {
+    top: 28,
+    left: 2,
+  },
+  volumeColumn: {
+    alignItems: "center",
+    gap: 4,
+  },
+  volumeAdjustBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(4, 8, 14, 0.6)",
+  },
+  volumeTrack: {
+    width: 10,
+    height: 72,
+    borderRadius: 5,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    overflow: "hidden",
+    justifyContent: "flex-end",
+  },
+  volumeFill: {
+    width: "100%",
+    backgroundColor: "#7eb9ff",
   },
   fullscreenPinActive: {
     backgroundColor: "rgba(243, 200, 74, 0.18)",
@@ -2708,6 +2873,17 @@ const styles = StyleSheet.create({
   talkbackDebugText: {
     color: "#d7f6ff",
     fontSize: 12,
+    fontWeight: "700",
+  },
+  controlBusyBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  controlBusyText: {
+    color: "#f0f6ff",
+    fontSize: 11,
     fontWeight: "700",
   },
   fullscreenActionDisabled: {
