@@ -2869,7 +2869,7 @@ const styles = StyleSheet.create({
   fullscreenTopRightActions: {
     position: "absolute",
     right: 22,
-    top: 10,
+    top: -3,
     flexDirection: "row",
     gap: 10,
     zIndex: 40,
