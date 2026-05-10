@@ -90,6 +90,8 @@ export function CameraTalkWidget({
   const instarTalkFlushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const instarTalkQueueRef = useRef<Uint8Array[]>([]);
   const instarTalkQueueBytesRef = useRef(0);
+  const instarTalkSentBytesRef = useRef(0);
+  const instarTalkLastDebugAtRef = useRef(0);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const titleFontSize = Math.max(11, Math.min(28, Math.round(config.titleFontSize || 14)));
@@ -324,6 +326,8 @@ export function CameraTalkWidget({
     }
     instarTalkQueueRef.current = [];
     instarTalkQueueBytesRef.current = 0;
+    instarTalkSentBytesRef.current = 0;
+    instarTalkLastDebugAtRef.current = 0;
 
     if (instarTalkProcessorRef.current) {
       instarTalkProcessorRef.current.disconnect();
@@ -357,6 +361,7 @@ export function CameraTalkWidget({
       throw new Error("INSTAR talkback unavailable");
     }
     await stopInstarTalkback();
+    setPreviewStreamDebug("INSTAR: starte Talkback...");
     const startResponse = await fetch("/smarthome-dashboard/api/instar-talk/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -369,9 +374,10 @@ export function CameraTalkWidget({
     });
     const startPayload = await startResponse.json().catch(() => ({}));
     if (!startResponse.ok || !startPayload?.token) {
-      throw new Error(startPayload?.error || "INSTAR talk start failed");
+      throw new Error(startPayload?.error || `INSTAR talk start failed (${startResponse.status})`);
     }
     instarTalkTokenRef.current = String(startPayload.token);
+    setPreviewStreamDebug("INSTAR: Session aktiv, Mikrofon wird angefordert...");
 
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -382,6 +388,7 @@ export function CameraTalkWidget({
       video: false,
     });
     instarTalkStreamRef.current = stream;
+    setPreviewStreamDebug("INSTAR: Mikrofon aktiv.");
     const audioContext = new AudioContext();
     instarTalkAudioContextRef.current = audioContext;
     const source = audioContext.createMediaStreamSource(stream);
@@ -402,7 +409,16 @@ export function CameraTalkWidget({
     processor.connect(audioContext.destination);
 
     instarTalkFlushTimerRef.current = setInterval(() => {
-      void flushInstarTalkbackQueue(instarTalkTokenRef.current, instarTalkQueueRef, instarTalkQueueBytesRef);
+      void flushInstarTalkbackQueue(instarTalkTokenRef.current, instarTalkQueueRef, instarTalkQueueBytesRef).then((sent) => {
+        if (sent > 0) {
+          instarTalkSentBytesRef.current += sent;
+          const now = Date.now();
+          if (now - instarTalkLastDebugAtRef.current > 1000) {
+            instarTalkLastDebugAtRef.current = now;
+            setPreviewStreamDebug(`INSTAR: sende Audio (${instarTalkSentBytesRef.current} bytes)`);
+          }
+        }
+      });
     }, 80);
   }, [instarBaseUrl, instarPassword, instarTalkbackAvailable, instarUsername, stopInstarTalkback]);
 
@@ -1250,6 +1266,11 @@ export function CameraTalkWidget({
                   title: `${config.title || "camera-talk"}-talkback`,
                 })
               : null}
+            {talkbackActive && previewStreamDebug ? (
+              <View style={styles.talkbackDebugBadge}>
+                <Text style={styles.talkbackDebugText}>{previewStreamDebug}</Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
         {!previewFeed && !previewSnapshotBaseUrl && !previewMjpegUrl && !previewFlvUrl && !previewFmp4Url ? (
@@ -1586,7 +1607,7 @@ async function flushInstarTalkbackQueue(
   queueBytesRef: { current: number }
 ) {
   if (!token || !queueRef.current.length || queueBytesRef.current <= 0) {
-    return;
+    return 0;
   }
 
   const bytes = queueBytesRef.current;
@@ -1605,14 +1626,20 @@ async function flushInstarTalkbackQueue(
   }
   const base64 = typeof btoa === "function" ? btoa(binary) : "";
   if (!base64) {
-    return;
+    return 0;
   }
 
-  await fetch("/smarthome-dashboard/api/instar-talk/chunk", {
+  const response = await fetch("/smarthome-dashboard/api/instar-talk/chunk", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token, pcmBase64: base64 }),
-  }).catch(() => undefined);
+  }).catch(() => null);
+  if (!response || !response.ok) {
+    return 0;
+  }
+  const payload = await response.json().catch(() => ({}));
+  const sent = Number(payload?.sent || 0);
+  return Number.isFinite(sent) ? sent : 0;
 }
 
 function resolveCameraFeed(input: {
@@ -2652,6 +2679,21 @@ const styles = StyleSheet.create({
   },
   streamDebugText: {
     color: "#ffe7e7",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  talkbackDebugBadge: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 12,
+    borderRadius: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.76)",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  talkbackDebugText: {
+    color: "#d7f6ff",
     fontSize: 12,
     fontWeight: "700",
   },
