@@ -1213,6 +1213,23 @@ export function CameraTalkWidget({
       </View>
 
       <View style={styles.fullscreenControlsRow}>
+        <View style={styles.controlColumn}>
+          <Pressable
+            onPress={() => void setAlarmArmed(!(instarAlarmArmed === true))}
+            style={[
+              styles.fullscreenActionButton,
+              styles.alarmButton,
+              instarAlarmArmed === true ? styles.fullscreenAudioActive : styles.fullscreenActionInactive,
+            ]}
+          >
+            <MaterialCommunityIcons
+              color={instarAlarmArmed === true ? "#ff4d4d" : "#ff8e8e"}
+              name={instarAlarmArmed === true ? "alarm-light" : "alarm-light-outline"}
+              size={24}
+            />
+          </Pressable>
+        </View>
+
         <View style={styles.ptzPad}>
           <Pressable
             onPressIn={() => handlePtzPressIn("up")}
@@ -1259,26 +1276,13 @@ export function CameraTalkWidget({
 
         <View style={styles.controlColumn}>
           <Pressable
-            onPress={() => void setAlarmArmed(!(instarAlarmArmed === true))}
-            style={[styles.fullscreenActionButton, instarAlarmArmed === true ? styles.fullscreenAudioActive : styles.fullscreenActionInactive]}
-          >
-            <MaterialCommunityIcons
-              color={instarAlarmArmed === true ? pinnedColor : palette.textMuted}
-              name={instarAlarmArmed === true ? "alarm-light" : "alarm-light-off"}
-              size={22}
-            />
-          </Pressable>
-        </View>
-
-        <View style={styles.controlColumn}>
-          <Pressable
             onPress={() => void setLedMode(!(instarLedOn === true))}
             style={[styles.fullscreenActionButton, instarLedOn === true ? styles.fullscreenAudioActive : styles.fullscreenActionInactive]}
           >
             <MaterialCommunityIcons
-              color={instarLedOn === true ? pinnedColor : palette.textMuted}
-              name={instarLedOn === true ? "led-on" : "led-off"}
-              size={22}
+              color={instarLedOn === true ? "#ffd86b" : "#d4deef"}
+              name={instarLedOn === true ? "lightbulb-on" : "lightbulb-on-outline"}
+              size={24}
             />
           </Pressable>
         </View>
@@ -2857,16 +2861,17 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 16,
     right: 16,
-    bottom: 34,
+    bottom: 72,
     zIndex: 30,
     alignItems: "center",
   },
   fullscreenTopRightActions: {
     position: "absolute",
-    right: 0,
-    top: -6,
+    right: 10,
+    top: 10,
     flexDirection: "row",
     gap: 10,
+    zIndex: 40,
   },
   fullscreenControlsRow: {
     flexDirection: "row",
@@ -2957,6 +2962,10 @@ const styles = StyleSheet.create({
     opacity: 0.85,
     backgroundColor: "rgba(170, 192, 235, 0.22)",
     borderColor: "rgba(228, 240, 255, 0.45)",
+  },
+  alarmButton: {
+    borderColor: "rgba(255, 102, 102, 0.65)",
+    backgroundColor: "rgba(140, 24, 24, 0.25)",
   },
   fullscreenTitle: {
     position: "absolute",
