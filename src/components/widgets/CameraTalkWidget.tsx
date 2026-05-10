@@ -2869,7 +2869,7 @@ const styles = StyleSheet.create({
   fullscreenTopRightActions: {
     position: "absolute",
     right: 22,
-    top: 22,
+    top: 10,
     flexDirection: "row",
     gap: 10,
     zIndex: 40,
@@ -2877,7 +2877,7 @@ const styles = StyleSheet.create({
   fullscreenControlsRow: {
     position: "absolute",
     left: 26,
-    bottom: 118,
+    bottom: 106,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-start",
