@@ -7,7 +7,14 @@ const path = require("path");
 const { Readable } = require("stream");
 const http = require("http");
 const https = require("https");
+const crypto = require("crypto");
 const { resolveWebRoot } = require("./lib/static");
+let WebSocketClient = null;
+try {
+  WebSocketClient = require("ws");
+} catch {
+  WebSocketClient = null;
+}
 let UndiciAgent = null;
 try {
   ({ Agent: UndiciAgent } = require("undici"));
@@ -27,6 +34,7 @@ const LOG_BUFFER_LIMIT = 2000;
 let webShellCache = null;
 let logEntriesBuffer = [];
 let logListenerRegistered = false;
+const instarTalkSessions = new Map();
 
 const LOG_LEVEL_ORDER = {
   silly: 0,
@@ -47,7 +55,12 @@ function startAdapter(options) {
         .catch((error) => {
           adapter.log.warn(`Log capture cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
         })
-        .finally(() => callback());
+        .finally(() => {
+          for (const token of instarTalkSessions.keys()) {
+            closeInstarTalkSession(token);
+          }
+          callback();
+        });
     },
   });
 
@@ -360,6 +373,103 @@ async function main(adapter) {
 
   app.get("/smarthome-dashboard/api/camera-stream", handleCameraStreamProxy);
   app.get("/smarthome-dashboard/api/camera-mjpeg", handleCameraStreamProxy);
+  app.post("/smarthome-dashboard/api/instar-talk/start", async (req, res) => {
+    if (!WebSocketClient) {
+      res.status(500).json({ error: "ws dependency missing in adapter runtime" });
+      return;
+    }
+
+    const cameraBaseUrl = normalizeUrl(req.body?.cameraBaseUrl);
+    const username = String(req.body?.username || "");
+    const password = String(req.body?.password || "");
+    const allowInsecure = req.body?.allowInsecure !== false;
+    if (!cameraBaseUrl || !username || !password) {
+      res.status(400).json({ error: "cameraBaseUrl, username, password required" });
+      return;
+    }
+
+    try {
+      const invite = await requestInstarCallInvite(cameraBaseUrl, username, password, allowInsecure);
+      const wsUrl = `${cameraBaseUrl.replace(/^http/i, "ws")}/ws`;
+      const token = crypto.randomBytes(16).toString("hex");
+      const authHeader = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+      const ws = new WebSocketClient(wsUrl, {
+        headers: {
+          Authorization: authHeader,
+        },
+        rejectUnauthorized: !allowInsecure,
+      });
+
+      ws.on("error", (error) => {
+        adapter.log.warn(`INSTAR talkback socket error: ${error instanceof Error ? error.message : String(error)}`);
+      });
+      ws.on("close", () => {
+        instarTalkSessions.delete(token);
+      });
+
+      await waitForSocketOpen(ws, 8000);
+      ws.send(`call_ack?session_id=${invite.sessionId}`);
+      instarTalkSessions.set(token, {
+        ws,
+        frameSize: invite.frameSize || 640,
+        sessionId: invite.sessionId,
+        timestamp: invite.initialTimestamp,
+      });
+      res.json({ ok: true, token, frameSize: invite.frameSize || 640 });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "INSTAR talk start failed" });
+    }
+  });
+  app.post("/smarthome-dashboard/api/instar-talk/chunk", async (req, res) => {
+    const token = String(req.body?.token || "");
+    const pcmBase64 = String(req.body?.pcmBase64 || "");
+    if (!token || !pcmBase64) {
+      res.status(400).json({ error: "token and pcmBase64 required" });
+      return;
+    }
+    const session = instarTalkSessions.get(token);
+    if (!session || !session.ws || session.ws.readyState !== WebSocketClient.OPEN) {
+      res.status(404).json({ error: "talk session not active" });
+      return;
+    }
+
+    try {
+      const pcm = Buffer.from(pcmBase64, "base64");
+      if (!pcm.length) {
+        res.json({ ok: true, sent: 0 });
+        return;
+      }
+
+      let offset = 0;
+      let sent = 0;
+      while (offset < pcm.length) {
+        const remaining = pcm.length - offset;
+        const size = Math.min(session.frameSize, remaining);
+        const chunk = pcm.subarray(offset, offset + size);
+        const header = Buffer.from(
+          `Session: ${session.sessionId}\r\nTimestamp: ${session.timestamp}\r\nFrame-Length: ${size}\r\n\r\n`,
+          "ascii"
+        );
+        session.ws.send(Buffer.concat([header, chunk]));
+        session.timestamp += 45;
+        offset += size;
+        sent += size;
+      }
+
+      res.json({ ok: true, sent });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "INSTAR talk chunk failed" });
+    }
+  });
+  app.post("/smarthome-dashboard/api/instar-talk/stop", async (req, res) => {
+    const token = String(req.body?.token || "");
+    if (!token) {
+      res.status(400).json({ error: "token required" });
+      return;
+    }
+    closeInstarTalkSession(token);
+    res.json({ ok: true });
+  });
 
   app.use("/smarthome-dashboard/widget-assets", express.static(widgetAssetsRoot));
 
@@ -417,6 +527,93 @@ async function main(adapter) {
 
 function normalizeDashboardName(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeUrl(value) {
+  const input = String(value || "").trim().replace(/\/+$/, "");
+  if (!input) {
+    return "";
+  }
+  if (/^https?:\/\//i.test(input)) {
+    return input;
+  }
+  return `https://${input}`;
+}
+
+async function requestInstarCallInvite(cameraBaseUrl, username, password, allowInsecure) {
+  const inviteUrl = `${cameraBaseUrl}/call_invite`;
+  const authHeader = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+  const response = await fetch(inviteUrl, {
+    method: "GET",
+    headers: {
+      Accept: "*/*",
+      Authorization: authHeader,
+    },
+    ...(allowInsecure ? buildCameraFetchOptions(inviteUrl) : { redirect: "follow" }),
+  });
+  if (!response.ok) {
+    throw new Error(`call_invite failed (${response.status})`);
+  }
+  let text = await response.text();
+  const normalized = text.trim();
+  if (/^[A-Za-z0-9+/=\r\n]+$/.test(normalized) && normalized.length % 4 === 0) {
+    try {
+      const decoded = Buffer.from(normalized, "base64").toString("utf8");
+      if (decoded.includes("Session:")) {
+        text = decoded;
+      }
+    } catch {
+      // keep original body
+    }
+  }
+
+  const sessionMatch = text.match(/Session:\s*(\d+)/i);
+  if (!sessionMatch) {
+    throw new Error("call_invite response without Session id");
+  }
+  const frameSizeMatch = text.match(/Frame-Size:\s*(\d+)/i);
+  return {
+    sessionId: Number(sessionMatch[1]),
+    frameSize: frameSizeMatch ? Number(frameSizeMatch[1]) : 640,
+    initialTimestamp: Math.floor(Date.now() / 10),
+  };
+}
+
+function waitForSocketOpen(ws, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("INSTAR websocket connect timeout"));
+    }, timeoutMs);
+    const cleanup = () => {
+      clearTimeout(timer);
+      ws.off("open", onOpen);
+      ws.off("error", onError);
+    };
+    const onOpen = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = (error) => {
+      cleanup();
+      reject(error);
+    };
+    ws.on("open", onOpen);
+    ws.on("error", onError);
+  });
+}
+
+function closeInstarTalkSession(token) {
+  const session = instarTalkSessions.get(token);
+  if (!session) {
+    return;
+  }
+  instarTalkSessions.delete(token);
+  try {
+    session.ws.close();
+  } catch {
+    // ignore socket close errors
+  }
 }
 
 function buildCameraRequestConfig(rawUrl) {

@@ -128,6 +128,10 @@ export type CameraTalkWidgetConfig = Omit<CameraWidgetConfig, "type"> & {
   talkbackWebrtcUrl?: string;
   talkbackPushToTalk?: boolean;
   talkbackAutoEnableVideo?: boolean;
+  instarTalkbackEnabled?: boolean;
+  instarBaseUrl?: string;
+  instarUsername?: string;
+  instarPassword?: string;
 };
 
 export type GrafanaWidgetConfig = WidgetBase & {

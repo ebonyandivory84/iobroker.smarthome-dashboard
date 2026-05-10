@@ -82,6 +82,14 @@ export function CameraTalkWidget({
   const webPinchingRef = useRef(false);
   const previewMjpegReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewMjpegReconnectAttemptsRef = useRef(0);
+  const instarTalkTokenRef = useRef<string | null>(null);
+  const instarTalkStreamRef = useRef<MediaStream | null>(null);
+  const instarTalkAudioContextRef = useRef<AudioContext | null>(null);
+  const instarTalkProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const instarTalkSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const instarTalkFlushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const instarTalkQueueRef = useRef<Uint8Array[]>([]);
+  const instarTalkQueueBytesRef = useRef(0);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const titleFontSize = Math.max(11, Math.min(28, Math.round(config.titleFontSize || 14)));
@@ -132,9 +140,15 @@ export function CameraTalkWidget({
   const showPreviewFeed = !fullscreenOpen || showInPlaceFullscreen;
   const showNativeFullscreenModal = Platform.OS !== "web" && fullscreenOpen;
   const talkbackWebrtcUrl = (config.talkbackWebrtcUrl || "").trim();
-  const talkbackAvailable = Platform.OS === "web" && Boolean(talkbackWebrtcUrl);
+  const instarTalkbackEnabled = Platform.OS === "web" && config.instarTalkbackEnabled === true;
+  const instarBaseUrl = (config.instarBaseUrl || "").trim();
+  const instarUsername = (config.instarUsername || "").trim();
+  const instarPassword = config.instarPassword || "";
+  const instarTalkbackAvailable = instarTalkbackEnabled && Boolean(instarBaseUrl && instarUsername && instarPassword);
+  const talkbackAvailable = Platform.OS === "web" && (Boolean(talkbackWebrtcUrl) || instarTalkbackAvailable);
   const talkbackPushToTalk = config.talkbackPushToTalk !== false;
   const talkbackShowVideo = config.talkbackAutoEnableVideo === true;
+  const talkbackIframeEnabled = Boolean(talkbackWebrtcUrl) && !instarTalkbackEnabled;
   const activeFeed = previewFeed;
   const activeSnapshotBaseUrl = activeFeed?.kind === "snapshot" ? activeFeed.url : null;
   const previewMjpegSources = useMemo(
@@ -240,6 +254,9 @@ export function CameraTalkWidget({
     fullscreenVisibilityCallbackRef.current?.(false);
     setFullscreenOpen(false);
     setPinned(false);
+    if (instarTalkbackEnabled) {
+      void stopInstarTalkback();
+    }
     setTalkbackActive(false);
     if (Platform.OS === "web" && typeof document !== "undefined") {
       const webDocument = document as Document & {
@@ -295,25 +312,145 @@ export function CameraTalkWidget({
     setAudioEnabled((current) => !current);
   }, [config.id, config.interactionSounds?.press]);
 
+  const stopInstarTalkback = useCallback(async () => {
+    const token = instarTalkTokenRef.current;
+    instarTalkTokenRef.current = null;
+
+    if (instarTalkFlushTimerRef.current) {
+      clearInterval(instarTalkFlushTimerRef.current);
+      instarTalkFlushTimerRef.current = null;
+    }
+    instarTalkQueueRef.current = [];
+    instarTalkQueueBytesRef.current = 0;
+
+    if (instarTalkProcessorRef.current) {
+      instarTalkProcessorRef.current.disconnect();
+      instarTalkProcessorRef.current.onaudioprocess = null;
+      instarTalkProcessorRef.current = null;
+    }
+    if (instarTalkSourceRef.current) {
+      instarTalkSourceRef.current.disconnect();
+      instarTalkSourceRef.current = null;
+    }
+    if (instarTalkAudioContextRef.current) {
+      await instarTalkAudioContextRef.current.close().catch(() => undefined);
+      instarTalkAudioContextRef.current = null;
+    }
+    if (instarTalkStreamRef.current) {
+      instarTalkStreamRef.current.getTracks().forEach((track) => track.stop());
+      instarTalkStreamRef.current = null;
+    }
+
+    if (token) {
+      await fetch("/smarthome-dashboard/api/instar-talk/stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      }).catch(() => undefined);
+    }
+  }, []);
+
+  const startInstarTalkback = useCallback(async () => {
+    if (Platform.OS !== "web" || !instarTalkbackAvailable || !navigator.mediaDevices?.getUserMedia) {
+      throw new Error("INSTAR talkback unavailable");
+    }
+    await stopInstarTalkback();
+    const startResponse = await fetch("/smarthome-dashboard/api/instar-talk/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cameraBaseUrl: instarBaseUrl,
+        username: instarUsername,
+        password: instarPassword,
+        allowInsecure: true,
+      }),
+    });
+    const startPayload = await startResponse.json().catch(() => ({}));
+    if (!startResponse.ok || !startPayload?.token) {
+      throw new Error(startPayload?.error || "INSTAR talk start failed");
+    }
+    instarTalkTokenRef.current = String(startPayload.token);
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: true,
+      },
+      video: false,
+    });
+    instarTalkStreamRef.current = stream;
+    const audioContext = new AudioContext();
+    instarTalkAudioContextRef.current = audioContext;
+    const source = audioContext.createMediaStreamSource(stream);
+    instarTalkSourceRef.current = source;
+    const processor = audioContext.createScriptProcessor(2048, 1, 1);
+    instarTalkProcessorRef.current = processor;
+    processor.onaudioprocess = (event) => {
+      const input = event.inputBuffer.getChannelData(0);
+      const pcm = downsampleFloat32ToInt16(input, event.inputBuffer.sampleRate, 16000);
+      if (!pcm.length) {
+        return;
+      }
+      instarTalkQueueRef.current.push(pcm);
+      instarTalkQueueBytesRef.current += pcm.length;
+    };
+
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+
+    instarTalkFlushTimerRef.current = setInterval(() => {
+      void flushInstarTalkbackQueue(instarTalkTokenRef.current, instarTalkQueueRef, instarTalkQueueBytesRef);
+    }, 80);
+  }, [instarBaseUrl, instarPassword, instarTalkbackAvailable, instarUsername, stopInstarTalkback]);
+
   const enableTalkback = useCallback(() => {
     if (!talkbackAvailable) {
       return;
     }
     playConfiguredUiSound(config.interactionSounds?.press, "toggle", `${config.id}:talkback-on`);
+    if (instarTalkbackAvailable) {
+      void startInstarTalkback()
+        .then(() => setTalkbackActive(true))
+        .catch((error) => {
+          setPreviewStreamDebug(error instanceof Error ? error.message : "INSTAR talkback failed");
+          void stopInstarTalkback();
+          setTalkbackActive(false);
+        });
+      return;
+    }
     setTalkbackActive(true);
-  }, [config.id, config.interactionSounds?.press, talkbackAvailable]);
+  }, [config.id, config.interactionSounds?.press, instarTalkbackAvailable, startInstarTalkback, stopInstarTalkback, talkbackAvailable]);
 
   const disableTalkback = useCallback(() => {
+    if (instarTalkbackAvailable) {
+      void stopInstarTalkback();
+    }
     setTalkbackActive(false);
-  }, []);
+  }, [instarTalkbackAvailable, stopInstarTalkback]);
 
   const toggleTalkback = useCallback(() => {
     if (!talkbackAvailable) {
       return;
     }
     playConfiguredUiSound(config.interactionSounds?.press, "toggle", `${config.id}:talkback-toggle`);
+    if (instarTalkbackAvailable) {
+      if (talkbackActive) {
+        void stopInstarTalkback();
+        setTalkbackActive(false);
+      } else {
+        void startInstarTalkback()
+          .then(() => setTalkbackActive(true))
+          .catch((error) => {
+            setPreviewStreamDebug(error instanceof Error ? error.message : "INSTAR talkback failed");
+            void stopInstarTalkback();
+            setTalkbackActive(false);
+          });
+      }
+      return;
+    }
     setTalkbackActive((current) => !current);
-  }, [config.id, config.interactionSounds?.press, talkbackAvailable]);
+  }, [config.id, config.interactionSounds?.press, instarTalkbackAvailable, startInstarTalkback, stopInstarTalkback, talkbackActive, talkbackAvailable]);
 
   const fullscreenPanResponder = useMemo(
     () =>
@@ -330,6 +467,12 @@ export function CameraTalkWidget({
       }),
     [closeFullscreen, config.id, config.interactionSounds?.scroll, onFullscreenSwipeClose]
   );
+
+  useEffect(() => {
+    return () => {
+      void stopInstarTalkback();
+    };
+  }, [stopInstarTalkback]);
 
   useEffect(() => {
     if (!activeSnapshotBaseUrl) {
@@ -1097,7 +1240,7 @@ export function CameraTalkWidget({
                 <MaterialCommunityIcons color={palette.text} name="close" size={20} />
               </Pressable>
             </View>
-            {talkbackAvailable && talkbackActive
+            {talkbackIframeEnabled && talkbackActive
               ? createElement("iframe", {
                   allow: "autoplay; microphone; camera",
                   src: talkbackWebrtcUrl,
@@ -1169,7 +1312,7 @@ export function CameraTalkWidget({
               <MaterialCommunityIcons color={palette.text} name="close" size={20} />
             </Pressable>
           </View>
-          {talkbackAvailable && talkbackActive
+          {talkbackIframeEnabled && talkbackActive
             ? createElement("iframe", {
                 allow: "autoplay; microphone; camera",
                 src: talkbackWebrtcUrl,
@@ -1395,6 +1538,79 @@ function normalizeBoolean(value: unknown) {
   }
 
   return null;
+}
+
+function downsampleFloat32ToInt16(input: Float32Array, sourceRate: number, targetRate: number) {
+  if (!input.length || !Number.isFinite(sourceRate) || sourceRate <= 0) {
+    return new Uint8Array(0);
+  }
+
+  if (!Number.isFinite(targetRate) || targetRate <= 0 || sourceRate <= targetRate) {
+    const out = new Uint8Array(input.length * 2);
+    const view = new DataView(out.buffer);
+    for (let i = 0; i < input.length; i += 1) {
+      const sample = Math.max(-1, Math.min(1, input[i]));
+      const value = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+      view.setInt16(i * 2, value, true);
+    }
+    return out;
+  }
+
+  const ratio = sourceRate / targetRate;
+  const length = Math.max(1, Math.floor(input.length / ratio));
+  const out = new Uint8Array(length * 2);
+  const view = new DataView(out.buffer);
+  let offset = 0;
+  for (let i = 0; i < length; i += 1) {
+    const end = Math.min(input.length, Math.floor((i + 1) * ratio));
+    let sum = 0;
+    let count = 0;
+    while (offset < end) {
+      sum += input[offset];
+      count += 1;
+      offset += 1;
+    }
+    const sample = count > 0 ? sum / count : input[Math.min(input.length - 1, offset)] || 0;
+    const clipped = Math.max(-1, Math.min(1, sample));
+    const value = clipped < 0 ? clipped * 0x8000 : clipped * 0x7fff;
+    view.setInt16(i * 2, value, true);
+  }
+  return out;
+}
+
+async function flushInstarTalkbackQueue(
+  token: string | null,
+  queueRef: { current: Uint8Array[] },
+  queueBytesRef: { current: number }
+) {
+  if (!token || !queueRef.current.length || queueBytesRef.current <= 0) {
+    return;
+  }
+
+  const bytes = queueBytesRef.current;
+  const merged = new Uint8Array(bytes);
+  let offset = 0;
+  for (const chunk of queueRef.current) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
+  queueRef.current = [];
+  queueBytesRef.current = 0;
+
+  let binary = "";
+  for (let i = 0; i < merged.length; i += 1) {
+    binary += String.fromCharCode(merged[i]);
+  }
+  const base64 = typeof btoa === "function" ? btoa(binary) : "";
+  if (!base64) {
+    return;
+  }
+
+  await fetch("/smarthome-dashboard/api/instar-talk/chunk", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, pcmBase64: base64 }),
+  }).catch(() => undefined);
 }
 
 function resolveCameraFeed(input: {

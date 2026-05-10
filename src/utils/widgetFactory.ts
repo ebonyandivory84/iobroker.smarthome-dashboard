@@ -132,6 +132,10 @@ export function buildWidgetTemplate(
       talkbackWebrtcUrl: "",
       talkbackPushToTalk: true,
       talkbackAutoEnableVideo: false,
+      instarTalkbackEnabled: false,
+      instarBaseUrl: "",
+      instarUsername: "",
+      instarPassword: "",
       position: {
         ...basePosition,
         w: Math.min(6, grid.columns),

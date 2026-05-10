@@ -138,6 +138,10 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         talkbackWebrtcUrl: widget.type === "cameraTalk" ? widget.talkbackWebrtcUrl || "" : "",
         talkbackPushToTalk: widget.type === "cameraTalk" ? (widget.talkbackPushToTalk !== false ? "true" : "false") : "true",
         talkbackAutoEnableVideo: widget.type === "cameraTalk" ? (widget.talkbackAutoEnableVideo ? "true" : "false") : "false",
+        instarTalkbackEnabled: widget.type === "cameraTalk" ? (widget.instarTalkbackEnabled ? "true" : "false") : "false",
+        instarBaseUrl: widget.type === "cameraTalk" ? widget.instarBaseUrl || "" : "",
+        instarUsername: widget.type === "cameraTalk" ? widget.instarUsername || "" : "",
+        instarPassword: widget.type === "cameraTalk" ? widget.instarPassword || "" : "",
         ...appearanceDraft,
       });
       return;
@@ -825,6 +829,10 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
               talkbackWebrtcUrl: normalizeOptionalInput(draft.talkbackWebrtcUrl),
               talkbackPushToTalk: draft.talkbackPushToTalk !== "false",
               talkbackAutoEnableVideo: draft.talkbackAutoEnableVideo === "true",
+              instarTalkbackEnabled: draft.instarTalkbackEnabled === "true",
+              instarBaseUrl: normalizeOptionalInput(draft.instarBaseUrl),
+              instarUsername: normalizeOptionalInput(draft.instarUsername),
+              instarPassword: normalizeOptionalInput(draft.instarPassword),
             }
           : null),
         interactionSounds: buildStoredInteractionSounds(
@@ -1814,6 +1822,42 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                           options={["false", "true"]}
                           value={draft.talkbackAutoEnableVideo || "false"}
                           onSelect={(value) => setDraft((current) => ({ ...current, talkbackAutoEnableVideo: value }))}
+                        />
+                      </Field>
+                      <Field label="INSTAR Talkback API nutzen">
+                        <ChoiceRow
+                          options={["false", "true"]}
+                          value={draft.instarTalkbackEnabled || "false"}
+                          onSelect={(value) => setDraft((current) => ({ ...current, instarTalkbackEnabled: value }))}
+                        />
+                      </Field>
+                      <Field label="INSTAR Base URL">
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, instarBaseUrl: value }))}
+                          placeholder="https://192.168.44.253"
+                          placeholderTextColor={palette.textMuted}
+                          style={styles.input}
+                          value={draft.instarBaseUrl || ""}
+                        />
+                      </Field>
+                      <Field label="INSTAR Benutzer">
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, instarUsername: value }))}
+                          placeholderTextColor={palette.textMuted}
+                          style={styles.input}
+                          value={draft.instarUsername || ""}
+                        />
+                      </Field>
+                      <Field label="INSTAR Passwort">
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, instarPassword: value }))}
+                          placeholderTextColor={palette.textMuted}
+                          secureTextEntry
+                          style={styles.input}
+                          value={draft.instarPassword || ""}
                         />
                       </Field>
                     </>
