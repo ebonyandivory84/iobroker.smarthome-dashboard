@@ -16,6 +16,8 @@ export function buildWidgetTemplate(
     w:
       type === "camera"
         ? 6
+        : type === "cameraTalk"
+        ? 6
         : type === "solar"
           ? 8
             : type === "grafana"
@@ -43,6 +45,8 @@ export function buildWidgetTemplate(
                 : 3,
     h:
       type === "camera"
+        ? 4
+        : type === "cameraTalk"
         ? 4
         : type === "solar"
           ? 4
@@ -105,6 +109,29 @@ export function buildWidgetTemplate(
       fmp4Url: "",
       refreshMs: 2000,
       audioEnabled: false,
+      position: {
+        ...basePosition,
+        w: Math.min(6, grid.columns),
+      },
+    };
+  }
+
+  if (type === "cameraTalk") {
+    return {
+      id: `camera-talk-${suffix}`,
+      type: "cameraTalk",
+      title: `Camera Talk ${suffix}`,
+      titleFontSize: 14,
+      previewSourceMode: "snapshot",
+      snapshotUrl: "",
+      mjpegUrl: "",
+      flvUrl: "",
+      fmp4Url: "",
+      refreshMs: 2000,
+      audioEnabled: false,
+      talkbackWebrtcUrl: "",
+      talkbackPushToTalk: true,
+      talkbackAutoEnableVideo: false,
       position: {
         ...basePosition,
         w: Math.min(6, grid.columns),

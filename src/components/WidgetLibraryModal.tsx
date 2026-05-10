@@ -29,6 +29,12 @@ const OPTIONS: Array<{
     icon: "cctv",
   },
   {
+    type: "cameraTalk",
+    title: "Camera Talk",
+    description: "Eigenes Kamera-Widget mit zusaetzlichem WebRTC-Gegensprechen im Vollbild.",
+    icon: "microphone",
+  },
+  {
     type: "energy",
     title: "Energiefluss",
     description: "Kompakter Energiefluss fuer PV, Haus, Batterie und Netz.",

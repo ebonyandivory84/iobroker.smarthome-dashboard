@@ -102,7 +102,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       return;
     }
 
-    if (widget.type === "camera") {
+    if (widget.type === "camera" || widget.type === "cameraTalk") {
       setSoundDraft({
         press: resolveDraftSoundValue(
           widget.interactionSounds?.press,
@@ -135,6 +135,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         maximizeStateId: widget.maximizeStateId || "",
         maximizeTriggerFormat: widget.maximizeTriggerFormat || "boolean",
         maximizeTriggerValue: widget.maximizeTriggerValue || "",
+        talkbackWebrtcUrl: widget.type === "cameraTalk" ? widget.talkbackWebrtcUrl || "" : "",
+        talkbackPushToTalk: widget.type === "cameraTalk" ? (widget.talkbackPushToTalk !== false ? "true" : "false") : "true",
+        talkbackAutoEnableVideo: widget.type === "cameraTalk" ? (widget.talkbackAutoEnableVideo ? "true" : "false") : "false",
         ...appearanceDraft,
       });
       return;
@@ -783,7 +786,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ),
         appearance,
       });
-    } else if (widget.type === "camera") {
+    } else if (widget.type === "camera" || widget.type === "cameraTalk") {
       const previewSourceMode = cameraMode;
       const snapshotUrl = normalizeOptionalInput(draft.snapshotUrl);
       const mjpegUrl = normalizeOptionalInput(draft.mjpegUrl);
@@ -817,6 +820,13 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         maximizeStateId: draft.maximizeStateId || undefined,
         maximizeTriggerFormat: normalizeStateFormat(draft.maximizeTriggerFormat),
         maximizeTriggerValue: draft.maximizeTriggerValue || undefined,
+        ...(widget.type === "cameraTalk"
+          ? {
+              talkbackWebrtcUrl: normalizeOptionalInput(draft.talkbackWebrtcUrl),
+              talkbackPushToTalk: draft.talkbackPushToTalk !== "false",
+              talkbackAutoEnableVideo: draft.talkbackAutoEnableVideo === "true",
+            }
+          : null),
         interactionSounds: buildStoredInteractionSounds(
           widget.type,
           soundDraft,
@@ -1687,7 +1697,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 </Field>
               </>
             ) : null}
-            {widget.type === "camera" ? (
+            {widget.type === "camera" || widget.type === "cameraTalk" ? (
               <>
                 <Field label="Titelgroesse (px)">
                   <TextInput
@@ -1780,6 +1790,34 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   />
                 </Field>
                 <Field label="Sounds bei Interaktion">
+                  {widget.type === "cameraTalk" ? (
+                    <>
+                      <Field label="WebRTC Talkback URL">
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, talkbackWebrtcUrl: value }))}
+                          placeholder="https://.../stream.html?src=cam&mode=webrtc&media=video,audio,microphone"
+                          placeholderTextColor={palette.textMuted}
+                          style={styles.input}
+                          value={draft.talkbackWebrtcUrl || ""}
+                        />
+                      </Field>
+                      <Field label="Push-to-Talk (halten)">
+                        <ChoiceRow
+                          options={["true", "false"]}
+                          value={draft.talkbackPushToTalk || "true"}
+                          onSelect={(value) => setDraft((current) => ({ ...current, talkbackPushToTalk: value }))}
+                        />
+                      </Field>
+                      <Field label="Talkback-Video anzeigen">
+                        <ChoiceRow
+                          options={["false", "true"]}
+                          value={draft.talkbackAutoEnableVideo || "false"}
+                          onSelect={(value) => setDraft((current) => ({ ...current, talkbackAutoEnableVideo: value }))}
+                        />
+                      </Field>
+                    </>
+                  ) : null}
                   <Field label="Beim Tippen">
                     <SoundPickerField
                       onChange={(value) => setSoundDraft((current) => ({ ...current, press: value }))}
@@ -4347,7 +4385,7 @@ function getWidgetAppearanceDefaults(
     };
   }
 
-  if (widget.type === "camera") {
+  if (widget.type === "camera" || widget.type === "cameraTalk") {
     return {
       widgetColor: theme.widgetTones.cameraStart,
       widgetColor2: theme.widgetTones.cameraEnd,

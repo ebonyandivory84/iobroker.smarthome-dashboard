@@ -1,0 +1,2139 @@
+{
+  "title": "Pi Stats",
+  "backgroundMode": "mesh",
+  "backgroundColor": "#08111f",
+  "backgroundAccent": "#123a5d",
+  "theme": {
+    "widgetTones": {
+      "stateStart": "rgba(154, 16, 38, 0.98)",
+      "stateEnd": "rgba(163, 22, 126, 0.92)",
+      "energyStart": "rgba(26, 74, 148, 0.9)",
+      "energyEnd": "rgba(18, 36, 78, 0.96)",
+      "cameraStart": "rgba(31, 28, 44, 0.92)",
+      "cameraEnd": "rgba(14, 16, 26, 0.96)",
+      "solarStart": "rgba(18, 122, 94, 0.98)",
+      "solarEnd": "rgba(16, 72, 156, 0.96)"
+    },
+    "solar": {
+      "sceneCardBackground": "rgba(226, 232, 240, 0.04)",
+      "sceneCardBorder": "rgba(226, 232, 240, 0.12)",
+      "nodeCardBackground": "rgba(226, 232, 240, 0.12)",
+      "nodeCardBorder": "rgba(226, 232, 240, 0.18)",
+      "statCardBackground": "rgba(255,255,255,0.03)",
+      "statCardBorder": "rgba(157, 173, 214, 0.14)"
+    }
+  },
+  "grid": {
+    "columns": 12,
+    "rowHeight": 84,
+    "gap": 12
+  },
+  "pollingMs": 2000,
+  "iobroker": {
+    "baseUrl": "",
+    "adapterBasePath": "/smarthome-dashboard/api"
+  },
+  "widgets": [
+    {
+      "id": "log-1",
+      "type": "log",
+      "title": "Log 1",
+      "refreshMs": 2000,
+      "maxEntries": 80,
+      "minSeverity": "info",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "w": 2.6666666666666665,
+        "h": 5.1000000000000005
+      },
+      "showTitle": false,
+      "appearance": {
+        "widgetColor": "transparent",
+        "widgetColor2": "transparent",
+        "textColor": "#f7f8fc",
+        "mutedTextColor": "#8c94ad",
+        "cardColor": "rgba(5, 9, 17, 0.7)",
+        "cardColor2": "rgba(16, 30, 56, 0.8)"
+      },
+      "manualHeightOverride": true,
+      "interactionSounds": {
+        "press": [
+          "scrdisplay2.wav",
+          "processing3.wav"
+        ],
+        "confirm": [],
+        "slider": [],
+        "open": [],
+        "close": [],
+        "scroll": [
+          "scrscroll1.wav"
+        ],
+        "notify": [
+          "computerbeep_12.mp3"
+        ],
+        "notifyWarn": [
+          "voy_hail.mp3"
+        ],
+        "notifyError": [
+          "alarm6.wav"
+        ]
+      }
+    },
+    {
+      "id": "script-2",
+      "type": "script",
+      "title": "Skripte 2",
+      "refreshMs": 3000,
+      "maxEntries": 120,
+      "position": {
+        "x": 8,
+        "y": 0,
+        "w": 2.6666666666666665,
+        "h": 5.2
+      },
+      "showTitle": false,
+      "appearance": {
+        "widgetColor": "transparent",
+        "widgetColor2": "transparent",
+        "textColor": "#f7f8fc",
+        "mutedTextColor": "#8c94ad",
+        "cardColor": "rgba(7, 14, 29, 0.72)",
+        "cardColor2": "rgba(20, 42, 82, 0.82)"
+      },
+      "manualHeightOverride": true
+    },
+    {
+      "id": "host-3",
+      "type": "host",
+      "title": "Host 3",
+      "refreshMs": 10000,
+      "position": {
+        "x": 4,
+        "y": 0,
+        "w": 2.6666666666666665,
+        "h": 2.4000000000000004
+      },
+      "manualHeightOverride": true,
+      "showTitle": false,
+      "appearance": {
+        "widgetColor": "rgba(15, 34, 66, 0.95)",
+        "widgetColor2": "rgba(8, 18, 36, 0.98)",
+        "textColor": "#f7f8fc",
+        "mutedTextColor": "#8c94ad",
+        "cardColor": "#6ce8b4",
+        "cardColor2": "rgba(255,255,255,0.12)",
+        "statColor": "rgba(130, 182, 255, 0.24)",
+        "statColor2": "rgba(89, 132, 238, 0.18)"
+      }
+    },
+    {
+      "id": "raspberry-pi-stats-4",
+      "type": "raspberryPiStats",
+      "title": "Raspberry-Pi Stats 4",
+      "label": "NAS Pi",
+      "cpuTempStateId": "0_userdata.0.NAS-pi.cpuTemp",
+      "cpuLoadStateId": "0_userdata.0.NAS-pi.cpuLoad",
+      "ramFreeStateId": "0_userdata.0.NAS-pi.ramFree",
+      "diskFreeStateId": "0_userdata.0.NAS-pi.diskFree",
+      "onlineStateId": "0_userdata.0.NAS-pi.online",
+      "position": {
+        "x": 4,
+        "y": 2.9000000000000004,
+        "w": 2.6666666666666665,
+        "h": 2
+      },
+      "manualHeightOverride": true,
+      "showTitle": false,
+      "appearance": {
+        "widgetColor": "rgba(15, 34, 66, 0.95)",
+        "widgetColor2": "rgba(8, 18, 36, 0.98)",
+        "textColor": "#f7f8fc",
+        "mutedTextColor": "#8c94ad",
+        "cardColor": "#6ce8b4",
+        "cardColor2": "rgba(255,255,255,0.12)",
+        "statColor": "rgba(130, 182, 255, 0.24)",
+        "statColor2": "rgba(89, 132, 238, 0.18)"
+      },
+      "ramFreeUnit": "GB",
+      "diskFreeUnit": "GB"
+    }
+  ],
+  "uiSounds": {
+    "enabled": true,
+    "volume": 55,
+    "soundSet": "voyager",
+    "widgetTypeDefaults": {
+      "state": {
+        "press": [
+          "keyok2.mp3",
+          "keyok3.wav",
+          "keyok5.mp3"
+        ],
+        "confirm": [
+          "voiceinput3.wav",
+          "voiceinput4.wav"
+        ],
+        "slider": [],
+        "open": [],
+        "close": [],
+        "scroll": [],
+        "notify": [],
+        "notifyWarn": [],
+        "notifyError": []
+      },
+      "camera": {
+        "press": [
+          "computerbeep_30.mp3",
+          "computerbeep_4.mp3",
+          "keyok5.mp3"
+        ],
+        "confirm": [],
+        "slider": [],
+        "open": [
+          "scrclose1.wav"
+        ],
+        "close": [
+          "inputok2.wav"
+        ],
+        "scroll": [],
+        "notify": [],
+        "notifyWarn": [],
+        "notifyError": []
+      },
+      "link": {
+        "press": [
+          "keyok5.mp3"
+        ],
+        "confirm": [],
+        "slider": [],
+        "open": [
+          "scrdisplay1.wav",
+          "processing3.wav"
+        ],
+        "close": [
+          "voiceinput2.wav",
+          "voiceinput4.wav"
+        ],
+        "scroll": [],
+        "notify": [],
+        "notifyWarn": [],
+        "notifyError": []
+      },
+      "script": {
+        "press": [
+          "keyok2.mp3",
+          "keyok4.wav",
+          "keyok5.mp3"
+        ],
+        "confirm": [],
+        "slider": [],
+        "open": [],
+        "close": [],
+        "scroll": [
+          "scrscroll1.wav"
+        ],
+        "notify": [],
+        "notifyWarn": [],
+        "notifyError": []
+      }
+    },
+    "pageSounds": {
+      "tabPress": [
+        "computerbeep_30.mp3",
+        "computerbeep_61.mp3",
+        "input_ok_1_clean.mp3",
+        "keyok5.mp3"
+      ],
+      "swipe": [
+        "scrscroll1.mp3"
+      ],
+      "contentScroll": [
+        "scrscroll1.wav"
+      ],
+      "pullToRefresh": [
+        "computerbeep_12.mp3"
+      ],
+      "layoutToggle": [
+        "computerbeep_4.mp3"
+      ],
+      "addWidget": [
+        "computerbeep_61.mp3"
+      ],
+      "openSettings": [
+        "keyok5.mp3"
+      ],
+      "widgetEdit": [
+        "keyok5.wav"
+      ],
+      "editorButton": [
+        "keyok2.mp3",
+        "keyok3.wav",
+        "keyok5.mp3",
+        "keyok1.mp3"
+      ]
+    }
+  },
+  "pages": [
+    {
+      "id": "home",
+      "title": "SmartHome Control",
+      "widgets": [
+        {
+          "id": "front-door",
+          "type": "state",
+          "title": "Haustuer",
+          "stateId": "0_userdata.0.doors.front",
+          "writeable": true,
+          "onLabel": "Offen",
+          "offLabel": "Geschlossen",
+          "activeValue": "open",
+          "inactiveValue": "closed",
+          "iconPair": {
+            "active": "door-open",
+            "inactive": "door-closed"
+          },
+          "position": {
+            "x": 1.3333333333333333,
+            "y": 2,
+            "w": 1.3333333333333333,
+            "h": 1
+          },
+          "showTitle": false,
+          "format": "boolean",
+          "addonMode": "text",
+          "addonUseStateValue": false,
+          "appearance": {
+            "widgetColor": "transparent",
+            "widgetColor2": "transparent",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad",
+            "iconColor": "#5c7cff",
+            "iconColor2": "#8c94ad"
+          },
+          "addonValue": "423",
+          "addonColor": "#00f900",
+          "mobilePosition": {
+            "x": 1.3333333333333333,
+            "y": 2,
+            "w": 1.3333333333333333,
+            "h": 1
+          },
+          "mobileOverride": {
+            "title": "Haustuer",
+            "stateId": "0_userdata.0.doors.front",
+            "writeable": true,
+            "onLabel": "Offen",
+            "offLabel": "Geschlossen",
+            "activeValue": "open",
+            "inactiveValue": "closed",
+            "iconPair": {
+              "active": "door-open",
+              "inactive": "door-closed"
+            },
+            "showTitle": false,
+            "format": "boolean",
+            "addonMode": "text",
+            "addonUseStateValue": false,
+            "appearance": {
+              "widgetColor": "transparent",
+              "widgetColor2": "transparent",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "#8c94ad",
+              "iconColor": "#5c7cff",
+              "iconColor2": "#8c94ad"
+            },
+            "addonValue": "423",
+            "addonColor": "#00f900"
+          },
+          "iconImageCrop": "none",
+          "iconImageSizeMode": "standard",
+          "iconImageBorderless": false
+        },
+        {
+          "id": "alarm",
+          "type": "state",
+          "title": "Alarmanlage",
+          "stateId": "0_userdata.0.alarm.armed",
+          "writeable": true,
+          "onLabel": "Scharf",
+          "offLabel": "Unscharf",
+          "activeValue": "true",
+          "inactiveValue": "false",
+          "iconPair": {
+            "active": "shield-lock",
+            "inactive": "shield-off-outline"
+          },
+          "position": {
+            "x": 2.6666666666666665,
+            "y": 2,
+            "w": 1.3333333333333333,
+            "h": 1
+          },
+          "showTitle": false,
+          "format": "boolean",
+          "addonMode": "circle",
+          "addonValue": "20",
+          "addonColor": "#ffaa00",
+          "addonUseStateValue": false,
+          "appearance": {
+            "widgetColor": "transparent",
+            "widgetColor2": "transparent",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad",
+            "iconColor": "#5c7cff",
+            "iconColor2": "#8c94ad"
+          },
+          "mobilePosition": {
+            "x": 2.6666666666666665,
+            "y": 2,
+            "w": 1.3333333333333333,
+            "h": 1
+          },
+          "mobileOverride": {
+            "title": "Alarmanlage",
+            "stateId": "0_userdata.0.alarm.armed",
+            "writeable": true,
+            "onLabel": "Scharf",
+            "offLabel": "Unscharf",
+            "activeValue": "true",
+            "inactiveValue": "false",
+            "iconPair": {
+              "active": "shield-lock",
+              "inactive": "shield-off-outline"
+            },
+            "showTitle": false,
+            "format": "boolean",
+            "addonMode": "circle",
+            "addonValue": "20",
+            "addonColor": "#ffaa00",
+            "addonUseStateValue": false,
+            "appearance": {
+              "widgetColor": "transparent",
+              "widgetColor2": "transparent",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "#8c94ad",
+              "iconColor": "#5c7cff",
+              "iconColor2": "#8c94ad"
+            }
+          },
+          "iconImageCrop": "none",
+          "iconImageSizeMode": "standard",
+          "iconImageBorderless": false
+        },
+        {
+          "id": "camera",
+          "type": "camera",
+          "title": "Einfahrt",
+          "snapshotUrl": "http://192.168.44.253/snap.cgi?chn=11&user=dutchman&pwd=zezqyf-herKe4-qerpev",
+          "refreshMs": 2000,
+          "position": {
+            "x": 4,
+            "y": 0,
+            "w": 2.6666666666666665,
+            "h": 1.7000000000000002
+          },
+          "showTitle": false,
+          "appearance": {
+            "widgetColor": "rgba(31, 28, 44, 0.92)",
+            "widgetColor2": "rgba(14, 16, 26, 0.96)",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad"
+          },
+          "previewSourceMode": "fmp4",
+          "mobilePosition": {
+            "x": 0,
+            "y": 14.100000000000001,
+            "w": 1,
+            "h": 1.5
+          },
+          "mobileOverride": {
+            "title": "Einfahrt",
+            "snapshotUrl": "http://192.168.44.253/snap.cgi?chn=11&user=dutchman&pwd=zezqyf-herKe4-qerpev",
+            "refreshMs": 2000,
+            "showTitle": false,
+            "appearance": {
+              "widgetColor": "rgba(31, 28, 44, 0.92)",
+              "widgetColor2": "rgba(14, 16, 26, 0.96)",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "#8c94ad"
+            },
+            "previewSourceMode": "fmp4",
+            "manualHeightOverride": true,
+            "titleFontSize": 14,
+            "mjpegUrl": "http://dutchman:zezqyf-herKe4-qerpev@192.168.44.253/livestream/11?action=play&media=mjpeg",
+            "maximizeTriggerFormat": "boolean",
+            "fmp4Url": "http://dutchman:zezqyf-herKe4-qerpev@192.168.44.253/livestream/22?action=play&media=fmp4",
+            "audioEnabled": true
+          },
+          "manualHeightOverride": true,
+          "titleFontSize": 14,
+          "mjpegUrl": "http://dutchman:zezqyf-herKe4-qerpev@192.168.44.253/livestream/11?action=play&media=mjpeg",
+          "maximizeTriggerFormat": "boolean",
+          "fmp4Url": "http://dutchman:zezqyf-herKe4-qerpev@192.168.44.253/livestream/22?action=play&media=fmp4",
+          "audioEnabled": true
+        },
+        {
+          "id": "state-6",
+          "type": "state",
+          "title": "Schalter 6",
+          "stateId": "0_userdata.0.widgets.state_6",
+          "writeable": true,
+          "onLabel": "Ein",
+          "offLabel": "Aus",
+          "activeValue": "true",
+          "inactiveValue": "false",
+          "iconPair": {
+            "active": "toggle-switch",
+            "inactive": "toggle-switch-off-outline"
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "w": 1.3333333333333333,
+            "h": 1
+          },
+          "showTitle": false,
+          "format": "boolean",
+          "addonMode": "none",
+          "addonUseStateValue": false,
+          "appearance": {
+            "widgetColor": "transparent",
+            "widgetColor2": "transparent",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad",
+            "iconColor": "#5c7cff",
+            "iconColor2": "#8c94ad"
+          },
+          "mobilePosition": {
+            "x": 0,
+            "y": 2,
+            "w": 1.3333333333333333,
+            "h": 1
+          },
+          "mobileOverride": {
+            "title": "Schalter 6",
+            "stateId": "0_userdata.0.widgets.state_6",
+            "writeable": true,
+            "onLabel": "Ein",
+            "offLabel": "Aus",
+            "activeValue": "true",
+            "inactiveValue": "false",
+            "iconPair": {
+              "active": "toggle-switch",
+              "inactive": "toggle-switch-off-outline"
+            },
+            "showTitle": false,
+            "format": "boolean",
+            "addonMode": "none",
+            "addonUseStateValue": false,
+            "appearance": {
+              "widgetColor": "transparent",
+              "widgetColor2": "transparent",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "#8c94ad",
+              "iconColor": "#5c7cff",
+              "iconColor2": "#8c94ad"
+            }
+          }
+        },
+        {
+          "id": "camera-8",
+          "type": "camera",
+          "title": "Kamera 8",
+          "snapshotUrl": "http://192.168.44.37/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=wuuPhkmUCeI9WG7C&user=admin&password=Sh585058500",
+          "refreshMs": 2000,
+          "position": {
+            "x": 4,
+            "y": 1.7000000000000002,
+            "w": 2.6666666666666665,
+            "h": 0.9
+          },
+          "showTitle": false,
+          "appearance": {
+            "widgetColor": "rgba(31, 28, 44, 0.92)",
+            "widgetColor2": "rgba(14, 16, 26, 0.96)",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad"
+          },
+          "previewSourceMode": "flv",
+          "mobilePosition": {
+            "x": 5.333333333333333,
+            "y": 1.5,
+            "w": 2.6666666666666665,
+            "h": 1
+          },
+          "mobileOverride": {
+            "title": "Kamera 8",
+            "snapshotUrl": "http://192.168.44.37/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=wuuPhkmUCeI9WG7C&user=admin&password=Sh585058500",
+            "refreshMs": 2000,
+            "showTitle": false,
+            "appearance": {
+              "widgetColor": "rgba(31, 28, 44, 0.92)",
+              "widgetColor2": "rgba(14, 16, 26, 0.96)",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "#8c94ad"
+            },
+            "previewSourceMode": "flv",
+            "manualHeightOverride": true,
+            "titleFontSize": 14,
+            "flvUrl": "https://192.168.44.37/flv?port=1935&app=bcs&stream=channel0_ext.bcs&user=admin&password=Sh585058500",
+            "maximizeTriggerFormat": "boolean",
+            "audioEnabled": true
+          },
+          "manualHeightOverride": true,
+          "titleFontSize": 14,
+          "flvUrl": "https://192.168.44.37/flv?port=1935&app=bcs&stream=channel0_ext.bcs&user=admin&password=Sh585058500",
+          "maximizeTriggerFormat": "boolean",
+          "audioEnabled": true
+        },
+        {
+          "id": "weather-9",
+          "type": "weather",
+          "title": "Wetter 9",
+          "locationName": "Zuhause",
+          "latitude": 52.52,
+          "longitude": 13.41,
+          "timezone": "auto",
+          "refreshMs": 300000,
+          "position": {
+            "x": 0,
+            "y": 0,
+            "w": 2.6666666666666665,
+            "h": 2
+          },
+          "showTitle": false,
+          "appearance": {
+            "widgetColor": "#00c7fc",
+            "widgetColor2": "#1d4ea9",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "rgba(230, 243, 255, 0.82)"
+          },
+          "mobilePosition": {
+            "x": 0,
+            "y": 0,
+            "w": 2.6666666666666665,
+            "h": 2
+          },
+          "mobileOverride": {
+            "title": "Wetter 9",
+            "locationName": "Zuhause",
+            "latitude": 52.52,
+            "longitude": 13.41,
+            "timezone": "auto",
+            "refreshMs": 300000,
+            "showTitle": false,
+            "appearance": {
+              "widgetColor": "#00c7fc",
+              "widgetColor2": "#1d4ea9",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "rgba(230, 243, 255, 0.82)"
+            }
+          }
+        },
+        {
+          "id": "camera-9",
+          "type": "camera",
+          "title": "Kamera 9",
+          "snapshotUrl": "http://192.168.44.251/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=wuuPhkmUCeI9WG7C&user=admin&password=Sh585058500",
+          "refreshMs": 2000,
+          "position": {
+            "x": 4,
+            "y": 3.5,
+            "w": 2.6666666666666665,
+            "h": 0.9
+          },
+          "showTitle": false,
+          "appearance": {
+            "widgetColor": "rgba(31, 28, 44, 0.92)",
+            "widgetColor2": "rgba(14, 16, 26, 0.96)",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad"
+          },
+          "previewSourceMode": "flv",
+          "mobilePosition": {
+            "x": 4,
+            "y": 3,
+            "w": 2.6666666666666665,
+            "h": 1
+          },
+          "mobileOverride": {
+            "title": "Kamera 9",
+            "snapshotUrl": "http://192.168.44.251/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=wuuPhkmUCeI9WG7C&user=admin&password=Sh585058500",
+            "refreshMs": 2000,
+            "showTitle": false,
+            "appearance": {
+              "widgetColor": "rgba(31, 28, 44, 0.92)",
+              "widgetColor2": "rgba(14, 16, 26, 0.96)",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "#8c94ad"
+            },
+            "previewSourceMode": "flv",
+            "manualHeightOverride": true,
+            "titleFontSize": 14,
+            "flvUrl": "https://192.168.44.251/flv?port=1935&app=bcs&stream=channel0_ext.bcs&user=admin&password=Sh585058500",
+            "maximizeTriggerFormat": "boolean",
+            "audioEnabled": true
+          },
+          "manualHeightOverride": true,
+          "titleFontSize": 14,
+          "flvUrl": "https://192.168.44.251/flv?port=1935&app=bcs&stream=channel0_ext.bcs&user=admin&password=Sh585058500",
+          "maximizeTriggerFormat": "boolean",
+          "audioEnabled": true
+        },
+        {
+          "id": "camera-10",
+          "type": "camera",
+          "title": "Kamera 10",
+          "snapshotUrl": "http://192.168.44.249/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=wuuPhkmUCeI9WG7C&user=admin&password=Sh585058500",
+          "refreshMs": 2000,
+          "position": {
+            "x": 4,
+            "y": 4.4,
+            "w": 2.6666666666666665,
+            "h": 0.9
+          },
+          "showTitle": false,
+          "appearance": {
+            "widgetColor": "rgba(31, 28, 44, 0.92)",
+            "widgetColor2": "rgba(14, 16, 26, 0.96)",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad"
+          },
+          "previewSourceMode": "flv",
+          "manualHeightOverride": true,
+          "mobilePosition": {
+            "x": 4,
+            "y": 4.1000000000000005,
+            "w": 2.6666666666666665,
+            "h": 0.8
+          },
+          "mobileOverride": {
+            "title": "Kamera 10",
+            "snapshotUrl": "http://192.168.44.249/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=wuuPhkmUCeI9WG7C&user=admin&password=Sh585058500",
+            "refreshMs": 2000,
+            "showTitle": false,
+            "appearance": {
+              "widgetColor": "rgba(31, 28, 44, 0.92)",
+              "widgetColor2": "rgba(14, 16, 26, 0.96)",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "#8c94ad"
+            },
+            "previewSourceMode": "flv",
+            "manualHeightOverride": true,
+            "titleFontSize": 14,
+            "flvUrl": "https://192.168.44.249/flv?port=1935&app=bcs&stream=channel0_ext.bcs&user=admin&password=Sh585058500",
+            "maximizeTriggerFormat": "boolean",
+            "audioEnabled": true
+          },
+          "titleFontSize": 14,
+          "flvUrl": "https://192.168.44.249/flv?port=1935&app=bcs&stream=channel0_ext.bcs&user=admin&password=Sh585058500",
+          "maximizeTriggerFormat": "boolean",
+          "audioEnabled": true
+        },
+        {
+          "id": "grafana-12",
+          "type": "grafana",
+          "title": "Grafana 12",
+          "url": "http://192.168.44.31:3000/d-solo/dcb00a5d-ad36-4041-a417-4c5bbd94af84/akku-ladezustand?orgId=1&timezone=browser&panelId=1&__feature.dashboardSceneSolo\" width=\"450\" height=\"200\" frameborder=\"0\"",
+          "refreshMs": 10000,
+          "allowInteractions": true,
+          "position": {
+            "x": 8,
+            "y": 3.5,
+            "w": 2.6666666666666665,
+            "h": 1.5
+          },
+          "showTitle": false,
+          "appearance": {
+            "widgetColor": "rgba(13, 19, 35, 0.96)",
+            "widgetColor2": "rgba(15, 24, 46, 0.94)",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad"
+          },
+          "mobilePosition": {
+            "x": 0,
+            "y": 20,
+            "w": 1,
+            "h": 2
+          },
+          "mobileOverride": {
+            "title": "Grafana 12",
+            "url": "http://192.168.44.31:3000/d-solo/dcb00a5d-ad36-4041-a417-4c5bbd94af84/akku-ladezustand?orgId=1&timezone=browser&panelId=1&__feature.dashboardSceneSolo\" width=\"450\" height=\"200\" frameborder=\"0\"",
+            "refreshMs": 10000,
+            "allowInteractions": true,
+            "showTitle": false,
+            "appearance": {
+              "widgetColor": "rgba(13, 19, 35, 0.96)",
+              "widgetColor2": "rgba(15, 24, 46, 0.94)",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "#8c94ad"
+            },
+            "manualHeightOverride": true
+          },
+          "manualHeightOverride": true
+        },
+        {
+          "id": "camera-12",
+          "type": "camera",
+          "title": "Kamera 12",
+          "titleFontSize": 14,
+          "previewSourceMode": "flv",
+          "flvUrl": "https://192.168.44.248/flv?port=1935&app=bcs&stream=channel0_ext.bcs&user=admin&password=Sh585058500",
+          "refreshMs": 2000,
+          "position": {
+            "x": 4,
+            "y": 2.6,
+            "w": 2.6666666666666665,
+            "h": 0.9
+          },
+          "showTitle": false,
+          "manualHeightOverride": true,
+          "maximizeTriggerFormat": "boolean",
+          "appearance": {
+            "widgetColor": "transparent",
+            "widgetColor2": "transparent",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad"
+          },
+          "audioEnabled": true,
+          "mobilePosition": {
+            "x": 4,
+            "y": 2.7,
+            "w": 2.6666666666666665,
+            "h": 1
+          },
+          "mobileOverride": {
+            "title": "Kamera 12",
+            "titleFontSize": 14,
+            "previewSourceMode": "flv",
+            "flvUrl": "https://192.168.44.248/flv?port=1935&app=bcs&stream=channel0_ext.bcs&user=admin&password=Sh585058500",
+            "refreshMs": 2000,
+            "showTitle": false,
+            "manualHeightOverride": true,
+            "maximizeTriggerFormat": "boolean",
+            "appearance": {
+              "widgetColor": "transparent",
+              "widgetColor2": "transparent",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "#8c94ad"
+            },
+            "audioEnabled": true
+          }
+        },
+        {
+          "id": "link-14",
+          "type": "link",
+          "title": "Link 14",
+          "url": "http://192.168.44.143",
+          "position": {
+            "x": 1.3333333333333333,
+            "y": 2.7,
+            "w": 1.3333333333333333,
+            "h": 1
+          },
+          "showTitle": false,
+          "iconImage": "R503.png",
+          "iconImageCrop": "none",
+          "iconImageSizeMode": "maximized",
+          "iconImageBorderless": true,
+          "appearance": {
+            "widgetColor": "transparent",
+            "widgetColor2": "transparent",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad",
+            "cardColor": "rgba(8, 18, 36, 0.72)",
+            "cardColor2": "rgba(24, 48, 86, 0.8)"
+          },
+          "mobilePosition": {
+            "x": 1,
+            "y": 3,
+            "w": 1,
+            "h": 1
+          },
+          "mobileOverride": {
+            "title": "Link 14",
+            "url": "http://192.168.44.143",
+            "showTitle": false,
+            "iconImage": "R503.png",
+            "iconImageCrop": "none",
+            "iconImageSizeMode": "maximized",
+            "iconImageBorderless": true,
+            "appearance": {
+              "widgetColor": "transparent",
+              "widgetColor2": "transparent",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "#8c94ad",
+              "cardColor": "rgba(8, 18, 36, 0.72)",
+              "cardColor2": "rgba(24, 48, 86, 0.8)"
+            }
+          }
+        },
+        {
+          "id": "link-14-2",
+          "type": "link",
+          "title": "Link 14",
+          "url": "http://192.168.44.31:8099",
+          "position": {
+            "x": 0,
+            "y": 2.9000000000000004,
+            "w": 1.3333333333333333,
+            "h": 1
+          },
+          "showTitle": false,
+          "iconImage": "bmw-logo.png",
+          "iconImageCrop": "none",
+          "iconImageSizeMode": "maximized",
+          "iconImageBorderless": true,
+          "appearance": {
+            "widgetColor": "transparent",
+            "widgetColor2": "transparent",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad",
+            "cardColor": "rgba(8, 18, 36, 0.72)",
+            "cardColor2": "rgba(24, 48, 86, 0.8)"
+          },
+          "mobilePosition": {
+            "x": 0,
+            "y": 3,
+            "w": 1,
+            "h": 1
+          },
+          "mobileOverride": {
+            "title": "Link 14",
+            "url": "http://192.168.44.31:8099",
+            "showTitle": false,
+            "iconImage": "bmw-logo.png",
+            "iconImageCrop": "none",
+            "iconImageSizeMode": "maximized",
+            "iconImageBorderless": true,
+            "appearance": {
+              "widgetColor": "transparent",
+              "widgetColor2": "transparent",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "#8c94ad",
+              "cardColor": "rgba(8, 18, 36, 0.72)",
+              "cardColor2": "rgba(24, 48, 86, 0.8)"
+            }
+          }
+        },
+        {
+          "id": "link-14-3",
+          "type": "link",
+          "title": "Link 14",
+          "url": "192.168.44.181",
+          "position": {
+            "x": 0,
+            "y": 15,
+            "w": 1.3333333333333333,
+            "h": 1
+          },
+          "showTitle": false,
+          "iconImageCrop": "none",
+          "iconImageSizeMode": "standard",
+          "iconImageBorderless": false,
+          "appearance": {
+            "widgetColor": "rgba(18, 42, 78, 0.95)",
+            "widgetColor2": "rgba(10, 24, 46, 0.98)",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad",
+            "cardColor": "rgba(8, 18, 36, 0.72)",
+            "cardColor2": "rgba(24, 48, 86, 0.8)"
+          },
+          "mobilePosition": {
+            "x": 0,
+            "y": 21,
+            "w": 1,
+            "h": 1
+          },
+          "mobileOverride": {
+            "title": "Link 14",
+            "url": "192.168.44.181",
+            "showTitle": false,
+            "iconImageCrop": "none",
+            "iconImageSizeMode": "standard",
+            "iconImageBorderless": false,
+            "appearance": {
+              "widgetColor": "rgba(18, 42, 78, 0.95)",
+              "widgetColor2": "rgba(10, 24, 46, 0.98)",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "#8c94ad",
+              "cardColor": "rgba(8, 18, 36, 0.72)",
+              "cardColor2": "rgba(24, 48, 86, 0.8)"
+            }
+          }
+        },
+        {
+          "id": "ekd-solar-copy-copy",
+          "type": "solar",
+          "title": "Solar",
+          "statePrefix": "ekd-solar.0.friendly",
+          "keys": {
+            "pvNow": "leistung_pv_aktuell",
+            "homeNow": "hausverbrauch_aktuell",
+            "gridIn": "netzbezug_aktuell",
+            "gridOut": "netzeinspeisung_aktuell",
+            "soc": "ladezustand_akku",
+            "battIn": "ladeleistung_akku",
+            "battOut": "entladeleistung_akku",
+            "dayConsumed": "tagesverbrauch_gesamt",
+            "daySelf": "tages_eigenverbrauch_gesamt",
+            "pvTotal": "pv_ertrag_gesamt",
+            "battTemp": "akku_temp_bms1"
+          },
+          "dailyEnergyUnit": "auto",
+          "position": {
+            "x": 8,
+            "y": 0,
+            "w": 2.6666666666666665,
+            "h": 3.5
+          },
+          "showTitle": false,
+          "backgroundMode": "image",
+          "backgroundImageBlur": 4,
+          "nodeLayout": {
+            "pv": {
+              "x": 0.39,
+              "y": 0.02,
+              "w": 0.2,
+              "h": 0.18
+            },
+            "home": {
+              "x": 0.39,
+              "y": 0.36,
+              "w": 0.2,
+              "h": 0.18
+            },
+            "battery": {
+              "x": 0,
+              "y": 0.38,
+              "w": 0.22,
+              "h": 0.14
+            },
+            "grid": {
+              "x": 0.76,
+              "y": 0.38,
+              "w": 0.22,
+              "h": 0.14
+            },
+            "car": {
+              "x": 0.39,
+              "y": 0.72,
+              "w": 0.2,
+              "h": 0.14
+            }
+          },
+          "appearance": {
+            "widgetColor": "transparent",
+            "widgetColor2": "transparent",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad",
+            "cardColor": "rgba(226, 232, 240, 0.12)",
+            "statColor": "rgba(255,255,255,0.03)"
+          },
+          "backgroundImage": "sunset.jpg",
+          "mobilePosition": {
+            "x": 0,
+            "y": 15,
+            "w": 1,
+            "h": 4.9
+          },
+          "mobileOverride": {
+            "title": "Solar",
+            "statePrefix": "ekd-solar.0.friendly",
+            "keys": {
+              "pvNow": "leistung_pv_aktuell",
+              "homeNow": "hausverbrauch_aktuell",
+              "gridIn": "netzbezug_aktuell",
+              "gridOut": "netzeinspeisung_aktuell",
+              "soc": "ladezustand_akku",
+              "battIn": "ladeleistung_akku",
+              "battOut": "entladeleistung_akku",
+              "dayConsumed": "tagesverbrauch_gesamt",
+              "daySelf": "tages_eigenverbrauch_gesamt",
+              "pvTotal": "pv_ertrag_gesamt",
+              "battTemp": "akku_temp_bms1"
+            },
+            "dailyEnergyUnit": "auto",
+            "showTitle": true,
+            "backgroundMode": "image",
+            "backgroundImageBlur": 8,
+            "nodeLayout": {
+              "pv": {
+                "x": 0.39,
+                "y": 0.02,
+                "w": 0.2,
+                "h": 0.18
+              },
+              "home": {
+                "x": 0.39,
+                "y": 0.36,
+                "w": 0.2,
+                "h": 0.18
+              },
+              "battery": {
+                "x": 0,
+                "y": 0.38,
+                "w": 0.22,
+                "h": 0.14
+              },
+              "grid": {
+                "x": 0.76,
+                "y": 0.38,
+                "w": 0.22,
+                "h": 0.14
+              },
+              "car": {
+                "x": 0.39,
+                "y": 0.72,
+                "w": 0.2,
+                "h": 0.14
+              }
+            },
+            "appearance": {
+              "widgetColor": "rgba(18, 122, 94, 0.98)",
+              "widgetColor2": "rgba(16, 72, 156, 0.96)",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "#8c94ad",
+              "cardColor": "rgba(226, 232, 240, 0.12)",
+              "statColor": "rgba(255,255,255,0.03)"
+            },
+            "backgroundImage": "sunset.jpg",
+            "manualHeightOverride": true,
+            "statValueUnit": "none",
+            "statTextScale": 1,
+            "stats": {
+              "count": 3,
+              "cards": [
+                {
+                  "label": "Eigenverbrauch"
+                },
+                {
+                  "label": "Verbraucht"
+                },
+                {
+                  "label": "Stat 3"
+                }
+              ],
+              "first": {
+                "label": "Eigenverbrauch"
+              },
+              "second": {
+                "label": "Verbraucht"
+              },
+              "third": {
+                "label": "Stat 3"
+              }
+            }
+          },
+          "manualHeightOverride": true,
+          "statValueUnit": "none",
+          "statTextScale": 1.5,
+          "stats": {
+            "count": 4,
+            "cards": [
+              {
+                "label": "Autarkie heute",
+                "stateId": "ekd-solar.0.friendly.autarkiegrad_heute_prozent"
+              },
+              {
+                "label": "Autarkie Monat",
+                "stateId": "ekd-solar.0.friendly.autarkiegrad_monat_prozent"
+              },
+              {
+                "label": "Autarkie gesamt",
+                "stateId": "ekd-solar.0.friendly.autarkiegrad_gesamt_prozent"
+              },
+              {
+                "label": "Stromverbrauch Tag",
+                "stateId": "ekd-solar.0.friendly.tagesverbrauch_gesamt"
+              }
+            ],
+            "first": {
+              "label": "Autarkie heute",
+              "stateId": "ekd-solar.0.friendly.autarkiegrad_heute_prozent"
+            },
+            "second": {
+              "label": "Autarkie Monat",
+              "stateId": "ekd-solar.0.friendly.autarkiegrad_monat_prozent"
+            },
+            "third": {
+              "label": "Autarkie gesamt",
+              "stateId": "ekd-solar.0.friendly.autarkiegrad_gesamt_prozent"
+            }
+          },
+          "wallboxChargePowerStateId": "go-e-gemini-adapter.0.status.chargerPowerW",
+          "wallboxAmpereStateId": "go-e.0.ampere",
+          "wallboxPhaseModeStateId": "go-e.0.phaseSwitchMode",
+          "wallboxCarSocStateId": "bmw.0.WBY11CF080CP51905.stream.vehicle.drivetrain.batteryManagement.header.value",
+          "wallboxCarRangeStateId": "bmw.0.WBY11CF080CP51905.stream.vehicle.drivetrain.lastRemainingRange.value",
+          "wallboxCarStateId": "go-e.0.car"
+        },
+        {
+          "id": "state-15",
+          "type": "state",
+          "title": "Scheibe",
+          "stateId": "tuya.0.bf2bb23b342877f2e1maqy.1",
+          "writeable": true,
+          "onLabel": "Ein",
+          "offLabel": "Aus",
+          "activeValue": "true",
+          "inactiveValue": "false",
+          "iconPair": {
+            "active": "window-open-variant",
+            "inactive": "window-closed-variant"
+          },
+          "position": {
+            "x": 2.6666666666666665,
+            "y": 3,
+            "w": 1.3333333333333333,
+            "h": 1
+          },
+          "showTitle": false,
+          "iconImageCrop": "none",
+          "iconImageSizeMode": "maximized",
+          "iconImageBorderless": true,
+          "format": "boolean",
+          "addonMode": "text",
+          "addonUseStateValue": false,
+          "appearance": {
+            "widgetColor": "transparent",
+            "widgetColor2": "transparent",
+            "inactiveWidgetColor": "#6d7178",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad",
+            "iconColor": "#1ed2cf",
+            "iconColor2": "#cb2536"
+          },
+          "addonValue": "Glass",
+          "addonColor": "#23e17f",
+          "addonIcon": "window-closed-variant",
+          "mobilePosition": {
+            "x": 2,
+            "y": 3,
+            "w": 1,
+            "h": 1
+          },
+          "mobileOverride": {
+            "title": "Scheibe",
+            "stateId": "tuya.0.bf2bb23b342877f2e1maqy.1",
+            "writeable": true,
+            "onLabel": "Ein",
+            "offLabel": "Aus",
+            "activeValue": "true",
+            "inactiveValue": "false",
+            "iconPair": {
+              "active": "window-open-variant",
+              "inactive": "window-closed-variant"
+            },
+            "showTitle": false,
+            "iconImageCrop": "none",
+            "iconImageSizeMode": "maximized",
+            "iconImageBorderless": true,
+            "format": "boolean",
+            "addonMode": "text",
+            "addonUseStateValue": false,
+            "appearance": {
+              "widgetColor": "transparent",
+              "widgetColor2": "transparent",
+              "inactiveWidgetColor": "#6d7178",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "#8c94ad",
+              "iconColor": "#1ed2cf",
+              "iconColor2": "#cb2536"
+            },
+            "addonValue": "Glass",
+            "addonColor": "#23e17f",
+            "addonIcon": "window-closed-variant"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dashboard-1773356263742",
+      "title": "Pi Stats",
+      "widgets": [
+        {
+          "id": "log-1",
+          "type": "log",
+          "title": "Log 1",
+          "refreshMs": 2000,
+          "maxEntries": 80,
+          "minSeverity": "info",
+          "position": {
+            "x": 0,
+            "y": 0,
+            "w": 2.6666666666666665,
+            "h": 5.1000000000000005
+          },
+          "showTitle": false,
+          "appearance": {
+            "widgetColor": "transparent",
+            "widgetColor2": "transparent",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad",
+            "cardColor": "rgba(5, 9, 17, 0.7)",
+            "cardColor2": "rgba(16, 30, 56, 0.8)"
+          },
+          "manualHeightOverride": true,
+          "interactionSounds": {
+            "press": [
+              "scrdisplay2.wav",
+              "processing3.wav"
+            ],
+            "confirm": [],
+            "slider": [],
+            "open": [],
+            "close": [],
+            "scroll": [
+              "scrscroll1.wav"
+            ],
+            "notify": [
+              "computerbeep_12.mp3"
+            ],
+            "notifyWarn": [
+              "voy_hail.mp3"
+            ],
+            "notifyError": [
+              "alarm6.wav"
+            ]
+          }
+        },
+        {
+          "id": "script-2",
+          "type": "script",
+          "title": "Skripte 2",
+          "refreshMs": 3000,
+          "maxEntries": 120,
+          "position": {
+            "x": 8,
+            "y": 0,
+            "w": 2.6666666666666665,
+            "h": 5.2
+          },
+          "showTitle": false,
+          "appearance": {
+            "widgetColor": "transparent",
+            "widgetColor2": "transparent",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad",
+            "cardColor": "rgba(7, 14, 29, 0.72)",
+            "cardColor2": "rgba(20, 42, 82, 0.82)"
+          },
+          "manualHeightOverride": true
+        },
+        {
+          "id": "host-3",
+          "type": "host",
+          "title": "Host 3",
+          "refreshMs": 10000,
+          "position": {
+            "x": 4,
+            "y": 0,
+            "w": 2.6666666666666665,
+            "h": 2.4000000000000004
+          },
+          "manualHeightOverride": true,
+          "showTitle": false,
+          "appearance": {
+            "widgetColor": "rgba(15, 34, 66, 0.95)",
+            "widgetColor2": "rgba(8, 18, 36, 0.98)",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad",
+            "cardColor": "#6ce8b4",
+            "cardColor2": "rgba(255,255,255,0.12)",
+            "statColor": "rgba(130, 182, 255, 0.24)",
+            "statColor2": "rgba(89, 132, 238, 0.18)"
+          }
+        },
+        {
+          "id": "raspberry-pi-stats-4",
+          "type": "raspberryPiStats",
+          "title": "Raspberry-Pi Stats 4",
+          "label": "NAS Pi",
+          "cpuTempStateId": "0_userdata.0.NAS-pi.cpuTemp",
+          "cpuLoadStateId": "0_userdata.0.NAS-pi.cpuLoad",
+          "ramFreeStateId": "0_userdata.0.NAS-pi.ramFree",
+          "diskFreeStateId": "0_userdata.0.NAS-pi.diskFree",
+          "onlineStateId": "0_userdata.0.NAS-pi.online",
+          "position": {
+            "x": 4,
+            "y": 2.9000000000000004,
+            "w": 2.6666666666666665,
+            "h": 2
+          },
+          "manualHeightOverride": true,
+          "showTitle": false,
+          "appearance": {
+            "widgetColor": "rgba(15, 34, 66, 0.95)",
+            "widgetColor2": "rgba(8, 18, 36, 0.98)",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad",
+            "cardColor": "#6ce8b4",
+            "cardColor2": "rgba(255,255,255,0.12)",
+            "statColor": "rgba(130, 182, 255, 0.24)",
+            "statColor2": "rgba(89, 132, 238, 0.18)"
+          },
+          "ramFreeUnit": "GB",
+          "diskFreeUnit": "GB"
+        }
+      ]
+    },
+    {
+      "id": "dashboard-1773437712562",
+      "title": "PV / Auto / Heizung",
+      "widgets": [
+        {
+          "id": "ekd-solar-copy",
+          "type": "solar",
+          "title": "Solar",
+          "statePrefix": "ekd-solar.0.friendly",
+          "keys": {
+            "pvNow": "leistung_pv_aktuell",
+            "homeNow": "hausverbrauch_aktuell",
+            "gridIn": "netzbezug_aktuell",
+            "gridOut": "netzeinspeisung_aktuell",
+            "soc": "ladezustand_akku",
+            "battIn": "ladeleistung_akku",
+            "battOut": "entladeleistung_akku",
+            "dayConsumed": "tagesverbrauch_gesamt",
+            "daySelf": "tages_eigenverbrauch_gesamt",
+            "pvTotal": "pv_ertrag_gesamt",
+            "battTemp": "akku_temp_bms1"
+          },
+          "dailyEnergyUnit": "auto",
+          "position": {
+            "x": 4,
+            "y": 0,
+            "w": 3.333333333333333,
+            "h": 3.3000000000000003
+          },
+          "showTitle": false,
+          "backgroundMode": "image",
+          "backgroundImageBlur": 4,
+          "nodeLayout": {
+            "pv": {
+              "x": 0.39,
+              "y": 0.02,
+              "w": 0.2,
+              "h": 0.18
+            },
+            "home": {
+              "x": 0.39,
+              "y": 0.36,
+              "w": 0.2,
+              "h": 0.18
+            },
+            "battery": {
+              "x": 0,
+              "y": 0.38,
+              "w": 0.22,
+              "h": 0.14
+            },
+            "grid": {
+              "x": 0.76,
+              "y": 0.38,
+              "w": 0.22,
+              "h": 0.14
+            },
+            "car": {
+              "x": 0.39,
+              "y": 0.72,
+              "w": 0.2,
+              "h": 0.14
+            }
+          },
+          "appearance": {
+            "widgetColor": "transparent",
+            "widgetColor2": "transparent",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad",
+            "cardColor": "rgba(226, 232, 240, 0.12)",
+            "statColor": "rgba(255,255,255,0.03)"
+          },
+          "backgroundImage": "sunset.jpg",
+          "mobilePosition": {
+            "x": 0,
+            "y": 15,
+            "w": 1,
+            "h": 4.9
+          },
+          "mobileOverride": {
+            "title": "Solar",
+            "statePrefix": "ekd-solar.0.friendly",
+            "keys": {
+              "pvNow": "leistung_pv_aktuell",
+              "homeNow": "hausverbrauch_aktuell",
+              "gridIn": "netzbezug_aktuell",
+              "gridOut": "netzeinspeisung_aktuell",
+              "soc": "ladezustand_akku",
+              "battIn": "ladeleistung_akku",
+              "battOut": "entladeleistung_akku",
+              "dayConsumed": "tagesverbrauch_gesamt",
+              "daySelf": "tages_eigenverbrauch_gesamt",
+              "pvTotal": "pv_ertrag_gesamt",
+              "battTemp": "akku_temp_bms1"
+            },
+            "dailyEnergyUnit": "auto",
+            "showTitle": true,
+            "backgroundMode": "image",
+            "backgroundImageBlur": 8,
+            "nodeLayout": {
+              "pv": {
+                "x": 0.39,
+                "y": 0.02,
+                "w": 0.2,
+                "h": 0.18
+              },
+              "home": {
+                "x": 0.39,
+                "y": 0.36,
+                "w": 0.2,
+                "h": 0.18
+              },
+              "battery": {
+                "x": 0,
+                "y": 0.38,
+                "w": 0.22,
+                "h": 0.14
+              },
+              "grid": {
+                "x": 0.76,
+                "y": 0.38,
+                "w": 0.22,
+                "h": 0.14
+              },
+              "car": {
+                "x": 0.39,
+                "y": 0.72,
+                "w": 0.2,
+                "h": 0.14
+              }
+            },
+            "appearance": {
+              "widgetColor": "rgba(18, 122, 94, 0.98)",
+              "widgetColor2": "rgba(16, 72, 156, 0.96)",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "#8c94ad",
+              "cardColor": "rgba(226, 232, 240, 0.12)",
+              "statColor": "rgba(255,255,255,0.03)"
+            },
+            "backgroundImage": "sunset.jpg",
+            "manualHeightOverride": true,
+            "statValueUnit": "none",
+            "statTextScale": 1,
+            "stats": {
+              "count": 3,
+              "cards": [
+                {
+                  "label": "Eigenverbrauch"
+                },
+                {
+                  "label": "Verbraucht"
+                },
+                {
+                  "label": "Stat 3"
+                }
+              ],
+              "first": {
+                "label": "Eigenverbrauch"
+              },
+              "second": {
+                "label": "Verbraucht"
+              },
+              "third": {
+                "label": "Stat 3"
+              }
+            }
+          },
+          "manualHeightOverride": true,
+          "statValueUnit": "none",
+          "statTextScale": 1.5,
+          "stats": {
+            "count": 4,
+            "cards": [
+              {
+                "label": "Autarkie heute",
+                "stateId": "ekd-solar.0.friendly.autarkiegrad_heute_prozent"
+              },
+              {
+                "label": "Autarkie Monat",
+                "stateId": "ekd-solar.0.friendly.autarkiegrad_monat_prozent"
+              },
+              {
+                "label": "Autarkie gesamt",
+                "stateId": "ekd-solar.0.friendly.autarkiegrad_gesamt_prozent"
+              },
+              {
+                "label": "Stromverbrauch Tag",
+                "stateId": "ekd-solar.0.friendly.tagesverbrauch_gesamt"
+              }
+            ],
+            "first": {
+              "label": "Autarkie heute",
+              "stateId": "ekd-solar.0.friendly.autarkiegrad_heute_prozent"
+            },
+            "second": {
+              "label": "Autarkie Monat",
+              "stateId": "ekd-solar.0.friendly.autarkiegrad_monat_prozent"
+            },
+            "third": {
+              "label": "Autarkie gesamt",
+              "stateId": "ekd-solar.0.friendly.autarkiegrad_gesamt_prozent"
+            }
+          },
+          "wallboxChargePowerStateId": "go-e-gemini-adapter.0.status.chargerPowerW",
+          "wallboxAmpereStateId": "go-e.0.ampere",
+          "wallboxPhaseModeStateId": "go-e.0.phaseSwitchMode",
+          "wallboxCarSocStateId": "bmw.0.WBY11CF080CP51905.stream.vehicle.drivetrain.batteryManagement.header.value",
+          "wallboxCarRangeStateId": "bmw.0.WBY11CF080CP51905.stream.vehicle.drivetrain.lastRemainingRange.value",
+          "wallboxCarStateId": "go-e.0.car"
+        },
+        {
+          "id": "grafana-5",
+          "type": "grafana",
+          "title": "Grafana 5",
+          "url": "http://192.168.44.31:3000/d-solo/0874ec91-d0aa-419e-a9a1-e683d732e1ed/pv-overview?orgId=1&timezone=browser&panelId=1&__feature.dashboardSceneSolo\" width=\"450\" height=\"200\" frameborder=\"0\"",
+          "refreshMs": 10000,
+          "allowInteractions": true,
+          "position": {
+            "x": 4,
+            "y": 3.5,
+            "w": 3.333333333333333,
+            "h": 1.6
+          },
+          "interactionSounds": {
+            "press": [
+              "scrscroll1.mp3"
+            ],
+            "confirm": [],
+            "slider": [],
+            "open": [],
+            "close": [],
+            "scroll": [],
+            "notify": [],
+            "notifyWarn": [],
+            "notifyError": []
+          },
+          "showTitle": false,
+          "appearance": {
+            "widgetColor": "transparent",
+            "widgetColor2": "transparent",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad"
+          },
+          "manualHeightOverride": true,
+          "mobilePosition": {
+            "x": 0,
+            "y": 28,
+            "w": 3,
+            "h": 1.5
+          },
+          "mobileOverride": {
+            "title": "Grafana 5",
+            "url": "http://192.168.44.31:3000/d-solo/0874ec91-d0aa-419e-a9a1-e683d732e1ed/pv-overview?orgId=1&timezone=browser&panelId=1&__feature.dashboardSceneSolo\" width=\"450\" height=\"200\" frameborder=\"0\"",
+            "refreshMs": 10000,
+            "allowInteractions": true,
+            "interactionSounds": {
+              "press": [
+                "scrscroll1.mp3"
+              ],
+              "confirm": [],
+              "slider": [],
+              "open": [],
+              "close": [],
+              "scroll": [],
+              "notify": [],
+              "notifyWarn": [],
+              "notifyError": []
+            },
+            "showTitle": false,
+            "appearance": {
+              "widgetColor": "transparent",
+              "widgetColor2": "transparent",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "#8c94ad"
+            },
+            "manualHeightOverride": true
+          }
+        },
+        {
+          "id": "grafana-5-2",
+          "type": "grafana",
+          "title": "Grafana 5",
+          "url": "http://192.168.44.31:3000/d-solo/d2e74275-6de1-4545-9bdc-483b30228324/heizung-stromverbrauch?orgId=1&timezone=browser&panelId=1&__feature.dashboardSceneSolo\" width=\"450\" height=\"200\" frameborder=\"0",
+          "refreshMs": 10000,
+          "allowInteractions": true,
+          "position": {
+            "x": 8,
+            "y": 3.5,
+            "w": 3.333333333333333,
+            "h": 1.5
+          },
+          "showTitle": false,
+          "appearance": {
+            "widgetColor": "transparent",
+            "widgetColor2": "transparent",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad"
+          },
+          "manualHeightOverride": true,
+          "mobilePosition": {
+            "x": 0,
+            "y": 26,
+            "w": 3,
+            "h": 1.5
+          },
+          "mobileOverride": {
+            "title": "Grafana 5",
+            "url": "http://192.168.44.31:3000/d-solo/d2e74275-6de1-4545-9bdc-483b30228324/heizung-stromverbrauch?orgId=1&timezone=browser&panelId=1&__feature.dashboardSceneSolo\" width=\"450\" height=\"200\" frameborder=\"0",
+            "refreshMs": 10000,
+            "allowInteractions": true,
+            "showTitle": false,
+            "appearance": {
+              "widgetColor": "transparent",
+              "widgetColor2": "transparent",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "#8c94ad"
+            },
+            "manualHeightOverride": true
+          }
+        },
+        {
+          "id": "grafana-6",
+          "type": "grafana",
+          "title": "Grafana 6",
+          "url": "http://192.168.44.31:3000/d-solo/6757daa9-3b1f-4775-b352-0e1c94284fe1/wallbox-uebersicht?orgId=1&timezone=browser&panelId=1&__feature.dashboardSceneSolo\" width=\"450\" height=\"200\" frameborder=\"0\"",
+          "refreshMs": 10000,
+          "allowInteractions": true,
+          "position": {
+            "x": 0,
+            "y": 3.5,
+            "w": 3.333333333333333,
+            "h": 1.6
+          },
+          "showTitle": false,
+          "appearance": {
+            "widgetColor": "transparent",
+            "widgetColor2": "transparent",
+            "textColor": "#f7f8fc",
+            "mutedTextColor": "#8c94ad"
+          },
+          "manualHeightOverride": true,
+          "mobilePosition": {
+            "x": 0,
+            "y": 6,
+            "w": 1,
+            "h": 2.7
+          },
+          "mobileOverride": {
+            "title": "Grafana 6",
+            "url": "http://192.168.44.31:3000/d-solo/6757daa9-3b1f-4775-b352-0e1c94284fe1/wallbox-uebersicht?orgId=1&timezone=browser&panelId=1&__feature.dashboardSceneSolo\" width=\"450\" height=\"200\" frameborder=\"0\"",
+            "refreshMs": 10000,
+            "allowInteractions": true,
+            "showTitle": false,
+            "appearance": {
+              "widgetColor": "transparent",
+              "widgetColor2": "transparent",
+              "textColor": "#f7f8fc",
+              "mutedTextColor": "#8c94ad"
+            },
+            "manualHeightOverride": true
+          }
+        },
+        {
+          "id": "heating-v2-1-copy-2",
+          "type": "heatingV2",
+          "title": "Heizung V2 1",
+          "refreshMs": 3000,
+          "showStatusSubtitle": true,
+          "backgroundImage": "viessmann.jpg",
+          "backgroundImageBlur": 1,
+          "modeSetStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.operating.modes.active.commands.setMode.setValue",
+          "modeValueStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.operating.modes.active.properties.value.value",
+          "activeProgramStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.active.properties.value.value",
+          "normalSetTempStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.normal.commands.setTemperature.setValue",
+          "reducedSetTempStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.reduced.commands.setTemperature.setValue",
+          "comfortSetTempStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.comfort.commands.setTemperature.setValue",
+          "dhwSetTempStateId": "viessmannapi.0.299550.0.features.heating.dhw.temperature.main.commands.setTargetTemperature.setValue",
+          "comfortActivateStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.comfort.commands.activate.setValue",
+          "comfortDeactivateStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.comfort.commands.deactivate.setValue",
+          "ecoSetActiveStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.eco.commands.setActive.setValue",
+          "oneTimeChargeSetActiveStateId": "viessmannapi.0.299550.0.features.heating.dhw.oneTimeCharge.commands.setActive.setValue",
+          "oneTimeChargeActiveStateId": "viessmannapi.0.299550.0.features.heating.dhw.oneTimeCharge.properties.active.value",
+          "roomTempStateId": "sainlogic.0.weather.current.indoortemp",
+          "heatingTempStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.temperature.properties.value.value",
+          "supplyTempStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.sensors.temperature.supply.properties.value.value",
+          "outsideTempStateId": "viessmannapi.0.299550.0.features.heating.sensors.temperature.outside.properties.value.value",
+          "returnTempStateId": "viessmannapi.0.299550.0.features.heating.sensors.temperature.return.properties.value.value",
+          "dhwTempStateId": "viessmannapi.0.299550.0.features.heating.dhw.sensors.temperature.dhwCylinder.properties.value.value",
+          "compressorPowerStateId": "viessmannapi.0.299550.0.features.heating.compressors.0.power.properties.value.value",
+          "compressorSensorPowerStateId": "viessmannapi.0.299550.0.features.heating.compressors.0.sensors.power.properties.value.value",
+          "showInfoProgram": true,
+          "showInfoTargets": true,
+          "showInfoOutsideTemp": true,
+          "showInfoSupplyTemp": true,
+          "showInfoReturnTemp": true,
+          "showInfoHeatingTemp": true,
+          "showInfoCompressorPower": true,
+          "standbyIcon": "power-standby",
+          "dhwIcon": "water",
+          "heatingIcon": "radiator",
+          "comfortIcon": "white-balance-sunny",
+          "ecoIcon": "leaf",
+          "oneTimeChargeIcon": "shower-head",
+          "position": {
+            "x": 8,
+            "y": 0,
+            "w": 3.333333333333333,
+            "h": 3.5
+          },
+          "manualHeightOverride": true,
+          "showTitle": false,
+          "appearance": {
+            "widgetColor": "transparent",
+            "widgetColor2": "transparent",
+            "textColor": "#f5f8ff",
+            "mutedTextColor": "rgba(214, 224, 244, 0.78)",
+            "iconColor": "#79b5ff",
+            "iconColor2": "#5a85ef",
+            "cardColor": "rgba(255,255,255,0.035)",
+            "statColor": "#7fb9ff"
+          },
+          "ventilationAutoSetActiveStateId": "0_userdata.0.ventilation.control.auto",
+          "ventilationLevelSetStateId": "0_userdata.0.ventilation.control.manualVentLevel",
+          "interactionSounds": {
+            "press": [
+              "keyok5.wav"
+            ],
+            "confirm": [
+              "voiceinput4.wav"
+            ],
+            "slider": [
+              "scrscroll1.mp3"
+            ],
+            "open": [],
+            "close": [],
+            "scroll": [],
+            "notify": [],
+            "notifyWarn": [],
+            "notifyError": []
+          },
+          "detailsTickerSpeedPxPerS": 46,
+          "ventilationAutoActiveStateId": "0_userdata.0.ventilation.control.auto",
+          "ventilationLevelStateId": "esphome.0.349454816D9C.Number.2606862985.state",
+          "mobilePosition": {
+            "x": 0,
+            "y": 30.5,
+            "w": 3,
+            "h": 3.5
+          },
+          "mobileOverride": {
+            "title": "Heizung V2 1",
+            "refreshMs": 3000,
+            "showStatusSubtitle": true,
+            "backgroundImage": "viessmann.jpg",
+            "backgroundImageBlur": 1,
+            "modeSetStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.operating.modes.active.commands.setMode.setValue",
+            "modeValueStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.operating.modes.active.properties.value.value",
+            "activeProgramStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.active.properties.value.value",
+            "normalSetTempStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.normal.commands.setTemperature.setValue",
+            "reducedSetTempStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.reduced.commands.setTemperature.setValue",
+            "comfortSetTempStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.comfort.commands.setTemperature.setValue",
+            "dhwSetTempStateId": "viessmannapi.0.299550.0.features.heating.dhw.temperature.main.commands.setTargetTemperature.setValue",
+            "comfortActivateStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.comfort.commands.activate.setValue",
+            "comfortDeactivateStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.comfort.commands.deactivate.setValue",
+            "ecoSetActiveStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.eco.commands.setActive.setValue",
+            "oneTimeChargeSetActiveStateId": "viessmannapi.0.299550.0.features.heating.dhw.oneTimeCharge.commands.setActive.setValue",
+            "oneTimeChargeActiveStateId": "viessmannapi.0.299550.0.features.heating.dhw.oneTimeCharge.properties.active.value",
+            "roomTempStateId": "sainlogic.0.weather.current.indoortemp",
+            "heatingTempStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.temperature.properties.value.value",
+            "supplyTempStateId": "viessmannapi.0.299550.0.features.heating.circuits.1.sensors.temperature.supply.properties.value.value",
+            "outsideTempStateId": "viessmannapi.0.299550.0.features.heating.sensors.temperature.outside.properties.value.value",
+            "returnTempStateId": "viessmannapi.0.299550.0.features.heating.sensors.temperature.return.properties.value.value",
+            "dhwTempStateId": "viessmannapi.0.299550.0.features.heating.dhw.sensors.temperature.dhwCylinder.properties.value.value",
+            "compressorPowerStateId": "viessmannapi.0.299550.0.features.heating.compressors.0.power.properties.value.value",
+            "compressorSensorPowerStateId": "viessmannapi.0.299550.0.features.heating.compressors.0.sensors.power.properties.value.value",
+            "showInfoProgram": true,
+            "showInfoTargets": true,
+            "showInfoOutsideTemp": true,
+            "showInfoSupplyTemp": true,
+            "showInfoReturnTemp": true,
+            "showInfoHeatingTemp": true,
+            "showInfoCompressorPower": true,
+            "standbyIcon": "power-standby",
+            "dhwIcon": "water",
+            "heatingIcon": "radiator",
+            "comfortIcon": "white-balance-sunny",
+            "ecoIcon": "leaf",
+            "oneTimeChargeIcon": "shower-head",
+            "manualHeightOverride": true,
+            "showTitle": false,
+            "appearance": {
+              "widgetColor": "transparent",
+              "widgetColor2": "transparent",
+              "textColor": "#f5f8ff",
+              "mutedTextColor": "rgba(214, 224, 244, 0.78)",
+              "iconColor": "#79b5ff",
+              "iconColor2": "#5a85ef",
+              "cardColor": "rgba(255,255,255,0.035)",
+              "statColor": "#7fb9ff"
+            },
+            "ventilationAutoSetActiveStateId": "0_userdata.0.ventilation.control.auto",
+            "ventilationLevelSetStateId": "0_userdata.0.ventilation.control.manualVentLevel",
+            "interactionSounds": {
+              "press": [
+                "keyok5.wav"
+              ],
+              "confirm": [
+                "voiceinput4.wav"
+              ],
+              "slider": [
+                "scrscroll1.mp3"
+              ],
+              "open": [],
+              "close": [],
+              "scroll": [],
+              "notify": [],
+              "notifyWarn": [],
+              "notifyError": []
+            },
+            "detailsTickerSpeedPxPerS": 46,
+            "ventilationAutoActiveStateId": "0_userdata.0.ventilation.control.auto",
+            "ventilationLevelStateId": "esphome.0.349454816D9C.Number.2606862985.state"
+          }
+        },
+        {
+          "id": "goe-1-copy",
+          "type": "goe",
+          "title": "go-e 1",
+          "refreshMs": 2000,
+          "showStatusSubtitle": false,
+          "showGridAmpereControl": true,
+          "targetMode": "soc",
+          "highlightOpacity": 0.32,
+          "backgroundImage": "go-e.jpg",
+          "backgroundImageBlur": 1,
+          "stopWriteStateId": "go-e-gemini-adapter.0.control.allowCharging",
+          "stopStateId": "go-e-gemini-adapter.0.status.effectiveAllowCharging",
+          "pvWriteStateId": "go-e-gemini-adapter.0.control.mode",
+          "pvStateId": "go-e-gemini-adapter.0.status.activeMode",
+          "pvPriorityWriteStateId": "go-e-gemini-adapter.0.control.mode",
+          "pvPriorityStateId": "go-e-gemini-adapter.0.status.activeMode",
+          "gridWriteStateId": "go-e-gemini-adapter.0.control.mode",
+          "gridStateId": "go-e-gemini-adapter.0.status.activeMode",
+          "manualCurrentWriteStateId": "go-e-gemini-adapter.0.control.gridManual.currentA",
+          "manualCurrentStateId": "go-e-gemini-adapter.0.status.setCurrentA",
+          "ampereCardsWriteStateId": "go-e-gemini-adapter.0.control.gridManual.currentA",
+          "ampereCardsStateId": "go-e-gemini-adapter.0.status.setCurrentA",
+          "phaseCardsWriteStateId": "go-e-gemini-adapter.0.control.gridManual.phaseMode",
+          "phaseCardsStateId": "go-e-gemini-adapter.0.status.targetPhaseMode",
+          "stopWriteValueType": "boolean",
+          "stopStateValueType": "boolean",
+          "pvWriteValueType": "number",
+          "pvWriteValue": "1",
+          "pvStateValueType": "string",
+          "pvStateValue": "pv only",
+          "pvPriorityWriteValueType": "number",
+          "pvPriorityWriteValue": "2",
+          "pvPriorityStateValueType": "string",
+          "pvPriorityStateValue": "pv only (go-e = priority)",
+          "gridWriteValueType": "number",
+          "gridWriteValue": "3",
+          "gridStateValueType": "string",
+          "gridStateValue": "grid mode",
+          "manualCurrentWriteValueType": "number",
+          "manualCurrentStateValueType": "number",
+          "ampereCardsWriteValueType": "number",
+          "ampereCardsStateValueType": "number",
+          "ampere6WriteValue": "6",
+          "ampere10WriteValue": "10",
+          "ampere12WriteValue": "12",
+          "ampere14WriteValue": "14",
+          "ampere16WriteValue": "16",
+          "ampere6StateValue": "6",
+          "ampere10StateValue": "10",
+          "ampere12StateValue": "12",
+          "ampere14StateValue": "14",
+          "ampere16StateValue": "16",
+          "phaseCardsWriteValueType": "number",
+          "phaseCardsStateValueType": "number",
+          "phase1WriteValue": "1",
+          "phase3WriteValue": "2",
+          "phase1StateValue": "1",
+          "phase3StateValue": "2",
+          "targetChargeValueType": "number",
+          "modeStateId": "go-e-gemini-adapter.0.control.mode",
+          "gridAmpereStateId": "go-e-gemini-adapter.0.control.gridManual.currentA",
+          "limit80StateId": "go-e-gemini-adapter.0.control.targetSocPercent",
+          "allowChargingStateId": "go-e-gemini-adapter.0.control.allowCharging",
+          "emergencyStopStateId": "go-e-gemini-adapter.0.control.emergencyStop",
+          "phaseSwitchModeStateId": "go-e-gemini-adapter.0.control.gridManual.phaseMode",
+          "phaseSwitchModeEnabledStateId": "go-e-gemini-adapter.0.status.enabledPhases",
+          "ampereStateId": "go-e-gemini-adapter.0.status.setCurrentA",
+          "carStateId": "go-e-gemini-adapter.0.status.carState",
+          "batterySocStateId": "go-e-gemini-adapter.0.status.carSocPercent",
+          "chargePowerStateId": "go-e-gemini-adapter.0.status.chargerPowerW",
+          "chargedEnergyStateId": "go-e-gemini-adapter.0.status.sessionEnergyKWh",
+          "stopChargeingAtCarSoc80StateId": "go-e-gemini-adapter.0.control.targetSocEnabled",
+          "position": {
+            "x": 0,
+            "y": 0,
+            "w": 3.333333333333333,
+            "h": 3.5
+          },
+          "interactionSounds": {
+            "press": [
+              "keyok5.mp3"
+            ],
+            "confirm": [
+              "voiceinput4.wav"
+            ],
+            "slider": [
+              "keyok5.wav",
+              "keyok4.wav",
+              "keyok3.wav",
+              "keyok2.mp3"
+            ],
+            "open": [],
+            "close": [],
+            "scroll": [],
+            "notify": [],
+            "notifyWarn": [],
+            "notifyError": []
+          },
+          "showTitle": false,
+          "appearance": {
+            "widgetColor": "transparent",
+            "widgetColor2": "transparent",
+            "textColor": "#f5f8ff",
+            "mutedTextColor": "rgba(214, 224, 244, 0.75)",
+            "iconColor": "#7eb9ff",
+            "iconColor2": "#5f8cf0",
+            "cardColor": "rgba(166, 176, 194, 0.2)",
+            "cardColor2": "rgba(123, 135, 158, 0.2)",
+            "statColor": "#5f9eff",
+            "statColor2": "#4578e6"
+          },
+          "manualHeightOverride": true,
+          "targetSocAutoApiStateId": "bmw.0.WBY11CF080CP51905.stream.vehicle.drivetrain.batteryManagement.maxEnergy.value",
+          "mobilePosition": {
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 5.9
+          },
+          "mobileOverride": {
+            "title": "go-e 1",
+            "refreshMs": 2000,
+            "showStatusSubtitle": false,
+            "showGridAmpereControl": true,
+            "targetMode": "soc",
+            "highlightOpacity": 0.32,
+            "backgroundImage": "go-e.jpg",
+            "backgroundImageBlur": 1,
+            "stopWriteStateId": "go-e-gemini-adapter.0.control.allowCharging",
+            "stopStateId": "go-e-gemini-adapter.0.status.effectiveAllowCharging",
+            "pvWriteStateId": "go-e-gemini-adapter.0.control.mode",
+            "pvStateId": "go-e-gemini-adapter.0.status.activeMode",
+            "pvPriorityWriteStateId": "go-e-gemini-adapter.0.control.mode",
+            "pvPriorityStateId": "go-e-gemini-adapter.0.status.activeMode",
+            "gridWriteStateId": "go-e-gemini-adapter.0.control.mode",
+            "gridStateId": "go-e-gemini-adapter.0.status.activeMode",
+            "manualCurrentWriteStateId": "go-e-gemini-adapter.0.control.gridManual.currentA",
+            "manualCurrentStateId": "go-e-gemini-adapter.0.status.setCurrentA",
+            "ampereCardsWriteStateId": "go-e-gemini-adapter.0.control.gridManual.currentA",
+            "ampereCardsStateId": "go-e-gemini-adapter.0.status.setCurrentA",
+            "phaseCardsWriteStateId": "go-e-gemini-adapter.0.control.gridManual.phaseMode",
+            "phaseCardsStateId": "go-e-gemini-adapter.0.status.targetPhaseMode",
+            "stopWriteValueType": "boolean",
+            "stopStateValueType": "boolean",
+            "pvWriteValueType": "number",
+            "pvWriteValue": "1",
+            "pvStateValueType": "string",
+            "pvStateValue": "pv only",
+            "pvPriorityWriteValueType": "number",
+            "pvPriorityWriteValue": "2",
+            "pvPriorityStateValueType": "string",
+            "pvPriorityStateValue": "pv only (go-e = priority)",
+            "gridWriteValueType": "number",
+            "gridWriteValue": "3",
+            "gridStateValueType": "string",
+            "gridStateValue": "grid mode",
+            "manualCurrentWriteValueType": "number",
+            "manualCurrentStateValueType": "number",
+            "ampereCardsWriteValueType": "number",
+            "ampereCardsStateValueType": "number",
+            "ampere6WriteValue": "6",
+            "ampere10WriteValue": "10",
+            "ampere12WriteValue": "12",
+            "ampere14WriteValue": "14",
+            "ampere16WriteValue": "16",
+            "ampere6StateValue": "6",
+            "ampere10StateValue": "10",
+            "ampere12StateValue": "12",
+            "ampere14StateValue": "14",
+            "ampere16StateValue": "16",
+            "phaseCardsWriteValueType": "number",
+            "phaseCardsStateValueType": "number",
+            "phase1WriteValue": "1",
+            "phase3WriteValue": "2",
+            "phase1StateValue": "1",
+            "phase3StateValue": "2",
+            "targetChargeValueType": "number",
+            "modeStateId": "go-e-gemini-adapter.0.control.mode",
+            "gridAmpereStateId": "go-e-gemini-adapter.0.control.gridManual.currentA",
+            "limit80StateId": "go-e-gemini-adapter.0.control.targetSocPercent",
+            "allowChargingStateId": "go-e-gemini-adapter.0.control.allowCharging",
+            "emergencyStopStateId": "go-e-gemini-adapter.0.control.emergencyStop",
+            "phaseSwitchModeStateId": "go-e-gemini-adapter.0.control.gridManual.phaseMode",
+            "phaseSwitchModeEnabledStateId": "go-e-gemini-adapter.0.status.enabledPhases",
+            "ampereStateId": "go-e-gemini-adapter.0.status.setCurrentA",
+            "carStateId": "go-e-gemini-adapter.0.status.carState",
+            "batterySocStateId": "go-e-gemini-adapter.0.status.carSocPercent",
+            "chargePowerStateId": "go-e-gemini-adapter.0.status.chargerPowerW",
+            "chargedEnergyStateId": "go-e-gemini-adapter.0.status.sessionEnergyKWh",
+            "stopChargeingAtCarSoc80StateId": "go-e-gemini-adapter.0.control.targetSocEnabled",
+            "interactionSounds": {
+              "press": [
+                "keyok5.mp3"
+              ],
+              "confirm": [
+                "voiceinput4.wav"
+              ],
+              "slider": [
+                "keyok5.wav",
+                "keyok4.wav",
+                "keyok3.wav",
+                "keyok2.mp3"
+              ],
+              "open": [],
+              "close": [],
+              "scroll": [],
+              "notify": [],
+              "notifyWarn": [],
+              "notifyError": []
+            },
+            "showTitle": false,
+            "appearance": {
+              "widgetColor": "transparent",
+              "widgetColor2": "transparent",
+              "textColor": "#f5f8ff",
+              "mutedTextColor": "rgba(214, 224, 244, 0.75)",
+              "iconColor": "#7eb9ff",
+              "iconColor2": "#5f8cf0",
+              "cardColor": "rgba(166, 176, 194, 0.2)",
+              "cardColor2": "rgba(123, 135, 158, 0.2)",
+              "statColor": "#5f9eff",
+              "statColor2": "#4578e6"
+            },
+            "manualHeightOverride": true,
+            "targetSocAutoApiStateId": "bmw.0.WBY11CF080CP51905.stream.vehicle.drivetrain.batteryManagement.maxEnergy.value"
+          }
+        }
+      ]
+    }
+  ],
+  "activePageId": "dashboard-1773356263742",
+  "homeLabel": "My Home"
+}

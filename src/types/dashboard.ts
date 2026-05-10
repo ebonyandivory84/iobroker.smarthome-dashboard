@@ -1,6 +1,7 @@
 export type WidgetType =
   | "state"
   | "camera"
+  | "cameraTalk"
   | "energy"
   | "solar"
   | "grafana"
@@ -120,6 +121,13 @@ export type CameraWidgetConfig = WidgetBase & {
   maximizeStateId?: string;
   maximizeTriggerFormat?: "boolean" | "number" | "text";
   maximizeTriggerValue?: string;
+};
+
+export type CameraTalkWidgetConfig = Omit<CameraWidgetConfig, "type"> & {
+  type: "cameraTalk";
+  talkbackWebrtcUrl?: string;
+  talkbackPushToTalk?: boolean;
+  talkbackAutoEnableVideo?: boolean;
 };
 
 export type GrafanaWidgetConfig = WidgetBase & {
@@ -454,6 +462,7 @@ export type SolarWidgetConfig = WidgetBase & {
 export type WidgetConfig =
   | StateWidgetConfig
   | CameraWidgetConfig
+  | CameraTalkWidgetConfig
   | EnergyWidgetConfig
   | SolarWidgetConfig
   | GrafanaWidgetConfig
