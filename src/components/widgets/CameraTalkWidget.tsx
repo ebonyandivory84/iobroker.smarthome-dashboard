@@ -1223,9 +1223,9 @@ export function CameraTalkWidget({
             ]}
           >
             <MaterialCommunityIcons
-              color={instarAlarmArmed === true ? "#ff4d4d" : "#ff8e8e"}
+              color={instarAlarmArmed === true ? "#ff4d4d" : "#ffc0c0"}
               name={instarAlarmArmed === true ? "alarm-light" : "alarm-light-outline"}
-              size={24}
+              size={26}
             />
           </Pressable>
         </View>
@@ -1280,8 +1280,8 @@ export function CameraTalkWidget({
             style={[styles.fullscreenActionButton, instarLedOn === true ? styles.fullscreenAudioActive : styles.fullscreenActionInactive]}
           >
             <MaterialCommunityIcons
-              color={instarLedOn === true ? "#ffd86b" : "#d4deef"}
-              name={instarLedOn === true ? "lightbulb-on" : "lightbulb-on-outline"}
+              color={instarLedOn === true ? "#ffd86b" : "#f7fbff"}
+              name={instarLedOn === true ? "led-on" : "led-off"}
               size={24}
             />
           </Pressable>
@@ -2859,21 +2859,25 @@ const styles = StyleSheet.create({
   },
   fullscreenControlsWrap: {
     position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: 72,
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     zIndex: 30,
-    alignItems: "center",
+    pointerEvents: "box-none",
   },
   fullscreenTopRightActions: {
     position: "absolute",
-    right: 10,
-    top: 10,
+    right: 22,
+    top: 22,
     flexDirection: "row",
     gap: 10,
     zIndex: 40,
   },
   fullscreenControlsRow: {
+    position: "absolute",
+    left: 26,
+    bottom: 118,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-start",
@@ -2964,8 +2968,8 @@ const styles = StyleSheet.create({
     borderColor: "rgba(228, 240, 255, 0.45)",
   },
   alarmButton: {
-    borderColor: "rgba(255, 102, 102, 0.65)",
-    backgroundColor: "rgba(140, 24, 24, 0.25)",
+    borderColor: "rgba(255, 92, 92, 0.95)",
+    backgroundColor: "rgba(150, 22, 22, 0.34)",
   },
   fullscreenTitle: {
     position: "absolute",
