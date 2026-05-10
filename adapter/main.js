@@ -414,6 +414,7 @@ async function main(adapter) {
         frameSize: invite.frameSize || 640,
         sessionId: invite.sessionId,
         timestamp: invite.initialTimestamp,
+        aencFormat: invite.aencFormat || "pcm16",
       });
       res.json({ ok: true, token, frameSize: invite.frameSize || 640 });
     } catch (error) {
@@ -439,21 +440,22 @@ async function main(adapter) {
         res.json({ ok: true, sent: 0 });
         return;
       }
+      const payload = session.aencFormat === "pcma" ? pcm16le16kToPcma8k(pcm) : pcm;
 
       let offset = 0;
       let sent = 0;
-      while (offset < pcm.length) {
-        const remaining = pcm.length - offset;
+      while (offset < payload.length) {
+        const remaining = payload.length - offset;
         const size = Math.min(session.frameSize, remaining);
-        const chunk = pcm.subarray(offset, offset + size);
+        const chunk = payload.subarray(offset, offset + size);
         const header = Buffer.from(
           `Session: ${session.sessionId}\r\nTimestamp: ${session.timestamp}\r\nFrame-Length: ${size}\r\n\r\n`,
           "ascii"
         );
         session.ws.send(Buffer.concat([header, chunk]));
-        // INSTAR expects monotonic audio timestamps. Our payload is PCM16 mono @16kHz:
-        // durationMs = bytes / (2 bytes per sample) / 16000 * 1000
-        const durationMs = Math.max(1, Math.round((size / 2 / 16000) * 1000));
+        const durationMs = session.aencFormat === "pcma"
+          ? Math.max(1, Math.round((size / 8000) * 1000))
+          : Math.max(1, Math.round((size / 2 / 16000) * 1000));
         session.timestamp += durationMs;
         offset += size;
         sent += size;
@@ -575,11 +577,55 @@ async function requestInstarCallInvite(cameraBaseUrl, username, password, allowI
     throw new Error("call_invite response without Session id");
   }
   const frameSizeMatch = text.match(/Frame-Size:\s*(\d+)/i);
+  const aencMatch = text.match(/AEnc-Format:\s*([^\r\n]+)/i);
+  const aencRaw = (aencMatch ? aencMatch[1] : "").trim().toLowerCase();
+  const aencFormat = /a-?law|pcma|g\.?711a/.test(aencRaw) ? "pcma" : "pcm16";
   return {
     sessionId: Number(sessionMatch[1]),
     frameSize: frameSizeMatch ? Number(frameSizeMatch[1]) : 640,
     initialTimestamp: Math.floor(Date.now() / 10),
+    aencFormat,
   };
+}
+
+function pcm16le16kToPcma8k(input) {
+  if (!Buffer.isBuffer(input) || input.length < 4) {
+    return Buffer.alloc(0);
+  }
+  const sampleCount = Math.floor(input.length / 2);
+  const outCount = Math.floor(sampleCount / 2);
+  const out = Buffer.allocUnsafe(outCount);
+  let o = 0;
+  for (let i = 0; i + 3 < input.length; i += 4) {
+    const s0 = input.readInt16LE(i);
+    const s1 = input.readInt16LE(i + 2);
+    const avg = (s0 + s1) >> 1;
+    out[o++] = linearToALaw(avg);
+  }
+  return out;
+}
+
+function linearToALaw(sample) {
+  let pcm = sample;
+  let mask;
+  if (pcm >= 0) {
+    mask = 0xd5;
+  } else {
+    mask = 0x55;
+    pcm = -pcm - 1;
+  }
+  if (pcm > 0x7fff) {
+    pcm = 0x7fff;
+  }
+
+  let seg = 0;
+  let value = pcm >> 4;
+  while (value > 15 && seg < 7) {
+    seg += 1;
+    value >>= 1;
+  }
+  const aval = seg >= 1 ? ((seg << 4) | ((pcm >> (seg + 3)) & 0x0f)) : (pcm >> 4);
+  return aval ^ mask;
 }
 
 function waitForSocketOpen(ws, timeoutMs) {

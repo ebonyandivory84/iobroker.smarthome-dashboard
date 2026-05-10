@@ -144,11 +144,13 @@ export function CameraTalkWidget({
   const instarBaseUrl = (config.instarBaseUrl || "").trim();
   const instarUsername = (config.instarUsername || "").trim();
   const instarPassword = config.instarPassword || "";
-  const instarTalkbackAvailable = instarTalkbackEnabled && Boolean(instarBaseUrl && instarUsername && instarPassword);
+  const instarTalkbackConfigured = Boolean(instarBaseUrl && instarUsername && instarPassword);
+  const instarTalkbackActiveMode = instarTalkbackEnabled && instarTalkbackConfigured;
+  const instarTalkbackAvailable = Platform.OS === "web" && instarTalkbackActiveMode;
   const talkbackAvailable = Platform.OS === "web" && (Boolean(talkbackWebrtcUrl) || instarTalkbackAvailable);
   const talkbackPushToTalk = config.talkbackPushToTalk !== false;
   const talkbackShowVideo = config.talkbackAutoEnableVideo === true;
-  const talkbackIframeEnabled = Boolean(talkbackWebrtcUrl) && !instarTalkbackEnabled;
+  const talkbackIframeEnabled = Boolean(talkbackWebrtcUrl) && !instarTalkbackConfigured;
   const activeFeed = previewFeed;
   const activeSnapshotBaseUrl = activeFeed?.kind === "snapshot" ? activeFeed.url : null;
   const previewMjpegSources = useMemo(
