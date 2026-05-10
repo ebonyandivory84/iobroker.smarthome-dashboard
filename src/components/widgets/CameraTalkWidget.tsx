@@ -150,6 +150,7 @@ export function CameraTalkWidget({
   const instarTalkbackActiveMode = instarTalkbackEnabled && instarTalkbackConfigured;
   const instarTalkbackAvailable = Platform.OS === "web" && instarTalkbackActiveMode;
   const talkbackAvailable = Platform.OS === "web" && (Boolean(talkbackWebrtcUrl) || instarTalkbackAvailable);
+  const talkbackControlVisible = Platform.OS === "web";
   const talkbackPushToTalk = config.talkbackPushToTalk !== false;
   const talkbackShowVideo = config.talkbackAutoEnableVideo === true;
   const talkbackIframeEnabled = Boolean(talkbackWebrtcUrl) && !instarTalkbackConfigured;
@@ -424,6 +425,7 @@ export function CameraTalkWidget({
 
   const enableTalkback = useCallback(() => {
     if (!talkbackAvailable) {
+      setPreviewStreamDebug("Talkback nicht konfiguriert. Bitte INSTAR-Daten oder WebRTC-URL setzen.");
       return;
     }
     playConfiguredUiSound(config.interactionSounds?.press, "toggle", `${config.id}:talkback-on`);
@@ -449,6 +451,7 @@ export function CameraTalkWidget({
 
   const toggleTalkback = useCallback(() => {
     if (!talkbackAvailable) {
+      setPreviewStreamDebug("Talkback nicht konfiguriert. Bitte INSTAR-Daten oder WebRTC-URL setzen.");
       return;
     }
     playConfiguredUiSound(config.interactionSounds?.press, "toggle", `${config.id}:talkback-toggle`);
@@ -1224,15 +1227,20 @@ export function CameraTalkWidget({
                   />
                 </Pressable>
               ) : null}
-              {talkbackAvailable ? (
+              {talkbackControlVisible ? (
                 <Pressable
                   onPress={talkbackPushToTalk ? undefined : toggleTalkback}
                   onPressIn={talkbackPushToTalk ? enableTalkback : undefined}
                   onPressOut={talkbackPushToTalk ? disableTalkback : undefined}
-                  style={[styles.fullscreenActionButton, styles.fullscreenActionSpacing, talkbackActive ? styles.fullscreenAudioActive : null]}
+                  style={[
+                    styles.fullscreenActionButton,
+                    styles.fullscreenActionSpacing,
+                    talkbackActive ? styles.fullscreenAudioActive : null,
+                    !talkbackAvailable ? styles.fullscreenActionDisabled : null,
+                  ]}
                 >
                   <MaterialCommunityIcons
-                    color={talkbackActive ? pinnedColor : palette.text}
+                    color={!talkbackAvailable ? palette.textMuted : talkbackActive ? pinnedColor : palette.text}
                     name={talkbackActive ? "microphone" : "microphone-outline"}
                     size={18}
                   />
@@ -1266,7 +1274,7 @@ export function CameraTalkWidget({
                   title: `${config.title || "camera-talk"}-talkback`,
                 })
               : null}
-            {talkbackActive && previewStreamDebug ? (
+            {previewStreamDebug ? (
               <View style={styles.talkbackDebugBadge}>
                 <Text style={styles.talkbackDebugText}>{previewStreamDebug}</Text>
               </View>
@@ -1301,15 +1309,20 @@ export function CameraTalkWidget({
                 />
               </Pressable>
             ) : null}
-            {talkbackAvailable ? (
+            {talkbackControlVisible ? (
               <Pressable
                 onPress={talkbackPushToTalk ? undefined : toggleTalkback}
                 onPressIn={talkbackPushToTalk ? enableTalkback : undefined}
                 onPressOut={talkbackPushToTalk ? disableTalkback : undefined}
-                style={[styles.fullscreenActionButton, styles.fullscreenActionSpacing, talkbackActive ? styles.fullscreenAudioActive : null]}
+                style={[
+                  styles.fullscreenActionButton,
+                  styles.fullscreenActionSpacing,
+                  talkbackActive ? styles.fullscreenAudioActive : null,
+                  !talkbackAvailable ? styles.fullscreenActionDisabled : null,
+                ]}
               >
                 <MaterialCommunityIcons
-                  color={talkbackActive ? pinnedColor : palette.text}
+                  color={!talkbackAvailable ? palette.textMuted : talkbackActive ? pinnedColor : palette.text}
                   name={talkbackActive ? "microphone" : "microphone-outline"}
                   size={18}
                 />
@@ -2696,6 +2709,9 @@ const styles = StyleSheet.create({
     color: "#d7f6ff",
     fontSize: 12,
     fontWeight: "700",
+  },
+  fullscreenActionDisabled: {
+    opacity: 0.45,
   },
 });
 
