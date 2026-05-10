@@ -2857,7 +2857,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 16,
     right: 16,
-    bottom: 16,
+    bottom: 34,
     zIndex: 30,
     alignItems: "center",
   },
@@ -2954,7 +2954,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(243, 200, 74, 0.18)",
   },
   fullscreenActionInactive: {
-    opacity: 0.62,
+    opacity: 0.85,
+    backgroundColor: "rgba(170, 192, 235, 0.22)",
+    borderColor: "rgba(228, 240, 255, 0.45)",
   },
   fullscreenTitle: {
     position: "absolute",
