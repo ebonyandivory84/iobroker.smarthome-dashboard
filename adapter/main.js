@@ -451,7 +451,10 @@ async function main(adapter) {
           "ascii"
         );
         session.ws.send(Buffer.concat([header, chunk]));
-        session.timestamp += 45;
+        // INSTAR expects monotonic audio timestamps. Our payload is PCM16 mono @16kHz:
+        // durationMs = bytes / (2 bytes per sample) / 16000 * 1000
+        const durationMs = Math.max(1, Math.round((size / 2 / 16000) * 1000));
+        session.timestamp += durationMs;
         offset += size;
         sent += size;
       }
