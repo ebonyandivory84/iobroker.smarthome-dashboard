@@ -505,6 +505,7 @@ async function main(adapter) {
       "stopalarmsound",
       "setmutealarm",
       "setlampctrl",
+      "illuminate",
     ]);
 
     if (!cameraBaseUrl || !username || !password || !query || !cmd) {

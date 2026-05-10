@@ -555,8 +555,8 @@ export function CameraTalkWidget({
   const setLedMode = useCallback(
     async (enabled: boolean) => {
       const result = await callInstarControl({
-        cmd: "setlampctrl",
-        "-lampstat": enabled ? "open" : "close",
+        cmd: "illuminate",
+        duration: enabled ? 180 : 0,
       });
       if (result) {
         setInstarLedOn(enabled);
@@ -1173,6 +1173,28 @@ export function CameraTalkWidget({
 
   const renderFullscreenControls = () => (
     <View pointerEvents="box-none" style={styles.fullscreenControlsWrap}>
+      <View style={styles.fullscreenTopRightActions}>
+        <Pressable
+          onPress={() => setPinned((current) => !current)}
+          style={[styles.fullscreenActionButton, pinned ? styles.fullscreenAudioActive : styles.fullscreenActionInactive]}
+        >
+          <MaterialCommunityIcons
+            color={pinned ? pinnedColor : palette.text}
+            name={pinned ? "pin" : "pin-outline"}
+            size={22}
+          />
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            playConfiguredUiSound(config.interactionSounds?.close, "close", `${config.id}:close`);
+            closeFullscreen();
+          }}
+          style={[styles.fullscreenActionButton, styles.fullscreenActionInactive]}
+        >
+          <MaterialCommunityIcons color={palette.text} name="close" size={22} />
+        </Pressable>
+      </View>
+
       <View style={styles.fullscreenControlsRow}>
         <View style={styles.ptzPad}>
           <Pressable
@@ -1219,20 +1241,28 @@ export function CameraTalkWidget({
         </View>
 
         <View style={styles.controlColumn}>
-          <Pressable onPress={() => void setAlarmArmed(true)} style={[styles.fullscreenActionButton, instarAlarmArmed === true ? styles.fullscreenAudioActive : null]}>
-            <MaterialCommunityIcons color={instarAlarmArmed === true ? pinnedColor : palette.text} name="alarm-light" size={18} />
-          </Pressable>
-          <Pressable onPress={() => void setAlarmArmed(false)} style={[styles.fullscreenActionButton, instarAlarmArmed === false ? styles.fullscreenAudioActive : null]}>
-            <MaterialCommunityIcons color={instarAlarmArmed === false ? pinnedColor : palette.text} name="alarm-light-off" size={18} />
+          <Pressable
+            onPress={() => void setAlarmArmed(!(instarAlarmArmed === true))}
+            style={[styles.fullscreenActionButton, instarAlarmArmed === true ? styles.fullscreenAudioActive : styles.fullscreenActionInactive]}
+          >
+            <MaterialCommunityIcons
+              color={instarAlarmArmed === true ? pinnedColor : palette.textMuted}
+              name={instarAlarmArmed === true ? "alarm-light" : "alarm-light-off"}
+              size={22}
+            />
           </Pressable>
         </View>
 
         <View style={styles.controlColumn}>
-          <Pressable onPress={() => void setLedMode(true)} style={[styles.fullscreenActionButton, instarLedOn === true ? styles.fullscreenAudioActive : null]}>
-            <MaterialCommunityIcons color={instarLedOn === true ? pinnedColor : palette.text} name="led-on" size={18} />
-          </Pressable>
-          <Pressable onPress={() => void setLedMode(false)} style={[styles.fullscreenActionButton, instarLedOn === false ? styles.fullscreenAudioActive : null]}>
-            <MaterialCommunityIcons color={instarLedOn === false ? pinnedColor : palette.text} name="led-off" size={18} />
+          <Pressable
+            onPress={() => void setLedMode(!(instarLedOn === true))}
+            style={[styles.fullscreenActionButton, instarLedOn === true ? styles.fullscreenAudioActive : styles.fullscreenActionInactive]}
+          >
+            <MaterialCommunityIcons
+              color={instarLedOn === true ? pinnedColor : palette.textMuted}
+              name={instarLedOn === true ? "led-on" : "led-off"}
+              size={22}
+            />
           </Pressable>
         </View>
 
@@ -1256,38 +1286,19 @@ export function CameraTalkWidget({
               onPressOut={talkbackPushToTalk ? disableTalkback : undefined}
               onTouchEnd={talkbackPushToTalk ? disableTalkback : undefined}
               onTouchCancel={talkbackPushToTalk ? disableTalkback : undefined}
-              style={[
-                styles.fullscreenActionButton,
-                talkbackActive ? styles.fullscreenAudioActive : null,
-                !talkbackAvailable ? styles.fullscreenActionDisabled : null,
-              ]}
-            >
-              <MaterialCommunityIcons
+                style={[
+                  styles.fullscreenActionButton,
+                  talkbackActive ? styles.fullscreenAudioActive : null,
+                  !talkbackAvailable ? styles.fullscreenActionDisabled : styles.fullscreenActionInactive,
+                ]}
+              >
+                <MaterialCommunityIcons
                 color={!talkbackAvailable ? palette.textMuted : talkbackActive ? pinnedColor : palette.text}
                 name={talkbackActive ? "microphone" : "microphone-outline"}
-                size={18}
+                size={22}
               />
             </Pressable>
           ) : null}
-          <Pressable
-            onPress={() => setPinned((current) => !current)}
-            style={[styles.fullscreenActionButton, pinned ? styles.fullscreenPinActive : null]}
-          >
-            <MaterialCommunityIcons
-              color={pinned ? pinnedColor : palette.text}
-              name={pinned ? "pin" : "pin-outline"}
-              size={18}
-            />
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              playConfiguredUiSound(config.interactionSounds?.close, "close", `${config.id}:close`);
-              closeFullscreen();
-            }}
-            style={styles.fullscreenActionButton}
-          >
-            <MaterialCommunityIcons color={palette.text} name="close" size={18} />
-          </Pressable>
         </View>
       </View>
       
@@ -2806,22 +2817,29 @@ const styles = StyleSheet.create({
     zIndex: 30,
     alignItems: "center",
   },
+  fullscreenTopRightActions: {
+    position: "absolute",
+    right: 0,
+    top: -6,
+    flexDirection: "row",
+    gap: 10,
+  },
   fullscreenControlsRow: {
-    width: "100%",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 8,
+    justifyContent: "flex-start",
+    gap: 12,
+    paddingHorizontal: 2,
   },
   fullscreenActionButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(150, 180, 255, 0.14)",
+    backgroundColor: "rgba(190, 210, 255, 0.18)",
     borderWidth: 1,
-    borderColor: "rgba(220,235,255,0.32)",
+    borderColor: "rgba(220,235,255,0.38)",
   },
   controlColumn: {
     gap: 6,
@@ -2888,11 +2906,11 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: "#7eb9ff",
   },
-  fullscreenPinActive: {
-    backgroundColor: "rgba(243, 200, 74, 0.18)",
-  },
   fullscreenAudioActive: {
     backgroundColor: "rgba(243, 200, 74, 0.18)",
+  },
+  fullscreenActionInactive: {
+    opacity: 0.62,
   },
   fullscreenTitle: {
     position: "absolute",
