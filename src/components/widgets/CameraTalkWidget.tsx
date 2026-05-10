@@ -95,6 +95,8 @@ export function CameraTalkWidget({
   const instarTalkQueueBytesRef = useRef(0);
   const instarTalkSentBytesRef = useRef(0);
   const instarTalkLastDebugAtRef = useRef(0);
+  const ptzHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ptzContinuousRef = useRef<"up" | "right" | "down" | "left" | null>(null);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const titleFontSize = Math.max(11, Math.min(28, Math.round(config.titleFontSize || 14)));
@@ -465,7 +467,7 @@ export function CameraTalkWidget({
     async (direction: "up" | "right" | "down" | "left" | "zoomin" | "zoomout") => {
       const result = await callInstarControl({
         cmd: "ptzmove",
-        [direction]: 1,
+        [direction]: 10,
         speed: 5,
         timeout: 1,
       });
@@ -474,6 +476,52 @@ export function CameraTalkWidget({
       }
     },
     [callInstarControl]
+  );
+
+  const stopPtzContinuous = useCallback(async () => {
+    if (!ptzContinuousRef.current) {
+      return;
+    }
+    ptzContinuousRef.current = null;
+    await callInstarControl({
+      cmd: "ptzmove",
+      stop: "pt",
+    });
+  }, [callInstarControl]);
+
+  const handlePtzPressIn = useCallback(
+    (direction: "up" | "right" | "down" | "left") => {
+      if (ptzHoldTimerRef.current) {
+        clearTimeout(ptzHoldTimerRef.current);
+        ptzHoldTimerRef.current = null;
+      }
+      ptzHoldTimerRef.current = setTimeout(() => {
+        ptzHoldTimerRef.current = null;
+        ptzContinuousRef.current = direction;
+        void callInstarControl({
+          cmd: "ptzmove",
+          [direction]: 0,
+          speed: 8,
+          timeout: 0,
+        });
+      }, 220);
+    },
+    [callInstarControl]
+  );
+
+  const handlePtzPressOut = useCallback(
+    (direction: "up" | "right" | "down" | "left") => {
+      if (ptzHoldTimerRef.current) {
+        clearTimeout(ptzHoldTimerRef.current);
+        ptzHoldTimerRef.current = null;
+      }
+      if (ptzContinuousRef.current === direction) {
+        void stopPtzContinuous();
+        return;
+      }
+      void sendPtz(direction);
+    },
+    [sendPtz, stopPtzContinuous]
   );
 
   const setAlarmArmed = useCallback(
@@ -608,6 +656,18 @@ export function CameraTalkWidget({
       window.removeEventListener("touchcancel", release);
     };
   }, [disableTalkback, talkbackActive, talkbackPushToTalk]);
+
+  useEffect(() => {
+    return () => {
+      if (ptzHoldTimerRef.current) {
+        clearTimeout(ptzHoldTimerRef.current);
+        ptzHoldTimerRef.current = null;
+      }
+      if (ptzContinuousRef.current) {
+        void stopPtzContinuous();
+      }
+    };
+  }, [stopPtzContinuous]);
 
   useEffect(() => {
     if ((!useInPlaceFullscreen && fullscreenOpen) || previewFeed?.kind !== "mjpeg") {
@@ -1102,18 +1162,38 @@ export function CameraTalkWidget({
 
   const renderFullscreenControls = () => (
     <View pointerEvents="box-none" style={styles.fullscreenControlsWrap}>
-      <View style={styles.fullscreenControlsBar}>
+      <View style={styles.fullscreenControlsRow}>
         <View style={styles.ptzPad}>
-          <Pressable onPress={() => void sendPtz("up")} style={[styles.ptzButton, styles.ptzButtonTop]}>
+          <Pressable
+            onPressIn={() => handlePtzPressIn("up")}
+            onPressOut={() => handlePtzPressOut("up")}
+            onTouchCancel={() => handlePtzPressOut("up")}
+            style={[styles.ptzButton, styles.ptzButtonTop]}
+          >
             <MaterialCommunityIcons color={palette.text} name="chevron-up" size={18} />
           </Pressable>
-          <Pressable onPress={() => void sendPtz("right")} style={[styles.ptzButton, styles.ptzButtonRight]}>
+          <Pressable
+            onPressIn={() => handlePtzPressIn("right")}
+            onPressOut={() => handlePtzPressOut("right")}
+            onTouchCancel={() => handlePtzPressOut("right")}
+            style={[styles.ptzButton, styles.ptzButtonRight]}
+          >
             <MaterialCommunityIcons color={palette.text} name="chevron-right" size={18} />
           </Pressable>
-          <Pressable onPress={() => void sendPtz("down")} style={[styles.ptzButton, styles.ptzButtonBottom]}>
+          <Pressable
+            onPressIn={() => handlePtzPressIn("down")}
+            onPressOut={() => handlePtzPressOut("down")}
+            onTouchCancel={() => handlePtzPressOut("down")}
+            style={[styles.ptzButton, styles.ptzButtonBottom]}
+          >
             <MaterialCommunityIcons color={palette.text} name="chevron-down" size={18} />
           </Pressable>
-          <Pressable onPress={() => void sendPtz("left")} style={[styles.ptzButton, styles.ptzButtonLeft]}>
+          <Pressable
+            onPressIn={() => handlePtzPressIn("left")}
+            onPressOut={() => handlePtzPressOut("left")}
+            onTouchCancel={() => handlePtzPressOut("left")}
+            style={[styles.ptzButton, styles.ptzButtonLeft]}
+          >
             <MaterialCommunityIcons color={palette.text} name="chevron-left" size={18} />
           </Pressable>
         </View>
@@ -1129,10 +1209,10 @@ export function CameraTalkWidget({
 
         <View style={styles.controlColumn}>
           <Pressable onPress={() => void setAlarmArmed(true)} style={[styles.fullscreenActionButton, instarAlarmArmed === true ? styles.fullscreenAudioActive : null]}>
-            <MaterialCommunityIcons color={instarAlarmArmed === true ? pinnedColor : palette.text} name="shield-check-outline" size={18} />
+            <MaterialCommunityIcons color={instarAlarmArmed === true ? pinnedColor : palette.text} name="alarm-light" size={18} />
           </Pressable>
           <Pressable onPress={() => void setAlarmArmed(false)} style={[styles.fullscreenActionButton, instarAlarmArmed === false ? styles.fullscreenAudioActive : null]}>
-            <MaterialCommunityIcons color={instarAlarmArmed === false ? pinnedColor : palette.text} name="shield-off-outline" size={18} />
+            <MaterialCommunityIcons color={instarAlarmArmed === false ? pinnedColor : palette.text} name="alarm-light-off" size={18} />
           </Pressable>
         </View>
 
@@ -2711,16 +2791,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  fullscreenControlsBar: {
+  fullscreenControlsRow: {
+    width: "100%",
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    borderRadius: 18,
-    backgroundColor: "rgba(8, 12, 20, 0.58)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    justifyContent: "space-between",
+    paddingHorizontal: 2,
   },
   fullscreenActionButton: {
     width: 40,
@@ -2732,6 +2808,7 @@ const styles = StyleSheet.create({
   },
   controlColumn: {
     gap: 6,
+    alignItems: "center",
   },
   ptzPad: {
     width: 86,
