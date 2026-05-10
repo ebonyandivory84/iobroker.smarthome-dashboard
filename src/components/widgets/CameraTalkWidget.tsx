@@ -1281,7 +1281,7 @@ export function CameraTalkWidget({
           >
             <MaterialCommunityIcons
               color={instarLedOn === true ? "#ffd86b" : "#f7fbff"}
-              name={instarLedOn === true ? "led-on" : "led-off"}
+              name={instarLedOn === true ? "lightning-bolt" : "lightning-bolt-outline"}
               size={24}
             />
           </Pressable>
