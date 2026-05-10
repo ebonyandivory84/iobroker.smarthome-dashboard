@@ -587,10 +587,16 @@ async function requestInstarCallInvite(cameraBaseUrl, username, password, allowI
   const frameSizeMatch = text.match(/Frame-Size:\s*(\d+)/i);
   const aencMatch = text.match(/AEnc-Format:\s*([^\r\n]+)/i);
   const aencRaw = (aencMatch ? aencMatch[1] : "").trim().toLowerCase();
-  const aencFormat = /a-?law|pcma|g\.?711a/.test(aencRaw) ? "pcma" : "pcm16";
+  const frameSize = frameSizeMatch ? Number(frameSizeMatch[1]) : 640;
+  let aencFormat = /a-?law|pcma|g\.?711a/.test(aencRaw) ? "pcma" : "pcm16";
+  // INSTAR often reports Frame-Size 640 for wideband PCM frames. In that case,
+  // forcing PCMA transcode can produce chipmunk-like playback. Keep PCM16 path.
+  if (Number.isFinite(frameSize) && frameSize >= 640) {
+    aencFormat = "pcm16";
+  }
   return {
     sessionId: Number(sessionMatch[1]),
-    frameSize: frameSizeMatch ? Number(frameSizeMatch[1]) : 640,
+    frameSize,
     initialTimestamp: Math.floor(Date.now() / 10),
     aencFormat,
   };
