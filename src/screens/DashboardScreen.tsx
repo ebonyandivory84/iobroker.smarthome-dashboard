@@ -411,6 +411,7 @@ export function DashboardScreen() {
     const supportsManualHeightOverride =
       currentWidget.type === "camera" ||
       currentWidget.type === "cameraTalk" ||
+      currentWidget.type === "cameraTalkReolink" ||
       currentWidget.type === "solar" ||
       currentWidget.type === "weather" ||
       currentWidget.type === "grafana" ||
@@ -452,7 +453,9 @@ export function DashboardScreen() {
     }
     if (partial.position) {
       const positionConstraint =
-        currentWidget.type === "camera" || currentWidget.type === "cameraTalk"
+        currentWidget.type === "camera" ||
+        currentWidget.type === "cameraTalk" ||
+        currentWidget.type === "cameraTalkReolink"
           ? { minHeight: 0.5, heightSnap: 0.1 }
           : currentWidget.type === "solar"
             ? { minHeight: 2.5, heightSnap: 0.1 }

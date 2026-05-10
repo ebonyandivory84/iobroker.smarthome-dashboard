@@ -102,7 +102,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       return;
     }
 
-    if (widget.type === "camera" || widget.type === "cameraTalk") {
+    if (widget.type === "camera" || widget.type === "cameraTalk" || widget.type === "cameraTalkReolink") {
       setSoundDraft({
         press: resolveDraftSoundValue(
           widget.interactionSounds?.press,
@@ -135,13 +135,18 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         maximizeStateId: widget.maximizeStateId || "",
         maximizeTriggerFormat: widget.maximizeTriggerFormat || "boolean",
         maximizeTriggerValue: widget.maximizeTriggerValue || "",
-        talkbackWebrtcUrl: widget.type === "cameraTalk" ? widget.talkbackWebrtcUrl || "" : "",
-        talkbackPushToTalk: widget.type === "cameraTalk" ? (widget.talkbackPushToTalk !== false ? "true" : "false") : "true",
-        talkbackAutoEnableVideo: widget.type === "cameraTalk" ? (widget.talkbackAutoEnableVideo ? "true" : "false") : "false",
-        instarTalkbackEnabled: widget.type === "cameraTalk" ? (widget.instarTalkbackEnabled ? "true" : "false") : "false",
-        instarBaseUrl: widget.type === "cameraTalk" ? widget.instarBaseUrl || "" : "",
-        instarUsername: widget.type === "cameraTalk" ? widget.instarUsername || "" : "",
-        instarPassword: widget.type === "cameraTalk" ? widget.instarPassword || "" : "",
+        talkbackWebrtcUrl: widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ? widget.talkbackWebrtcUrl || "" : "",
+        talkbackPushToTalk: widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ? (widget.talkbackPushToTalk !== false ? "true" : "false") : "true",
+        talkbackAutoEnableVideo: widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ? (widget.talkbackAutoEnableVideo ? "true" : "false") : "false",
+        instarTalkbackEnabled: widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ? (widget.instarTalkbackEnabled ? "true" : "false") : "false",
+        instarBaseUrl: widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ? widget.instarBaseUrl || "" : "",
+        instarUsername: widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ? widget.instarUsername || "" : "",
+        instarPassword: widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ? widget.instarPassword || "" : "",
+        reolinkTalkbackEnabled: widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ? (widget.reolinkTalkbackEnabled ? "true" : "false") : "false",
+        reolinkBaseUrl: widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ? widget.reolinkBaseUrl || "" : "",
+        reolinkUsername: widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ? widget.reolinkUsername || "" : "",
+        reolinkPassword: widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ? widget.reolinkPassword || "" : "",
+        reolinkChannel: widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ? String(widget.reolinkChannel ?? 0) : "0",
         ...appearanceDraft,
       });
       return;
@@ -628,6 +633,9 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
       return;
     }
 
+    if (widget.type !== "solar") {
+      return;
+    }
     const solarStatDraft = buildSolarStatEditorDraft(widget.stats);
     setSoundDraft({});
     setWeatherSuggestions([]);
@@ -790,7 +798,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         ),
         appearance,
       });
-    } else if (widget.type === "camera" || widget.type === "cameraTalk") {
+    } else if (widget.type === "camera" || widget.type === "cameraTalk" || widget.type === "cameraTalkReolink") {
       const previewSourceMode = cameraMode;
       const snapshotUrl = normalizeOptionalInput(draft.snapshotUrl);
       const mjpegUrl = normalizeOptionalInput(draft.mjpegUrl);
@@ -824,7 +832,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         maximizeStateId: draft.maximizeStateId || undefined,
         maximizeTriggerFormat: normalizeStateFormat(draft.maximizeTriggerFormat),
         maximizeTriggerValue: draft.maximizeTriggerValue || undefined,
-        ...(widget.type === "cameraTalk"
+        ...(widget.type === "cameraTalk" || widget.type === "cameraTalkReolink"
           ? {
               talkbackWebrtcUrl: normalizeOptionalInput(draft.talkbackWebrtcUrl),
               talkbackPushToTalk: draft.talkbackPushToTalk !== "false",
@@ -833,6 +841,11 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
               instarBaseUrl: normalizeOptionalInput(draft.instarBaseUrl),
               instarUsername: normalizeOptionalInput(draft.instarUsername),
               instarPassword: normalizeOptionalInput(draft.instarPassword),
+              reolinkTalkbackEnabled: draft.reolinkTalkbackEnabled === "true",
+              reolinkBaseUrl: normalizeOptionalInput(draft.reolinkBaseUrl),
+              reolinkUsername: normalizeOptionalInput(draft.reolinkUsername),
+              reolinkPassword: normalizeOptionalInput(draft.reolinkPassword),
+              reolinkChannel: clampInt(draft.reolinkChannel, 0, 0),
             }
           : null),
         interactionSounds: buildStoredInteractionSounds(
@@ -1145,7 +1158,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 300000, 60000),
         appearance,
       });
-    } else {
+    } else if (widget.type === "solar") {
       onSave(widget.id, {
         title: draft.title,
         showTitle: draft.showTitle !== "false",
@@ -1191,6 +1204,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         tapAction: buildSolarTapAction(draft),
         appearance,
       });
+    } else {
+      return;
     }
 
     onClose();
@@ -1705,7 +1720,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 </Field>
               </>
             ) : null}
-            {widget.type === "camera" || widget.type === "cameraTalk" ? (
+            {widget.type === "camera" || widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ? (
               <>
                 <Field label="Titelgroesse (px)">
                   <TextInput
@@ -1798,7 +1813,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   />
                 </Field>
                 <Field label="Sounds bei Interaktion">
-                  {widget.type === "cameraTalk" ? (
+                  {widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ? (
                     <>
                       <Field label="WebRTC Talkback URL">
                         <TextInput
@@ -1858,6 +1873,52 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                           secureTextEntry
                           style={styles.input}
                           value={draft.instarPassword || ""}
+                        />
+                      </Field>
+                      <Field label="Reolink API nutzen">
+                        <ChoiceRow
+                          options={["false", "true"]}
+                          value={draft.reolinkTalkbackEnabled || "false"}
+                          onSelect={(value) => setDraft((current) => ({ ...current, reolinkTalkbackEnabled: value }))}
+                        />
+                      </Field>
+                      <Field label="Reolink Base URL">
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, reolinkBaseUrl: value }))}
+                          placeholder="https://192.168.44.37"
+                          placeholderTextColor={palette.textMuted}
+                          style={styles.input}
+                          value={draft.reolinkBaseUrl || ""}
+                        />
+                      </Field>
+                      <Field label="Reolink Benutzer">
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, reolinkUsername: value }))}
+                          placeholderTextColor={palette.textMuted}
+                          style={styles.input}
+                          value={draft.reolinkUsername || ""}
+                        />
+                      </Field>
+                      <Field label="Reolink Passwort">
+                        <TextInput
+                          autoCapitalize="none"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, reolinkPassword: value }))}
+                          placeholderTextColor={palette.textMuted}
+                          secureTextEntry
+                          style={styles.input}
+                          value={draft.reolinkPassword || ""}
+                        />
+                      </Field>
+                      <Field label="Reolink Channel">
+                        <TextInput
+                          autoCapitalize="none"
+                          keyboardType="numeric"
+                          onChangeText={(value) => setDraft((current) => ({ ...current, reolinkChannel: value }))}
+                          placeholderTextColor={palette.textMuted}
+                          style={styles.input}
+                          value={draft.reolinkChannel || "0"}
                         />
                       </Field>
                     </>
@@ -4429,7 +4490,7 @@ function getWidgetAppearanceDefaults(
     };
   }
 
-  if (widget.type === "camera" || widget.type === "cameraTalk") {
+  if (widget.type === "camera" || widget.type === "cameraTalk" || widget.type === "cameraTalkReolink") {
     return {
       widgetColor: theme.widgetTones.cameraStart,
       widgetColor2: theme.widgetTones.cameraEnd,

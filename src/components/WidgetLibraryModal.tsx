@@ -35,6 +35,12 @@ const OPTIONS: Array<{
     icon: "microphone",
   },
   {
+    type: "cameraTalkReolink",
+    title: "Reolink Cam",
+    description: "Reolink-Kamera-Widget mit Talkback, Alarm und LED im Vollbild.",
+    icon: "cctv",
+  },
+  {
     type: "energy",
     title: "Energiefluss",
     description: "Kompakter Energiefluss fuer PV, Haus, Batterie und Netz.",
@@ -162,9 +168,9 @@ export function WidgetLibraryModal({
               <Text style={styles.optionTitle}>Neues Dashboard</Text>
               <Text style={styles.optionText}>Erstellt eine weitere Seite, zwischen der du wischen oder tippen kannst.</Text>
             </Pressable>
-            {OPTIONS.map((option) => (
+            {OPTIONS.map((option, index) => (
               <Pressable
-                key={option.type}
+                key={`${option.type}-${index}`}
                 onPress={() => {
                   onSelectType(option.type);
                   onClose();

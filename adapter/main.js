@@ -547,6 +547,70 @@ async function main(adapter) {
       res.status(500).json({ error: error instanceof Error ? error.message : "instar control failed" });
     }
   });
+  app.post("/smarthome-dashboard/api/reolink-control", async (req, res) => {
+    const cameraBaseUrl = normalizeUrl(req.body?.cameraBaseUrl);
+    const username = String(req.body?.username || "");
+    const password = String(req.body?.password || "");
+    const allowInsecure = req.body?.allowInsecure !== false;
+    const cmd = typeof req.body?.cmd === "string" ? req.body.cmd.trim() : "";
+    const param = req.body?.param && typeof req.body.param === "object" ? req.body.param : {};
+    const action = Number.isFinite(Number(req.body?.action)) ? Number(req.body.action) : 0;
+
+    const allowedCommands = new Set([
+      "SetWhiteLed",
+      "GetWhiteLed",
+      "AudioAlarmPlay",
+      "GetAudioCfg",
+      "SetAudioCfg",
+    ]);
+
+    if (!cameraBaseUrl || !username || !password || !cmd) {
+      res.status(400).json({ error: "cameraBaseUrl, username, password and cmd required" });
+      return;
+    }
+    if (!allowedCommands.has(cmd)) {
+      res.status(400).json({ error: `unsupported cmd: ${cmd}` });
+      return;
+    }
+
+    try {
+      const url = new URL(`${cameraBaseUrl}/cgi-bin/api.cgi`);
+      url.searchParams.set("cmd", cmd);
+      url.searchParams.set("user", username);
+      url.searchParams.set("password", password);
+      const body = [{ cmd, action, param }];
+      const response = await fetch(url.toString(), {
+        method: "POST",
+        headers: {
+          Accept: "application/json, text/plain, */*",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+        ...(allowInsecure ? buildCameraFetchOptions(url.toString()) : { redirect: "follow" }),
+      });
+      const text = await response.text();
+      let payload = null;
+      try {
+        payload = text ? JSON.parse(text) : null;
+      } catch {
+        payload = null;
+      }
+      if (!response.ok) {
+        res.status(response.status).json({ error: text || `reolink control failed (${response.status})` });
+        return;
+      }
+      const first = Array.isArray(payload) ? payload[0] : payload;
+      const code = Number(first?.code);
+      if (Number.isFinite(code) && code !== 0) {
+        const detail = first?.error?.detail || first?.error?.rspCode || `code ${code}`;
+        res.status(400).json({ error: `reolink ${cmd} failed: ${detail}`, payload });
+        return;
+      }
+      res.json({ ok: true, cmd, payload: payload ?? text });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "reolink control failed" });
+    }
+  });
 
   app.use("/smarthome-dashboard/widget-assets", express.static(widgetAssetsRoot));
 

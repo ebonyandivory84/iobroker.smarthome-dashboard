@@ -58,7 +58,7 @@ function migrateConfig(input: DashboardSettings): DashboardSettings {
     widgets: input.widgets.map((widget) => {
       const normalizedInteractionSounds = normalizeWidgetInteractionSounds(widget.interactionSounds);
 
-      if (widget.type !== "camera" && widget.type !== "cameraTalk") {
+      if (widget.type !== "camera" && widget.type !== "cameraTalk" && widget.type !== "cameraTalkReolink") {
         return {
           ...widget,
           interactionSounds: normalizedInteractionSounds,

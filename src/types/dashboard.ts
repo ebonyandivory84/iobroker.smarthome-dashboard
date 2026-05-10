@@ -2,6 +2,7 @@ export type WidgetType =
   | "state"
   | "camera"
   | "cameraTalk"
+  | "cameraTalkReolink"
   | "energy"
   | "solar"
   | "grafana"
@@ -124,7 +125,7 @@ export type CameraWidgetConfig = WidgetBase & {
 };
 
 export type CameraTalkWidgetConfig = Omit<CameraWidgetConfig, "type"> & {
-  type: "cameraTalk";
+  type: "cameraTalk" | "cameraTalkReolink";
   talkbackWebrtcUrl?: string;
   talkbackPushToTalk?: boolean;
   talkbackAutoEnableVideo?: boolean;
@@ -132,6 +133,11 @@ export type CameraTalkWidgetConfig = Omit<CameraWidgetConfig, "type"> & {
   instarBaseUrl?: string;
   instarUsername?: string;
   instarPassword?: string;
+  reolinkTalkbackEnabled?: boolean;
+  reolinkBaseUrl?: string;
+  reolinkUsername?: string;
+  reolinkPassword?: string;
+  reolinkChannel?: number;
 };
 
 export type GrafanaWidgetConfig = WidgetBase & {

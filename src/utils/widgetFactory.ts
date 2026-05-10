@@ -18,6 +18,8 @@ export function buildWidgetTemplate(
         ? 6
         : type === "cameraTalk"
         ? 6
+        : type === "cameraTalkReolink"
+        ? 6
         : type === "solar"
           ? 8
             : type === "grafana"
@@ -47,6 +49,8 @@ export function buildWidgetTemplate(
       type === "camera"
         ? 4
         : type === "cameraTalk"
+        ? 4
+        : type === "cameraTalkReolink"
         ? 4
         : type === "solar"
           ? 4
@@ -136,6 +140,34 @@ export function buildWidgetTemplate(
       instarBaseUrl: "",
       instarUsername: "",
       instarPassword: "",
+      position: {
+        ...basePosition,
+        w: Math.min(6, grid.columns),
+      },
+    };
+  }
+
+  if (type === "cameraTalkReolink") {
+    return {
+      id: `camera-talk-reolink-${suffix}`,
+      type: "cameraTalkReolink",
+      title: `Reolink Cam ${suffix}`,
+      titleFontSize: 14,
+      previewSourceMode: "snapshot",
+      snapshotUrl: "",
+      mjpegUrl: "",
+      flvUrl: "",
+      fmp4Url: "",
+      refreshMs: 2000,
+      audioEnabled: false,
+      talkbackWebrtcUrl: "",
+      talkbackPushToTalk: true,
+      talkbackAutoEnableVideo: false,
+      reolinkTalkbackEnabled: true,
+      reolinkBaseUrl: "",
+      reolinkUsername: "",
+      reolinkPassword: "",
+      reolinkChannel: 0,
       position: {
         ...basePosition,
         w: Math.min(6, grid.columns),

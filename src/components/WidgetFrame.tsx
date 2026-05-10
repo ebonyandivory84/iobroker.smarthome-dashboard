@@ -46,7 +46,7 @@ export function WidgetFrame({
     widget.iconImageBorderless === true;
   const showHeaderTitle =
     widget.type !== "camera" &&
-    widget.type !== "cameraTalk" &&
+    widget.type !== "cameraTalk" && widget.type !== "cameraTalkReolink" &&
     widget.type !== "wallbox" &&
     widget.type !== "goe" &&
     widget.type !== "heating" &&
@@ -65,7 +65,7 @@ export function WidgetFrame({
   const useFreeGridConstraint = columns <= 3;
   const isVerticalResizeWidget =
     widget.type === "camera" ||
-    widget.type === "cameraTalk" ||
+    widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ||
     widget.type === "solar" ||
     widget.type === "weather" ||
     widget.type === "grafana" ||
@@ -177,10 +177,10 @@ export function WidgetFrame({
           ...current.startPosition,
           x: clamp(current.startPosition.x + xSteps, 0, columns - current.startPosition.w),
           y: Math.max(0, current.startPosition.y + ySteps),
-        }, columns, widget.type, useFreeGridConstraint, widget.type === "camera" || widget.type === "cameraTalk" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : undefined));
+        }, columns, widget.type, useFreeGridConstraint, widget.type === "camera" || widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : undefined));
       } else {
         if (isVerticalResizeWidget) {
-          const minHeight = widget.type === "camera" || widget.type === "cameraTalk" ? 0.5 : widget.type === "solar" ? 2.5 : 1;
+          const minHeight = widget.type === "camera" || widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ? 0.5 : widget.type === "solar" ? 2.5 : 1;
           onCommitPosition(widget.id, constrainPositionForLayout({
             ...current.startPosition,
             w: current.startPosition.w,
@@ -237,7 +237,7 @@ export function WidgetFrame({
     <View
       style={[
         styles.shell,
-        widget.type === "state" || widget.type === "camera" || widget.type === "cameraTalk" || linkBorderless ? styles.shellTransparent : null,
+        widget.type === "state" || widget.type === "camera" || widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" || linkBorderless ? styles.shellTransparent : null,
         interactionMode === "drag"
           ? {
               transform: [{ translateX: dragOffset.x }, { translateY: dragOffset.y }],
@@ -287,7 +287,7 @@ export function WidgetFrame({
         style={[
           styles.content,
           widget.type !== "camera" &&
-          widget.type !== "cameraTalk" &&
+          widget.type !== "cameraTalk" && widget.type !== "cameraTalkReolink" &&
           widget.type !== "solar" &&
           widget.type !== "state" &&
           widget.type !== "wallbox" &&
@@ -349,7 +349,11 @@ function constrainPositionForLayout(
   }
 
   const minHeight = options?.minHeight ?? 1;
-  const heightSnap = options?.heightSnap ?? (widgetType === "camera" || widgetType === "cameraTalk" || widgetType === "solar" ? 0.1 : GRID_SNAP);
+  const heightSnap =
+    options?.heightSnap ??
+    (widgetType === "camera" || widgetType === "cameraTalk" || widgetType === "cameraTalkReolink" || widgetType === "solar"
+      ? 0.1
+      : GRID_SNAP);
   const w = clamp(snap(position.w), 1, columns);
   const h = Math.max(minHeight, snapWithStep(position.h, heightSnap));
   const x = clamp(snap(position.x), 0, Math.max(0, columns - w));

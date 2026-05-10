@@ -194,7 +194,7 @@ export function GridCanvas({
                 allowManualLayout={!isCompactViewport || Platform.OS === "web"}
                 allowResize={
                   widget.type === "camera" ||
-                  widget.type === "cameraTalk" ||
+                  widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ||
                   widget.type === "solar" ||
                   widget.type === "log" ||
                   widget.type === "script" ||
@@ -615,7 +615,8 @@ function getAutoLayoutSpec(
       case "state":
         return { w: 1, h: 1 };
       case "camera":
-      case "cameraTalk": {
+      case "cameraTalk":
+      case "cameraTalkReolink": {
         if (widget.manualHeightOverride) {
           return { w: 1, h: Math.max(0.5, roundCameraGridUnit(fallbackHeight)) };
         }
@@ -688,7 +689,8 @@ function getAutoLayoutSpec(
     case "state":
       return { w: 1, h: 1 };
     case "camera":
-    case "cameraTalk": {
+    case "cameraTalk":
+    case "cameraTalkReolink": {
       if (widget.manualHeightOverride) {
         return { w: mainColumnWidth, h: Math.max(0.5, roundCameraGridUnit(fallbackHeight)) };
       }
@@ -773,7 +775,7 @@ function ceilGridUnit(value: number) {
 }
 
 function ceilGridUnitForWidget(value: number, widgetType: WidgetType) {
-  if (widgetType === "camera" || widgetType === "cameraTalk") {
+  if (widgetType === "camera" || widgetType === "cameraTalk" || widgetType === "cameraTalkReolink") {
     return Math.ceil(value / CAMERA_GRID_SNAP) * CAMERA_GRID_SNAP;
   }
   return ceilGridUnit(value);
@@ -801,7 +803,12 @@ function mapDisplayPositionToSourceHint(
     const localRatio = localDisplayMax > 0 ? clamp(position.x / localDisplayMax, 0, 1) : 0;
     const mappedX = sectionIndex * sourceSectionWidth + sourceLocalMax * localRatio;
     const mappedY = Math.max(0, sourceCurrent.y + (position.y - displayCurrent.y));
-    const minHeight = options.widgetType === "camera" || options.widgetType === "cameraTalk" ? 0.5 : options.widgetType === "solar" ? 2.5 : 1;
+    const minHeight =
+      options.widgetType === "camera" || options.widgetType === "cameraTalk" || options.widgetType === "cameraTalkReolink"
+        ? 0.5
+        : options.widgetType === "solar"
+          ? 2.5
+          : 1;
     const mappedH = Math.max(minHeight, sourceCurrent.h + (position.h - displayCurrent.h));
 
     return {
@@ -931,7 +938,7 @@ function WebGridCanvas({
           allowManualLayout={true}
           allowResize={
             widget.type === "camera" ||
-            widget.type === "cameraTalk" ||
+            widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ||
             widget.type === "solar" ||
             widget.type === "grafana" ||
             widget.type === "log" ||
@@ -1011,7 +1018,7 @@ function WebWidgetShell({
     widget.iconImageBorderless === true;
   const showHeaderTitle =
     widget.type !== "camera" &&
-    widget.type !== "cameraTalk" &&
+    widget.type !== "cameraTalk" && widget.type !== "cameraTalkReolink" &&
     widget.type !== "wallbox" &&
     widget.type !== "goe" &&
     widget.type !== "coco" &&
@@ -1098,7 +1105,7 @@ function WebWidgetShell({
         (event.clientY - active.startY) / stepY,
         active.mode === "resize" &&
         (widget.type === "camera" ||
-          widget.type === "cameraTalk" ||
+          widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ||
           widget.type === "solar" ||
           widget.type === "grafana" ||
           widget.type === "log" ||
@@ -1123,7 +1130,7 @@ function WebWidgetShell({
           ...active.startPosition,
           x: clamp(active.startPosition.x + dx, 0, config.grid.columns - active.startPosition.w),
           y: Math.max(0, active.startPosition.y + dy),
-        }, config.grid.columns, widget.type === "camera" || widget.type === "cameraTalk" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : widget.type === "grafana" || widget.type === "log" || widget.type === "script" || widget.type === "host" || widget.type === "raspberryPiStats" || widget.type === "coco" || widget.type === "wallbox" || widget.type === "goe" || widget.type === "heating" || widget.type === "heatingV2" ? { minHeight: 1, heightSnap: 0.1 } : undefined);
+        }, config.grid.columns, widget.type === "camera" || widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ? { minHeight: 0.5, heightSnap: 0.1 } : widget.type === "solar" ? { minHeight: 2.5, heightSnap: 0.1 } : widget.type === "grafana" || widget.type === "log" || widget.type === "script" || widget.type === "host" || widget.type === "raspberryPiStats" || widget.type === "coco" || widget.type === "wallbox" || widget.type === "goe" || widget.type === "heating" || widget.type === "heatingV2" ? { minHeight: 1, heightSnap: 0.1 } : undefined);
         setPreview(nextPreview);
 
         if (isLayoutMode && onDragAcrossPageEdge) {
@@ -1149,7 +1156,7 @@ function WebWidgetShell({
       } else {
         if (
           widget.type === "camera" ||
-          widget.type === "cameraTalk" ||
+          widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ||
           widget.type === "solar" ||
           widget.type === "grafana" ||
           widget.type === "log" ||
@@ -1162,7 +1169,7 @@ function WebWidgetShell({
           widget.type === "heating" ||
           widget.type === "heatingV2"
         ) {
-          const minHeight = widget.type === "camera" || widget.type === "cameraTalk" ? 0.5 : widget.type === "solar" ? 2.5 : 1;
+          const minHeight = widget.type === "camera" || widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" ? 0.5 : widget.type === "solar" ? 2.5 : 1;
           setPreview(constrainToPrimarySections({
             ...active.startPosition,
             w: active.startPosition.w,
@@ -1226,7 +1233,7 @@ function WebWidgetShell({
   const shellStyle: CSSProperties = {
     ...webWidgetStyle,
     ...getWidgetTone(widget, theme),
-    ...(widget.type === "camera" || widget.type === "cameraTalk"
+    ...(widget.type === "camera" || widget.type === "cameraTalk" || widget.type === "cameraTalkReolink"
       ? {
           border: "none",
           background: "#000000",
@@ -1267,9 +1274,9 @@ function WebWidgetShell({
 
   const contentStyle = [
     styles.webContent,
-    widget.type === "camera" || widget.type === "cameraTalk" || widget.type === "grafana" || linkBorderless ? styles.webContentBleed : null,
+    widget.type === "camera" || widget.type === "cameraTalk" || widget.type === "cameraTalkReolink" || widget.type === "grafana" || linkBorderless ? styles.webContentBleed : null,
     widget.type !== "camera" &&
-    widget.type !== "cameraTalk" &&
+    widget.type !== "cameraTalk" && widget.type !== "cameraTalkReolink" &&
     widget.type !== "solar" &&
     widget.type !== "state" &&
     widget.type !== "wallbox" &&
@@ -1422,7 +1429,7 @@ function renderWidget(
     );
   }
 
-  if (effectiveWidget.type === "cameraTalk") {
+  if (effectiveWidget.type === "cameraTalk" || effectiveWidget.type === "cameraTalkReolink") {
     return (
       <CameraTalkWidget
         config={effectiveWidget}
@@ -1552,6 +1559,7 @@ function supportsManualHeightOverride(type: WidgetType) {
   return (
     type === "camera" ||
     type === "cameraTalk" ||
+    type === "cameraTalkReolink" ||
     type === "solar" ||
     type === "grafana" ||
     type === "weather" ||
@@ -1806,7 +1814,7 @@ function getWidgetTone(widget: WidgetConfig, theme: ReturnType<typeof resolveThe
       border: "1px solid rgba(90, 150, 255, 0.16)",
     };
   }
-  if (type === "camera" || type === "cameraTalk") {
+  if (type === "camera" || type === "cameraTalk" || type === "cameraTalkReolink") {
     return {
       background: `linear-gradient(180deg, ${theme.widgetTones.cameraStart}, ${theme.widgetTones.cameraEnd})`,
       border: "1px solid rgba(255,255,255,0.06)",

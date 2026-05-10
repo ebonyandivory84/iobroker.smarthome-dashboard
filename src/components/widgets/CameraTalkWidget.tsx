@@ -154,15 +154,24 @@ export function CameraTalkWidget({
   const instarBaseUrl = (config.instarBaseUrl || "").trim();
   const instarUsername = (config.instarUsername || "").trim();
   const instarPassword = config.instarPassword || "";
+  const reolinkTalkbackEnabled = Platform.OS === "web" && config.reolinkTalkbackEnabled === true;
+  const reolinkBaseUrl = (config.reolinkBaseUrl || "").trim();
+  const reolinkUsername = (config.reolinkUsername || "").trim();
+  const reolinkPassword = config.reolinkPassword || "";
+  const reolinkChannel = Number.isFinite(Number(config.reolinkChannel)) ? Number(config.reolinkChannel) : 0;
   const instarTalkbackConfigured = Boolean(instarBaseUrl && instarUsername && instarPassword);
+  const reolinkTalkbackConfigured = Boolean(reolinkBaseUrl && reolinkUsername && reolinkPassword);
   const instarTalkbackActiveMode = instarTalkbackEnabled && instarTalkbackConfigured;
   const instarTalkbackAvailable = Platform.OS === "web" && instarTalkbackActiveMode;
-  const talkbackAvailable = Platform.OS === "web" && (Boolean(talkbackWebrtcUrl) || instarTalkbackAvailable);
+  const reolinkTalkbackAvailable = Platform.OS === "web" && reolinkTalkbackEnabled && reolinkTalkbackConfigured && Boolean(talkbackWebrtcUrl);
+  const talkbackAvailable =
+    Platform.OS === "web" && (Boolean(talkbackWebrtcUrl) || instarTalkbackAvailable || reolinkTalkbackAvailable);
   const talkbackControlVisible = Platform.OS === "web";
   const talkbackPushToTalk = config.talkbackPushToTalk !== false;
   const talkbackShowVideo = config.talkbackAutoEnableVideo === true;
-  const talkbackIframeEnabled = Boolean(talkbackWebrtcUrl) && !instarTalkbackConfigured;
+  const talkbackIframeEnabled = Boolean(talkbackWebrtcUrl) && !instarTalkbackAvailable;
   const showInstarControls = instarTalkbackConfigured;
+  const showReolinkControls = reolinkTalkbackConfigured;
   const activeFeed = previewFeed;
   const activeSnapshotBaseUrl = activeFeed?.kind === "snapshot" ? activeFeed.url : null;
   const previewMjpegSources = useMemo(
@@ -463,6 +472,39 @@ export function CameraTalkWidget({
     [instarBaseUrl, instarPassword, instarTalkbackConfigured, instarUsername]
   );
 
+  const callReolinkControl = useCallback(
+    async (cmd: string, param: Record<string, unknown>) => {
+      if (!reolinkTalkbackConfigured) {
+        setPreviewStreamDebug("Reolink-Steuerung nicht konfiguriert.");
+        return null;
+      }
+      try {
+        const response = await fetch("/smarthome-dashboard/api/reolink-control", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cameraBaseUrl: reolinkBaseUrl,
+            username: reolinkUsername,
+            password: reolinkPassword,
+            allowInsecure: true,
+            cmd,
+            action: 0,
+            param,
+          }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error || `Reolink control failed (${response.status})`);
+        }
+        return payload;
+      } catch (error) {
+        setPreviewStreamDebug(error instanceof Error ? error.message : "Reolink control failed");
+        return null;
+      }
+    },
+    [reolinkBaseUrl, reolinkPassword, reolinkTalkbackConfigured, reolinkUsername]
+  );
+
   const sendPtz = useCallback(
     async (direction: "up" | "right" | "down" | "left" | "zoomin" | "zoomout") => {
       const result = await callInstarControl({
@@ -526,33 +568,47 @@ export function CameraTalkWidget({
 
   const setAlarmArmed = useCallback(
     async (armed: boolean) => {
-      const result = await callInstarControl({
-        cmd: "setalarmattr",
-        armed: armed ? 1 : 0,
-      });
+      const result = showReolinkControls
+        ? await callReolinkControl("AudioAlarmPlay", {
+            alarm_mode: "manul",
+            manual_switch: armed ? 1 : 0,
+            times: 1,
+            channel: reolinkChannel,
+          })
+        : await callInstarControl({
+            cmd: "setalarmattr",
+            armed: armed ? 1 : 0,
+          });
       if (result) {
         setInstarAlarmArmed(armed);
         setPreviewStreamDebug(`Alarm ${armed ? "ON" : "OFF"}`);
       }
     },
-    [callInstarControl]
+    [callInstarControl, callReolinkControl, reolinkChannel, showReolinkControls]
   );
 
   const updateSpeakerVolume = useCallback(
     async (volume: number) => {
       const clamped = Math.max(1, Math.min(100, Math.round(volume)));
       setInstarSpeakerVolume(clamped);
-      const result = await callInstarControl({
-        cmd: "setaudioattr",
-        type: "out",
-        enable: 1,
-        volume: clamped,
-      });
+      const result = showReolinkControls
+        ? await callReolinkControl("SetAudioCfg", {
+            AudioCfg: {
+              channel: reolinkChannel,
+              volume: clamped,
+            },
+          })
+        : await callInstarControl({
+            cmd: "setaudioattr",
+            type: "out",
+            enable: 1,
+            volume: clamped,
+          });
       if (result) {
         setPreviewStreamDebug(`Lautsprecher ${clamped}%`);
       }
     },
-    [callInstarControl]
+    [callInstarControl, callReolinkControl, reolinkChannel, showReolinkControls]
   );
 
   const updateSpeakerVolumeDrag = useCallback(
@@ -571,21 +627,30 @@ export function CameraTalkWidget({
 
   const setLedMode = useCallback(
     async (enabled: boolean) => {
-      const result = await callInstarControl({
-        cmd: "illuminate",
-        duration: enabled ? 180 : 0,
-      });
+      const result = showReolinkControls
+        ? await callReolinkControl("SetWhiteLed", {
+            WhiteLed: {
+              channel: reolinkChannel,
+              mode: 1,
+              state: enabled ? 1 : 0,
+              bright: 100,
+            },
+          })
+        : await callInstarControl({
+            cmd: "illuminate",
+            duration: enabled ? 180 : 0,
+          });
       if (result) {
         setInstarLedOn(enabled);
         setPreviewStreamDebug(`LED ${enabled ? "ON" : "OFF"}`);
       }
     },
-    [callInstarControl]
+    [callInstarControl, callReolinkControl, reolinkChannel, showReolinkControls]
   );
 
   const enableTalkback = useCallback(() => {
     if (!talkbackAvailable) {
-      setPreviewStreamDebug("Talkback nicht konfiguriert. Bitte INSTAR-Daten oder WebRTC-URL setzen.");
+      setPreviewStreamDebug("Talkback nicht konfiguriert. Bitte INSTAR/Reolink-Daten oder WebRTC-URL setzen.");
       return;
     }
     playConfiguredUiSound(config.interactionSounds?.press, "toggle", `${config.id}:talkback-on`);
@@ -611,7 +676,7 @@ export function CameraTalkWidget({
 
   const toggleTalkback = useCallback(() => {
     if (!talkbackAvailable) {
-      setPreviewStreamDebug("Talkback nicht konfiguriert. Bitte INSTAR-Daten oder WebRTC-URL setzen.");
+      setPreviewStreamDebug("Talkback nicht konfiguriert. Bitte INSTAR/Reolink-Daten oder WebRTC-URL setzen.");
       return;
     }
     playConfiguredUiSound(config.interactionSounds?.press, "toggle", `${config.id}:talkback-toggle`);
@@ -1213,81 +1278,90 @@ export function CameraTalkWidget({
       </View>
 
       <View style={styles.fullscreenControlsRow}>
-        <View style={styles.controlColumn}>
-          <Pressable
-            onPress={() => void setAlarmArmed(!(instarAlarmArmed === true))}
-            style={[
-              styles.fullscreenActionButton,
-              styles.alarmButton,
-              instarAlarmArmed === true ? styles.fullscreenAudioActive : styles.fullscreenActionInactive,
-            ]}
-          >
-            <MaterialCommunityIcons
-              color={instarAlarmArmed === true ? "#ff4d4d" : "#ffc0c0"}
-              name={instarAlarmArmed === true ? "alarm-light" : "alarm-light-outline"}
-              size={26}
-            />
-          </Pressable>
-        </View>
+        {showInstarControls || showReolinkControls ? (
+          <View style={styles.controlColumn}>
+            <Pressable
+              onPress={() => void setAlarmArmed(!(instarAlarmArmed === true))}
+              style={[
+                styles.fullscreenActionButton,
+                styles.alarmButton,
+                instarAlarmArmed === true ? styles.fullscreenAudioActive : styles.fullscreenActionInactive,
+              ]}
+            >
+              <MaterialCommunityIcons
+                color={instarAlarmArmed === true ? "#ff4d4d" : "#ffc0c0"}
+                name={instarAlarmArmed === true ? "alarm-light" : "alarm-light-outline"}
+                size={26}
+              />
+            </Pressable>
+          </View>
+        ) : null}
 
-        <View style={styles.ptzPad}>
-          <Pressable
-            onPressIn={() => handlePtzPressIn("up")}
-            onPressOut={() => handlePtzPressOut("up")}
-            onTouchCancel={() => handlePtzPressOut("up")}
-            style={[styles.ptzButton, styles.ptzButtonTop]}
-          >
-            <MaterialCommunityIcons color={palette.text} name="chevron-up" size={18} />
-          </Pressable>
-          <Pressable
-            onPressIn={() => handlePtzPressIn("right")}
-            onPressOut={() => handlePtzPressOut("right")}
-            onTouchCancel={() => handlePtzPressOut("right")}
-            style={[styles.ptzButton, styles.ptzButtonRight]}
-          >
-            <MaterialCommunityIcons color={palette.text} name="chevron-right" size={18} />
-          </Pressable>
-          <Pressable
-            onPressIn={() => handlePtzPressIn("down")}
-            onPressOut={() => handlePtzPressOut("down")}
-            onTouchCancel={() => handlePtzPressOut("down")}
-            style={[styles.ptzButton, styles.ptzButtonBottom]}
-          >
-            <MaterialCommunityIcons color={palette.text} name="chevron-down" size={18} />
-          </Pressable>
-          <Pressable
-            onPressIn={() => handlePtzPressIn("left")}
-            onPressOut={() => handlePtzPressOut("left")}
-            onTouchCancel={() => handlePtzPressOut("left")}
-            style={[styles.ptzButton, styles.ptzButtonLeft]}
-          >
-            <MaterialCommunityIcons color={palette.text} name="chevron-left" size={18} />
-          </Pressable>
-        </View>
+        {showInstarControls ? (
+          <>
+            <View style={styles.ptzPad}>
+              <Pressable
+                onPressIn={() => handlePtzPressIn("up")}
+                onPressOut={() => handlePtzPressOut("up")}
+                onTouchCancel={() => handlePtzPressOut("up")}
+                style={[styles.ptzButton, styles.ptzButtonTop]}
+              >
+                <MaterialCommunityIcons color={palette.text} name="chevron-up" size={18} />
+              </Pressable>
+              <Pressable
+                onPressIn={() => handlePtzPressIn("right")}
+                onPressOut={() => handlePtzPressOut("right")}
+                onTouchCancel={() => handlePtzPressOut("right")}
+                style={[styles.ptzButton, styles.ptzButtonRight]}
+              >
+                <MaterialCommunityIcons color={palette.text} name="chevron-right" size={18} />
+              </Pressable>
+              <Pressable
+                onPressIn={() => handlePtzPressIn("down")}
+                onPressOut={() => handlePtzPressOut("down")}
+                onTouchCancel={() => handlePtzPressOut("down")}
+                style={[styles.ptzButton, styles.ptzButtonBottom]}
+              >
+                <MaterialCommunityIcons color={palette.text} name="chevron-down" size={18} />
+              </Pressable>
+              <Pressable
+                onPressIn={() => handlePtzPressIn("left")}
+                onPressOut={() => handlePtzPressOut("left")}
+                onTouchCancel={() => handlePtzPressOut("left")}
+                style={[styles.ptzButton, styles.ptzButtonLeft]}
+              >
+                <MaterialCommunityIcons color={palette.text} name="chevron-left" size={18} />
+              </Pressable>
+            </View>
 
-        <View style={styles.controlColumn}>
-          <Pressable onPress={() => void sendPtz("zoomin")} style={styles.fullscreenActionButton}>
-            <MaterialCommunityIcons color={palette.text} name="magnify-plus-outline" size={18} />
-          </Pressable>
-          <Pressable onPress={() => void sendPtz("zoomout")} style={styles.fullscreenActionButton}>
-            <MaterialCommunityIcons color={palette.text} name="magnify-minus-outline" size={18} />
-          </Pressable>
-        </View>
+            <View style={styles.controlColumn}>
+              <Pressable onPress={() => void sendPtz("zoomin")} style={styles.fullscreenActionButton}>
+                <MaterialCommunityIcons color={palette.text} name="magnify-plus-outline" size={18} />
+              </Pressable>
+              <Pressable onPress={() => void sendPtz("zoomout")} style={styles.fullscreenActionButton}>
+                <MaterialCommunityIcons color={palette.text} name="magnify-minus-outline" size={18} />
+              </Pressable>
+            </View>
+          </>
+        ) : null}
 
-        <View style={styles.controlColumn}>
-          <Pressable
-            onPress={() => void setLedMode(!(instarLedOn === true))}
-            style={[styles.fullscreenActionButton, instarLedOn === true ? styles.fullscreenAudioActive : styles.fullscreenActionInactive]}
-          >
-            <MaterialCommunityIcons
-              color={instarLedOn === true ? "#ffd86b" : "#f7fbff"}
-              name={instarLedOn === true ? "lightning-bolt" : "lightning-bolt-outline"}
-              size={24}
-            />
-          </Pressable>
-        </View>
+        {showInstarControls || showReolinkControls ? (
+          <View style={styles.controlColumn}>
+            <Pressable
+              onPress={() => void setLedMode(!(instarLedOn === true))}
+              style={[styles.fullscreenActionButton, instarLedOn === true ? styles.fullscreenAudioActive : styles.fullscreenActionInactive]}
+            >
+              <MaterialCommunityIcons
+                color={instarLedOn === true ? "#ffd86b" : "#f7fbff"}
+                name={instarLedOn === true ? "lightning-bolt" : "lightning-bolt-outline"}
+                size={24}
+              />
+            </Pressable>
+          </View>
+        ) : null}
 
-        <View style={styles.volumeColumn}>
+        {showInstarControls || showReolinkControls ? (
+          <View style={styles.volumeColumn}>
           <Pressable onPress={() => void updateSpeakerVolume(instarSpeakerVolume + 5)} style={styles.volumeAdjustBtn}>
             <MaterialCommunityIcons color={palette.text} name="plus" size={16} />
           </Pressable>
@@ -1324,7 +1398,8 @@ export function CameraTalkWidget({
           <Pressable onPress={() => void updateSpeakerVolume(instarSpeakerVolume - 5)} style={styles.volumeAdjustBtn}>
             <MaterialCommunityIcons color={palette.text} name="minus" size={16} />
           </Pressable>
-        </View>
+          </View>
+        ) : null}
 
         <View style={styles.controlColumn}>
           {talkbackControlVisible ? (
