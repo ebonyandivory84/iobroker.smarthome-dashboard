@@ -66,7 +66,7 @@ export function CameraTalkWidget({
   const [talkbackActive, setTalkbackActive] = useState(false);
   const [instarSpeakerVolume, setInstarSpeakerVolume] = useState(70);
   const [instarAlarmArmed, setInstarAlarmArmed] = useState<boolean | null>(null);
-  const [instarControlBusy, setInstarControlBusy] = useState(false);
+  const [instarLedOn, setInstarLedOn] = useState<boolean | null>(null);
   const [previewMjpegLoaded, setPreviewMjpegLoaded] = useState(false);
   const [fullscreenMjpegLoaded, setFullscreenMjpegLoaded] = useState(false);
   const hasReportedAspectRatio = useRef(false);
@@ -435,7 +435,6 @@ export function CameraTalkWidget({
         setPreviewStreamDebug("INSTAR-Steuerung nicht konfiguriert.");
         return null;
       }
-      setInstarControlBusy(true);
       try {
         const response = await fetch("/smarthome-dashboard/api/instar-control", {
           method: "POST",
@@ -456,8 +455,6 @@ export function CameraTalkWidget({
       } catch (error) {
         setPreviewStreamDebug(error instanceof Error ? error.message : "INSTAR control failed");
         return null;
-      } finally {
-        setInstarControlBusy(false);
       }
     },
     [instarBaseUrl, instarPassword, instarTalkbackConfigured, instarUsername]
@@ -550,6 +547,20 @@ export function CameraTalkWidget({
       });
       if (result) {
         setPreviewStreamDebug(`Lautsprecher ${clamped}%`);
+      }
+    },
+    [callInstarControl]
+  );
+
+  const setLedMode = useCallback(
+    async (enabled: boolean) => {
+      const result = await callInstarControl({
+        cmd: "setlampctrl",
+        "-lampstat": enabled ? "open" : "close",
+      });
+      if (result) {
+        setInstarLedOn(enabled);
+        setPreviewStreamDebug(`LED ${enabled ? "ON" : "OFF"}`);
       }
     },
     [callInstarControl]
@@ -1216,6 +1227,15 @@ export function CameraTalkWidget({
           </Pressable>
         </View>
 
+        <View style={styles.controlColumn}>
+          <Pressable onPress={() => void setLedMode(true)} style={[styles.fullscreenActionButton, instarLedOn === true ? styles.fullscreenAudioActive : null]}>
+            <MaterialCommunityIcons color={instarLedOn === true ? pinnedColor : palette.text} name="led-on" size={18} />
+          </Pressable>
+          <Pressable onPress={() => void setLedMode(false)} style={[styles.fullscreenActionButton, instarLedOn === false ? styles.fullscreenAudioActive : null]}>
+            <MaterialCommunityIcons color={instarLedOn === false ? pinnedColor : palette.text} name="led-off" size={18} />
+          </Pressable>
+        </View>
+
         <View style={styles.volumeColumn}>
           <Pressable onPress={() => void updateSpeakerVolume(instarSpeakerVolume + 5)} style={styles.volumeAdjustBtn}>
             <MaterialCommunityIcons color={palette.text} name="plus" size={16} />
@@ -1270,11 +1290,7 @@ export function CameraTalkWidget({
           </Pressable>
         </View>
       </View>
-      {instarControlBusy ? (
-        <View style={styles.controlBusyBadge}>
-          <Text style={styles.controlBusyText}>INSTAR ...</Text>
-        </View>
-      ) : null}
+      
     </View>
   );
 
@@ -2784,82 +2800,87 @@ const styles = StyleSheet.create({
   },
   fullscreenControlsWrap: {
     position: "absolute",
-    left: 12,
-    right: 12,
-    bottom: 12,
+    left: 16,
+    right: 16,
+    bottom: 16,
     zIndex: 30,
     alignItems: "center",
-    gap: 8,
   },
   fullscreenControlsRow: {
     width: "100%",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 2,
+    paddingHorizontal: 8,
   },
   fullscreenActionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(4, 8, 14, 0.54)",
+    backgroundColor: "rgba(150, 180, 255, 0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(220,235,255,0.32)",
   },
   controlColumn: {
     gap: 6,
     alignItems: "center",
   },
   ptzPad: {
-    width: 86,
-    height: 86,
-    borderRadius: 43,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    backgroundColor: "rgba(160,190,255,0.14)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(220,235,255,0.3)",
   },
   ptzButton: {
     position: "absolute",
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(4, 8, 14, 0.6)",
+    backgroundColor: "rgba(10, 16, 28, 0.65)",
+    borderWidth: 1,
+    borderColor: "rgba(220,235,255,0.24)",
   },
   ptzButtonTop: {
-    top: 2,
-    left: 28,
+    top: 4,
+    left: 34,
   },
   ptzButtonRight: {
-    top: 28,
-    right: 2,
+    top: 34,
+    right: 4,
   },
   ptzButtonBottom: {
-    bottom: 2,
-    left: 28,
+    bottom: 4,
+    left: 34,
   },
   ptzButtonLeft: {
-    top: 28,
-    left: 2,
+    top: 34,
+    left: 4,
   },
   volumeColumn: {
     alignItems: "center",
     gap: 4,
   },
   volumeAdjustBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(4, 8, 14, 0.6)",
+    backgroundColor: "rgba(10, 16, 28, 0.65)",
+    borderWidth: 1,
+    borderColor: "rgba(220,235,255,0.24)",
   },
   volumeTrack: {
-    width: 10,
-    height: 72,
-    borderRadius: 5,
-    backgroundColor: "rgba(255,255,255,0.16)",
+    width: 14,
+    height: 84,
+    borderRadius: 7,
+    backgroundColor: "rgba(220,235,255,0.2)",
     overflow: "hidden",
     justifyContent: "flex-end",
   },
