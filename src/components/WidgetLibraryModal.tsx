@@ -30,8 +30,8 @@ const OPTIONS: Array<{
   },
   {
     type: "cameraTalk",
-    title: "Camera Talk",
-    description: "Eigenes Kamera-Widget mit zusaetzlichem WebRTC-Gegensprechen im Vollbild.",
+    title: "INSTAR Cam",
+    description: "Eigenes INSTAR-Kamera-Widget mit Gegensprechen im Vollbild.",
     icon: "microphone",
   },
   {

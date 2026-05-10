@@ -120,7 +120,7 @@ export function buildWidgetTemplate(
     return {
       id: `camera-talk-${suffix}`,
       type: "cameraTalk",
-      title: `Camera Talk ${suffix}`,
+      title: `INSTAR Cam ${suffix}`,
       titleFontSize: 14,
       previewSourceMode: "snapshot",
       snapshotUrl: "",
