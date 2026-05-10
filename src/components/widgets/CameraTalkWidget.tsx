@@ -97,6 +97,9 @@ export function CameraTalkWidget({
   const instarTalkLastDebugAtRef = useRef(0);
   const ptzHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ptzContinuousRef = useRef<"up" | "right" | "down" | "left" | null>(null);
+  const volumeTrackHeightRef = useRef(84);
+  const volumeDragActiveRef = useRef(false);
+  const volumeLastSentRef = useRef(0);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const titleFontSize = Math.max(11, Math.min(28, Math.round(config.titleFontSize || 14)));
@@ -550,6 +553,20 @@ export function CameraTalkWidget({
       }
     },
     [callInstarControl]
+  );
+
+  const updateSpeakerVolumeDrag = useCallback(
+    async (next: number) => {
+      const clamped = Math.max(1, Math.min(100, Math.round(next)));
+      setInstarSpeakerVolume(clamped);
+      const now = Date.now();
+      if (now - volumeLastSentRef.current < 120) {
+        return;
+      }
+      volumeLastSentRef.current = now;
+      await updateSpeakerVolume(clamped);
+    },
+    [updateSpeakerVolume]
   );
 
   const setLedMode = useCallback(
@@ -1270,7 +1287,34 @@ export function CameraTalkWidget({
           <Pressable onPress={() => void updateSpeakerVolume(instarSpeakerVolume + 5)} style={styles.volumeAdjustBtn}>
             <MaterialCommunityIcons color={palette.text} name="plus" size={16} />
           </Pressable>
-          <View style={styles.volumeTrack}>
+          <View
+            onLayout={(event) => {
+              const h = Math.round(event.nativeEvent.layout.height || 84);
+              volumeTrackHeightRef.current = h > 20 ? h : 84;
+            }}
+            onMoveShouldSetResponder={() => true}
+            onResponderGrant={(event) => {
+              volumeDragActiveRef.current = true;
+              const y = event.nativeEvent.locationY ?? 0;
+              const pct = 100 - (y / volumeTrackHeightRef.current) * 100;
+              void updateSpeakerVolumeDrag(pct);
+            }}
+            onResponderMove={(event) => {
+              if (!volumeDragActiveRef.current) {
+                return;
+              }
+              const y = event.nativeEvent.locationY ?? 0;
+              const pct = 100 - (y / volumeTrackHeightRef.current) * 100;
+              void updateSpeakerVolumeDrag(pct);
+            }}
+            onResponderRelease={() => {
+              volumeDragActiveRef.current = false;
+            }}
+            onResponderTerminate={() => {
+              volumeDragActiveRef.current = false;
+            }}
+            style={styles.volumeTrack}
+          >
             <View style={[styles.volumeFill, { height: `${instarSpeakerVolume}%` }]} />
           </View>
           <Pressable onPress={() => void updateSpeakerVolume(instarSpeakerVolume - 5)} style={styles.volumeAdjustBtn}>
