@@ -374,6 +374,7 @@ async function main(adapter) {
   app.get("/smarthome-dashboard/api/camera-stream", handleCameraStreamProxy);
   app.get("/smarthome-dashboard/api/camera-mjpeg", handleCameraStreamProxy);
   app.post("/smarthome-dashboard/api/instar-talk/start", async (req, res) => {
+    adapter.log.info("[instar-talk] start request received");
     if (!WebSocketClient) {
       res.status(500).json({ error: "ws dependency missing in adapter runtime" });
       return;
@@ -384,6 +385,7 @@ async function main(adapter) {
     const password = String(req.body?.password || "");
     const allowInsecure = req.body?.allowInsecure !== false;
     if (!cameraBaseUrl || !username || !password) {
+      adapter.log.warn("[instar-talk] start rejected: missing cameraBaseUrl/username/password");
       res.status(400).json({ error: "cameraBaseUrl, username, password required" });
       return;
     }
@@ -416,8 +418,10 @@ async function main(adapter) {
         timestamp: invite.initialTimestamp,
         aencFormat: invite.aencFormat || "pcm16",
       });
+      adapter.log.info(`[instar-talk] start ok session=${invite.sessionId} token=${token.slice(0, 8)}... codec=${invite.aencFormat || "pcm16"} frameSize=${invite.frameSize || 640}`);
       res.json({ ok: true, token, frameSize: invite.frameSize || 640 });
     } catch (error) {
+      adapter.log.warn(`[instar-talk] start failed: ${error instanceof Error ? error.message : String(error)}`);
       res.status(500).json({ error: error instanceof Error ? error.message : "INSTAR talk start failed" });
     }
   });
@@ -430,6 +434,7 @@ async function main(adapter) {
     }
     const session = instarTalkSessions.get(token);
     if (!session || !session.ws || session.ws.readyState !== WebSocketClient.OPEN) {
+      adapter.log.warn("[instar-talk] chunk rejected: session not active");
       res.status(404).json({ error: "talk session not active" });
       return;
     }
@@ -463,15 +468,18 @@ async function main(adapter) {
 
       res.json({ ok: true, sent });
     } catch (error) {
+      adapter.log.warn(`[instar-talk] chunk failed: ${error instanceof Error ? error.message : String(error)}`);
       res.status(500).json({ error: error instanceof Error ? error.message : "INSTAR talk chunk failed" });
     }
   });
   app.post("/smarthome-dashboard/api/instar-talk/stop", async (req, res) => {
     const token = String(req.body?.token || "");
     if (!token) {
+      adapter.log.warn("[instar-talk] stop rejected: missing token");
       res.status(400).json({ error: "token required" });
       return;
     }
+    adapter.log.info(`[instar-talk] stop token=${token.slice(0, 8)}...`);
     closeInstarTalkSession(token);
     res.json({ ok: true });
   });
