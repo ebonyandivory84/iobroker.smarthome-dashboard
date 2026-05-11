@@ -417,7 +417,7 @@ export function CameraTalkWidget({
     }
     await stopReolinkTalkback();
     setPreviewStreamDebug("Reolink: Mikrofon wird gestartet...");
-    const source = `${config.id.replace(/[^a-z0-9_-]/gi, "_")}_tb`;
+    const source = cameraSrc;
     reolinkTalkSourceRef.current = source;
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -438,7 +438,7 @@ export function CameraTalkWidget({
     await peer.setLocalDescription(offer);
     await waitForIceGathering(peer, 1400);
 
-    const endpoint = resolveGo2rtcWebrtcEndpoint(talkbackWebrtcUrl, source);
+    const endpoint = resolveGo2rtcWebrtcEndpoint(talkbackWebrtcUrl);
     const localSdp = peer.localDescription?.sdp || offer.sdp;
     if (!localSdp) {
       throw new Error("Reolink: lokales SDP fehlt.");
@@ -3438,7 +3438,7 @@ function resolveGo2rtcStreamsEndpoint(rawUrl: string) {
   return parsed.toString();
 }
 
-function resolveGo2rtcWebrtcEndpoint(rawUrl: string, overrideSrc?: string) {
+function resolveGo2rtcWebrtcEndpoint(rawUrl: string) {
   const parsed = new URL(rawUrl);
   if (/\/stream\.html$/i.test(parsed.pathname)) {
     parsed.pathname = parsed.pathname.replace(/\/stream\.html$/i, "/api/webrtc");
@@ -3453,9 +3453,6 @@ function resolveGo2rtcWebrtcEndpoint(rawUrl: string, overrideSrc?: string) {
     }
     parsed.searchParams.set(key, value);
   });
-  if (overrideSrc) {
-    parsed.searchParams.set("src", overrideSrc);
-  }
   return parsed.toString();
 }
 
