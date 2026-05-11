@@ -168,6 +168,7 @@ export function CameraTalkWidget({
     Platform.OS === "web" && (Boolean(talkbackWebrtcUrl) || instarTalkbackAvailable || reolinkTalkbackAvailable);
   const talkbackControlVisible = Platform.OS === "web";
   const talkbackPushToTalk = config.talkbackPushToTalk !== false;
+  const talkbackPressToHold = talkbackPushToTalk && !reolinkTalkbackAvailable;
   const talkbackShowVideo = config.talkbackAutoEnableVideo === true;
   const talkbackIframeEnabled = Boolean(talkbackWebrtcUrl) && !instarTalkbackAvailable;
   const showInstarControls = instarTalkbackConfigured;
@@ -665,7 +666,7 @@ export function CameraTalkWidget({
       return;
     }
     if (reolinkTalkbackAvailable) {
-      setPreviewStreamDebug("Reolink Talkback aktiv. Mikrofon direkt im eingebetteten go2rtc-Panel drücken.");
+      setPreviewStreamDebug("Reolink Talkback wird aufgebaut...");
       setTalkbackActive(true);
       return;
     }
@@ -714,11 +715,7 @@ export function CameraTalkWidget({
     if (reolinkTalkbackAvailable) {
       const next = !talkbackActive;
       setTalkbackActive(next);
-      setPreviewStreamDebug(
-        next
-          ? "Reolink Talkback aktiv. Mikrofon direkt im eingebetteten go2rtc-Panel drücken."
-          : "Reolink Talkback beendet."
-      );
+      setPreviewStreamDebug(next ? "Reolink Talkback wird aufgebaut..." : "Reolink Talkback beendet.");
       return;
     }
     setTalkbackActive((current) => !current);
@@ -771,7 +768,7 @@ export function CameraTalkWidget({
   }, [fullscreenOpen]);
 
   useEffect(() => {
-    if (Platform.OS !== "web" || !talkbackPushToTalk || !talkbackActive) {
+    if (Platform.OS !== "web" || !talkbackPressToHold || !talkbackActive) {
       return;
     }
     const release = () => disableTalkback();
@@ -783,7 +780,7 @@ export function CameraTalkWidget({
       window.removeEventListener("touchend", release);
       window.removeEventListener("touchcancel", release);
     };
-  }, [disableTalkback, talkbackActive, talkbackPushToTalk]);
+  }, [disableTalkback, talkbackActive, talkbackPressToHold]);
 
   useEffect(() => {
     return () => {
@@ -1439,11 +1436,11 @@ export function CameraTalkWidget({
         <View style={styles.controlColumn}>
           {talkbackControlVisible ? (
             <Pressable
-              onPress={talkbackPushToTalk ? undefined : toggleTalkback}
-              onPressIn={talkbackPushToTalk ? enableTalkback : undefined}
-              onPressOut={talkbackPushToTalk ? disableTalkback : undefined}
-              onTouchEnd={talkbackPushToTalk ? disableTalkback : undefined}
-              onTouchCancel={talkbackPushToTalk ? disableTalkback : undefined}
+              onPress={talkbackPressToHold ? undefined : toggleTalkback}
+              onPressIn={talkbackPressToHold ? enableTalkback : undefined}
+              onPressOut={talkbackPressToHold ? disableTalkback : undefined}
+              onTouchEnd={talkbackPressToHold ? disableTalkback : undefined}
+              onTouchCancel={talkbackPressToHold ? disableTalkback : undefined}
                 style={[
                   styles.fullscreenActionButton,
                   talkbackActive ? styles.fullscreenAudioActive : null,
