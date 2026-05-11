@@ -467,7 +467,8 @@ export function CameraTalkWidget({
     });
 
     const streamRouteUrl = resolveGo2rtcStreamsEndpoint(talkbackWebrtcUrl);
-    const params = new URLSearchParams({ dst: routingDst, src: `webrtc:${source}` });
+    const routeSource = resolveGo2rtcWebsocketSource(talkbackWebrtcUrl, source);
+    const params = new URLSearchParams({ dst: routingDst, src: routeSource });
     let routed = false;
     let lastStatus = 0;
     let lastDetail = "";
@@ -3477,6 +3478,14 @@ function resolveGo2rtcStreamsEndpoint(rawUrl: string) {
   }
   parsed.search = "";
   return parsed.toString();
+}
+
+function resolveGo2rtcWebsocketSource(rawUrl: string, src: string) {
+  const parsed = new URL(rawUrl);
+  const wsProtocol = parsed.protocol === "https:" ? "wss:" : "ws:";
+  const wsUrl = new URL(`${wsProtocol}//${parsed.host}/api/ws`);
+  wsUrl.searchParams.set("src", src);
+  return `webrtc:${wsUrl.toString()}`;
 }
 
 function resolveGo2rtcWebrtcEndpoint(rawUrl: string) {
