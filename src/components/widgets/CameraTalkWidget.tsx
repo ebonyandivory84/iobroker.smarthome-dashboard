@@ -382,8 +382,7 @@ export function CameraTalkWidget({
   const stopReolinkTalkback = useCallback(async () => {
     const source = reolinkTalkSourceRef.current;
     const cameraSrc = getGo2rtcCameraSrc(talkbackWebrtcUrl);
-    const routingDst =
-      buildReolinkBackchannelDst(reolinkBaseUrl, reolinkUsername, reolinkPassword, reolinkChannel) || cameraSrc;
+    const routingDst = cameraSrc;
     if (source && routingDst) {
       const stopUrl = resolveGo2rtcStreamsEndpoint(talkbackWebrtcUrl);
       const params = new URLSearchParams({ dst: routingDst, src: "" });
@@ -402,7 +401,7 @@ export function CameraTalkWidget({
       reolinkTalkStreamRef.current.getTracks().forEach((track) => track.stop());
       reolinkTalkStreamRef.current = null;
     }
-  }, [reolinkBaseUrl, reolinkChannel, reolinkPassword, reolinkUsername, talkbackWebrtcUrl]);
+  }, [talkbackWebrtcUrl]);
 
   const startReolinkTalkback = useCallback(async () => {
     if (Platform.OS !== "web" || !reolinkTalkbackAvailable || !navigator.mediaDevices?.getUserMedia) {
@@ -414,8 +413,7 @@ export function CameraTalkWidget({
       throw new Error("Mikrofon im Browser blockiert (unsicherer Kontext). Bitte ueber HTTPS oder localhost oeffnen.");
     }
     const cameraSrc = getGo2rtcCameraSrc(talkbackWebrtcUrl);
-    const routingDst =
-      buildReolinkBackchannelDst(reolinkBaseUrl, reolinkUsername, reolinkPassword, reolinkChannel) || cameraSrc;
+    const routingDst = cameraSrc;
     if (!cameraSrc) {
       throw new Error("Reolink Talkback URL ohne src-Parameter.");
     }
@@ -476,16 +474,7 @@ export function CameraTalkWidget({
       throw new Error(`Reolink Backchannel-Routing fehlgeschlagen (${routeResponse.status})${routeError ? `: ${routeError}` : ""}.`);
     }
     setPreviewStreamDebug("Reolink Talkback aktiv.");
-  }, [
-    config.id,
-    reolinkBaseUrl,
-    reolinkChannel,
-    reolinkPassword,
-    reolinkTalkbackAvailable,
-    reolinkUsername,
-    stopReolinkTalkback,
-    talkbackWebrtcUrl,
-  ]);
+  }, [config.id, reolinkTalkbackAvailable, stopReolinkTalkback, talkbackWebrtcUrl]);
 
   const startInstarTalkback = useCallback(async () => {
     if (Platform.OS !== "web" || !instarTalkbackAvailable || !navigator.mediaDevices?.getUserMedia) {
