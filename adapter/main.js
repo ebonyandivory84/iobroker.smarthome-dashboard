@@ -28,6 +28,7 @@ let objectEntriesPromise = null;
 let insecureHttpsDispatcher = null;
 let runningAdapter = null;
 const OBJECT_CACHE_TTL_MS = 5 * 60 * 1000;
+const API_JSON_LIMIT = "2mb";
 const CONFIG_STATE_ID = "dashboardConfig";
 const SAVED_DASHBOARDS_STATE_ID = "savedDashboards";
 const LOG_BUFFER_LIMIT = 2000;
@@ -72,7 +73,14 @@ function startAdapter(options) {
 async function main(adapter) {
   runningAdapter = adapter;
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: API_JSON_LIMIT }));
+  app.use((error, _req, res, next) => {
+    if (error?.type === "entity.too.large") {
+      res.status(413).json({ error: `Request entity too large (limit ${API_JSON_LIMIT})` });
+      return;
+    }
+    next(error);
+  });
   const webRoot = resolveWebRoot(adapter);
   const widgetAssetsRoot = path.resolve(__dirname, "..", "assets");
   const devServerUrl =
