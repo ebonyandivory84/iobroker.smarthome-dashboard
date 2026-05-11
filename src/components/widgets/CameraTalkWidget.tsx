@@ -462,7 +462,7 @@ export function CameraTalkWidget({
     });
 
     const streamRouteUrl = resolveGo2rtcStreamsEndpoint(talkbackWebrtcUrl);
-    const params = new URLSearchParams({ dst: cameraSrc, src: source });
+    const params = new URLSearchParams({ dst: cameraSrc, src: `webrtc:${source}` });
     const routeResponse = await fetch(`${streamRouteUrl}?${params.toString()}`, { method: "POST" });
     if (!routeResponse.ok) {
       const routeError = (await routeResponse.text().catch(() => "")).trim().slice(0, 220);
