@@ -35,6 +35,7 @@ let webShellCache = null;
 let logEntriesBuffer = [];
 let logListenerRegistered = false;
 const instarTalkSessions = new Map();
+const reolinkTalkSessions = new Map();
 
 const LOG_LEVEL_ORDER = {
   silly: 0,
@@ -59,6 +60,7 @@ function startAdapter(options) {
           for (const token of instarTalkSessions.keys()) {
             closeInstarTalkSession(token);
           }
+          reolinkTalkSessions.clear();
           callback();
         });
     },
@@ -610,6 +612,36 @@ async function main(adapter) {
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "reolink control failed" });
     }
+  });
+  app.post("/smarthome-dashboard/api/reolink-talk/start", async (req, res) => {
+    const cameraBaseUrl = normalizeUrl(req.body?.cameraBaseUrl);
+    const username = String(req.body?.username || "");
+    const talkbackWebrtcUrl = String(req.body?.talkbackWebrtcUrl || "");
+    if (!cameraBaseUrl || !username || !talkbackWebrtcUrl) {
+      res.status(400).json({ error: "cameraBaseUrl, username and talkbackWebrtcUrl required" });
+      return;
+    }
+    const token = crypto.randomBytes(12).toString("hex");
+    reolinkTalkSessions.set(token, {
+      startedAt: Date.now(),
+      cameraBaseUrl,
+      username,
+      talkbackWebrtcUrl,
+    });
+    adapter.log.info(
+      `[reolink-talk] start ok token=${token.slice(0, 8)}... camera=${sanitizeCameraUrlForLog(cameraBaseUrl)} url=${sanitizeCameraUrlForLog(talkbackWebrtcUrl)}`
+    );
+    res.json({ ok: true, token });
+  });
+  app.post("/smarthome-dashboard/api/reolink-talk/stop", async (req, res) => {
+    const token = String(req.body?.token || "");
+    if (!token) {
+      res.status(400).json({ error: "token required" });
+      return;
+    }
+    const hadSession = reolinkTalkSessions.delete(token);
+    adapter.log.info(`[reolink-talk] stop token=${token.slice(0, 8)}... active=${hadSession ? "yes" : "no"}`);
+    res.json({ ok: true });
   });
 
   app.use("/smarthome-dashboard/widget-assets", express.static(widgetAssetsRoot));

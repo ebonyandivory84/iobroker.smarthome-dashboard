@@ -86,6 +86,7 @@ export function CameraTalkWidget({
   const previewMjpegReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewMjpegReconnectAttemptsRef = useRef(0);
   const instarTalkTokenRef = useRef<string | null>(null);
+  const reolinkTalkTokenRef = useRef<string | null>(null);
   const instarTalkStreamRef = useRef<MediaStream | null>(null);
   const instarTalkAudioContextRef = useRef<AudioContext | null>(null);
   const instarTalkProcessorRef = useRef<ScriptProcessorNode | null>(null);
@@ -373,6 +374,40 @@ export function CameraTalkWidget({
         body: JSON.stringify({ token }),
       }).catch(() => undefined);
     }
+  }, []);
+
+  const startReolinkTalkback = useCallback(async () => {
+    if (!reolinkTalkbackAvailable) {
+      throw new Error("Reolink talkback unavailable");
+    }
+    const response = await fetch("/smarthome-dashboard/api/reolink-talk/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cameraBaseUrl: reolinkBaseUrl,
+        username: reolinkUsername,
+        talkbackWebrtcUrl,
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload?.token) {
+      throw new Error(payload?.error || `Reolink talk start failed (${response.status})`);
+    }
+    reolinkTalkTokenRef.current = String(payload.token);
+    setPreviewStreamDebug("Reolink: Talkback aktiviert.");
+  }, [reolinkBaseUrl, reolinkTalkbackAvailable, reolinkUsername, talkbackWebrtcUrl]);
+
+  const stopReolinkTalkback = useCallback(async () => {
+    const token = reolinkTalkTokenRef.current;
+    reolinkTalkTokenRef.current = null;
+    if (!token) {
+      return;
+    }
+    await fetch("/smarthome-dashboard/api/reolink-talk/stop", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    }).catch(() => undefined);
   }, []);
 
   const startInstarTalkback = useCallback(async () => {
@@ -664,15 +699,38 @@ export function CameraTalkWidget({
         });
       return;
     }
+    if (reolinkTalkbackAvailable) {
+      void startReolinkTalkback()
+        .then(() => setTalkbackActive(true))
+        .catch((error) => {
+          setPreviewStreamDebug(error instanceof Error ? error.message : "Reolink talkback failed");
+          void stopReolinkTalkback();
+          setTalkbackActive(false);
+        });
+      return;
+    }
     setTalkbackActive(true);
-  }, [config.id, config.interactionSounds?.press, instarTalkbackAvailable, startInstarTalkback, stopInstarTalkback, talkbackAvailable]);
+  }, [
+    config.id,
+    config.interactionSounds?.press,
+    instarTalkbackAvailable,
+    reolinkTalkbackAvailable,
+    startInstarTalkback,
+    stopInstarTalkback,
+    startReolinkTalkback,
+    stopReolinkTalkback,
+    talkbackAvailable,
+  ]);
 
   const disableTalkback = useCallback(() => {
     if (instarTalkbackAvailable) {
       void stopInstarTalkback();
     }
+    if (reolinkTalkbackAvailable) {
+      void stopReolinkTalkback();
+    }
     setTalkbackActive(false);
-  }, [instarTalkbackAvailable, stopInstarTalkback]);
+  }, [instarTalkbackAvailable, reolinkTalkbackAvailable, stopInstarTalkback, stopReolinkTalkback]);
 
   const toggleTalkback = useCallback(() => {
     if (!talkbackAvailable) {
@@ -695,8 +753,34 @@ export function CameraTalkWidget({
       }
       return;
     }
+    if (reolinkTalkbackAvailable) {
+      if (talkbackActive) {
+        void stopReolinkTalkback();
+        setTalkbackActive(false);
+      } else {
+        void startReolinkTalkback()
+          .then(() => setTalkbackActive(true))
+          .catch((error) => {
+            setPreviewStreamDebug(error instanceof Error ? error.message : "Reolink talkback failed");
+            void stopReolinkTalkback();
+            setTalkbackActive(false);
+          });
+      }
+      return;
+    }
     setTalkbackActive((current) => !current);
-  }, [config.id, config.interactionSounds?.press, instarTalkbackAvailable, startInstarTalkback, stopInstarTalkback, talkbackActive, talkbackAvailable]);
+  }, [
+    config.id,
+    config.interactionSounds?.press,
+    instarTalkbackAvailable,
+    reolinkTalkbackAvailable,
+    startInstarTalkback,
+    stopInstarTalkback,
+    startReolinkTalkback,
+    stopReolinkTalkback,
+    talkbackActive,
+    talkbackAvailable,
+  ]);
 
   const fullscreenPanResponder = useMemo(
     () =>
@@ -717,8 +801,9 @@ export function CameraTalkWidget({
   useEffect(() => {
     return () => {
       void stopInstarTalkback();
+      void stopReolinkTalkback();
     };
-  }, [stopInstarTalkback]);
+  }, [stopInstarTalkback, stopReolinkTalkback]);
 
   useEffect(() => {
     if (!activeSnapshotBaseUrl) {
