@@ -3482,8 +3482,8 @@ function resolveGo2rtcStreamsEndpoint(rawUrl: string) {
 
 function resolveGo2rtcWebsocketSource(rawUrl: string, src: string) {
   const parsed = new URL(rawUrl);
-  const wsProtocol = parsed.protocol === "https:" ? "wss:" : "ws:";
-  const wsUrl = new URL(`${wsProtocol}//${parsed.host}/api/ws`);
+  const localApiPort = parsed.port && Number(parsed.port) > 0 ? Number(parsed.port) : 11984;
+  const wsUrl = new URL(`ws://127.0.0.1:${localApiPort}/api/ws`);
   wsUrl.searchParams.set("src", src);
   return `webrtc:${wsUrl.toString()}`;
 }
