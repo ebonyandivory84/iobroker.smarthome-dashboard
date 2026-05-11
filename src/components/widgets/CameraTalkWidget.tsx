@@ -3453,9 +3453,10 @@ function buildReolinkBackchannelDst(baseUrl: string, username: string, password:
     const scheme = parsed.protocol === "rtsps:" ? "rtsps" : "rtsp";
     const port = parsed.port ? Number(parsed.port) : 554;
     const safeChannel = Number.isFinite(channel) ? Math.max(0, Math.round(channel)) : 0;
+    const reolinkChannelPath = safeChannel + 1;
     const user = encodeURIComponent(username || "admin");
     const pass = encodeURIComponent(password || "");
-    return `${scheme}://${user}:${pass}@${host}:${port}/h264Preview_${String(safeChannel).padStart(2, "0")}_main#transport=tcp#backchannel=1#audio=pcma`;
+    return `${scheme}://${user}:${pass}@${host}:${port}/h264Preview_${String(reolinkChannelPath).padStart(2, "0")}_main#transport=tcp#backchannel=1#audio=pcma`;
   } catch {
     return "";
   }
