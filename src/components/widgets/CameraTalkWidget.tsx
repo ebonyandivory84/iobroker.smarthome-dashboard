@@ -382,9 +382,11 @@ export function CameraTalkWidget({
   const stopReolinkTalkback = useCallback(async () => {
     const source = reolinkTalkSourceRef.current;
     const cameraSrc = getGo2rtcCameraSrc(talkbackWebrtcUrl);
-    if (source && cameraSrc) {
+    const routingDst =
+      buildReolinkBackchannelDst(reolinkBaseUrl, reolinkUsername, reolinkPassword, reolinkChannel) || cameraSrc;
+    if (source && routingDst) {
       const stopUrl = resolveGo2rtcStreamsEndpoint(talkbackWebrtcUrl);
-      const params = new URLSearchParams({ dst: cameraSrc, src: "" });
+      const params = new URLSearchParams({ dst: routingDst, src: "" });
       await fetch(`${stopUrl}?${params.toString()}`, { method: "POST" }).catch(() => undefined);
     }
     reolinkTalkSourceRef.current = null;
@@ -400,7 +402,7 @@ export function CameraTalkWidget({
       reolinkTalkStreamRef.current.getTracks().forEach((track) => track.stop());
       reolinkTalkStreamRef.current = null;
     }
-  }, [talkbackWebrtcUrl]);
+  }, [reolinkBaseUrl, reolinkChannel, reolinkPassword, reolinkUsername, talkbackWebrtcUrl]);
 
   const startReolinkTalkback = useCallback(async () => {
     if (Platform.OS !== "web" || !reolinkTalkbackAvailable || !navigator.mediaDevices?.getUserMedia) {
@@ -412,8 +414,13 @@ export function CameraTalkWidget({
       throw new Error("Mikrofon im Browser blockiert (unsicherer Kontext). Bitte ueber HTTPS oder localhost oeffnen.");
     }
     const cameraSrc = getGo2rtcCameraSrc(talkbackWebrtcUrl);
+    const routingDst =
+      buildReolinkBackchannelDst(reolinkBaseUrl, reolinkUsername, reolinkPassword, reolinkChannel) || cameraSrc;
     if (!cameraSrc) {
       throw new Error("Reolink Talkback URL ohne src-Parameter.");
+    }
+    if (!routingDst) {
+      throw new Error("Reolink Backchannel-Ziel fehlt.");
     }
     await stopReolinkTalkback();
     setPreviewStreamDebug("Reolink: Mikrofon wird gestartet...");
@@ -462,14 +469,23 @@ export function CameraTalkWidget({
     });
 
     const streamRouteUrl = resolveGo2rtcStreamsEndpoint(talkbackWebrtcUrl);
-    const params = new URLSearchParams({ dst: cameraSrc, src: `webrtc:${source}` });
+    const params = new URLSearchParams({ dst: routingDst, src: `webrtc:${source}` });
     const routeResponse = await fetch(`${streamRouteUrl}?${params.toString()}`, { method: "POST" });
     if (!routeResponse.ok) {
       const routeError = (await routeResponse.text().catch(() => "")).trim().slice(0, 220);
       throw new Error(`Reolink Backchannel-Routing fehlgeschlagen (${routeResponse.status})${routeError ? `: ${routeError}` : ""}.`);
     }
     setPreviewStreamDebug("Reolink Talkback aktiv.");
-  }, [config.id, reolinkTalkbackAvailable, stopReolinkTalkback, talkbackWebrtcUrl]);
+  }, [
+    config.id,
+    reolinkBaseUrl,
+    reolinkChannel,
+    reolinkPassword,
+    reolinkTalkbackAvailable,
+    reolinkUsername,
+    stopReolinkTalkback,
+    talkbackWebrtcUrl,
+  ]);
 
   const startInstarTalkback = useCallback(async () => {
     if (Platform.OS !== "web" || !instarTalkbackAvailable || !navigator.mediaDevices?.getUserMedia) {
@@ -3422,6 +3438,24 @@ function getGo2rtcCameraSrc(rawUrl: string) {
   try {
     const parsed = new URL(rawUrl);
     return parsed.searchParams.get("src") || "";
+  } catch {
+    return "";
+  }
+}
+
+function buildReolinkBackchannelDst(baseUrl: string, username: string, password: string, channel: number) {
+  try {
+    const parsed = new URL(baseUrl);
+    const host = parsed.hostname;
+    if (!host) {
+      return "";
+    }
+    const scheme = parsed.protocol === "rtsps:" ? "rtsps" : "rtsp";
+    const port = parsed.port ? Number(parsed.port) : 554;
+    const safeChannel = Number.isFinite(channel) ? Math.max(0, Math.round(channel)) : 0;
+    const user = encodeURIComponent(username || "admin");
+    const pass = encodeURIComponent(password || "");
+    return `${scheme}://${user}:${pass}@${host}:${port}/h264Preview_${String(safeChannel).padStart(2, "0")}_main#transport=tcp#backchannel=1#audio=pcma`;
   } catch {
     return "";
   }
