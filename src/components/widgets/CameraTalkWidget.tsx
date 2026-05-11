@@ -438,7 +438,8 @@ export function CameraTalkWidget({
     });
     const answerSdp = await response.text();
     if (!response.ok || !answerSdp.trim()) {
-      throw new Error(`Reolink WebRTC Handshake fehlgeschlagen (${response.status}).`);
+      const detail = (answerSdp || "").trim().slice(0, 220);
+      throw new Error(`Reolink WebRTC Handshake fehlgeschlagen (${response.status})${detail ? `: ${detail}` : ""}.`);
     }
     await peer.setRemoteDescription({
       type: "answer",
@@ -3401,11 +3402,14 @@ function resolveGo2rtcWebrtcEndpoint(rawUrl: string) {
   } else if (!/\/api\/webrtc$/i.test(parsed.pathname)) {
     parsed.pathname = parsed.pathname.replace(/\/+$/, "") + "/api/webrtc";
   }
-  const src = parsed.searchParams.get("src");
+  const query = new URLSearchParams(parsed.search);
   parsed.search = "";
-  if (src) {
-    parsed.searchParams.set("src", src);
-  }
+  query.forEach((value, key) => {
+    if (!key || key.toLowerCase() === "mode") {
+      return;
+    }
+    parsed.searchParams.set(key, value);
+  });
   return parsed.toString();
 }
 
