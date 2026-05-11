@@ -170,6 +170,8 @@ export function CameraTalkWidget({
   const talkbackPushToTalk = config.talkbackPushToTalk !== false;
   const talkbackPressToHold = talkbackPushToTalk && !reolinkTalkbackAvailable;
   const talkbackShowVideo = config.talkbackAutoEnableVideo === true;
+  const talkbackIframeNeedsInteraction = reolinkTalkbackAvailable;
+  const effectiveTalkbackShowVideo = talkbackShowVideo || talkbackIframeNeedsInteraction;
   const talkbackIframeEnabled = Boolean(talkbackWebrtcUrl) && !instarTalkbackAvailable;
   const showInstarControls = instarTalkbackConfigured;
   const showReolinkControls = reolinkTalkbackConfigured;
@@ -666,7 +668,13 @@ export function CameraTalkWidget({
       return;
     }
     if (reolinkTalkbackAvailable) {
-      setPreviewStreamDebug("Reolink Talkback wird aufgebaut...");
+      const secureContextAllowed =
+        typeof window === "undefined" ? true : window.isSecureContext || window.location.hostname === "localhost";
+      setPreviewStreamDebug(
+        secureContextAllowed
+          ? "Reolink Talkback aktiv. Im Mini-Panel das Mikrofon starten."
+          : "Mikrofon im Browser blockiert (unsicherer Kontext). Bitte ueber HTTPS oder localhost oeffnen."
+      );
       setTalkbackActive(true);
       return;
     }
@@ -714,8 +722,16 @@ export function CameraTalkWidget({
     }
     if (reolinkTalkbackAvailable) {
       const next = !talkbackActive;
+      const secureContextAllowed =
+        typeof window === "undefined" ? true : window.isSecureContext || window.location.hostname === "localhost";
       setTalkbackActive(next);
-      setPreviewStreamDebug(next ? "Reolink Talkback wird aufgebaut..." : "Reolink Talkback beendet.");
+      setPreviewStreamDebug(
+        !next
+          ? "Reolink Talkback beendet."
+          : secureContextAllowed
+            ? "Reolink Talkback aktiv. Im Mini-Panel das Mikrofon starten."
+            : "Mikrofon im Browser blockiert (unsicherer Kontext). Bitte ueber HTTPS oder localhost oeffnen."
+      );
       return;
     }
     setTalkbackActive((current) => !current);
@@ -1678,7 +1694,7 @@ export function CameraTalkWidget({
               ? createElement("iframe", {
                   allow: "autoplay; microphone; camera",
                   src: talkbackWebrtcUrl,
-                  style: talkbackShowVideo ? webTalkbackVisibleStyle : webTalkbackBridgeStyle,
+                  style: effectiveTalkbackShowVideo ? webTalkbackVisibleStyle : webTalkbackBridgeStyle,
                   title: `${config.title || "camera-talk"}-talkback`,
                 })
               : null}
@@ -1709,7 +1725,7 @@ export function CameraTalkWidget({
             ? createElement("iframe", {
                 allow: "autoplay; microphone; camera",
                 src: talkbackWebrtcUrl,
-                style: talkbackShowVideo ? webTalkbackVisibleStyle : webTalkbackBridgeStyle,
+                style: effectiveTalkbackShowVideo ? webTalkbackVisibleStyle : webTalkbackBridgeStyle,
                 title: `${config.title || "camera-talk"}-talkback`,
               })
             : null}
