@@ -95,6 +95,8 @@ export function CameraTalkWidget({
   const instarTalkQueueBytesRef = useRef(0);
   const instarTalkSentBytesRef = useRef(0);
   const instarTalkLastDebugAtRef = useRef(0);
+  const reolinkTalkPeerRef = useRef<RTCPeerConnection | null>(null);
+  const reolinkTalkStreamRef = useRef<MediaStream | null>(null);
   const ptzHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ptzContinuousRef = useRef<"up" | "right" | "down" | "left" | null>(null);
   const volumeTrackHeightRef = useRef(84);
@@ -170,9 +172,7 @@ export function CameraTalkWidget({
   const talkbackPushToTalk = config.talkbackPushToTalk !== false;
   const talkbackPressToHold = talkbackPushToTalk && !reolinkTalkbackAvailable;
   const talkbackShowVideo = config.talkbackAutoEnableVideo === true;
-  const talkbackIframeNeedsInteraction = reolinkTalkbackAvailable;
-  const effectiveTalkbackShowVideo = talkbackShowVideo || talkbackIframeNeedsInteraction;
-  const talkbackIframeEnabled = Boolean(talkbackWebrtcUrl) && !instarTalkbackAvailable;
+  const talkbackIframeEnabled = Boolean(talkbackWebrtcUrl) && !instarTalkbackAvailable && !reolinkTalkbackAvailable;
   const showInstarControls = instarTalkbackConfigured;
   const showReolinkControls = reolinkTalkbackConfigured;
   const activeFeed = previewFeed;
@@ -377,6 +377,75 @@ export function CameraTalkWidget({
       }).catch(() => undefined);
     }
   }, []);
+
+  const stopReolinkTalkback = useCallback(async () => {
+    if (reolinkTalkPeerRef.current) {
+      try {
+        reolinkTalkPeerRef.current.close();
+      } catch {
+        // Ignore best-effort close errors.
+      }
+      reolinkTalkPeerRef.current = null;
+    }
+    if (reolinkTalkStreamRef.current) {
+      reolinkTalkStreamRef.current.getTracks().forEach((track) => track.stop());
+      reolinkTalkStreamRef.current = null;
+    }
+  }, []);
+
+  const startReolinkTalkback = useCallback(async () => {
+    if (Platform.OS !== "web" || !reolinkTalkbackAvailable || !navigator.mediaDevices?.getUserMedia) {
+      throw new Error("Reolink talkback unavailable");
+    }
+    const secureContextAllowed =
+      typeof window === "undefined" ? true : window.isSecureContext || window.location.hostname === "localhost";
+    if (!secureContextAllowed) {
+      throw new Error("Mikrofon im Browser blockiert (unsicherer Kontext). Bitte ueber HTTPS oder localhost oeffnen.");
+    }
+    await stopReolinkTalkback();
+    setPreviewStreamDebug("Reolink: Mikrofon wird gestartet...");
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: true,
+      },
+      video: false,
+    });
+    reolinkTalkStreamRef.current = stream;
+    const peer = new RTCPeerConnection();
+    reolinkTalkPeerRef.current = peer;
+    stream.getAudioTracks().forEach((track) => peer.addTrack(track, stream));
+    const offer = await peer.createOffer({
+      offerToReceiveAudio: false,
+      offerToReceiveVideo: false,
+    });
+    await peer.setLocalDescription(offer);
+    await waitForIceGathering(peer, 1800);
+
+    const endpoint = resolveGo2rtcWebrtcEndpoint(talkbackWebrtcUrl);
+    const localSdp = peer.localDescription?.sdp || offer.sdp;
+    if (!localSdp) {
+      throw new Error("Reolink: lokales SDP fehlt.");
+    }
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/sdp",
+        Accept: "application/sdp, text/plain, */*",
+      },
+      body: localSdp,
+    });
+    const answerSdp = await response.text();
+    if (!response.ok || !answerSdp.trim()) {
+      throw new Error(`Reolink WebRTC Handshake fehlgeschlagen (${response.status}).`);
+    }
+    await peer.setRemoteDescription({
+      type: "answer",
+      sdp: answerSdp,
+    });
+    setPreviewStreamDebug("Reolink Talkback aktiv.");
+  }, [reolinkTalkbackAvailable, stopReolinkTalkback, talkbackWebrtcUrl]);
 
   const startInstarTalkback = useCallback(async () => {
     if (Platform.OS !== "web" || !instarTalkbackAvailable || !navigator.mediaDevices?.getUserMedia) {
@@ -668,14 +737,13 @@ export function CameraTalkWidget({
       return;
     }
     if (reolinkTalkbackAvailable) {
-      const secureContextAllowed =
-        typeof window === "undefined" ? true : window.isSecureContext || window.location.hostname === "localhost";
-      setPreviewStreamDebug(
-        secureContextAllowed
-          ? "Reolink Talkback aktiv. Im Mini-Panel das Mikrofon starten."
-          : "Mikrofon im Browser blockiert (unsicherer Kontext). Bitte ueber HTTPS oder localhost oeffnen."
-      );
-      setTalkbackActive(true);
+      void startReolinkTalkback()
+        .then(() => setTalkbackActive(true))
+        .catch((error) => {
+          setPreviewStreamDebug(error instanceof Error ? error.message : "Reolink talkback failed");
+          void stopReolinkTalkback();
+          setTalkbackActive(false);
+        });
       return;
     }
     setTalkbackActive(true);
@@ -686,6 +754,8 @@ export function CameraTalkWidget({
     reolinkTalkbackAvailable,
     startInstarTalkback,
     stopInstarTalkback,
+    startReolinkTalkback,
+    stopReolinkTalkback,
     talkbackAvailable,
   ]);
 
@@ -694,10 +764,11 @@ export function CameraTalkWidget({
       void stopInstarTalkback();
     }
     if (reolinkTalkbackAvailable) {
+      void stopReolinkTalkback();
       setPreviewStreamDebug("Reolink Talkback beendet.");
     }
     setTalkbackActive(false);
-  }, [instarTalkbackAvailable, reolinkTalkbackAvailable, stopInstarTalkback]);
+  }, [instarTalkbackAvailable, reolinkTalkbackAvailable, stopInstarTalkback, stopReolinkTalkback]);
 
   const toggleTalkback = useCallback(() => {
     if (!talkbackAvailable) {
@@ -721,17 +792,19 @@ export function CameraTalkWidget({
       return;
     }
     if (reolinkTalkbackAvailable) {
-      const next = !talkbackActive;
-      const secureContextAllowed =
-        typeof window === "undefined" ? true : window.isSecureContext || window.location.hostname === "localhost";
-      setTalkbackActive(next);
-      setPreviewStreamDebug(
-        !next
-          ? "Reolink Talkback beendet."
-          : secureContextAllowed
-            ? "Reolink Talkback aktiv. Im Mini-Panel das Mikrofon starten."
-            : "Mikrofon im Browser blockiert (unsicherer Kontext). Bitte ueber HTTPS oder localhost oeffnen."
-      );
+      if (talkbackActive) {
+        void stopReolinkTalkback();
+        setTalkbackActive(false);
+        setPreviewStreamDebug("Reolink Talkback beendet.");
+      } else {
+        void startReolinkTalkback()
+          .then(() => setTalkbackActive(true))
+          .catch((error) => {
+            setPreviewStreamDebug(error instanceof Error ? error.message : "Reolink talkback failed");
+            void stopReolinkTalkback();
+            setTalkbackActive(false);
+          });
+      }
       return;
     }
     setTalkbackActive((current) => !current);
@@ -740,6 +813,8 @@ export function CameraTalkWidget({
     config.interactionSounds?.press,
     instarTalkbackAvailable,
     reolinkTalkbackAvailable,
+    startReolinkTalkback,
+    stopReolinkTalkback,
     startInstarTalkback,
     stopInstarTalkback,
     talkbackActive,
@@ -765,8 +840,9 @@ export function CameraTalkWidget({
   useEffect(() => {
     return () => {
       void stopInstarTalkback();
+      void stopReolinkTalkback();
     };
-  }, [stopInstarTalkback]);
+  }, [stopInstarTalkback, stopReolinkTalkback]);
 
   useEffect(() => {
     if (!activeSnapshotBaseUrl) {
@@ -1694,7 +1770,7 @@ export function CameraTalkWidget({
               ? createElement("iframe", {
                   allow: "autoplay; microphone; camera",
                   src: talkbackWebrtcUrl,
-                  style: effectiveTalkbackShowVideo ? webTalkbackVisibleStyle : webTalkbackBridgeStyle,
+                  style: talkbackShowVideo ? webTalkbackVisibleStyle : webTalkbackBridgeStyle,
                   title: `${config.title || "camera-talk"}-talkback`,
                 })
               : null}
@@ -1725,7 +1801,7 @@ export function CameraTalkWidget({
             ? createElement("iframe", {
                 allow: "autoplay; microphone; camera",
                 src: talkbackWebrtcUrl,
-                style: effectiveTalkbackShowVideo ? webTalkbackVisibleStyle : webTalkbackBridgeStyle,
+                style: talkbackShowVideo ? webTalkbackVisibleStyle : webTalkbackBridgeStyle,
                 title: `${config.title || "camera-talk"}-talkback`,
               })
             : null}
@@ -3316,6 +3392,46 @@ function getTouchMidpoint(touches: ArrayLike<{ pageX?: number; pageY?: number }>
     return null;
   }
   return { x, y };
+}
+
+function resolveGo2rtcWebrtcEndpoint(rawUrl: string) {
+  const parsed = new URL(rawUrl);
+  if (/\/stream\.html$/i.test(parsed.pathname)) {
+    parsed.pathname = parsed.pathname.replace(/\/stream\.html$/i, "/api/webrtc");
+  } else if (!/\/api\/webrtc$/i.test(parsed.pathname)) {
+    parsed.pathname = parsed.pathname.replace(/\/+$/, "") + "/api/webrtc";
+  }
+  const src = parsed.searchParams.get("src");
+  parsed.search = "";
+  if (src) {
+    parsed.searchParams.set("src", src);
+  }
+  return parsed.toString();
+}
+
+function waitForIceGathering(peer: RTCPeerConnection, timeoutMs: number) {
+  if (peer.iceGatheringState === "complete") {
+    return Promise.resolve();
+  }
+  return new Promise<void>((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) {
+        return;
+      }
+      done = true;
+      clearTimeout(timer);
+      peer.removeEventListener("icegatheringstatechange", onChange);
+      resolve();
+    };
+    const onChange = () => {
+      if (peer.iceGatheringState === "complete") {
+        finish();
+      }
+    };
+    const timer = setTimeout(finish, Math.max(300, timeoutMs));
+    peer.addEventListener("icegatheringstatechange", onChange);
+  });
 }
 
 const baseWebLayerStyle = {
