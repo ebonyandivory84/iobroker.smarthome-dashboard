@@ -468,10 +468,27 @@ export function CameraTalkWidget({
 
     const streamRouteUrl = resolveGo2rtcStreamsEndpoint(talkbackWebrtcUrl);
     const params = new URLSearchParams({ dst: routingDst, src: `webrtc:${source}` });
-    const routeResponse = await fetch(`${streamRouteUrl}?${params.toString()}`, { method: "POST" });
-    if (!routeResponse.ok) {
-      const routeError = (await routeResponse.text().catch(() => "")).trim().slice(0, 220);
-      throw new Error(`Reolink Backchannel-Routing fehlgeschlagen (${routeResponse.status})${routeError ? `: ${routeError}` : ""}.`);
+    let routed = false;
+    let lastStatus = 0;
+    let lastDetail = "";
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const routeResponse = await fetch(`${streamRouteUrl}?${params.toString()}`, { method: "POST" });
+      const routeText = (await routeResponse.text().catch(() => "")).trim();
+      if (routeResponse.ok) {
+        routed = true;
+        break;
+      }
+      lastStatus = routeResponse.status;
+      lastDetail = routeText.slice(0, 220);
+      if (!/can't find consumer/i.test(routeText)) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 180));
+    }
+    if (!routed) {
+      throw new Error(
+        `Reolink Backchannel-Routing fehlgeschlagen (${lastStatus || 500})${lastDetail ? `: ${lastDetail}` : ""}.`
+      );
     }
     setPreviewStreamDebug("Reolink Talkback aktiv.");
   }, [config.id, reolinkTalkbackAvailable, stopReolinkTalkback, talkbackWebrtcUrl]);
