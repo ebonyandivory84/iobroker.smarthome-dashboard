@@ -95,7 +95,9 @@ export function CameraTalkWidget({
   const instarTalkQueueBytesRef = useRef(0);
   const instarTalkSentBytesRef = useRef(0);
   const instarTalkLastDebugAtRef = useRef(0);
-  const reolinkTalkWindowRef = useRef<Window | null>(null);
+  const reolinkTalkPeerRef = useRef<RTCPeerConnection | null>(null);
+  const reolinkTalkStreamRef = useRef<MediaStream | null>(null);
+  const reolinkTalkSourceRef = useRef<string | null>(null);
   const ptzHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ptzContinuousRef = useRef<"up" | "right" | "down" | "left" | null>(null);
   const volumeTrackHeightRef = useRef(84);
@@ -378,27 +380,95 @@ export function CameraTalkWidget({
   }, []);
 
   const stopReolinkTalkback = useCallback(async () => {
-    if (reolinkTalkWindowRef.current && !reolinkTalkWindowRef.current.closed) {
-      reolinkTalkWindowRef.current.close();
+    const source = reolinkTalkSourceRef.current;
+    const cameraSrc = getGo2rtcCameraSrc(talkbackWebrtcUrl);
+    if (source && cameraSrc) {
+      const stopUrl = resolveGo2rtcStreamsEndpoint(talkbackWebrtcUrl);
+      const params = new URLSearchParams({ dst: cameraSrc, src: "" });
+      await fetch(`${stopUrl}?${params.toString()}`, { method: "POST" }).catch(() => undefined);
     }
-    reolinkTalkWindowRef.current = null;
-  }, []);
+    reolinkTalkSourceRef.current = null;
+    if (reolinkTalkPeerRef.current) {
+      try {
+        reolinkTalkPeerRef.current.close();
+      } catch {
+        // Ignore best-effort close errors.
+      }
+      reolinkTalkPeerRef.current = null;
+    }
+    if (reolinkTalkStreamRef.current) {
+      reolinkTalkStreamRef.current.getTracks().forEach((track) => track.stop());
+      reolinkTalkStreamRef.current = null;
+    }
+  }, [talkbackWebrtcUrl]);
 
   const startReolinkTalkback = useCallback(async () => {
-    if (Platform.OS !== "web" || !reolinkTalkbackAvailable) {
+    if (Platform.OS !== "web" || !reolinkTalkbackAvailable || !navigator.mediaDevices?.getUserMedia) {
       throw new Error("Reolink talkback unavailable");
     }
-    await stopReolinkTalkback();
-    const popup = window.open(
-      talkbackWebrtcUrl,
-      `${config.id}-reolink-talkback`,
-      "popup=yes,width=520,height=360,menubar=no,toolbar=no,location=yes,status=no,resizable=yes,scrollbars=yes"
-    );
-    if (!popup) {
-      throw new Error("Popup blockiert. Bitte Popups fuer diese Seite erlauben.");
+    const secureContextAllowed =
+      typeof window === "undefined" ? true : window.isSecureContext || window.location.hostname === "localhost";
+    if (!secureContextAllowed) {
+      throw new Error("Mikrofon im Browser blockiert (unsicherer Kontext). Bitte ueber HTTPS oder localhost oeffnen.");
     }
-    reolinkTalkWindowRef.current = popup;
-    setPreviewStreamDebug("Reolink Talkback-Fenster geoeffnet. Mikrofon dort aktivieren.");
+    const cameraSrc = getGo2rtcCameraSrc(talkbackWebrtcUrl);
+    if (!cameraSrc) {
+      throw new Error("Reolink Talkback URL ohne src-Parameter.");
+    }
+    await stopReolinkTalkback();
+    setPreviewStreamDebug("Reolink: Mikrofon wird gestartet...");
+    const source = `${config.id.replace(/[^a-z0-9_-]/gi, "_")}_tb`;
+    reolinkTalkSourceRef.current = source;
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: true,
+      },
+      video: false,
+    });
+    reolinkTalkStreamRef.current = stream;
+    const peer = new RTCPeerConnection();
+    reolinkTalkPeerRef.current = peer;
+    stream.getAudioTracks().forEach((track) => peer.addTrack(track, stream));
+    const offer = await peer.createOffer({
+      offerToReceiveAudio: false,
+      offerToReceiveVideo: false,
+    });
+    await peer.setLocalDescription(offer);
+    await waitForIceGathering(peer, 1400);
+
+    const endpoint = resolveGo2rtcWebrtcEndpoint(talkbackWebrtcUrl, source);
+    const localSdp = peer.localDescription?.sdp || offer.sdp;
+    if (!localSdp) {
+      throw new Error("Reolink: lokales SDP fehlt.");
+    }
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/sdp",
+        Accept: "application/sdp, text/plain, */*",
+      },
+      body: localSdp,
+    });
+    const answerSdp = await response.text();
+    if (!response.ok || !answerSdp.trim()) {
+      const detail = (answerSdp || "").trim().slice(0, 220);
+      throw new Error(`Reolink WebRTC Handshake fehlgeschlagen (${response.status})${detail ? `: ${detail}` : ""}.`);
+    }
+    await peer.setRemoteDescription({
+      type: "answer",
+      sdp: answerSdp,
+    });
+
+    const streamRouteUrl = resolveGo2rtcStreamsEndpoint(talkbackWebrtcUrl);
+    const params = new URLSearchParams({ dst: cameraSrc, src: source });
+    const routeResponse = await fetch(`${streamRouteUrl}?${params.toString()}`, { method: "POST" });
+    if (!routeResponse.ok) {
+      const routeError = (await routeResponse.text().catch(() => "")).trim().slice(0, 220);
+      throw new Error(`Reolink Backchannel-Routing fehlgeschlagen (${routeResponse.status})${routeError ? `: ${routeError}` : ""}.`);
+    }
+    setPreviewStreamDebug("Reolink Talkback aktiv.");
   }, [config.id, reolinkTalkbackAvailable, stopReolinkTalkback, talkbackWebrtcUrl]);
 
   const startInstarTalkback = useCallback(async () => {
@@ -3348,7 +3418,27 @@ function getTouchMidpoint(touches: ArrayLike<{ pageX?: number; pageY?: number }>
   return { x, y };
 }
 
-function resolveGo2rtcWebrtcEndpoint(rawUrl: string) {
+function getGo2rtcCameraSrc(rawUrl: string) {
+  try {
+    const parsed = new URL(rawUrl);
+    return parsed.searchParams.get("src") || "";
+  } catch {
+    return "";
+  }
+}
+
+function resolveGo2rtcStreamsEndpoint(rawUrl: string) {
+  const parsed = new URL(rawUrl);
+  if (/\/stream\.html$/i.test(parsed.pathname)) {
+    parsed.pathname = parsed.pathname.replace(/\/stream\.html$/i, "/api/streams");
+  } else if (!/\/api\/streams$/i.test(parsed.pathname)) {
+    parsed.pathname = parsed.pathname.replace(/\/+$/, "") + "/api/streams";
+  }
+  parsed.search = "";
+  return parsed.toString();
+}
+
+function resolveGo2rtcWebrtcEndpoint(rawUrl: string, overrideSrc?: string) {
   const parsed = new URL(rawUrl);
   if (/\/stream\.html$/i.test(parsed.pathname)) {
     parsed.pathname = parsed.pathname.replace(/\/stream\.html$/i, "/api/webrtc");
@@ -3363,7 +3453,35 @@ function resolveGo2rtcWebrtcEndpoint(rawUrl: string) {
     }
     parsed.searchParams.set(key, value);
   });
+  if (overrideSrc) {
+    parsed.searchParams.set("src", overrideSrc);
+  }
   return parsed.toString();
+}
+
+function waitForIceGathering(peer: RTCPeerConnection, timeoutMs: number) {
+  if (peer.iceGatheringState === "complete") {
+    return Promise.resolve();
+  }
+  return new Promise<void>((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) {
+        return;
+      }
+      done = true;
+      clearTimeout(timer);
+      peer.removeEventListener("icegatheringstatechange", onChange);
+      resolve();
+    };
+    const onChange = () => {
+      if (peer.iceGatheringState === "complete") {
+        finish();
+      }
+    };
+    const timer = setTimeout(finish, Math.max(300, timeoutMs));
+    peer.addEventListener("icegatheringstatechange", onChange);
+  });
 }
 
 const baseWebLayerStyle = {
