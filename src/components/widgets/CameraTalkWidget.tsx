@@ -98,6 +98,7 @@ export function CameraTalkWidget({
   const instarTalkLastDebugAtRef = useRef(0);
   const ptzHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ptzContinuousRef = useRef<"up" | "right" | "down" | "left" | null>(null);
+  const reolinkTalkWindowRef = useRef<Window | null>(null);
   const volumeTrackHeightRef = useRef(84);
   const volumeDragActiveRef = useRef(false);
   const volumeLastSentRef = useRef(0);
@@ -170,7 +171,7 @@ export function CameraTalkWidget({
   const talkbackControlVisible = Platform.OS === "web";
   const talkbackPushToTalk = config.talkbackPushToTalk !== false;
   const talkbackShowVideo = config.talkbackAutoEnableVideo === true;
-  const talkbackIframeEnabled = Boolean(talkbackWebrtcUrl) && !instarTalkbackAvailable;
+  const talkbackIframeEnabled = Boolean(talkbackWebrtcUrl) && !instarTalkbackAvailable && !reolinkTalkbackAvailable;
   const showInstarControls = instarTalkbackConfigured;
   const showReolinkControls = reolinkTalkbackConfigured;
   const activeFeed = previewFeed;
@@ -394,8 +395,19 @@ export function CameraTalkWidget({
       throw new Error(payload?.error || `Reolink talk start failed (${response.status})`);
     }
     reolinkTalkTokenRef.current = String(payload.token);
+    if (Platform.OS === "web" && talkbackWebrtcUrl) {
+      const popup = window.open(
+        talkbackWebrtcUrl,
+        `reolink-talk-${config.id}`,
+        "popup=yes,width=480,height=320,noopener,noreferrer"
+      );
+      if (!popup) {
+        throw new Error("Reolink Talkback Popup blockiert. Bitte Popups erlauben.");
+      }
+      reolinkTalkWindowRef.current = popup;
+    }
     setPreviewStreamDebug("Reolink: Talkback aktiviert.");
-  }, [reolinkBaseUrl, reolinkTalkbackAvailable, reolinkUsername, talkbackWebrtcUrl]);
+  }, [config.id, reolinkBaseUrl, reolinkTalkbackAvailable, reolinkUsername, talkbackWebrtcUrl]);
 
   const stopReolinkTalkback = useCallback(async () => {
     const token = reolinkTalkTokenRef.current;
@@ -408,6 +420,13 @@ export function CameraTalkWidget({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
     }).catch(() => undefined);
+    const popup = reolinkTalkWindowRef.current;
+    reolinkTalkWindowRef.current = null;
+    try {
+      popup?.close();
+    } catch {
+      // ignore
+    }
   }, []);
 
   const startInstarTalkback = useCallback(async () => {
