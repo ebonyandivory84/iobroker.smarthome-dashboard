@@ -427,15 +427,21 @@ export function CameraTalkWidget({
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         channelCount: 1,
-        echoCancellation: true,
-        noiseSuppression: true,
+        sampleRate: 48000,
+        sampleSize: 16,
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
       },
       video: false,
     });
     reolinkTalkStreamRef.current = stream;
     const peer = new RTCPeerConnection();
     reolinkTalkPeerRef.current = peer;
-    stream.getAudioTracks().forEach((track) => peer.addTrack(track, stream));
+    stream.getAudioTracks().forEach((track) => {
+      track.contentHint = "speech";
+      peer.addTrack(track, stream);
+    });
     const offer = await peer.createOffer({
       offerToReceiveAudio: false,
       offerToReceiveVideo: false,
