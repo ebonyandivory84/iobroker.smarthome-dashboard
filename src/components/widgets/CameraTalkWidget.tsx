@@ -441,7 +441,7 @@ export function CameraTalkWidget({
       offerToReceiveVideo: false,
     });
     await peer.setLocalDescription(offer);
-    await waitForIceGathering(peer, 1400);
+    await waitForIceGathering(peer, 450);
 
     const endpoint = resolveGo2rtcWebrtcEndpoint(talkbackWebrtcUrl);
     const localSdp = peer.localDescription?.sdp || offer.sdp;
@@ -472,7 +472,7 @@ export function CameraTalkWidget({
     let routed = false;
     let lastStatus = 0;
     let lastDetail = "";
-    for (let attempt = 0; attempt < 8; attempt += 1) {
+    for (let attempt = 0; attempt < 4; attempt += 1) {
       const routeResponse = await fetch(`${streamRouteUrl}?${params.toString()}`, { method: "POST" });
       const routeText = (await routeResponse.text().catch(() => "")).trim();
       if (routeResponse.ok) {
@@ -484,7 +484,7 @@ export function CameraTalkWidget({
       if (!/can't find consumer/i.test(routeText)) {
         break;
       }
-      await new Promise((resolve) => setTimeout(resolve, 180));
+      await new Promise((resolve) => setTimeout(resolve, 90));
     }
     if (!routed) {
       throw new Error(
