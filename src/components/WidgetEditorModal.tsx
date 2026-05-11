@@ -1839,88 +1839,96 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                           onSelect={(value) => setDraft((current) => ({ ...current, talkbackAutoEnableVideo: value }))}
                         />
                       </Field>
-                      <Field label="INSTAR Talkback API nutzen">
-                        <ChoiceRow
-                          options={["false", "true"]}
-                          value={draft.instarTalkbackEnabled || "false"}
-                          onSelect={(value) => setDraft((current) => ({ ...current, instarTalkbackEnabled: value }))}
-                        />
-                      </Field>
-                      <Field label="INSTAR Base URL">
-                        <TextInput
-                          autoCapitalize="none"
-                          onChangeText={(value) => setDraft((current) => ({ ...current, instarBaseUrl: value }))}
-                          placeholder="https://192.168.44.253"
-                          placeholderTextColor={palette.textMuted}
-                          style={styles.input}
-                          value={draft.instarBaseUrl || ""}
-                        />
-                      </Field>
-                      <Field label="INSTAR Benutzer">
-                        <TextInput
-                          autoCapitalize="none"
-                          onChangeText={(value) => setDraft((current) => ({ ...current, instarUsername: value }))}
-                          placeholderTextColor={palette.textMuted}
-                          style={styles.input}
-                          value={draft.instarUsername || ""}
-                        />
-                      </Field>
-                      <Field label="INSTAR Passwort">
-                        <TextInput
-                          autoCapitalize="none"
-                          onChangeText={(value) => setDraft((current) => ({ ...current, instarPassword: value }))}
-                          placeholderTextColor={palette.textMuted}
-                          secureTextEntry
-                          style={styles.input}
-                          value={draft.instarPassword || ""}
-                        />
-                      </Field>
-                      <Field label="Reolink API nutzen">
-                        <ChoiceRow
-                          options={["false", "true"]}
-                          value={draft.reolinkTalkbackEnabled || "false"}
-                          onSelect={(value) => setDraft((current) => ({ ...current, reolinkTalkbackEnabled: value }))}
-                        />
-                      </Field>
-                      <Field label="Reolink Base URL">
-                        <TextInput
-                          autoCapitalize="none"
-                          onChangeText={(value) => setDraft((current) => ({ ...current, reolinkBaseUrl: value }))}
-                          placeholder="https://192.168.44.37"
-                          placeholderTextColor={palette.textMuted}
-                          style={styles.input}
-                          value={draft.reolinkBaseUrl || ""}
-                        />
-                      </Field>
-                      <Field label="Reolink Benutzer">
-                        <TextInput
-                          autoCapitalize="none"
-                          onChangeText={(value) => setDraft((current) => ({ ...current, reolinkUsername: value }))}
-                          placeholderTextColor={palette.textMuted}
-                          style={styles.input}
-                          value={draft.reolinkUsername || ""}
-                        />
-                      </Field>
-                      <Field label="Reolink Passwort">
-                        <TextInput
-                          autoCapitalize="none"
-                          onChangeText={(value) => setDraft((current) => ({ ...current, reolinkPassword: value }))}
-                          placeholderTextColor={palette.textMuted}
-                          secureTextEntry
-                          style={styles.input}
-                          value={draft.reolinkPassword || ""}
-                        />
-                      </Field>
-                      <Field label="Reolink Channel">
-                        <TextInput
-                          autoCapitalize="none"
-                          keyboardType="numeric"
-                          onChangeText={(value) => setDraft((current) => ({ ...current, reolinkChannel: value }))}
-                          placeholderTextColor={palette.textMuted}
-                          style={styles.input}
-                          value={draft.reolinkChannel || "0"}
-                        />
-                      </Field>
+                      {widget.type === "cameraTalk" ? (
+                        <>
+                          <Field label="INSTAR Talkback API nutzen">
+                            <ChoiceRow
+                              options={["false", "true"]}
+                              value={draft.instarTalkbackEnabled || "false"}
+                              onSelect={(value) => setDraft((current) => ({ ...current, instarTalkbackEnabled: value }))}
+                            />
+                          </Field>
+                          <Field label="INSTAR Base URL">
+                            <TextInput
+                              autoCapitalize="none"
+                              onChangeText={(value) => setDraft((current) => ({ ...current, instarBaseUrl: value }))}
+                              placeholder="https://192.168.44.253"
+                              placeholderTextColor={palette.textMuted}
+                              style={styles.input}
+                              value={draft.instarBaseUrl || ""}
+                            />
+                          </Field>
+                          <Field label="INSTAR Benutzer">
+                            <TextInput
+                              autoCapitalize="none"
+                              onChangeText={(value) => setDraft((current) => ({ ...current, instarUsername: value }))}
+                              placeholderTextColor={palette.textMuted}
+                              style={styles.input}
+                              value={draft.instarUsername || ""}
+                            />
+                          </Field>
+                          <Field label="INSTAR Passwort">
+                            <TextInput
+                              autoCapitalize="none"
+                              onChangeText={(value) => setDraft((current) => ({ ...current, instarPassword: value }))}
+                              placeholderTextColor={palette.textMuted}
+                              secureTextEntry
+                              style={styles.input}
+                              value={draft.instarPassword || ""}
+                            />
+                          </Field>
+                        </>
+                      ) : null}
+                      {widget.type === "cameraTalkReolink" ? (
+                        <>
+                          <Field label="Reolink API nutzen">
+                            <ChoiceRow
+                              options={["false", "true"]}
+                              value={draft.reolinkTalkbackEnabled || "false"}
+                              onSelect={(value) => setDraft((current) => ({ ...current, reolinkTalkbackEnabled: value }))}
+                            />
+                          </Field>
+                          <Field label="Reolink Base URL">
+                            <TextInput
+                              autoCapitalize="none"
+                              onChangeText={(value) => setDraft((current) => ({ ...current, reolinkBaseUrl: value }))}
+                              placeholder="https://192.168.44.37"
+                              placeholderTextColor={palette.textMuted}
+                              style={styles.input}
+                              value={draft.reolinkBaseUrl || ""}
+                            />
+                          </Field>
+                          <Field label="Reolink Benutzer">
+                            <TextInput
+                              autoCapitalize="none"
+                              onChangeText={(value) => setDraft((current) => ({ ...current, reolinkUsername: value }))}
+                              placeholderTextColor={palette.textMuted}
+                              style={styles.input}
+                              value={draft.reolinkUsername || ""}
+                            />
+                          </Field>
+                          <Field label="Reolink Passwort">
+                            <TextInput
+                              autoCapitalize="none"
+                              onChangeText={(value) => setDraft((current) => ({ ...current, reolinkPassword: value }))}
+                              placeholderTextColor={palette.textMuted}
+                              secureTextEntry
+                              style={styles.input}
+                              value={draft.reolinkPassword || ""}
+                            />
+                          </Field>
+                          <Field label="Reolink Channel">
+                            <TextInput
+                              autoCapitalize="none"
+                              keyboardType="numeric"
+                              onChangeText={(value) => setDraft((current) => ({ ...current, reolinkChannel: value }))}
+                              placeholderTextColor={palette.textMuted}
+                              style={styles.input}
+                              value={draft.reolinkChannel || "0"}
+                            />
+                          </Field>
+                        </>
+                      ) : null}
                     </>
                   ) : null}
                   <Field label="Beim Tippen">
