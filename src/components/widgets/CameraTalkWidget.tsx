@@ -95,8 +95,7 @@ export function CameraTalkWidget({
   const instarTalkQueueBytesRef = useRef(0);
   const instarTalkSentBytesRef = useRef(0);
   const instarTalkLastDebugAtRef = useRef(0);
-  const reolinkTalkPeerRef = useRef<RTCPeerConnection | null>(null);
-  const reolinkTalkStreamRef = useRef<MediaStream | null>(null);
+  const reolinkTalkWindowRef = useRef<Window | null>(null);
   const ptzHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ptzContinuousRef = useRef<"up" | "right" | "down" | "left" | null>(null);
   const volumeTrackHeightRef = useRef(84);
@@ -379,74 +378,28 @@ export function CameraTalkWidget({
   }, []);
 
   const stopReolinkTalkback = useCallback(async () => {
-    if (reolinkTalkPeerRef.current) {
-      try {
-        reolinkTalkPeerRef.current.close();
-      } catch {
-        // Ignore best-effort close errors.
-      }
-      reolinkTalkPeerRef.current = null;
+    if (reolinkTalkWindowRef.current && !reolinkTalkWindowRef.current.closed) {
+      reolinkTalkWindowRef.current.close();
     }
-    if (reolinkTalkStreamRef.current) {
-      reolinkTalkStreamRef.current.getTracks().forEach((track) => track.stop());
-      reolinkTalkStreamRef.current = null;
-    }
+    reolinkTalkWindowRef.current = null;
   }, []);
 
   const startReolinkTalkback = useCallback(async () => {
-    if (Platform.OS !== "web" || !reolinkTalkbackAvailable || !navigator.mediaDevices?.getUserMedia) {
+    if (Platform.OS !== "web" || !reolinkTalkbackAvailable) {
       throw new Error("Reolink talkback unavailable");
     }
-    const secureContextAllowed =
-      typeof window === "undefined" ? true : window.isSecureContext || window.location.hostname === "localhost";
-    if (!secureContextAllowed) {
-      throw new Error("Mikrofon im Browser blockiert (unsicherer Kontext). Bitte ueber HTTPS oder localhost oeffnen.");
-    }
     await stopReolinkTalkback();
-    setPreviewStreamDebug("Reolink: Mikrofon wird gestartet...");
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 1,
-        echoCancellation: true,
-        noiseSuppression: true,
-      },
-      video: false,
-    });
-    reolinkTalkStreamRef.current = stream;
-    const peer = new RTCPeerConnection();
-    reolinkTalkPeerRef.current = peer;
-    stream.getAudioTracks().forEach((track) => peer.addTrack(track, stream));
-    const offer = await peer.createOffer({
-      offerToReceiveAudio: false,
-      offerToReceiveVideo: false,
-    });
-    await peer.setLocalDescription(offer);
-    await waitForIceGathering(peer, 1800);
-
-    const endpoint = resolveGo2rtcWebrtcEndpoint(talkbackWebrtcUrl);
-    const localSdp = peer.localDescription?.sdp || offer.sdp;
-    if (!localSdp) {
-      throw new Error("Reolink: lokales SDP fehlt.");
+    const popup = window.open(
+      talkbackWebrtcUrl,
+      `${config.id}-reolink-talkback`,
+      "popup=yes,width=520,height=360,menubar=no,toolbar=no,location=yes,status=no,resizable=yes,scrollbars=yes"
+    );
+    if (!popup) {
+      throw new Error("Popup blockiert. Bitte Popups fuer diese Seite erlauben.");
     }
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/sdp",
-        Accept: "application/sdp, text/plain, */*",
-      },
-      body: localSdp,
-    });
-    const answerSdp = await response.text();
-    if (!response.ok || !answerSdp.trim()) {
-      const detail = (answerSdp || "").trim().slice(0, 220);
-      throw new Error(`Reolink WebRTC Handshake fehlgeschlagen (${response.status})${detail ? `: ${detail}` : ""}.`);
-    }
-    await peer.setRemoteDescription({
-      type: "answer",
-      sdp: answerSdp,
-    });
-    setPreviewStreamDebug("Reolink Talkback aktiv.");
-  }, [reolinkTalkbackAvailable, stopReolinkTalkback, talkbackWebrtcUrl]);
+    reolinkTalkWindowRef.current = popup;
+    setPreviewStreamDebug("Reolink Talkback-Fenster geoeffnet. Mikrofon dort aktivieren.");
+  }, [config.id, reolinkTalkbackAvailable, stopReolinkTalkback, talkbackWebrtcUrl]);
 
   const startInstarTalkback = useCallback(async () => {
     if (Platform.OS !== "web" || !instarTalkbackAvailable || !navigator.mediaDevices?.getUserMedia) {
@@ -3411,31 +3364,6 @@ function resolveGo2rtcWebrtcEndpoint(rawUrl: string) {
     parsed.searchParams.set(key, value);
   });
   return parsed.toString();
-}
-
-function waitForIceGathering(peer: RTCPeerConnection, timeoutMs: number) {
-  if (peer.iceGatheringState === "complete") {
-    return Promise.resolve();
-  }
-  return new Promise<void>((resolve) => {
-    let done = false;
-    const finish = () => {
-      if (done) {
-        return;
-      }
-      done = true;
-      clearTimeout(timer);
-      peer.removeEventListener("icegatheringstatechange", onChange);
-      resolve();
-    };
-    const onChange = () => {
-      if (peer.iceGatheringState === "complete") {
-        finish();
-      }
-    };
-    const timer = setTimeout(finish, Math.max(300, timeoutMs));
-    peer.addEventListener("icegatheringstatechange", onChange);
-  });
 }
 
 const baseWebLayerStyle = {
