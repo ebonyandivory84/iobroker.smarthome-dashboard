@@ -110,16 +110,16 @@ export function CameraTalkWidget({
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const titleFontSize = Math.max(11, Math.min(28, Math.round(config.titleFontSize || 14)));
   const displayUrl = layerUrls[activeLayer];
-  const previewSnapshotBaseUrl = (config.snapshotUrl || config.fullscreenSnapshotUrl || "").trim() || null;
-  const fullscreenSnapshotBaseUrl = previewSnapshotBaseUrl;
-  const previewMjpegUrl = (config.mjpegUrl || config.fullscreenMjpegUrl || "").trim() || null;
-  const fullscreenMjpegUrl = previewMjpegUrl;
-  const previewFlvUrl = (config.flvUrl || config.fullscreenFlvUrl || "").trim() || null;
-  const fullscreenFlvUrl = previewFlvUrl;
-  const previewFmp4Url = (config.fmp4Url || config.fullscreenFmp4Url || "").trim() || null;
-  const fullscreenFmp4Url = previewFmp4Url;
-  const requestedPreviewSourceMode = config.previewSourceMode || config.fullscreenSourceMode;
-  const requestedFullscreenSourceMode = requestedPreviewSourceMode;
+  const previewSnapshotBaseUrl = (config.snapshotUrl || "").trim() || null;
+  const fullscreenSnapshotBaseUrl = (config.fullscreenSnapshotUrl || config.snapshotUrl || "").trim() || null;
+  const previewMjpegUrl = (config.mjpegUrl || "").trim() || null;
+  const fullscreenMjpegUrl = (config.fullscreenMjpegUrl || config.mjpegUrl || "").trim() || null;
+  const previewFlvUrl = (config.flvUrl || "").trim() || null;
+  const fullscreenFlvUrl = (config.fullscreenFlvUrl || config.flvUrl || "").trim() || null;
+  const previewFmp4Url = (config.fmp4Url || "").trim() || null;
+  const fullscreenFmp4Url = (config.fullscreenFmp4Url || config.fmp4Url || "").trim() || null;
+  const requestedPreviewSourceMode = config.previewSourceMode;
+  const requestedFullscreenSourceMode = config.fullscreenSourceMode || config.previewSourceMode;
   const previewSourceMode = resolveSourceMode(
     requestedPreviewSourceMode,
     previewSnapshotBaseUrl,
@@ -150,11 +150,18 @@ export function CameraTalkWidget({
     flvUrl: fullscreenFlvUrl,
     fmp4Url: fullscreenFmp4Url,
   });
-  const useInPlaceFullscreen = Platform.OS === "web";
+  const hasDistinctFullscreenConfiguration =
+    fullscreenSourceMode !== previewSourceMode ||
+    fullscreenSnapshotBaseUrl !== previewSnapshotBaseUrl ||
+    fullscreenMjpegUrl !== previewMjpegUrl ||
+    fullscreenFlvUrl !== previewFlvUrl ||
+    fullscreenFmp4Url !== previewFmp4Url ||
+    Math.max(100, config.fullscreenRefreshMs || config.refreshMs || 2000) !== Math.max(100, config.refreshMs || 2000);
+  const useInPlaceFullscreen = Platform.OS === "web" && !hasDistinctFullscreenConfiguration;
   const showInPlaceFullscreen = useInPlaceFullscreen && (fullscreenOpen || webDocumentFullscreenActive);
   const showFixedFallbackFullscreen = showInPlaceFullscreen && !webDocumentFullscreenActive;
   const showPreviewFeed = !fullscreenOpen || showInPlaceFullscreen;
-  const showNativeFullscreenModal = Platform.OS !== "web" && fullscreenOpen;
+  const showNativeFullscreenModal = fullscreenOpen && !showInPlaceFullscreen;
   const talkbackWebrtcUrl = (config.talkbackWebrtcUrl || "").trim();
   const instarTalkbackEnabled = Platform.OS === "web" && config.instarTalkbackEnabled === true;
   const instarBaseUrl = (config.instarBaseUrl || "").trim();
@@ -179,7 +186,7 @@ export function CameraTalkWidget({
   const talkbackIframeEnabled = Boolean(talkbackWebrtcUrl) && !instarTalkbackAvailable && !reolinkTalkbackAvailable;
   const showInstarControls = instarTalkbackConfigured;
   const showReolinkControls = reolinkTalkbackConfigured;
-  const activeFeed = previewFeed;
+  const activeFeed = fullscreenOpen ? fullscreenFeed || previewFeed : previewFeed;
   const activeSnapshotBaseUrl = activeFeed?.kind === "snapshot" ? activeFeed.url : null;
   const previewMjpegSources = useMemo(
     () =>
@@ -235,7 +242,9 @@ export function CameraTalkWidget({
     previewFmp4Sources[Math.min(previewFmp4SourceIndex, Math.max(0, previewFmp4Sources.length - 1))] || null;
   const currentFullscreenFmp4Src =
     fullscreenFmp4Sources[Math.min(fullscreenFmp4SourceIndex, Math.max(0, fullscreenFmp4Sources.length - 1))] || null;
-  const activeRefreshMs = Math.max(100, config.refreshMs || 2000);
+  const activeRefreshMs = fullscreenOpen
+    ? Math.max(100, config.fullscreenRefreshMs || config.refreshMs || 2000)
+    : Math.max(100, config.refreshMs || 2000);
   const shouldUseSnapshotWebSocket =
     Platform.OS === "web" &&
     documentVisible &&
@@ -336,7 +345,7 @@ export function CameraTalkWidget({
     fullscreenVisibilityCallbackRef.current?.(true);
     setPinned(false);
     setFullscreenOpen(true);
-    if (Platform.OS === "web") {
+    if (Platform.OS === "web" && useInPlaceFullscreen) {
       const host = inPlaceFullscreenHostRef.current as
         | (Element & { webkitRequestFullscreen?: () => Promise<void> | void })
         | null;

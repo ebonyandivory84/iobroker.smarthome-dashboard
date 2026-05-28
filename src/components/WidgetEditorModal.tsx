@@ -125,12 +125,18 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         title: widget.title,
         showTitle: widget.showTitle === false ? "false" : "true",
         titleFontSize: String(widget.titleFontSize || 14),
-        previewSourceMode: widget.previewSourceMode || widget.fullscreenSourceMode || "snapshot",
-        snapshotUrl: widget.snapshotUrl || widget.fullscreenSnapshotUrl || "",
-        mjpegUrl: widget.mjpegUrl || widget.fullscreenMjpegUrl || "",
-        flvUrl: widget.flvUrl || widget.fullscreenFlvUrl || "",
-        fmp4Url: widget.fmp4Url || widget.fullscreenFmp4Url || "",
-        refreshMs: String(widget.refreshMs || widget.fullscreenRefreshMs || 2000),
+        previewSourceMode: widget.previewSourceMode || "snapshot",
+        fullscreenSourceMode: widget.fullscreenSourceMode || widget.previewSourceMode || "snapshot",
+        snapshotUrl: widget.snapshotUrl || "",
+        fullscreenSnapshotUrl: widget.fullscreenSnapshotUrl || widget.snapshotUrl || "",
+        mjpegUrl: widget.mjpegUrl || "",
+        fullscreenMjpegUrl: widget.fullscreenMjpegUrl || widget.mjpegUrl || "",
+        flvUrl: widget.flvUrl || "",
+        fullscreenFlvUrl: widget.fullscreenFlvUrl || widget.flvUrl || "",
+        fmp4Url: widget.fmp4Url || "",
+        fullscreenFmp4Url: widget.fullscreenFmp4Url || widget.fmp4Url || "",
+        refreshMs: String(widget.refreshMs || 2000),
+        fullscreenRefreshMs: String(widget.fullscreenRefreshMs || widget.refreshMs || 2000),
         audioEnabled: widget.audioEnabled === true ? "true" : "false",
         maximizeStateId: widget.maximizeStateId || "",
         maximizeTriggerFormat: widget.maximizeTriggerFormat || "boolean",
@@ -758,8 +764,10 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     return null;
   }
 
-  const cameraMode = normalizeCameraSourceMode(draft.previewSourceMode || draft.fullscreenSourceMode);
-  const cameraUrl = getCameraUrlByMode(draft, cameraMode);
+  const previewCameraMode = normalizeCameraSourceMode(draft.previewSourceMode);
+  const fullscreenCameraMode = normalizeCameraSourceMode(draft.fullscreenSourceMode || draft.previewSourceMode);
+  const previewCameraUrl = getCameraUrlByMode(draft, previewCameraMode, "preview");
+  const fullscreenCameraUrl = getCameraUrlByMode(draft, fullscreenCameraMode, "fullscreen");
   const solarStatCount = clampSolarStatCount(draft.statCount);
 
   const save = () => {
@@ -799,33 +807,43 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         appearance,
       });
     } else if (widget.type === "camera" || widget.type === "cameraTalk" || widget.type === "cameraTalkReolink") {
-      const previewSourceMode = cameraMode;
+      const previewSourceMode = previewCameraMode;
+      const fullscreenSourceMode = fullscreenCameraMode;
       const snapshotUrl = normalizeOptionalInput(draft.snapshotUrl);
+      const fullscreenSnapshotUrl = normalizeOptionalInput(draft.fullscreenSnapshotUrl);
       const mjpegUrl = normalizeOptionalInput(draft.mjpegUrl);
+      const fullscreenMjpegUrl = normalizeOptionalInput(draft.fullscreenMjpegUrl);
       const flvUrl = normalizeOptionalInput(draft.flvUrl);
+      const fullscreenFlvUrl = normalizeOptionalInput(draft.fullscreenFlvUrl);
       const fmp4Url = normalizeOptionalInput(draft.fmp4Url);
+      const fullscreenFmp4Url = normalizeOptionalInput(draft.fullscreenFmp4Url);
       const cameraSourceChanged =
         normalizeCameraSourceMode(widget.previewSourceMode) !== previewSourceMode ||
+        normalizeCameraSourceMode(widget.fullscreenSourceMode || widget.previewSourceMode) !== fullscreenSourceMode ||
         normalizeOptionalInput(widget.snapshotUrl) !== snapshotUrl ||
+        normalizeOptionalInput(widget.fullscreenSnapshotUrl) !== fullscreenSnapshotUrl ||
         normalizeOptionalInput(widget.mjpegUrl) !== mjpegUrl ||
+        normalizeOptionalInput(widget.fullscreenMjpegUrl) !== fullscreenMjpegUrl ||
         normalizeOptionalInput(widget.flvUrl) !== flvUrl ||
-        normalizeOptionalInput(widget.fmp4Url) !== fmp4Url;
+        normalizeOptionalInput(widget.fullscreenFlvUrl) !== fullscreenFlvUrl ||
+        normalizeOptionalInput(widget.fmp4Url) !== fmp4Url ||
+        normalizeOptionalInput(widget.fullscreenFmp4Url) !== fullscreenFmp4Url;
       onSave(widget.id, {
         title: draft.title,
         showTitle: draft.showTitle !== "false",
         titleFontSize: clampInt(draft.titleFontSize, widget.titleFontSize || 14, 11),
         previewSourceMode,
-        fullscreenSourceMode: undefined,
+        fullscreenSourceMode,
         snapshotUrl,
-        fullscreenSnapshotUrl: undefined,
+        fullscreenSnapshotUrl,
         mjpegUrl,
-        fullscreenMjpegUrl: undefined,
+        fullscreenMjpegUrl,
         flvUrl,
-        fullscreenFlvUrl: undefined,
+        fullscreenFlvUrl,
         fmp4Url,
-        fullscreenFmp4Url: undefined,
+        fullscreenFmp4Url,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 250),
-        fullscreenRefreshMs: undefined,
+        fullscreenRefreshMs: clampInt(draft.fullscreenRefreshMs, widget.fullscreenRefreshMs || widget.refreshMs || 2000, 250),
         audioEnabled: draft.audioEnabled === "true",
         manualHeightOverride: cameraSourceChanged ? false : widget.manualHeightOverride,
         snapshotAspectRatio: cameraSourceChanged ? undefined : widget.snapshotAspectRatio,
@@ -1735,43 +1753,80 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                   value={draft.textColor || ""}
                   onChange={(value) => setDraft((current) => ({ ...current, textColor: value }))}
                 />
-                <Field label="Quelle">
-                  <ChoiceRow
-                    options={["snapshot", "mjpeg", "flv", "fmp4"]}
-                    value={cameraMode}
-                    onSelect={(value) => setDraft((current) => ({ ...current, previewSourceMode: value }))}
-                  />
-                </Field>
-                <Field label="URL">
-                  <TextInput
-                    autoCapitalize="none"
-                    onChangeText={(value) => setDraft((current) => setCameraUrlByMode(current, cameraMode, value))}
-                    style={styles.input}
-                    value={cameraUrl}
-                  />
-                </Field>
-                <Text style={styles.mappingHint}>
-                  Die URL gilt fuer das oben gewaehlte Format (Snapshot, MJPEG, FLV oder fMP4).
-                </Text>
+                <View style={styles.groupCard}>
+                  <Text style={styles.groupTitle}>Miniaturansicht</Text>
+                  <Field label="Darstellung">
+                    <ChoiceRow
+                      options={["snapshot", "mjpeg", "flv", "fmp4"]}
+                      value={previewCameraMode}
+                      onSelect={(value) => setDraft((current) => ({ ...current, previewSourceMode: value }))}
+                    />
+                  </Field>
+                  <Field label="URL fuer gewaehlte Darstellung">
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={(value) =>
+                        setDraft((current) => setCameraUrlByMode(current, previewCameraMode, value, "preview"))
+                      }
+                      style={styles.input}
+                      value={previewCameraUrl}
+                    />
+                  </Field>
+                  <Field label="Snapshot Refresh (ms)">
+                    <TextInput
+                      editable={previewCameraMode === "snapshot"}
+                      keyboardType="numeric"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, refreshMs: value }))}
+                      style={[
+                        styles.input,
+                        previewCameraMode !== "snapshot" ? styles.disabledInput : null,
+                      ]}
+                      value={draft.refreshMs || ""}
+                    />
+                    {previewCameraMode !== "snapshot" ? (
+                      <Text style={styles.mappingHint}>Nur relevant, wenn Miniatur auf Snapshot steht.</Text>
+                    ) : null}
+                  </Field>
+                </View>
+                <View style={styles.groupCard}>
+                  <Text style={styles.groupTitle}>Maximierte Ansicht</Text>
+                  <Field label="Darstellung">
+                    <ChoiceRow
+                      options={["snapshot", "mjpeg", "flv", "fmp4"]}
+                      value={fullscreenCameraMode}
+                      onSelect={(value) => setDraft((current) => ({ ...current, fullscreenSourceMode: value }))}
+                    />
+                  </Field>
+                  <Field label="URL fuer gewaehlte Darstellung">
+                    <TextInput
+                      autoCapitalize="none"
+                      onChangeText={(value) =>
+                        setDraft((current) => setCameraUrlByMode(current, fullscreenCameraMode, value, "fullscreen"))
+                      }
+                      style={styles.input}
+                      value={fullscreenCameraUrl}
+                    />
+                  </Field>
+                  <Field label="Snapshot Refresh (ms)">
+                    <TextInput
+                      editable={fullscreenCameraMode === "snapshot"}
+                      keyboardType="numeric"
+                      onChangeText={(value) => setDraft((current) => ({ ...current, fullscreenRefreshMs: value }))}
+                      style={[
+                        styles.input,
+                        fullscreenCameraMode !== "snapshot" ? styles.disabledInput : null,
+                      ]}
+                      value={draft.fullscreenRefreshMs || ""}
+                    />
+                    {fullscreenCameraMode !== "snapshot" ? (
+                      <Text style={styles.mappingHint}>Nur relevant, wenn Vollbild auf Snapshot steht.</Text>
+                    ) : null}
+                  </Field>
+                </View>
                 <Text style={styles.mappingHint}>
                   FLV-Hinweis: Bei `CodecUnsupported` liefert der Stream meist kein browser-kompatibles H.264. Falls
                   vorhanden, statt `main` den `ext`/Substream verwenden (z. B. `channel0_ext.bcs`).
                 </Text>
-                <Field label="Refresh (ms)">
-                  <TextInput
-                    editable={cameraMode === "snapshot"}
-                    keyboardType="numeric"
-                    onChangeText={(value) => setDraft((current) => ({ ...current, refreshMs: value }))}
-                    style={[
-                      styles.input,
-                      cameraMode !== "snapshot" ? styles.disabledInput : null,
-                    ]}
-                    value={draft.refreshMs || ""}
-                  />
-                  {cameraMode !== "snapshot" ? (
-                    <Text style={styles.mappingHint}>Refresh gilt nur fuer Snapshot.</Text>
-                  ) : null}
-                </Field>
                 <Field label="Ton standardmaessig aktiv">
                   <ChoiceRow
                     options={["true", "false"]}
@@ -4853,35 +4908,39 @@ function normalizeCocoFullscreenMediaMode(raw: string | undefined) {
 
 function getCameraUrlByMode(
   draft: Record<string, string>,
-  mode: "snapshot" | "mjpeg" | "flv" | "fmp4"
+  mode: "snapshot" | "mjpeg" | "flv" | "fmp4",
+  scope: "preview" | "fullscreen" = "preview"
 ) {
+  const suffix = scope === "fullscreen" ? "fullscreen" : "preview";
   if (mode === "snapshot") {
-    return draft.snapshotUrl || "";
+    return suffix === "fullscreen" ? draft.fullscreenSnapshotUrl || "" : draft.snapshotUrl || "";
   }
   if (mode === "mjpeg") {
-    return draft.mjpegUrl || "";
+    return suffix === "fullscreen" ? draft.fullscreenMjpegUrl || "" : draft.mjpegUrl || "";
   }
   if (mode === "flv") {
-    return draft.flvUrl || "";
+    return suffix === "fullscreen" ? draft.fullscreenFlvUrl || "" : draft.flvUrl || "";
   }
-  return draft.fmp4Url || "";
+  return suffix === "fullscreen" ? draft.fullscreenFmp4Url || "" : draft.fmp4Url || "";
 }
 
 function setCameraUrlByMode(
   draft: Record<string, string>,
   mode: "snapshot" | "mjpeg" | "flv" | "fmp4",
-  value: string
+  value: string,
+  scope: "preview" | "fullscreen" = "preview"
 ) {
+  const suffix = scope === "fullscreen" ? "fullscreen" : "preview";
   if (mode === "snapshot") {
-    return { ...draft, snapshotUrl: value };
+    return suffix === "fullscreen" ? { ...draft, fullscreenSnapshotUrl: value } : { ...draft, snapshotUrl: value };
   }
   if (mode === "mjpeg") {
-    return { ...draft, mjpegUrl: value };
+    return suffix === "fullscreen" ? { ...draft, fullscreenMjpegUrl: value } : { ...draft, mjpegUrl: value };
   }
   if (mode === "flv") {
-    return { ...draft, flvUrl: value };
+    return suffix === "fullscreen" ? { ...draft, fullscreenFlvUrl: value } : { ...draft, flvUrl: value };
   }
-  return { ...draft, fmp4Url: value };
+  return suffix === "fullscreen" ? { ...draft, fullscreenFmp4Url: value } : { ...draft, fmp4Url: value };
 }
 
 function normalizeOptionalInput(value: string | undefined) {
