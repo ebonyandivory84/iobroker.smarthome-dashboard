@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Platform } from "react-native";
 import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { IoBrokerClient } from "../services/iobroker";
-import { StateSnapshot, WidgetConfig } from "../types/dashboard";
+import { DashboardSettings, StateSnapshot, WidgetConfig } from "../types/dashboard";
 import { resolveMobileWidget } from "../utils/mobileWidget";
 import { useDocumentVisibility } from "./useDocumentVisibility";
 
@@ -106,6 +107,8 @@ const pickStateIds = (widgets: ReturnType<typeof useDashboardConfig>["config"]["
 
 const normalizeStateIds = (stateIds: string[]) =>
   Array.from(new Set(stateIds.map((entry) => entry.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "de"));
+const WS_RECONNECT_BASE_DELAY_MS = 850;
+const WS_RECONNECT_MAX_DELAY_MS = 8000;
 
 export function useIoBrokerStates() {
   const { config } = useDashboardConfig();
@@ -114,6 +117,7 @@ export function useIoBrokerStates() {
   const [stateWrites, setStateWrites] = useState<Record<string, StateWriteFeedback>>({});
   const [error, setError] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
   const client = useMemo(
     () => new IoBrokerClient(config),
     [
@@ -125,9 +129,145 @@ export function useIoBrokerStates() {
     ]
   );
   const watchedStateIds = useMemo(() => normalizeStateIds(pickStateIds(config.widgets)), [config.widgets]);
+  const statePushWsUrl = useMemo(
+    () => buildStatePushWebSocketUrl(config),
+    [config.iobroker.adapterBasePath, config.iobroker.baseUrl]
+  );
+  const shouldUseStatePushWebSocket = Platform.OS === "web" && Boolean(statePushWsUrl);
+  const watchRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    if (!shouldUseStatePushWebSocket || !documentVisible || !statePushWsUrl) {
+      setWsConnected(false);
+      return;
+    }
+
+    let active = true;
+    let reconnectAttempt = 0;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let socket: WebSocket | null = null;
+
+    const applyIncomingStateBatch = (incoming: StateSnapshot) => {
+      let nextSnapshot = incoming;
+      setStates((current) => {
+        const normalized = buildWatchedStateSnapshot(current, incoming, watchedStateIds);
+        nextSnapshot = normalized;
+        return areStateSnapshotsEqual(current, normalized, watchedStateIds) ? current : normalized;
+      });
+      setStateWrites((current) => resolveStateWriteFeedback(current, nextSnapshot));
+      setError(null);
+      setIsOnline(true);
+    };
+
+    const clearReconnectTimer = () => {
+      if (!reconnectTimer) {
+        return;
+      }
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    };
+
+    const scheduleReconnect = () => {
+      if (!active) {
+        return;
+      }
+      clearReconnectTimer();
+      const delay = Math.min(WS_RECONNECT_MAX_DELAY_MS, WS_RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttempt);
+      reconnectAttempt = Math.min(reconnectAttempt + 1, 8);
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, delay);
+    };
+
+    const connect = () => {
+      if (!active) {
+        return;
+      }
+
+      try {
+        socket = new WebSocket(statePushWsUrl);
+      } catch (connectError) {
+        setWsConnected(false);
+        setError(connectError instanceof Error ? connectError.message : "State push websocket connection failed");
+        scheduleReconnect();
+        return;
+      }
+
+      socket.onopen = () => {
+        if (!active || !socket) {
+          return;
+        }
+        reconnectAttempt = 0;
+        setWsConnected(true);
+        setIsOnline(true);
+        setError(null);
+        watchRequestIdRef.current += 1;
+        const watchPayload = {
+          type: "watch",
+          requestId: `watch-${watchRequestIdRef.current}`,
+          stateIds: watchedStateIds,
+        };
+        socket.send(JSON.stringify(watchPayload));
+      };
+
+      socket.onmessage = (event) => {
+        if (!active) {
+          return;
+        }
+
+        try {
+          const payload = JSON.parse(String(event.data ?? ""));
+          if (payload?.type !== "stateBatch") {
+            return;
+          }
+          const rawStates = payload?.states;
+          if (!rawStates || typeof rawStates !== "object" || Array.isArray(rawStates)) {
+            return;
+          }
+          applyIncomingStateBatch(rawStates as StateSnapshot);
+        } catch {
+          // Ignore malformed websocket payloads; polling fallback stays active.
+        }
+      };
+
+      socket.onclose = () => {
+        if (!active) {
+          return;
+        }
+        setWsConnected(false);
+        scheduleReconnect();
+      };
+
+      socket.onerror = () => {
+        if (!active) {
+          return;
+        }
+        setWsConnected(false);
+      };
+    };
+
+    connect();
+
+    return () => {
+      active = false;
+      setWsConnected(false);
+      clearReconnectTimer();
+      if (socket) {
+        try {
+          socket.close();
+        } catch {
+          // Ignore best-effort socket close errors.
+        }
+      }
+    };
+  }, [documentVisible, shouldUseStatePushWebSocket, statePushWsUrl, watchedStateIds]);
 
   useEffect(() => {
     if (!documentVisible) {
+      return;
+    }
+    if (shouldUseStatePushWebSocket && wsConnected) {
       return;
     }
 
@@ -178,7 +318,7 @@ export function useIoBrokerStates() {
       active = false;
       clearInterval(timer);
     };
-  }, [client, config.pollingMs, documentVisible, watchedStateIds]);
+  }, [client, config.pollingMs, documentVisible, shouldUseStatePushWebSocket, watchedStateIds, wsConnected]);
 
   const writeStateTracked = async (stateId: string, value: unknown) => {
     const startedAt = Date.now();
@@ -215,6 +355,43 @@ export function useIoBrokerStates() {
     stateWrites,
     writeStateTracked,
   };
+}
+
+function buildStatePushWebSocketUrl(config: DashboardSettings) {
+  if (Platform.OS !== "web" || typeof window === "undefined") {
+    return "";
+  }
+
+  const configuredBase = (config.iobroker.baseUrl || "").trim();
+  const baseUrl = (configuredBase || window.location.origin || "").trim();
+  if (!baseUrl) {
+    return "";
+  }
+
+  const adapterBasePath = normalizeAdapterBasePath(config.iobroker.adapterBasePath);
+  const wsPath = adapterBasePath.endsWith("/api")
+    ? `${adapterBasePath.slice(0, -4)}/ws`
+    : `${adapterBasePath}/ws`;
+
+  try {
+    const url = new URL(baseUrl);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    url.pathname = wsPath;
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+
+function normalizeAdapterBasePath(rawPath?: string) {
+  const trimmed = String(rawPath || "/smarthome-dashboard/api").trim();
+  if (!trimmed) {
+    return "/smarthome-dashboard/api";
+  }
+  const withLeadingSlash = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  return withLeadingSlash.replace(/\/+$/, "");
 }
 
 function buildWatchedStateSnapshot(

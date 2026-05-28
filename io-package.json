@@ -53,7 +53,8 @@
   "native": {
     "port": 8109,
     "webDir": "adapter/www",
-    "devServerUrl": ""
+    "devServerUrl": "",
+    "enableDevProxy": false
   },
   "objects": []
 }

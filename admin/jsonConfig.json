@@ -29,6 +29,15 @@
       "sm": 12,
       "md": 12,
       "lg": 12
+    },
+    "enableDevProxy": {
+      "type": "checkbox",
+      "label": "Enable dev proxy",
+      "help": "Only for development. When disabled, the adapter always serves the local production web bundle.",
+      "default": false,
+      "sm": 12,
+      "md": 12,
+      "lg": 12
     }
   }
 }

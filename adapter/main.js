@@ -37,6 +37,9 @@ let logEntriesBuffer = [];
 let logListenerRegistered = false;
 const instarTalkSessions = new Map();
 const reolinkTalkSessions = new Map();
+let statePushShutdown = null;
+const STATE_PUSH_WS_PATH = "/smarthome-dashboard/ws";
+const STATE_PUSH_MAX_STATES_PER_CLIENT = 4000;
 
 const LOG_LEVEL_ORDER = {
   silly: 0,
@@ -53,17 +56,22 @@ function startAdapter(options) {
     name: "smarthome-dashboard",
     ready: () => main(adapter),
     unload: (callback) => {
-      Promise.resolve(stopLogCapture(adapter))
-        .catch((error) => {
-          adapter.log.warn(`Log capture cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
-        })
-        .finally(() => {
+      const stopLogPromise = Promise.resolve(stopLogCapture(adapter)).catch((error) => {
+        adapter.log.warn(`Log capture cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
+      });
+      const statePushPromise = Promise.resolve(statePushShutdown?.()).catch((error) => {
+        adapter.log.warn(`State push cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
+      });
+
+      Promise.allSettled([stopLogPromise, statePushPromise]).finally(() => {
+          statePushShutdown = null;
           for (const token of instarTalkSessions.keys()) {
             closeInstarTalkSession(token);
           }
           reolinkTalkSessions.clear();
           callback();
-        });
+        }
+      );
     },
   });
 
@@ -83,8 +91,14 @@ async function main(adapter) {
   });
   const webRoot = resolveWebRoot(adapter);
   const widgetAssetsRoot = path.resolve(__dirname, "..", "assets");
-  const devServerUrl =
+  const devProxyEnabled = Boolean(adapter.config?.enableDevProxy);
+  const configuredDevServerUrl =
     adapter.config && typeof adapter.config.devServerUrl === "string" ? adapter.config.devServerUrl.trim() : "";
+  const devServerUrl = devProxyEnabled ? configuredDevServerUrl : "";
+
+  if (!devProxyEnabled && configuredDevServerUrl) {
+    adapter.log.info("Dev server URL is configured but ignored because dev proxy is disabled.");
+  }
 
   await adapter.setObjectNotExistsAsync(CONFIG_STATE_ID, {
     type: "state",
@@ -696,7 +710,7 @@ async function main(adapter) {
   }
 
   const port = Number(adapter.config.port) || 8109;
-  app.listen(port, () => {
+  const server = app.listen(port, () => {
     if (devServerUrl) {
       adapter.log.info(`SmartHome Dashboard dev proxy enabled: ${devServerUrl}`);
     } else {
@@ -704,6 +718,8 @@ async function main(adapter) {
     }
     adapter.log.info(`SmartHome Dashboard available on http://0.0.0.0:${port}/smarthome-dashboard`);
   });
+
+  statePushShutdown = setupStatePushWebSocket(adapter, server);
 }
 
 function normalizeDashboardName(value) {
@@ -856,6 +872,275 @@ function closeInstarTalkSession(token) {
   } catch {
     // ignore socket close errors
   }
+}
+
+function setupStatePushWebSocket(adapter, server) {
+  const WebSocketServerCtor = WebSocketClient?.WebSocketServer || WebSocketClient?.Server;
+  if (!WebSocketClient || !WebSocketServerCtor) {
+    adapter.log.warn("WebSocket state push disabled: ws server dependency unavailable.");
+    return () => undefined;
+  }
+
+  const wsOpenState = typeof WebSocketClient.OPEN === "number" ? WebSocketClient.OPEN : 1;
+  const clients = new Set();
+  const stateRefCount = new Map();
+
+  const sendJson = (socket, payload) => {
+    if (!socket || socket.readyState !== wsOpenState) {
+      return;
+    }
+    try {
+      socket.send(JSON.stringify(payload));
+    } catch {
+      // ignore socket send failures
+    }
+  };
+
+  const retainStateIds = async (stateIds) => {
+    for (const stateId of stateIds) {
+      const current = stateRefCount.get(stateId) || 0;
+      stateRefCount.set(stateId, current + 1);
+      if (current > 0) {
+        continue;
+      }
+
+      try {
+        await adapter.subscribeForeignStatesAsync(stateId);
+      } catch (error) {
+        const nextCount = stateRefCount.get(stateId) || 1;
+        if (nextCount <= 1) {
+          stateRefCount.delete(stateId);
+        } else {
+          stateRefCount.set(stateId, nextCount - 1);
+        }
+        adapter.log.warn(
+          `State push subscribe failed for ${stateId}: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+  };
+
+  const releaseStateIds = async (stateIds) => {
+    for (const stateId of stateIds) {
+      const current = stateRefCount.get(stateId) || 0;
+      if (current <= 0) {
+        continue;
+      }
+
+      if (current > 1) {
+        stateRefCount.set(stateId, current - 1);
+        continue;
+      }
+
+      stateRefCount.delete(stateId);
+      try {
+        await adapter.unsubscribeForeignStatesAsync(stateId);
+      } catch (error) {
+        adapter.log.warn(
+          `State push unsubscribe failed for ${stateId}: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+  };
+
+  const readSnapshot = async (stateIds) => {
+    const entries = await Promise.all(
+      stateIds.map(async (stateId) => {
+        try {
+          const state = await adapter.getForeignStateAsync(stateId);
+          return [stateId, state ? state.val : null];
+        } catch {
+          return [stateId, null];
+        }
+      })
+    );
+    return Object.fromEntries(entries);
+  };
+
+  const normalizeWatchStateIds = (rawStateIds) => {
+    if (!Array.isArray(rawStateIds)) {
+      return [];
+    }
+
+    const unique = new Set();
+    for (const raw of rawStateIds) {
+      const stateId = typeof raw === "string" ? raw.trim() : "";
+      if (!stateId) {
+        continue;
+      }
+      unique.add(stateId);
+      if (unique.size >= STATE_PUSH_MAX_STATES_PER_CLIENT) {
+        break;
+      }
+    }
+
+    return Array.from(unique);
+  };
+
+  const applyWatchStateIds = async (context, nextStateIds, requestId) => {
+    const nextSet = new Set(normalizeWatchStateIds(nextStateIds));
+    const currentSet = context.stateIds;
+    const toAdd = [];
+    const toRemove = [];
+
+    for (const stateId of nextSet) {
+      if (!currentSet.has(stateId)) {
+        toAdd.push(stateId);
+      }
+    }
+    for (const stateId of currentSet) {
+      if (!nextSet.has(stateId)) {
+        toRemove.push(stateId);
+      }
+    }
+
+    if (toAdd.length) {
+      await retainStateIds(toAdd);
+    }
+    if (toRemove.length) {
+      await releaseStateIds(toRemove);
+    }
+
+    context.stateIds = nextSet;
+    sendJson(context.socket, {
+      type: "watchAck",
+      count: nextSet.size,
+      requestId: requestId || null,
+      ts: Date.now(),
+    });
+
+    const snapshot = await readSnapshot(Array.from(nextSet));
+    sendJson(context.socket, {
+      type: "stateBatch",
+      source: "snapshot",
+      states: snapshot,
+      requestId: requestId || null,
+      ts: Date.now(),
+    });
+  };
+
+  const releaseContext = (context) => {
+    if (!clients.has(context)) {
+      return;
+    }
+    clients.delete(context);
+    const watched = Array.from(context.stateIds);
+    context.stateIds.clear();
+    if (watched.length) {
+      void releaseStateIds(watched);
+    }
+  };
+
+  const stateChangeHandler = (stateId, state) => {
+    if (!stateRefCount.has(stateId)) {
+      return;
+    }
+
+    const value = state ? state.val : null;
+    for (const context of clients) {
+      if (!context.stateIds.has(stateId)) {
+        continue;
+      }
+      sendJson(context.socket, {
+        type: "stateBatch",
+        source: "delta",
+        states: { [stateId]: value },
+        ts: Date.now(),
+      });
+    }
+  };
+
+  adapter.on("stateChange", stateChangeHandler);
+
+  const wss = new WebSocketServerCtor({
+    server,
+    path: STATE_PUSH_WS_PATH,
+  });
+
+  wss.on("connection", (socket) => {
+    const context = {
+      socket,
+      stateIds: new Set(),
+    };
+    clients.add(context);
+
+    sendJson(socket, {
+      type: "hello",
+      transport: "websocket",
+      path: STATE_PUSH_WS_PATH,
+      ts: Date.now(),
+    });
+
+    socket.on("message", (raw) => {
+      let payload;
+      try {
+        payload = JSON.parse(String(raw || ""));
+      } catch {
+        sendJson(socket, {
+          type: "error",
+          message: "Invalid JSON payload",
+          ts: Date.now(),
+        });
+        return;
+      }
+
+      const messageType = typeof payload?.type === "string" ? payload.type : "";
+      if (messageType === "ping") {
+        sendJson(socket, { type: "pong", ts: Date.now() });
+        return;
+      }
+
+      if (messageType === "watch") {
+        void applyWatchStateIds(context, payload?.stateIds, payload?.requestId).catch((error) => {
+          sendJson(socket, {
+            type: "error",
+            message: error instanceof Error ? error.message : "State watch update failed",
+            requestId: payload?.requestId || null,
+            ts: Date.now(),
+          });
+        });
+        return;
+      }
+
+      sendJson(socket, {
+        type: "error",
+        message: `Unsupported message type: ${messageType || "unknown"}`,
+        ts: Date.now(),
+      });
+    });
+
+    socket.on("close", () => {
+      releaseContext(context);
+    });
+
+    socket.on("error", () => {
+      releaseContext(context);
+    });
+  });
+
+  adapter.log.info(`WebSocket state push enabled on ${STATE_PUSH_WS_PATH}`);
+
+  return () => {
+    adapter.removeListener("stateChange", stateChangeHandler);
+    for (const context of Array.from(clients)) {
+      try {
+        context.socket.close();
+      } catch {
+        // ignore socket close failures
+      }
+      releaseContext(context);
+    }
+    for (const stateId of Array.from(stateRefCount.keys())) {
+      void adapter.unsubscribeForeignStatesAsync(stateId).catch(() => undefined);
+    }
+    stateRefCount.clear();
+
+    try {
+      wss.close();
+    } catch {
+      // ignore ws server close failures
+    }
+  };
 }
 
 function buildCameraRequestConfig(rawUrl) {
