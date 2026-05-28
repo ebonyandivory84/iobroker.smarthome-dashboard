@@ -1018,6 +1018,8 @@ function WebWidgetShell({
   sourceColumns: number;
 }) {
   const [preview, setPreview] = useState(widget.position);
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  const [isInViewport, setIsInViewport] = useState(true);
   const linkBorderless =
     (widget.type === "link" || widget.type === "netflix") &&
     Boolean(widget.iconImage) &&
@@ -1099,6 +1101,39 @@ function WebWidgetShell({
   useEffect(() => {
     setPreview(widget.position);
   }, [widget.position]);
+
+  useEffect(() => {
+    if (isLayoutMode || typeof window === "undefined") {
+      setIsInViewport(true);
+      return;
+    }
+
+    const node = shellRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
+      setIsInViewport(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) {
+          return;
+        }
+        setIsInViewport(entry.isIntersecting || entry.intersectionRatio > 0);
+      },
+      {
+        root: null,
+        rootMargin: "260px 0px",
+        threshold: 0.01,
+      }
+    );
+
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+    };
+  }, [isLayoutMode, widget.id]);
 
   useEffect(() => {
     const handleMove = (event: PointerEvent) => {
@@ -1306,9 +1341,11 @@ function WebWidgetShell({
     widget.type === "grafana" ? styles.webContentGrafana : null,
   ];
   const dragSurfaceStyle = allowResize ? webWidgetDragSurfaceWithCornerReserveStyle : webWidgetDragSurfaceStyle;
+  const shouldRenderWidgetContent = isLayoutMode || isInViewport;
+  const widgetRuntimeActive = isActivePage && (isLayoutMode || isInViewport);
 
   return (
-    <div style={shellStyle}>
+    <div ref={shellRef} style={shellStyle}>
       {isLayoutMode && allowManualLayout ? (
         <div
           onPointerDown={begin("drag")}
@@ -1346,20 +1383,22 @@ function WebWidgetShell({
         </div>
       ) : null}
       <View style={contentStyle}>
-        {renderWidget(
-          widget,
-          states,
-          client,
-          onUpdateWidget,
-          onWriteState,
-          config.theme,
-          stateWrites,
-          config.uiSounds?.widgetTypeDefaults,
-          undefined,
-          undefined,
-          onWidgetScrollFocusChange,
-          isActivePage
-        )}
+        {shouldRenderWidgetContent
+          ? renderWidget(
+              widget,
+              states,
+              client,
+              onUpdateWidget,
+              onWriteState,
+              config.theme,
+              stateWrites,
+              config.uiSounds?.widgetTypeDefaults,
+              undefined,
+              undefined,
+              onWidgetScrollFocusChange,
+              widgetRuntimeActive
+            )
+          : null}
       </View>
       {isLayoutMode && allowManualLayout && allowResize ? (
         <div style={webFooterOverlayStyle}>
@@ -1421,6 +1460,7 @@ function renderWidget(
     return (
       <CameraWidget
         config={effectiveWidget}
+        isActivePage={isActivePage}
         maximizeStateValue={effectiveWidget.maximizeStateId ? states[effectiveWidget.maximizeStateId] : undefined}
         onFullscreenSwipeClose={onCameraFullscreenSwipeClose}
         onFullscreenVisibilityChange={(open) => onCameraFullscreenVisibilityChange?.(effectiveWidget.id, open)}
@@ -1447,6 +1487,7 @@ function renderWidget(
     return (
       <CameraTalkWidget
         config={effectiveWidget}
+        isActivePage={isActivePage}
         maximizeStateValue={effectiveWidget.maximizeStateId ? states[effectiveWidget.maximizeStateId] : undefined}
         onFullscreenSwipeClose={onCameraFullscreenSwipeClose}
         onFullscreenVisibilityChange={(open) => onCameraFullscreenVisibilityChange?.(effectiveWidget.id, open)}

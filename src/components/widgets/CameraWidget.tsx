@@ -15,6 +15,7 @@ declare global {
 
 type CameraWidgetProps = {
   config: CameraWidgetConfig;
+  isActivePage?: boolean;
   maximizeStateValue?: unknown;
   onAspectRatioDetected?: (ratio: number) => void;
   onFullscreenSwipeClose?: () => void;
@@ -39,12 +40,14 @@ let flvLoaderPromise: Promise<boolean> | null = null;
 
 export function CameraWidget({
   config,
+  isActivePage = true,
   maximizeStateValue,
   onAspectRatioDetected,
   onFullscreenSwipeClose,
   onFullscreenVisibilityChange,
 }: CameraWidgetProps) {
   const documentVisible = useDocumentVisibility();
+  const runtimeActive = isActivePage && documentVisible;
   const [tick, setTick] = useState(0);
   const [layerUrls, setLayerUrls] = useState<[string | null, string | null]>([null, null]);
   const [activeLayer, setActiveLayer] = useState<0 | 1>(0);
@@ -201,7 +204,7 @@ export function CameraWidget({
     : Math.max(100, config.refreshMs || 2000);
   const shouldUseSnapshotWebSocket =
     Platform.OS === "web" &&
-    documentVisible &&
+    runtimeActive &&
     Boolean(activeSnapshotBaseUrl) &&
     typeof window !== "undefined" &&
     window.location.pathname.includes("/smarthome-dashboard");
@@ -330,6 +333,9 @@ export function CameraWidget({
   );
 
   useEffect(() => {
+    if (!runtimeActive) {
+      return;
+    }
     if (!activeSnapshotBaseUrl) {
       return;
     }
@@ -338,7 +344,7 @@ export function CameraWidget({
     }
     const timer = setInterval(() => setTick((current) => current + 1), activeRefreshMs);
     return () => clearInterval(timer);
-  }, [activeRefreshMs, activeSnapshotBaseUrl, snapshotWsConnected]);
+  }, [activeRefreshMs, activeSnapshotBaseUrl, runtimeActive, snapshotWsConnected]);
 
   useEffect(() => {
     if ((!useInPlaceFullscreen && fullscreenOpen) || previewFeed?.kind !== "mjpeg") {
