@@ -1,6 +1,8 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Image, Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCameraSnapshotWebSocket } from "../../hooks/useCameraSnapshotWebSocket";
+import { useDocumentVisibility } from "../../hooks/useDocumentVisibility";
 import { CameraWidgetConfig } from "../../types/dashboard";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
 import { palette } from "../../utils/theme";
@@ -42,6 +44,7 @@ export function CameraWidget({
   onFullscreenSwipeClose,
   onFullscreenVisibilityChange,
 }: CameraWidgetProps) {
+  const documentVisible = useDocumentVisibility();
   const [tick, setTick] = useState(0);
   const [layerUrls, setLayerUrls] = useState<[string | null, string | null]>([null, null]);
   const [activeLayer, setActiveLayer] = useState<0 | 1>(0);
@@ -187,6 +190,18 @@ export function CameraWidget({
   const currentFullscreenFmp4Src =
     fullscreenFmp4Sources[Math.min(fullscreenFmp4SourceIndex, Math.max(0, fullscreenFmp4Sources.length - 1))] || null;
   const activeRefreshMs = Math.max(100, config.refreshMs || 2000);
+  const shouldUseSnapshotWebSocket =
+    Platform.OS === "web" &&
+    documentVisible &&
+    Boolean(activeSnapshotBaseUrl) &&
+    typeof window !== "undefined" &&
+    window.location.pathname.includes("/smarthome-dashboard");
+  const { connected: snapshotWsConnected, snapshotDataUrl: snapshotWsDataUrl } = useCameraSnapshotWebSocket({
+    enabled: shouldUseSnapshotWebSocket,
+    refreshMs: activeRefreshMs,
+    snapshotUrl: activeSnapshotBaseUrl,
+  });
+  const liveSnapshotWsDataUrl = snapshotWsConnected ? snapshotWsDataUrl : null;
   const fullscreenMjpegHasFallback = fullscreenMjpegSourceIndex + 1 < fullscreenMjpegSources.length;
   const previewSupportsAudio = previewFeed?.kind === "flv" || previewFeed?.kind === "fmp4";
   const fullscreenSupportsAudio = fullscreenFeed?.kind === "flv" || fullscreenFeed?.kind === "fmp4";
@@ -309,9 +324,12 @@ export function CameraWidget({
     if (!activeSnapshotBaseUrl) {
       return;
     }
+    if (snapshotWsConnected) {
+      return;
+    }
     const timer = setInterval(() => setTick((current) => current + 1), activeRefreshMs);
     return () => clearInterval(timer);
-  }, [activeRefreshMs, activeSnapshotBaseUrl]);
+  }, [activeRefreshMs, activeSnapshotBaseUrl, snapshotWsConnected]);
 
   useEffect(() => {
     if ((!useInPlaceFullscreen && fullscreenOpen) || previewFeed?.kind !== "mjpeg") {
@@ -720,13 +738,16 @@ export function CameraWidget({
     if (!activeSnapshotBaseUrl) {
       return null;
     }
+    if (liveSnapshotWsDataUrl) {
+      return liveSnapshotWsDataUrl;
+    }
     if (Platform.OS === "web" && typeof window !== "undefined" && window.location.pathname.includes("/smarthome-dashboard")) {
       const proxyBase = `${window.location.origin}/smarthome-dashboard/api/camera-snapshot`;
       return `${proxyBase}?url=${encodeURIComponent(activeSnapshotBaseUrl)}&t=${tick}`;
     }
     const separator = activeSnapshotBaseUrl.includes("?") ? "&" : "?";
     return `${activeSnapshotBaseUrl}${separator}t=${tick}`;
-  }, [activeSnapshotBaseUrl, tick]);
+  }, [activeSnapshotBaseUrl, liveSnapshotWsDataUrl, tick]);
 
   useEffect(() => {
     activeLayerRef.current = activeLayer;

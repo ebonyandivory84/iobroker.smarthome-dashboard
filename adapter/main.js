@@ -38,8 +38,12 @@ let logListenerRegistered = false;
 const instarTalkSessions = new Map();
 const reolinkTalkSessions = new Map();
 let statePushShutdown = null;
+let cameraSnapshotPushShutdown = null;
 const STATE_PUSH_WS_PATH = "/smarthome-dashboard/ws";
+const CAMERA_SNAPSHOT_WS_PATH = "/smarthome-dashboard/ws-camera-snapshot";
 const STATE_PUSH_MAX_STATES_PER_CLIENT = 4000;
+const CAMERA_SNAPSHOT_MIN_REFRESH_MS = 400;
+const CAMERA_SNAPSHOT_MAX_REFRESH_MS = 60000;
 
 const LOG_LEVEL_ORDER = {
   silly: 0,
@@ -62,9 +66,13 @@ function startAdapter(options) {
       const statePushPromise = Promise.resolve(statePushShutdown?.()).catch((error) => {
         adapter.log.warn(`State push cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
       });
+      const cameraPushPromise = Promise.resolve(cameraSnapshotPushShutdown?.()).catch((error) => {
+        adapter.log.warn(`Camera snapshot push cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
+      });
 
-      Promise.allSettled([stopLogPromise, statePushPromise]).finally(() => {
+      Promise.allSettled([stopLogPromise, statePushPromise, cameraPushPromise]).finally(() => {
           statePushShutdown = null;
+          cameraSnapshotPushShutdown = null;
           for (const token of instarTalkSessions.keys()) {
             closeInstarTalkSession(token);
           }
@@ -720,6 +728,7 @@ async function main(adapter) {
   });
 
   statePushShutdown = setupStatePushWebSocket(adapter, server);
+  cameraSnapshotPushShutdown = setupCameraSnapshotWebSocket(adapter, server);
 }
 
 function normalizeDashboardName(value) {
@@ -1135,6 +1144,216 @@ function setupStatePushWebSocket(adapter, server) {
     }
     stateRefCount.clear();
 
+    try {
+      wss.close();
+    } catch {
+      // ignore ws server close failures
+    }
+  };
+}
+
+function setupCameraSnapshotWebSocket(adapter, server) {
+  const WebSocketServerCtor = WebSocketClient?.WebSocketServer || WebSocketClient?.Server;
+  if (!WebSocketClient || !WebSocketServerCtor) {
+    adapter.log.warn("Camera snapshot websocket disabled: ws server dependency unavailable.");
+    return () => undefined;
+  }
+
+  const wsOpenState = typeof WebSocketClient.OPEN === "number" ? WebSocketClient.OPEN : 1;
+  const sessions = new Set();
+
+  const sendJson = (socket, payload) => {
+    if (!socket || socket.readyState !== wsOpenState) {
+      return;
+    }
+    try {
+      socket.send(JSON.stringify(payload));
+    } catch {
+      // ignore send failures
+    }
+  };
+
+  const clearSessionTimer = (session) => {
+    if (!session.timer) {
+      return;
+    }
+    clearInterval(session.timer);
+    session.timer = null;
+  };
+
+  const normalizeRefreshMs = (rawValue) => {
+    const parsed = Number.parseInt(String(rawValue || ""), 10);
+    if (!Number.isFinite(parsed)) {
+      return 2000;
+    }
+    return Math.max(CAMERA_SNAPSHOT_MIN_REFRESH_MS, Math.min(CAMERA_SNAPSHOT_MAX_REFRESH_MS, parsed));
+  };
+
+  const sendSnapshot = async (session) => {
+    if (!session.activeUrl || !session.socket || session.socket.readyState !== wsOpenState) {
+      return;
+    }
+    if (session.inFlight) {
+      return;
+    }
+    session.inFlight = true;
+
+    try {
+      const requestConfig = buildCameraRequestConfig(session.activeUrl);
+      const response = await fetch(requestConfig.url, {
+        cache: "no-store",
+        headers: requestConfig.headers,
+        ...buildCameraFetchOptions(requestConfig.url),
+      });
+
+      if (!response.ok) {
+        sendJson(session.socket, {
+          type: "error",
+          source: "cameraSnapshot",
+          message: `Snapshot fetch failed (${response.status})`,
+          ts: Date.now(),
+        });
+        return;
+      }
+
+      const contentType = response.headers.get("content-type") || "image/jpeg";
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const dataUrl = `data:${contentType};base64,${buffer.toString("base64")}`;
+      sendJson(session.socket, {
+        type: "snapshot",
+        dataUrl,
+        ts: Date.now(),
+      });
+    } catch (error) {
+      sendJson(session.socket, {
+        type: "error",
+        source: "cameraSnapshot",
+        message: error instanceof Error ? error.message : "Snapshot websocket fetch failed",
+        ts: Date.now(),
+      });
+    } finally {
+      session.inFlight = false;
+    }
+  };
+
+  const applyStartPayload = async (session, payload) => {
+    const targetUrl = typeof payload?.url === "string" ? payload.url.trim() : "";
+    if (!targetUrl) {
+      sendJson(session.socket, {
+        type: "error",
+        source: "cameraSnapshot",
+        message: "url missing",
+        ts: Date.now(),
+      });
+      return;
+    }
+
+    session.activeUrl = targetUrl;
+    session.refreshMs = normalizeRefreshMs(payload?.refreshMs);
+    clearSessionTimer(session);
+    await sendSnapshot(session);
+    session.timer = setInterval(() => {
+      void sendSnapshot(session);
+    }, session.refreshMs);
+
+    sendJson(session.socket, {
+      type: "startAck",
+      source: "cameraSnapshot",
+      refreshMs: session.refreshMs,
+      ts: Date.now(),
+    });
+  };
+
+  const releaseSession = (session) => {
+    if (!sessions.has(session)) {
+      return;
+    }
+    sessions.delete(session);
+    clearSessionTimer(session);
+    session.activeUrl = "";
+  };
+
+  const wss = new WebSocketServerCtor({
+    server,
+    path: CAMERA_SNAPSHOT_WS_PATH,
+  });
+
+  wss.on("connection", (socket) => {
+    const session = {
+      socket,
+      timer: null,
+      inFlight: false,
+      activeUrl: "",
+      refreshMs: 2000,
+    };
+    sessions.add(session);
+
+    sendJson(socket, {
+      type: "hello",
+      source: "cameraSnapshot",
+      path: CAMERA_SNAPSHOT_WS_PATH,
+      ts: Date.now(),
+    });
+
+    socket.on("message", (raw) => {
+      let payload;
+      try {
+        payload = JSON.parse(String(raw || ""));
+      } catch {
+        sendJson(socket, {
+          type: "error",
+          source: "cameraSnapshot",
+          message: "Invalid JSON payload",
+          ts: Date.now(),
+        });
+        return;
+      }
+
+      const messageType = typeof payload?.type === "string" ? payload.type : "";
+      if (messageType === "ping") {
+        sendJson(socket, { type: "pong", source: "cameraSnapshot", ts: Date.now() });
+        return;
+      }
+
+      if (messageType === "start") {
+        void applyStartPayload(session, payload);
+        return;
+      }
+
+      if (messageType === "stop") {
+        clearSessionTimer(session);
+        sendJson(socket, { type: "stopAck", source: "cameraSnapshot", ts: Date.now() });
+        return;
+      }
+
+      sendJson(socket, {
+        type: "error",
+        source: "cameraSnapshot",
+        message: `Unsupported message type: ${messageType || "unknown"}`,
+        ts: Date.now(),
+      });
+    });
+
+    socket.on("close", () => {
+      releaseSession(session);
+    });
+
+    socket.on("error", () => {
+      releaseSession(session);
+    });
+  });
+
+  adapter.log.info(`Camera snapshot websocket enabled on ${CAMERA_SNAPSHOT_WS_PATH}`);
+
+  return () => {
+    for (const session of Array.from(sessions)) {
+      try {
+        session.socket.close();
+      } catch {
+        // ignore socket close failures
+      }
+      releaseSession(session);
+    }
     try {
       wss.close();
     } catch {
