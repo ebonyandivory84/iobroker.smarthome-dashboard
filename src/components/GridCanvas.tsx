@@ -1482,7 +1482,7 @@ function renderWidget(
   }
 
   if (effectiveWidget.type === "weather") {
-    return <WeatherWidget config={effectiveWidget} />;
+    return <WeatherWidget config={effectiveWidget} isActivePage={isActivePage} />;
   }
 
   if (effectiveWidget.type === "numpad") {
@@ -1498,6 +1498,7 @@ function renderWidget(
       <LogWidget
         client={client}
         config={effectiveWidget}
+        isActivePage={isActivePage}
         onScrollModeChange={(active) => onWidgetScrollFocusChange?.(effectiveWidget.id, active)}
         notificationsEnabled={isActivePage}
       />
@@ -1509,13 +1510,14 @@ function renderWidget(
       <ScriptWidget
         client={client}
         config={effectiveWidget}
+        isActivePage={isActivePage}
         onScrollModeChange={(active) => onWidgetScrollFocusChange?.(effectiveWidget.id, active)}
       />
     );
   }
 
   if (effectiveWidget.type === "host") {
-    return <HostStatsWidget client={client} config={effectiveWidget} />;
+    return <HostStatsWidget client={client} config={effectiveWidget} isActivePage={isActivePage} />;
   }
 
   if (effectiveWidget.type === "raspberryPiStats") {
@@ -1527,15 +1529,15 @@ function renderWidget(
   }
 
   if (effectiveWidget.type === "wallbox" || effectiveWidget.type === "goe") {
-    return <WallboxWidget client={client} config={effectiveWidget} isActivePage={isActivePage} />;
+    return <WallboxWidget client={client} config={effectiveWidget} isActivePage={isActivePage} states={states} />;
   }
 
   if (effectiveWidget.type === "heating") {
-    return <HeatingWidget client={client} config={effectiveWidget} isActivePage={isActivePage} />;
+    return <HeatingWidget client={client} config={effectiveWidget} isActivePage={isActivePage} states={states} />;
   }
 
   if (effectiveWidget.type === "heatingV2") {
-    return <HeatingWidgetV2 client={client} config={effectiveWidget} isActivePage={isActivePage} />;
+    return <HeatingWidgetV2 client={client} config={effectiveWidget} isActivePage={isActivePage} states={states} />;
   }
 
   return null;

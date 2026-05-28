@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { useDocumentVisibility } from "../../hooks/useDocumentVisibility";
 import { WeatherWidgetConfig } from "../../types/dashboard";
 import { palette } from "../../utils/theme";
 
@@ -31,9 +32,12 @@ type GeocodingPayload = {
 
 type WeatherWidgetProps = {
   config: WeatherWidgetConfig;
+  isActivePage?: boolean;
 };
 
-export function WeatherWidget({ config }: WeatherWidgetProps) {
+export function WeatherWidget({ config, isActivePage = true }: WeatherWidgetProps) {
+  const documentVisible = useDocumentVisibility();
+  const runtimeActive = isActivePage && documentVisible;
   const [data, setData] = useState<WeatherPayload | null>(null);
   const [resolvedCoords, setResolvedCoords] = useState<{ latitude: number; longitude: number; label: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +46,9 @@ export function WeatherWidget({ config }: WeatherWidgetProps) {
   const locationQuery = config.locationQuery?.trim() || "";
 
   useEffect(() => {
+    if (!runtimeActive) {
+      return;
+    }
     let active = true;
 
     const load = async () => {
@@ -108,7 +115,7 @@ export function WeatherWidget({ config }: WeatherWidgetProps) {
       active = false;
       clearInterval(timer);
     };
-  }, [config.latitude, config.locationName, config.refreshMs, config.timezone, config.title, config.longitude, locationQuery]);
+  }, [config.latitude, config.locationName, config.refreshMs, config.timezone, config.title, config.longitude, locationQuery, runtimeActive]);
 
   const current = data?.current_weather;
   const forecastDays = (data?.daily?.time || []).slice(0, 5).map((date, index) => ({

@@ -10,14 +10,13 @@ import { palette } from "../../utils/theme";
 type HeatingWidgetProps = {
   config: HeatingWidgetConfig;
   client: IoBrokerClient;
+  states: StateSnapshot;
   isActivePage?: boolean;
 };
 
 type HeatingMode = "standby" | "dhw" | "dhwAndHeating";
 type ProgramMode = "normal" | "reduced" | "comfort" | "eco";
 
-const DEFAULT_REFRESH_MS = 3000;
-const MIN_REFRESH_MS = 800;
 
 const ROOM_TEMP_MIN = 10;
 const ROOM_TEMP_MAX = 30;
@@ -61,7 +60,7 @@ const DEFAULT_IDS = {
   compressorSensorPower: "viessmannapi.0.299550.0.features.heating.compressors.0.sensors.power.properties.value.value",
 } as const;
 
-export function HeatingWidget({ config, client, isActivePage = true }: HeatingWidgetProps) {
+export function HeatingWidget({ config, client, states, isActivePage = true }: HeatingWidgetProps) {
   const documentVisible = useDocumentVisibility();
   const runtimeActive = isActivePage && documentVisible;
   const stateIds = useMemo(
@@ -111,7 +110,7 @@ export function HeatingWidget({ config, client, isActivePage = true }: HeatingWi
     ]
   );
 
-  const [stateSnapshot, setStateSnapshot] = useState<StateSnapshot>({});
+  const [optimisticStates, setOptimisticStates] = useState<StateSnapshot>({});
   const [pendingWrites, setPendingWrites] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [normalDraft, setNormalDraft] = useState<number | null>(null);
@@ -119,63 +118,42 @@ export function HeatingWidget({ config, client, isActivePage = true }: HeatingWi
   const [dhwBarTrackWidth, setDhwBarTrackWidth] = useState(0);
   const tempBarGlowAnim = useRef(new Animated.Value(0)).current;
 
-  const refreshMs = clampInt(config.refreshMs, DEFAULT_REFRESH_MS, MIN_REFRESH_MS);
-
-  useEffect(() => {
-    if (!runtimeActive) {
-      return;
-    }
-    let active = true;
-    let inFlight = false;
-    let pendingSync = false;
-    const readIds = uniqueStateIds(Object.values(stateIds));
-
-    const sync = async () => {
-      if (inFlight) {
-        pendingSync = true;
-        return;
-      }
-
-      inFlight = true;
-      try {
-        const next = await client.readStates(readIds);
-        if (active) {
-          setStateSnapshot((current) => mergeStateSnapshot(current, readIds, next));
-          setError(null);
-        }
-      } catch (syncError) {
-        if (active) {
-          setError(syncError instanceof Error ? syncError.message : "Heizungs-States konnten nicht geladen werden");
-        }
-      } finally {
-        inFlight = false;
-        if (active && pendingSync) {
-          pendingSync = false;
-          void sync();
-        }
-      }
-    };
-
-    void sync();
-    const timer = setInterval(() => {
-      void sync();
-    }, refreshMs);
-
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, [client, refreshMs, runtimeActive, stateIds]);
+  const effectiveSnapshot = useMemo(
+    () => ({
+      ...states,
+      ...optimisticStates,
+    }),
+    [optimisticStates, states]
+  );
 
   const readValue = useCallback(
     (stateId: string) => {
       if (!stateId) {
         return undefined;
       }
-      return stateSnapshot[stateId];
+      return effectiveSnapshot[stateId];
     },
-    [stateSnapshot]
+    [effectiveSnapshot]
   );
+
+  useEffect(() => {
+    setOptimisticStates((current) => {
+      const keys = Object.keys(current);
+      if (!keys.length) {
+        return current;
+      }
+      let changed = false;
+      const next: StateSnapshot = { ...current };
+      for (const stateId of keys) {
+        if (pendingWrites[stateId]) {
+          continue;
+        }
+        delete next[stateId];
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [pendingWrites, states]);
 
   const mode =
     normalizeMode(readValue(stateIds.modeValue)) ||
@@ -280,7 +258,7 @@ export function HeatingWidget({ config, client, isActivePage = true }: HeatingWi
         return;
       }
       setPendingWrites((current) => ({ ...current, [stateId]: true }));
-      setStateSnapshot((current) => ({
+      setOptimisticStates((current) => ({
         ...current,
         [stateId]: value,
       }));
@@ -758,18 +736,6 @@ export function HeatingWidget({ config, client, isActivePage = true }: HeatingWi
       </View>
     </View>
   );
-}
-
-function uniqueStateIds(ids: string[]) {
-  return [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
-}
-
-function mergeStateSnapshot(current: StateSnapshot, watchedIds: string[], next: StateSnapshot) {
-  const merged: StateSnapshot = { ...current };
-  watchedIds.forEach((stateId) => {
-    merged[stateId] = next[stateId];
-  });
-  return merged;
 }
 
 function resolveStateId(candidate: string | undefined, fallback: string) {

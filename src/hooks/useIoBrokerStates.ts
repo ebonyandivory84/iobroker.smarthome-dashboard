@@ -29,6 +29,74 @@ function inferRaspberryPercentStateId(stateId: string, key: "ramFree" | "diskFre
   return "";
 }
 
+const WALLBOX_PRIMARY_FALLBACK_STATE_IDS = [
+  "go-e-gemini-adapter.0.control.allowCharging",
+  "go-e-gemini-adapter.0.control.emergencyStop",
+  "go-e-gemini-adapter.0.control.mode",
+  "go-e-gemini-adapter.0.control.gridManual.currentA",
+  "go-e-gemini-adapter.0.control.gridManual.phaseMode",
+  "go-e-gemini-adapter.0.control.targetSocPercent",
+  "go-e-gemini-adapter.0.control.targetSocEnabled",
+  "go-e-gemini-adapter.0.status.effectiveAllowCharging",
+  "go-e-gemini-adapter.0.status.activeMode",
+  "go-e-gemini-adapter.0.status.setCurrentA",
+  "go-e-gemini-adapter.0.status.targetPhaseMode",
+  "go-e-gemini-adapter.0.status.actualPhaseMode",
+  "go-e-gemini-adapter.0.status.enabledPhases",
+  "go-e-gemini-adapter.0.status.carState",
+  "go-e-gemini-adapter.0.status.carSocPercent",
+  "go-e-gemini-adapter.0.status.chargerPowerW",
+  "go-e.0.eto",
+];
+
+const WALLBOX_LEGACY_FALLBACK_STATE_IDS = [
+  "go-e.0.allow_charging",
+  "0_userdata.0.goe.mode",
+  "0_userdata.0.goe.gridAmpere",
+  "go-e.0.phaseSwitchMode",
+  "go-e.0.phaseSwitchModeEnabled",
+  "go-e.0.ampere",
+  "go-e.0.car",
+  "go-e.0.carBatterySoc",
+  "go-e.0.nrg.11",
+  "go-e.0.stopChargeingAtCarSoc80",
+  "go-e.0.eto",
+];
+
+const HEATING_FALLBACK_STATE_IDS = [
+  "viessmannapi.0.299550.0.features.heating.circuits.1.operating.modes.active.commands.setMode.setValue",
+  "viessmannapi.0.299550.0.features.heating.circuits.1.operating.modes.active.properties.value.value",
+  "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.active.properties.value.value",
+  "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.normal.commands.setTemperature.setValue",
+  "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.reduced.commands.setTemperature.setValue",
+  "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.comfort.commands.setTemperature.setValue",
+  "viessmannapi.0.299550.0.features.heating.dhw.temperature.main.commands.setTargetTemperature.setValue",
+  "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.comfort.commands.activate.setValue",
+  "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.comfort.commands.deactivate.setValue",
+  "viessmannapi.0.299550.0.features.heating.circuits.1.operating.programs.eco.commands.setActive.setValue",
+  "viessmannapi.0.299550.0.features.heating.dhw.oneTimeCharge.commands.setActive.setValue",
+  "viessmannapi.0.299550.0.features.heating.dhw.oneTimeCharge.properties.active.value",
+  "viessmannapi.0.299550.0.features.heating.dhw.charging.properties.active.value",
+  "viessmannapi.0.299550.0.features.heating.circuits.1.temperature.properties.value.value",
+  "viessmannapi.0.299550.0.features.heating.circuits.1.sensors.temperature.supply.properties.value.value",
+  "viessmannapi.0.299550.0.features.heating.sensors.temperature.outside.properties.value.value",
+  "viessmannapi.0.299550.0.features.heating.sensors.temperature.return.properties.value.value",
+  "viessmannapi.0.299550.0.features.heating.dhw.sensors.temperature.dhwCylinder.properties.value.value",
+  "viessmannapi.0.299550.0.features.heating.compressors.0.power.properties.value.value",
+  "viessmannapi.0.299550.0.features.heating.compressors.0.sensors.power.properties.value.value",
+];
+
+function collectExplicitStateIds(widget: WidgetConfig) {
+  const explicit: string[] = [];
+  for (const [key, value] of Object.entries(widget)) {
+    if (!key.endsWith("StateId")) {
+      continue;
+    }
+    explicit.push(typeof value === "string" ? value : "");
+  }
+  return explicit;
+}
+
 const collectWidgetStateIds = (widget: WidgetConfig) => {
   if (widget.type === "state") {
     return [widget.stateId];
@@ -94,6 +162,19 @@ const collectWidgetStateIds = (widget: WidgetConfig) => {
       widget.offlineDevicesStateId || "",
       widget.lockModeStateId || "",
       widget.lockWriteStateId || "",
+    ];
+  }
+  if (widget.type === "wallbox" || widget.type === "goe") {
+    return [
+      ...collectExplicitStateIds(widget),
+      ...WALLBOX_PRIMARY_FALLBACK_STATE_IDS,
+      ...WALLBOX_LEGACY_FALLBACK_STATE_IDS,
+    ];
+  }
+  if (widget.type === "heating" || widget.type === "heatingV2") {
+    return [
+      ...collectExplicitStateIds(widget),
+      ...HEATING_FALLBACK_STATE_IDS,
     ];
   }
   return [];

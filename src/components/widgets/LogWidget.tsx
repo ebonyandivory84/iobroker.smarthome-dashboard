@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { createElement, useEffect, useMemo, useRef, useState } from "react";
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useDocumentVisibility } from "../../hooks/useDocumentVisibility";
 import { IoBrokerClient } from "../../services/iobroker";
 import { IoBrokerLogEntry, LogWidgetConfig } from "../../types/dashboard";
 import { palette } from "../../utils/theme";
@@ -9,6 +10,7 @@ import { playConfiguredUiSound } from "../../utils/uiSounds";
 type LogWidgetProps = {
   config: LogWidgetConfig;
   client: IoBrokerClient;
+  isActivePage?: boolean;
   onScrollModeChange?: (active: boolean) => void;
   notificationsEnabled?: boolean;
 };
@@ -27,14 +29,27 @@ const MONO_FONT = Platform.select({
 });
 
 const MAX_LOG_ENTRIES_HARD_LIMIT = 200;
+const LOG_WS_PATH = "/smarthome-dashboard/ws-logs";
+const WS_RECONNECT_BASE_DELAY_MS = 900;
+const WS_RECONNECT_MAX_DELAY_MS = 9000;
 
-export function LogWidget({ config, client, onScrollModeChange, notificationsEnabled = true }: LogWidgetProps) {
+export function LogWidget({
+  config,
+  client,
+  isActivePage = true,
+  onScrollModeChange,
+  notificationsEnabled = true,
+}: LogWidgetProps) {
+  const documentVisible = useDocumentVisibility();
+  const runtimeActive = isActivePage && documentVisible;
   const [entries, setEntries] = useState<IoBrokerLogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [wsConnected, setWsConnected] = useState(false);
   const [quickSeverity, setQuickSeverity] = useState<"base" | "warn" | "error">("base");
   const [isScrollActive, setIsScrollActive] = useState(false);
   const webRootRef = useRef<HTMLDivElement | null>(null);
   const webListRef = useRef<HTMLDivElement | null>(null);
+  const entriesRef = useRef<IoBrokerLogEntry[]>([]);
   const lastScrollSoundAtRef = useRef(0);
   const latestSeenTimestampRef = useRef(0);
   const scrollModeCallbackRef = useRef(onScrollModeChange);
@@ -51,6 +66,68 @@ export function LogWidget({ config, client, onScrollModeChange, notificationsEna
   const requestMinSeverity = quickSeverity === "base" ? configuredMinSeverity : quickSeverity;
   const sourceFilter = (config.sourceFilter || "").trim();
   const textFilter = (config.textFilter || "").trim();
+  const logWsUrl = useMemo(() => buildLogPushWebSocketUrl(), []);
+  const shouldUseLogPushWebSocket = Platform.OS === "web" && runtimeActive && Boolean(logWsUrl);
+
+  useEffect(() => {
+    entriesRef.current = entries;
+  }, [entries]);
+
+  const applyEntries = useCallback(
+    (nextEntries: IoBrokerLogEntry[], suppressIncomingSound = false) => {
+      const cappedLogs = nextEntries.slice(0, MAX_LOG_ENTRIES_HARD_LIMIT);
+      setEntries(cappedLogs);
+      setError(null);
+
+      const nextLatestTimestamp = cappedLogs.reduce(
+        (largest, entry) => Math.max(largest, Number.isFinite(entry.ts) ? entry.ts : 0),
+        0
+      );
+
+      if (suppressIncomingSound || !notificationsEnabled) {
+        latestSeenTimestampRef.current = Math.max(latestSeenTimestampRef.current, nextLatestTimestamp);
+        return;
+      }
+
+      if (nextLatestTimestamp <= latestSeenTimestampRef.current) {
+        return;
+      }
+
+      const incomingEntries = cappedLogs.filter(
+        (entry) => Number.isFinite(entry.ts) && entry.ts > latestSeenTimestampRef.current
+      );
+      latestSeenTimestampRef.current = nextLatestTimestamp;
+
+      const hasError = incomingEntries.some((entry) => entry.severity === "error");
+      const hasWarn = incomingEntries.some((entry) => entry.severity === "warn");
+      if (hasError) {
+        playConfiguredUiSound(
+          config.interactionSounds?.notifyError?.length
+            ? config.interactionSounds.notifyError
+            : config.interactionSounds?.notify,
+          "page",
+          `${config.id}:incoming-log:error`
+        );
+      } else if (hasWarn) {
+        playConfiguredUiSound(
+          config.interactionSounds?.notifyWarn?.length
+            ? config.interactionSounds.notifyWarn
+            : config.interactionSounds?.notify,
+          "page",
+          `${config.id}:incoming-log:warn`
+        );
+      } else {
+        playConfiguredUiSound(config.interactionSounds?.notify, "page", `${config.id}:incoming-log`);
+      }
+    },
+    [
+      config.id,
+      config.interactionSounds?.notify,
+      config.interactionSounds?.notifyError,
+      config.interactionSounds?.notifyWarn,
+      notificationsEnabled,
+    ]
+  );
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined" || !isScrollActive) {
@@ -86,6 +163,138 @@ export function LogWidget({ config, client, onScrollModeChange, notificationsEna
   }, []);
 
   useEffect(() => {
+    if (!shouldUseLogPushWebSocket || !logWsUrl) {
+      setWsConnected(false);
+      return;
+    }
+
+    let active = true;
+    let reconnectAttempt = 0;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let socket: WebSocket | null = null;
+
+    const clearReconnectTimer = () => {
+      if (!reconnectTimer) {
+        return;
+      }
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    };
+
+    const scheduleReconnect = () => {
+      if (!active) {
+        return;
+      }
+      clearReconnectTimer();
+      const delay = Math.min(WS_RECONNECT_MAX_DELAY_MS, WS_RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttempt);
+      reconnectAttempt = Math.min(reconnectAttempt + 1, 8);
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, delay);
+    };
+
+    const connect = () => {
+      if (!active) {
+        return;
+      }
+
+      try {
+        socket = new WebSocket(logWsUrl);
+      } catch (connectError) {
+        setWsConnected(false);
+        setError(connectError instanceof Error ? connectError.message : "Log websocket connection failed");
+        scheduleReconnect();
+        return;
+      }
+
+      socket.onopen = () => {
+        if (!active || !socket) {
+          return;
+        }
+        reconnectAttempt = 0;
+        setWsConnected(true);
+        setError(null);
+        socket.send(
+          JSON.stringify({
+            type: "watch",
+            limit: maxEntries,
+            minSeverity: requestMinSeverity,
+            source: sourceFilter,
+            contains: textFilter,
+          })
+        );
+      };
+
+      socket.onmessage = (event) => {
+        if (!active) {
+          return;
+        }
+
+        try {
+          const payload = JSON.parse(String(event.data ?? ""));
+          if (payload?.type === "snapshot" && Array.isArray(payload?.entries)) {
+            applyEntries(payload.entries as IoBrokerLogEntry[], true);
+            return;
+          }
+          if (payload?.type === "entry" && payload?.entry && typeof payload.entry === "object") {
+            const incomingEntry = payload.entry as IoBrokerLogEntry;
+            const incomingKey = `${incomingEntry.id}-${incomingEntry.ts}-${incomingEntry.from}-${incomingEntry.message}`;
+            const currentEntries = entriesRef.current || [];
+            const nextEntries = [incomingEntry, ...currentEntries.filter((row) => {
+              const rowKey = `${row.id}-${row.ts}-${row.from}-${row.message}`;
+              return rowKey !== incomingKey;
+            })];
+            applyEntries(nextEntries, false);
+            return;
+          }
+          if (payload?.type === "error" && typeof payload?.message === "string") {
+            setError(payload.message);
+          }
+        } catch {
+          // Ignore malformed websocket payloads; polling fallback stays active.
+        }
+      };
+
+      socket.onclose = () => {
+        if (!active) {
+          return;
+        }
+        setWsConnected(false);
+        scheduleReconnect();
+      };
+
+      socket.onerror = () => {
+        if (!active) {
+          return;
+        }
+        setWsConnected(false);
+      };
+    };
+
+    connect();
+
+    return () => {
+      active = false;
+      setWsConnected(false);
+      clearReconnectTimer();
+      if (socket) {
+        try {
+          socket.close();
+        } catch {
+          // Ignore best-effort socket close failures.
+        }
+      }
+    };
+  }, [applyEntries, logWsUrl, maxEntries, requestMinSeverity, shouldUseLogPushWebSocket, sourceFilter, textFilter]);
+
+  useEffect(() => {
+    if (!runtimeActive) {
+      return;
+    }
+    if (shouldUseLogPushWebSocket && wsConnected) {
+      return;
+    }
     let active = true;
     let inFlight = false;
     let pending = false;
@@ -106,53 +315,15 @@ export function LogWidget({ config, client, onScrollModeChange, notificationsEna
           contains: textFilter,
         });
 
-        const filteredLogs =
-          quickSeverity === "warn"
-            ? logs.filter((entry) => entry.severity === "warn")
-            : quickSeverity === "error"
-              ? logs.filter((entry) => entry.severity === "error")
-              : logs;
-        const cappedLogs = filteredLogs.slice(0, MAX_LOG_ENTRIES_HARD_LIMIT);
-
         if (active) {
-          setEntries(cappedLogs);
-          setError(null);
-
-          const nextLatestTimestamp = cappedLogs.reduce(
-            (largest, entry) => Math.max(largest, Number.isFinite(entry.ts) ? entry.ts : 0),
-            0
-          );
-
-          if (skipIncomingSound || !notificationsEnabled) {
-            latestSeenTimestampRef.current = Math.max(latestSeenTimestampRef.current, nextLatestTimestamp);
-            skipIncomingSound = false;
-          } else if (nextLatestTimestamp > latestSeenTimestampRef.current) {
-            const incomingEntries = cappedLogs.filter(
-              (entry) => Number.isFinite(entry.ts) && entry.ts > latestSeenTimestampRef.current
-            );
-            latestSeenTimestampRef.current = nextLatestTimestamp;
-            const hasError = incomingEntries.some((entry) => entry.severity === "error");
-            const hasWarn = incomingEntries.some((entry) => entry.severity === "warn");
-            if (hasError) {
-              playConfiguredUiSound(
-                config.interactionSounds?.notifyError?.length
-                  ? config.interactionSounds.notifyError
-                  : config.interactionSounds?.notify,
-                "page",
-                `${config.id}:incoming-log:error`
-              );
-            } else if (hasWarn) {
-              playConfiguredUiSound(
-                config.interactionSounds?.notifyWarn?.length
-                  ? config.interactionSounds.notifyWarn
-                  : config.interactionSounds?.notify,
-                "page",
-                `${config.id}:incoming-log:warn`
-              );
-            } else {
-              playConfiguredUiSound(config.interactionSounds?.notify, "page", `${config.id}:incoming-log`);
-            }
-          }
+          const filteredLogs =
+            quickSeverity === "warn"
+              ? logs.filter((entry) => entry.severity === "warn")
+              : quickSeverity === "error"
+                ? logs.filter((entry) => entry.severity === "error")
+                : logs;
+          applyEntries(filteredLogs, skipIncomingSound);
+          skipIncomingSound = false;
         }
       } catch (syncError) {
         if (active) {
@@ -177,18 +348,17 @@ export function LogWidget({ config, client, onScrollModeChange, notificationsEna
       clearInterval(timer);
     };
   }, [
+    applyEntries,
     client,
-    config.id,
-    config.interactionSounds?.notify,
-    config.interactionSounds?.notifyWarn,
-    config.interactionSounds?.notifyError,
     maxEntries,
-    notificationsEnabled,
     quickSeverity,
     refreshMs,
     requestMinSeverity,
+    runtimeActive,
+    shouldUseLogPushWebSocket,
     sourceFilter,
     textFilter,
+    wsConnected,
   ]);
 
   const levelLabel = quickSeverity === "base" ? configuredMinSeverity.toUpperCase() : `${quickSeverity.toUpperCase()} ONLY`;
@@ -349,6 +519,27 @@ function clampInt(value: number | undefined, fallback: number, min: number) {
     return fallback;
   }
   return Math.max(min, Math.round(value));
+}
+
+function buildLogPushWebSocketUrl() {
+  if (Platform.OS !== "web" || typeof window === "undefined") {
+    return "";
+  }
+
+  try {
+    const baseUrl = window.location.origin || "";
+    if (!baseUrl) {
+      return "";
+    }
+    const url = new URL(baseUrl);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    url.pathname = LOG_WS_PATH;
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return "";
+  }
 }
 
 function clampIntMax(value: number | undefined, fallback: number, min: number, max: number) {

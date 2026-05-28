@@ -1,5 +1,6 @@
 import { createElement, useEffect, useMemo, useState } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
+import { useDocumentVisibility } from "../../hooks/useDocumentVisibility";
 import { IoBrokerClient } from "../../services/iobroker";
 import { HostStatsWidgetConfig, IoBrokerHostStats } from "../../types/dashboard";
 import { palette } from "../../utils/theme";
@@ -7,14 +8,20 @@ import { palette } from "../../utils/theme";
 type HostStatsWidgetProps = {
   config: HostStatsWidgetConfig;
   client: IoBrokerClient;
+  isActivePage?: boolean;
 };
 
-export function HostStatsWidget({ config, client }: HostStatsWidgetProps) {
+export function HostStatsWidget({ config, client, isActivePage = true }: HostStatsWidgetProps) {
+  const documentVisible = useDocumentVisibility();
+  const runtimeActive = isActivePage && documentVisible;
   const [stats, setStats] = useState<IoBrokerHostStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const refreshMs = clampInt(config.refreshMs, 5000, 1500);
 
   useEffect(() => {
+    if (!runtimeActive) {
+      return;
+    }
     let active = true;
     let inFlight = false;
     let pending = false;
@@ -53,7 +60,7 @@ export function HostStatsWidget({ config, client }: HostStatsWidgetProps) {
       active = false;
       clearInterval(timer);
     };
-  }, [client, refreshMs]);
+  }, [client, refreshMs, runtimeActive]);
 
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;

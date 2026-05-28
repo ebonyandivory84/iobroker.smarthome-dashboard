@@ -39,11 +39,18 @@ const instarTalkSessions = new Map();
 const reolinkTalkSessions = new Map();
 let statePushShutdown = null;
 let cameraSnapshotPushShutdown = null;
+let logPushShutdown = null;
+let scriptPushShutdown = null;
+let logPushBroadcast = null;
 const STATE_PUSH_WS_PATH = "/smarthome-dashboard/ws";
 const CAMERA_SNAPSHOT_WS_PATH = "/smarthome-dashboard/ws-camera-snapshot";
+const LOG_PUSH_WS_PATH = "/smarthome-dashboard/ws-logs";
+const SCRIPT_PUSH_WS_PATH = "/smarthome-dashboard/ws-scripts";
 const STATE_PUSH_MAX_STATES_PER_CLIENT = 4000;
 const CAMERA_SNAPSHOT_MIN_REFRESH_MS = 400;
 const CAMERA_SNAPSHOT_MAX_REFRESH_MS = 60000;
+const LOG_PUSH_MAX_ENTRIES_PER_CLIENT = 200;
+const SCRIPT_PUSH_MAX_ENTRIES_PER_CLIENT = 1000;
 
 const LOG_LEVEL_ORDER = {
   silly: 0,
@@ -69,10 +76,20 @@ function startAdapter(options) {
       const cameraPushPromise = Promise.resolve(cameraSnapshotPushShutdown?.()).catch((error) => {
         adapter.log.warn(`Camera snapshot push cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
       });
+      const logPushPromise = Promise.resolve(logPushShutdown?.()).catch((error) => {
+        adapter.log.warn(`Log push cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
+      });
+      const scriptPushPromise = Promise.resolve(scriptPushShutdown?.()).catch((error) => {
+        adapter.log.warn(`Script push cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
+      });
 
-      Promise.allSettled([stopLogPromise, statePushPromise, cameraPushPromise]).finally(() => {
+      Promise.allSettled([stopLogPromise, statePushPromise, cameraPushPromise, logPushPromise, scriptPushPromise]).finally(
+        () => {
           statePushShutdown = null;
           cameraSnapshotPushShutdown = null;
+          logPushShutdown = null;
+          scriptPushShutdown = null;
+          logPushBroadcast = null;
           for (const token of instarTalkSessions.keys()) {
             closeInstarTalkSession(token);
           }
@@ -729,6 +746,8 @@ async function main(adapter) {
 
   statePushShutdown = setupStatePushWebSocket(adapter, server);
   cameraSnapshotPushShutdown = setupCameraSnapshotWebSocket(adapter, server);
+  logPushShutdown = setupLogWebSocket(adapter, server);
+  scriptPushShutdown = setupScriptWebSocket(adapter, server);
 }
 
 function normalizeDashboardName(value) {
@@ -1362,6 +1381,367 @@ function setupCameraSnapshotWebSocket(adapter, server) {
   };
 }
 
+function setupLogWebSocket(adapter, server) {
+  const WebSocketServerCtor = WebSocketClient?.WebSocketServer || WebSocketClient?.Server;
+  if (!WebSocketClient || !WebSocketServerCtor) {
+    adapter.log.warn("Log websocket disabled: ws server dependency unavailable.");
+    return () => undefined;
+  }
+
+  const wsOpenState = typeof WebSocketClient.OPEN === "number" ? WebSocketClient.OPEN : 1;
+  const sessions = new Set();
+
+  const sendJson = (socket, payload) => {
+    if (!socket || socket.readyState !== wsOpenState) {
+      return;
+    }
+    try {
+      socket.send(JSON.stringify(payload));
+    } catch {
+      // ignore send failures
+    }
+  };
+
+  const normalizeLogWatchPayload = (payload) => ({
+    limit: clampInt(payload?.limit, 100, 1, LOG_PUSH_MAX_ENTRIES_PER_CLIENT),
+    minSeverity: normalizeLogSeverity(payload?.minSeverity),
+    source: normalizeFilter(payload?.source),
+    contains: normalizeFilter(payload?.contains),
+  });
+
+  const sendSnapshot = (session, requestId) => {
+    const entries = readBufferedLogs(session.filter);
+    sendJson(session.socket, {
+      type: "snapshot",
+      source: "logBuffer",
+      requestId: requestId || null,
+      entries,
+      ts: Date.now(),
+    });
+  };
+
+  const applyWatchPayload = (session, payload) => {
+    session.filter = normalizeLogWatchPayload(payload);
+    sendJson(session.socket, {
+      type: "watchAck",
+      source: "logBuffer",
+      requestId: payload?.requestId || null,
+      limit: session.filter.limit,
+      ts: Date.now(),
+    });
+    sendSnapshot(session, payload?.requestId || null);
+  };
+
+  const releaseSession = (session) => {
+    if (!sessions.has(session)) {
+      return;
+    }
+    sessions.delete(session);
+  };
+
+  const broadcastLogEntry = (entry) => {
+    for (const session of sessions) {
+      if (!matchesLogEntryFilter(entry, session.filter)) {
+        continue;
+      }
+      sendJson(session.socket, {
+        type: "entry",
+        source: "logBuffer",
+        entry,
+        ts: Date.now(),
+      });
+    }
+  };
+
+  logPushBroadcast = broadcastLogEntry;
+
+  const wss = new WebSocketServerCtor({
+    server,
+    path: LOG_PUSH_WS_PATH,
+  });
+
+  wss.on("connection", (socket) => {
+    const session = {
+      socket,
+      filter: normalizeLogWatchPayload({}),
+    };
+    sessions.add(session);
+
+    sendJson(socket, {
+      type: "hello",
+      source: "logBuffer",
+      path: LOG_PUSH_WS_PATH,
+      ts: Date.now(),
+    });
+
+    socket.on("message", (raw) => {
+      let payload;
+      try {
+        payload = JSON.parse(String(raw || ""));
+      } catch {
+        sendJson(socket, {
+          type: "error",
+          source: "logBuffer",
+          message: "Invalid JSON payload",
+          ts: Date.now(),
+        });
+        return;
+      }
+
+      const messageType = typeof payload?.type === "string" ? payload.type : "";
+      if (messageType === "ping") {
+        sendJson(socket, { type: "pong", source: "logBuffer", ts: Date.now() });
+        return;
+      }
+
+      if (messageType === "watch") {
+        applyWatchPayload(session, payload);
+        return;
+      }
+
+      sendJson(socket, {
+        type: "error",
+        source: "logBuffer",
+        message: `Unsupported message type: ${messageType || "unknown"}`,
+        ts: Date.now(),
+      });
+    });
+
+    socket.on("close", () => {
+      releaseSession(session);
+    });
+
+    socket.on("error", () => {
+      releaseSession(session);
+    });
+  });
+
+  adapter.log.info(`Log websocket enabled on ${LOG_PUSH_WS_PATH}`);
+
+  return () => {
+    if (logPushBroadcast === broadcastLogEntry) {
+      logPushBroadcast = null;
+    }
+    for (const session of Array.from(sessions)) {
+      try {
+        session.socket.close();
+      } catch {
+        // ignore socket close failures
+      }
+      releaseSession(session);
+    }
+    try {
+      wss.close();
+    } catch {
+      // ignore ws server close failures
+    }
+  };
+}
+
+function setupScriptWebSocket(adapter, server) {
+  const WebSocketServerCtor = WebSocketClient?.WebSocketServer || WebSocketClient?.Server;
+  if (!WebSocketClient || !WebSocketServerCtor) {
+    adapter.log.warn("Script websocket disabled: ws server dependency unavailable.");
+    return () => undefined;
+  }
+
+  const wsOpenState = typeof WebSocketClient.OPEN === "number" ? WebSocketClient.OPEN : 1;
+  const sessions = new Set();
+
+  const sendJson = (socket, payload) => {
+    if (!socket || socket.readyState !== wsOpenState) {
+      return;
+    }
+    try {
+      socket.send(JSON.stringify(payload));
+    } catch {
+      // ignore send failures
+    }
+  };
+
+  const normalizeScriptWatchPayload = (payload) => ({
+    limit: clampInt(payload?.limit, 200, 1, SCRIPT_PUSH_MAX_ENTRIES_PER_CLIENT),
+    instance: normalizeFilter(payload?.instance),
+    contains: normalizeFilter(payload?.contains),
+  });
+
+  const sendSnapshot = async (session, requestId) => {
+    const entries = await listJavaScriptEntries(adapter, session.filter);
+    sendJson(session.socket, {
+      type: "snapshot",
+      source: "scripts",
+      requestId: requestId || null,
+      entries,
+      ts: Date.now(),
+    });
+  };
+
+  const applyWatchPayload = async (session, payload) => {
+    session.filter = normalizeScriptWatchPayload(payload);
+    sendJson(session.socket, {
+      type: "watchAck",
+      source: "scripts",
+      requestId: payload?.requestId || null,
+      limit: session.filter.limit,
+      ts: Date.now(),
+    });
+    await sendSnapshot(session, payload?.requestId || null);
+  };
+
+  const releaseSession = (session) => {
+    if (!sessions.has(session)) {
+      return;
+    }
+    sessions.delete(session);
+  };
+
+  const broadcastScriptStateChange = async (stateId, state) => {
+    const stateValue = state ? state.val : null;
+    const instance = resolveScriptInstance(stateId);
+    const scriptEntry = state
+      ? await readScriptEntryForStateId(adapter, stateId, stateValue)
+      : {
+          stateId,
+          name: resolveScriptName({ id: stateId, name: "" }),
+          instance,
+          enabled: false,
+        };
+
+    for (const session of sessions) {
+      if (!matchesScriptInstance(session.filter, instance)) {
+        continue;
+      }
+
+      if (!state) {
+        sendJson(session.socket, {
+          type: "entry",
+          source: "scripts",
+          action: "remove",
+          entry: scriptEntry,
+          ts: Date.now(),
+        });
+        continue;
+      }
+
+      if (!matchesScriptEntryFilter(scriptEntry, session.filter)) {
+        sendJson(session.socket, {
+          type: "entry",
+          source: "scripts",
+          action: "remove",
+          entry: scriptEntry,
+          ts: Date.now(),
+        });
+        continue;
+      }
+
+      sendJson(session.socket, {
+        type: "entry",
+        source: "scripts",
+        action: "upsert",
+        entry: scriptEntry,
+        ts: Date.now(),
+      });
+    }
+  };
+
+  const stateChangeHandler = (stateId, state) => {
+    if (!isScriptEnabledStateId(stateId)) {
+      return;
+    }
+    void broadcastScriptStateChange(stateId, state).catch(() => undefined);
+  };
+
+  adapter.on("stateChange", stateChangeHandler);
+
+  const wss = new WebSocketServerCtor({
+    server,
+    path: SCRIPT_PUSH_WS_PATH,
+  });
+
+  wss.on("connection", (socket) => {
+    const session = {
+      socket,
+      filter: normalizeScriptWatchPayload({}),
+    };
+    sessions.add(session);
+
+    sendJson(socket, {
+      type: "hello",
+      source: "scripts",
+      path: SCRIPT_PUSH_WS_PATH,
+      ts: Date.now(),
+    });
+
+    socket.on("message", (raw) => {
+      let payload;
+      try {
+        payload = JSON.parse(String(raw || ""));
+      } catch {
+        sendJson(socket, {
+          type: "error",
+          source: "scripts",
+          message: "Invalid JSON payload",
+          ts: Date.now(),
+        });
+        return;
+      }
+
+      const messageType = typeof payload?.type === "string" ? payload.type : "";
+      if (messageType === "ping") {
+        sendJson(socket, { type: "pong", source: "scripts", ts: Date.now() });
+        return;
+      }
+
+      if (messageType === "watch") {
+        void applyWatchPayload(session, payload).catch((error) => {
+          sendJson(socket, {
+            type: "error",
+            source: "scripts",
+            message: error instanceof Error ? error.message : "Script watch update failed",
+            requestId: payload?.requestId || null,
+            ts: Date.now(),
+          });
+        });
+        return;
+      }
+
+      sendJson(socket, {
+        type: "error",
+        source: "scripts",
+        message: `Unsupported message type: ${messageType || "unknown"}`,
+        ts: Date.now(),
+      });
+    });
+
+    socket.on("close", () => {
+      releaseSession(session);
+    });
+
+    socket.on("error", () => {
+      releaseSession(session);
+    });
+  });
+
+  adapter.log.info(`Script websocket enabled on ${SCRIPT_PUSH_WS_PATH}`);
+
+  return () => {
+    adapter.removeListener("stateChange", stateChangeHandler);
+    for (const session of Array.from(sessions)) {
+      try {
+        session.socket.close();
+      } catch {
+        // ignore socket close failures
+      }
+      releaseSession(session);
+    }
+    try {
+      wss.close();
+    } catch {
+      // ignore ws server close failures
+    }
+  };
+}
+
 function buildCameraRequestConfig(rawUrl) {
   const parsed = new URL(rawUrl);
   const headers = {};
@@ -1812,6 +2192,14 @@ function appendLogEntry(message) {
   if (logEntriesBuffer.length > LOG_BUFFER_LIMIT) {
     logEntriesBuffer = logEntriesBuffer.slice(-LOG_BUFFER_LIMIT);
   }
+
+  if (typeof logPushBroadcast === "function") {
+    try {
+      logPushBroadcast(entry);
+    } catch {
+      // ignore broadcast failures
+    }
+  }
 }
 
 function normalizeLogText(value) {
@@ -1879,6 +2267,31 @@ function readBufferedLogs({ limit, minSeverity, source, contains }) {
   return filtered.slice(-limit).reverse();
 }
 
+function matchesLogEntryFilter(entry, options) {
+  if (!entry || typeof entry !== "object") {
+    return false;
+  }
+  if (!options || typeof options !== "object") {
+    return true;
+  }
+
+  if (severityRank(entry.severity) < severityRank(options.minSeverity)) {
+    return false;
+  }
+
+  const sourceFilter = String(options.source || "").trim().toLowerCase();
+  if (sourceFilter && !String(entry.from || "").toLowerCase().includes(sourceFilter)) {
+    return false;
+  }
+
+  const textFilter = String(options.contains || "").trim().toLowerCase();
+  if (textFilter && !String(entry.message || "").toLowerCase().includes(textFilter)) {
+    return false;
+  }
+
+  return true;
+}
+
 async function listJavaScriptEntries(adapter, options) {
   const limit = clampInt(options?.limit, 200, 1, 1000);
   const containsFilter = String(options?.contains || "")
@@ -1928,6 +2341,46 @@ async function listJavaScriptEntries(adapter, options) {
       return a.stateId.localeCompare(b.stateId, "de");
     })
     .slice(0, limit);
+}
+
+async function readScriptEntryForStateId(adapter, stateId, stateValue) {
+  const entries = await getCachedObjectEntries(adapter);
+  const cachedObject = entries.find((entry) => entry.id === stateId);
+  const name = resolveScriptName({
+    id: stateId,
+    name: cachedObject?.name || "",
+  });
+
+  return {
+    stateId,
+    name,
+    instance: resolveScriptInstance(stateId),
+    enabled: normalizeScriptEnabledValue(stateValue),
+  };
+}
+
+function matchesScriptInstance(options, instance) {
+  const filter = String(options?.instance || "").trim().toLowerCase();
+  if (!filter) {
+    return true;
+  }
+  return String(instance || "").trim().toLowerCase() === filter;
+}
+
+function matchesScriptEntryFilter(entry, options) {
+  if (!matchesScriptInstance(options, entry.instance)) {
+    return false;
+  }
+
+  const containsFilter = String(options?.contains || "").trim().toLowerCase();
+  if (!containsFilter) {
+    return true;
+  }
+
+  return (
+    String(entry.stateId || "").toLowerCase().includes(containsFilter) ||
+    String(entry.name || "").toLowerCase().includes(containsFilter)
+  );
 }
 
 function isScriptEnabledStateId(stateId) {

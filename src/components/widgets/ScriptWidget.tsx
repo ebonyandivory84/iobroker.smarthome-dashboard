@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { createElement, useEffect, useMemo, useRef, useState } from "react";
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useDocumentVisibility } from "../../hooks/useDocumentVisibility";
 import { IoBrokerClient } from "../../services/iobroker";
 import { IoBrokerScriptEntry, ScriptWidgetConfig } from "../../types/dashboard";
 import { palette } from "../../utils/theme";
@@ -9,6 +10,7 @@ import { playConfiguredUiSound } from "../../utils/uiSounds";
 type ScriptWidgetProps = {
   config: ScriptWidgetConfig;
   client: IoBrokerClient;
+  isActivePage?: boolean;
   onScrollModeChange?: (active: boolean) => void;
 };
 
@@ -23,14 +25,22 @@ type ExplorerFolder = {
   count: number;
 };
 
-export function ScriptWidget({ config, client, onScrollModeChange }: ScriptWidgetProps) {
+const SCRIPT_WS_PATH = "/smarthome-dashboard/ws-scripts";
+const WS_RECONNECT_BASE_DELAY_MS = 900;
+const WS_RECONNECT_MAX_DELAY_MS = 9000;
+
+export function ScriptWidget({ config, client, isActivePage = true, onScrollModeChange }: ScriptWidgetProps) {
+  const documentVisible = useDocumentVisibility();
+  const runtimeActive = isActivePage && documentVisible;
   const [entries, setEntries] = useState<IoBrokerScriptEntry[]>([]);
   const [pending, setPending] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  const [wsConnected, setWsConnected] = useState(false);
   const [isScrollActive, setIsScrollActive] = useState(false);
   const [currentPath, setCurrentPath] = useState<string[]>([]);
   const webRootRef = useRef<HTMLDivElement | null>(null);
   const webListRef = useRef<HTMLDivElement | null>(null);
+  const entriesRef = useRef<IoBrokerScriptEntry[]>([]);
   const lastScrollSoundAtRef = useRef(0);
   const scrollModeCallbackRef = useRef(onScrollModeChange);
 
@@ -44,6 +54,17 @@ export function ScriptWidget({ config, client, onScrollModeChange }: ScriptWidge
   const maxEntries = clampInt(config.maxEntries, 120, 1);
   const instanceFilter = (config.instanceFilter || "").trim();
   const textFilter = (config.textFilter || "").trim();
+  const scriptWsUrl = useMemo(() => buildScriptWebSocketUrl(), []);
+  const shouldUseScriptPushWebSocket = Platform.OS === "web" && runtimeActive && Boolean(scriptWsUrl);
+
+  useEffect(() => {
+    entriesRef.current = entries;
+  }, [entries]);
+
+  const applyEntries = useCallback((nextEntries: IoBrokerScriptEntry[]) => {
+    setEntries(nextEntries.slice(0, maxEntries));
+    setError(null);
+  }, [maxEntries]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined" || !isScrollActive) {
@@ -79,6 +100,138 @@ export function ScriptWidget({ config, client, onScrollModeChange }: ScriptWidge
   }, []);
 
   useEffect(() => {
+    if (!shouldUseScriptPushWebSocket || !scriptWsUrl) {
+      setWsConnected(false);
+      return;
+    }
+
+    let active = true;
+    let reconnectAttempt = 0;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let socket: WebSocket | null = null;
+
+    const clearReconnectTimer = () => {
+      if (!reconnectTimer) {
+        return;
+      }
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    };
+
+    const scheduleReconnect = () => {
+      if (!active) {
+        return;
+      }
+      clearReconnectTimer();
+      const delay = Math.min(WS_RECONNECT_MAX_DELAY_MS, WS_RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttempt);
+      reconnectAttempt = Math.min(reconnectAttempt + 1, 8);
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, delay);
+    };
+
+    const connect = () => {
+      if (!active) {
+        return;
+      }
+
+      try {
+        socket = new WebSocket(scriptWsUrl);
+      } catch (connectError) {
+        setWsConnected(false);
+        setError(connectError instanceof Error ? connectError.message : "Script websocket connection failed");
+        scheduleReconnect();
+        return;
+      }
+
+      socket.onopen = () => {
+        if (!active || !socket) {
+          return;
+        }
+        reconnectAttempt = 0;
+        setWsConnected(true);
+        setError(null);
+        socket.send(
+          JSON.stringify({
+            type: "watch",
+            limit: maxEntries,
+            instance: instanceFilter,
+            contains: textFilter,
+          })
+        );
+      };
+
+      socket.onmessage = (event) => {
+        if (!active) {
+          return;
+        }
+
+        try {
+          const payload = JSON.parse(String(event.data ?? ""));
+          if (payload?.type === "snapshot" && Array.isArray(payload?.entries)) {
+            applyEntries(payload.entries as IoBrokerScriptEntry[]);
+            return;
+          }
+          if (payload?.type === "entry" && payload?.entry && typeof payload.entry === "object") {
+            const incoming = payload.entry as IoBrokerScriptEntry;
+            const currentEntries = entriesRef.current || [];
+            if (payload?.action === "remove") {
+              applyEntries(currentEntries.filter((row) => row.stateId !== incoming.stateId));
+              return;
+            }
+            const nextEntries = [incoming, ...currentEntries.filter((row) => row.stateId !== incoming.stateId)];
+            applyEntries(nextEntries);
+            return;
+          }
+          if (payload?.type === "error" && typeof payload?.message === "string") {
+            setError(payload.message);
+          }
+        } catch {
+          // Ignore malformed websocket payloads; polling fallback stays active.
+        }
+      };
+
+      socket.onclose = () => {
+        if (!active) {
+          return;
+        }
+        setWsConnected(false);
+        scheduleReconnect();
+      };
+
+      socket.onerror = () => {
+        if (!active) {
+          return;
+        }
+        setWsConnected(false);
+      };
+    };
+
+    connect();
+
+    return () => {
+      active = false;
+      setWsConnected(false);
+      clearReconnectTimer();
+      if (socket) {
+        try {
+          socket.close();
+        } catch {
+          // Ignore best-effort socket close failures.
+        }
+      }
+    };
+  }, [applyEntries, instanceFilter, maxEntries, scriptWsUrl, shouldUseScriptPushWebSocket, textFilter]);
+
+  useEffect(() => {
+    if (!runtimeActive) {
+      return;
+    }
+    if (shouldUseScriptPushWebSocket && wsConnected) {
+      return;
+    }
+
     let active = true;
     let inFlight = false;
     let pendingSync = false;
@@ -96,8 +249,7 @@ export function ScriptWidget({ config, client, onScrollModeChange }: ScriptWidge
           contains: textFilter,
         });
         if (active) {
-          setEntries(scripts);
-          setError(null);
+          applyEntries(scripts);
         }
       } catch (syncError) {
         if (active) {
@@ -121,7 +273,7 @@ export function ScriptWidget({ config, client, onScrollModeChange }: ScriptWidge
       active = false;
       clearInterval(timer);
     };
-  }, [client, instanceFilter, maxEntries, refreshMs, textFilter]);
+  }, [applyEntries, client, instanceFilter, maxEntries, refreshMs, runtimeActive, shouldUseScriptPushWebSocket, textFilter, wsConnected]);
 
   const includeInstanceRoot = useMemo(() => {
     if (instanceFilter) {
@@ -399,6 +551,27 @@ function clampInt(value: number | undefined, fallback: number, min: number) {
     return fallback;
   }
   return Math.max(min, Math.round(value));
+}
+
+function buildScriptWebSocketUrl() {
+  if (Platform.OS !== "web" || typeof window === "undefined") {
+    return "";
+  }
+
+  try {
+    const baseUrl = window.location.origin || "";
+    if (!baseUrl) {
+      return "";
+    }
+    const url = new URL(baseUrl);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    url.pathname = SCRIPT_WS_PATH;
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return "";
+  }
 }
 
 function toExplorerEntry(entry: IoBrokerScriptEntry, includeInstanceRoot: boolean): ExplorerEntry {

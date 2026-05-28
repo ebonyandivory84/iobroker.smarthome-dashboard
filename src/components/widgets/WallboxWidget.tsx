@@ -9,6 +9,7 @@ import { palette } from "../../utils/theme";
 type WallboxWidgetProps = {
   config: WallboxWidgetConfig | GoEWidgetConfig;
   client: IoBrokerClient;
+  states: StateSnapshot;
   isActivePage?: boolean;
 };
 
@@ -22,8 +23,6 @@ type PendingConfirmation = {
 };
 type ConfigValueType = "boolean" | "number" | "string";
 
-const DEFAULT_REFRESH_MS = 2000;
-const MIN_REFRESH_MS = 500;
 const AMPERE_MIN = 6;
 const AMPERE_MAX = 16;
 const DEFAULT_GRID_AMPERE = 10;
@@ -103,7 +102,7 @@ const LEGACY_READ_IDS = {
   chargedEnergy: "go-e.0.eto",
 } as const;
 
-export function WallboxWidget({ config, client, isActivePage = true }: WallboxWidgetProps) {
+export function WallboxWidget({ config, client, states, isActivePage = true }: WallboxWidgetProps) {
   const documentVisible = useDocumentVisibility();
   const runtimeActive = isActivePage && documentVisible;
   const [widgetWidth, setWidgetWidth] = useState(0);
@@ -252,7 +251,6 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
       config.carRangeStateId,
     ]
   );
-  const [stateSnapshot, setStateSnapshot] = useState<StateSnapshot>({});
   const [pendingWrites, setPendingWrites] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [chargingPulseOn, setChargingPulseOn] = useState(true);
@@ -260,70 +258,14 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
   const barGlowAnim = useRef(new Animated.Value(0)).current;
   const autoStopMarkerRef = useRef("");
   const pendingConfirmationsRef = useRef<Record<string, PendingConfirmation>>({});
-  const refreshMs = clampInt(config.refreshMs, DEFAULT_REFRESH_MS, MIN_REFRESH_MS);
-  const readIds = useMemo(
-    () =>
-      uniqueStateIds([
-        ...Object.values(stateIds.write),
-        ...Object.values(stateIds.status),
-        ...Object.values(stateIds.read),
-        stateIds.emergencyStop,
-      ]),
-    [stateIds]
-  );
-
-  useEffect(() => {
-    if (!runtimeActive) {
-      return;
-    }
-    let active = true;
-    let inFlight = false;
-    let pendingSync = false;
-
-    const sync = async () => {
-      if (inFlight) {
-        pendingSync = true;
-        return;
-      }
-      inFlight = true;
-      try {
-        const next = await client.readStates(readIds);
-        if (active) {
-          setStateSnapshot((current) => mergeStateSnapshot(current, readIds, next));
-          setError(null);
-        }
-      } catch (syncError) {
-        if (active) {
-          setError(syncError instanceof Error ? syncError.message : "Wallbox-States konnten nicht geladen werden");
-        }
-      } finally {
-        inFlight = false;
-        if (active && pendingSync) {
-          pendingSync = false;
-          void sync();
-        }
-      }
-    };
-
-    void sync();
-    const timer = setInterval(() => {
-      void sync();
-    }, refreshMs);
-
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, [client, readIds, refreshMs, runtimeActive]);
-
   const readValue = useCallback(
     (stateId: string) => {
       if (!stateId) {
         return undefined;
       }
-      return stateSnapshot[stateId];
+      return states[stateId];
     },
-    [stateSnapshot]
+    [states]
   );
 
   const modeWriteTypes = {
@@ -594,7 +536,7 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
     const expired: PendingConfirmation[] = [];
 
     entries.forEach(([confirmationId, confirmation]) => {
-      const currentValue = stateSnapshot[confirmation.watchStateId];
+      const currentValue = states[confirmation.watchStateId];
       if (confirmation.matcher(currentValue)) {
         resolved.push(confirmation);
         delete pendingConfirmationsRef.current[confirmationId];
@@ -628,7 +570,7 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
     if (expired.length) {
       setError("Bestaetigung aus Status blieb aus");
     }
-  }, [playConfirmSound, stateSnapshot]);
+  }, [playConfirmSound, states]);
 
   useEffect(() => {
     if (!runtimeActive) {
@@ -1480,18 +1422,6 @@ export function WallboxWidget({ config, client, isActivePage = true }: WallboxWi
       </View>
     </View>
   );
-}
-
-function uniqueStateIds(ids: string[]) {
-  return [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
-}
-
-function mergeStateSnapshot(current: StateSnapshot, watchedIds: string[], next: StateSnapshot) {
-  const merged: StateSnapshot = { ...current };
-  watchedIds.forEach((stateId) => {
-    merged[stateId] = next[stateId];
-  });
-  return merged;
 }
 
 function resolveStateId(candidate: string | undefined, fallback: string) {
