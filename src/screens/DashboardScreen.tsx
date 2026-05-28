@@ -248,7 +248,7 @@ export function DashboardScreen() {
       return;
     }
 
-    horizontalPagerRef.current.scrollTo({ x: width * activePageIndex, animated: true });
+    horizontalPagerRef.current.scrollTo({ x: width * activePageIndex, animated: false });
   }, [activePageIndex, width]);
 
   useEffect(() => {
@@ -557,7 +557,7 @@ export function DashboardScreen() {
     moveWidgetToPage(widgetId, targetPage.id, position);
     setVisiblePageId(targetPage.id);
     horizontalOffsetRef.current = width * targetIndex;
-    horizontalPagerRef.current?.scrollTo({ x: width * targetIndex, animated: true });
+    horizontalPagerRef.current?.scrollTo({ x: width * targetIndex, animated: false });
     playConfiguredUiSound(config.uiSounds?.pageSounds?.swipe, "swipe", "global:dragEdgePageTransfer");
   };
 
@@ -834,7 +834,7 @@ export function DashboardScreen() {
           const nextIndex = dashboardPages.findIndex((page) => page.id === pageId);
           if (nextIndex >= 0) {
             horizontalOffsetRef.current = width * nextIndex;
-            horizontalPagerRef.current?.scrollTo({ x: width * nextIndex, animated: true });
+            horizontalPagerRef.current?.scrollTo({ x: width * nextIndex, animated: false });
           }
           setVisiblePageId(pageId);
           setActivePage(pageId);
