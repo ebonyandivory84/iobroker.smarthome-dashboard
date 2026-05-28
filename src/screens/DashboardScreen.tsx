@@ -92,6 +92,7 @@ export function DashboardScreen() {
   const lastContentScrollAt = useRef(0);
   const activePageIndex = Math.max(0, dashboardPages.findIndex((page) => page.id === activePageId));
   const visiblePageIndex = Math.max(0, dashboardPages.findIndex((page) => page.id === visiblePageId));
+  const minimizePagePreload = Platform.OS === "web" && isTouchCapableWeb;
 
   const pageConfigs = useMemo(
     () =>
@@ -862,8 +863,9 @@ export function DashboardScreen() {
       >
         {pageConfigs.map((pageConfig, pageIndex) => {
           const isNearViewport = Math.abs(pageIndex - visiblePageIndex) <= 1;
+          const isVisible = pageIndex === visiblePageIndex;
           const isActive = pageIndex === activePageIndex;
-          const shouldRenderContent = isNearViewport || isActive;
+          const shouldRenderContent = minimizePagePreload ? isVisible || isActive : isNearViewport || isActive;
 
           return (
             <View key={pageConfig.activePageId} style={[styles.page, { width }]}>

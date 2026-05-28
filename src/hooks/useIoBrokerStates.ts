@@ -3,6 +3,7 @@ import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { IoBrokerClient } from "../services/iobroker";
 import { StateSnapshot, WidgetConfig } from "../types/dashboard";
 import { resolveMobileWidget } from "../utils/mobileWidget";
+import { useDocumentVisibility } from "./useDocumentVisibility";
 
 export type StateWriteFeedback = {
   expectedValue: unknown;
@@ -108,14 +109,28 @@ const normalizeStateIds = (stateIds: string[]) =>
 
 export function useIoBrokerStates() {
   const { config } = useDashboardConfig();
+  const documentVisible = useDocumentVisibility();
   const [states, setStates] = useState<StateSnapshot>({});
   const [stateWrites, setStateWrites] = useState<Record<string, StateWriteFeedback>>({});
   const [error, setError] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(false);
-  const client = useMemo(() => new IoBrokerClient(config), [config]);
+  const client = useMemo(
+    () => new IoBrokerClient(config),
+    [
+      config.iobroker.adapterBasePath,
+      config.iobroker.baseUrl,
+      config.iobroker.password,
+      config.iobroker.token,
+      config.iobroker.username,
+    ]
+  );
   const watchedStateIds = useMemo(() => normalizeStateIds(pickStateIds(config.widgets)), [config.widgets]);
 
   useEffect(() => {
+    if (!documentVisible) {
+      return;
+    }
+
     let active = true;
     let syncInFlight = false;
     let syncPending = false;
@@ -129,8 +144,13 @@ export function useIoBrokerStates() {
       try {
         const next = await client.readStates(watchedStateIds);
         if (active) {
-          setStates(next);
-          setStateWrites((current) => resolveStateWriteFeedback(current, next));
+          let nextSnapshot = next;
+          setStates((current) => {
+            const normalized = buildWatchedStateSnapshot(current, next, watchedStateIds);
+            nextSnapshot = normalized;
+            return areStateSnapshotsEqual(current, normalized, watchedStateIds) ? current : normalized;
+          });
+          setStateWrites((current) => resolveStateWriteFeedback(current, nextSnapshot));
           setError(null);
           setIsOnline(true);
         }
@@ -158,7 +178,7 @@ export function useIoBrokerStates() {
       active = false;
       clearInterval(timer);
     };
-  }, [client, config.pollingMs, watchedStateIds]);
+  }, [client, config.pollingMs, documentVisible, watchedStateIds]);
 
   const writeStateTracked = async (stateId: string, value: unknown) => {
     const startedAt = Date.now();
@@ -195,6 +215,40 @@ export function useIoBrokerStates() {
     stateWrites,
     writeStateTracked,
   };
+}
+
+function buildWatchedStateSnapshot(
+  previous: StateSnapshot,
+  incoming: StateSnapshot,
+  watchedStateIds: string[]
+) {
+  const next: StateSnapshot = {};
+
+  for (const stateId of watchedStateIds) {
+    if (Object.prototype.hasOwnProperty.call(incoming, stateId)) {
+      next[stateId] = incoming[stateId];
+      continue;
+    }
+    if (Object.prototype.hasOwnProperty.call(previous, stateId)) {
+      next[stateId] = previous[stateId];
+    }
+  }
+
+  return next;
+}
+
+function areStateSnapshotsEqual(current: StateSnapshot, next: StateSnapshot, watchedStateIds: string[]) {
+  if (Object.keys(current).length !== Object.keys(next).length) {
+    return false;
+  }
+
+  for (const stateId of watchedStateIds) {
+    if (!Object.is(current[stateId], next[stateId])) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function resolveStateWriteFeedback(

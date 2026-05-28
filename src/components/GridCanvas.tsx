@@ -71,6 +71,7 @@ export function GridCanvas({
       (typeof window !== "undefined" &&
         "matchMedia" in window &&
         window.matchMedia("(pointer: coarse)").matches)));
+  const useLowPowerWebEffects = Platform.OS === "web" && isCoarsePointerWeb;
   const isPhoneLikeWeb = isCoarsePointerWeb && Math.max(windowWidth, windowHeight) < 1000;
   const isCompactViewport = windowWidth < 700 || isPhoneLikeWeb;
   const isCompactWeb = Platform.OS === "web" && isCompactViewport;
@@ -170,6 +171,7 @@ export function GridCanvas({
         onWriteState={onWriteState}
         onDragAcrossPageEdge={onDragAcrossPageEdge}
         onWidgetScrollFocusChange={onWidgetScrollFocusChange}
+        lowPowerMode={useLowPowerWebEffects}
         stateWrites={stateWrites}
         states={states}
       />
@@ -878,6 +880,7 @@ function WebGridCanvas({
   config,
   isActivePage,
   mainColumnExtraGap,
+  lowPowerMode,
   sourceColumns,
   theme,
   states,
@@ -897,6 +900,7 @@ function WebGridCanvas({
   config: DashboardSettings;
   isActivePage: boolean;
   mainColumnExtraGap: number;
+  lowPowerMode: boolean;
   sourceColumns: number;
   theme: ReturnType<typeof resolveThemeSettings>;
   states: StateSnapshot;
@@ -951,6 +955,7 @@ function WebGridCanvas({
             widget.type === "heating" ||
             widget.type === "heatingV2"
           }
+          lowPowerMode={lowPowerMode}
           mainColumnExtraGap={mainColumnExtraGap}
           sourceColumns={sourceColumns}
           states={states}
@@ -984,6 +989,7 @@ function WebWidgetShell({
   stateWrites,
   allowManualLayout = true,
   allowResize = true,
+  lowPowerMode,
   mainColumnExtraGap,
   sourceColumns,
 }: {
@@ -1007,6 +1013,7 @@ function WebWidgetShell({
   stateWrites?: Record<string, StateWriteFeedback>;
   allowManualLayout?: boolean;
   allowResize?: boolean;
+  lowPowerMode: boolean;
   mainColumnExtraGap: number;
   sourceColumns: number;
 }) {
@@ -1233,6 +1240,13 @@ function WebWidgetShell({
   const shellStyle: CSSProperties = {
     ...webWidgetStyle,
     ...getWidgetTone(widget, theme),
+    ...(lowPowerMode
+      ? {
+          backdropFilter: "none",
+          WebkitBackdropFilter: "none",
+          boxShadow: "none",
+        }
+      : null),
     ...(widget.type === "camera" || widget.type === "cameraTalk" || widget.type === "cameraTalkReolink"
       ? {
           border: "none",
