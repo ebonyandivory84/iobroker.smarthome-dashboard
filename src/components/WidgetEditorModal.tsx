@@ -49,7 +49,10 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
     return sourcePage?.id || null;
   }, [dashboardPages, widget]);
   const copyTargetPages = useMemo(
-    () => (widget ? dashboardPages.filter((page) => page.id !== sourcePageId) : []),
+    () =>
+      widget
+        ? dashboardPages.filter((page) => page.id !== sourcePageId && (page.mode || "dashboard") !== "url")
+        : [],
     [dashboardPages, sourcePageId, widget]
   );
 

@@ -121,6 +121,7 @@ export const defaultConfig: DashboardSettings = {
     {
       id: "home",
       title: "SmartHome Control",
+      mode: "dashboard",
       widgets: defaultWidgets,
     },
   ],

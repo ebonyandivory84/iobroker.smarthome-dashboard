@@ -8,6 +8,7 @@ type WidgetLibraryModalProps = {
   onClose: () => void;
   onSelectType: (type: WidgetType) => void;
   onCreateDashboard: () => void;
+  onCreateUrlPage: () => void;
 };
 
 const OPTIONS: Array<{
@@ -143,6 +144,7 @@ export function WidgetLibraryModal({
   onClose,
   onSelectType,
   onCreateDashboard,
+  onCreateUrlPage,
 }: WidgetLibraryModalProps) {
   return (
     <Modal animationType="fade" transparent visible={visible}>
@@ -167,6 +169,19 @@ export function WidgetLibraryModal({
               </View>
               <Text style={styles.optionTitle}>Neues Dashboard</Text>
               <Text style={styles.optionText}>Erstellt eine weitere Seite, zwischen der du wischen oder tippen kannst.</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                onCreateUrlPage();
+                onClose();
+              }}
+              style={[styles.option, styles.optionFeature]}
+            >
+              <View style={styles.iconWrap}>
+                <MaterialCommunityIcons color={palette.accent} name="web" size={28} />
+              </View>
+              <Text style={styles.optionTitle}>Neue URL-Seite</Text>
+              <Text style={styles.optionText}>Erstellt eine Side Page, die eine komplette Webseite als Inhalt rendert.</Text>
             </Pressable>
             {OPTIONS.map((option, index) => (
               <Pressable

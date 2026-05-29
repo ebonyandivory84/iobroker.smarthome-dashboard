@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Linking,
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -19,7 +20,7 @@ import { WidgetEditorModal } from "../components/WidgetEditorModal";
 import { WidgetLibraryModal } from "../components/WidgetLibraryModal";
 import { useDashboardConfig } from "../context/DashboardConfigContext";
 import { useIoBrokerStates } from "../hooks/useIoBrokerStates";
-import { BackgroundMode, WidgetConfig, WidgetType } from "../types/dashboard";
+import { BackgroundMode, DashboardPageMode, WidgetConfig, WidgetType } from "../types/dashboard";
 import { constrainToPrimarySections, normalizeWidgetLayout, resolveWidgetPosition } from "../utils/gridLayout";
 import { buildMobileOverrideFromWidget, resolveMobileWidget } from "../utils/mobileWidget";
 import { configureUiSounds, playConfiguredUiSound, primeConfiguredSounds } from "../utils/uiSounds";
@@ -69,7 +70,7 @@ export function DashboardScreen() {
     activePageId,
     createDashboardPage,
     moveDashboardPage,
-    renameDashboardPage,
+    updateDashboardPage,
     deleteDashboardPage,
     moveWidgetToPage,
     removeWidget,
@@ -86,8 +87,10 @@ export function DashboardScreen() {
   const [scrollFocusWidgetId, setScrollFocusWidgetId] = useState<string | null>(null);
   const [layoutMode, setLayoutMode] = useState(false);
   const [visiblePageId, setVisiblePageId] = useState(activePageId);
-  const [renamePageId, setRenamePageId] = useState<string | null>(null);
-  const [renamePageTitle, setRenamePageTitle] = useState("");
+  const [pageSettingsPageId, setPageSettingsPageId] = useState<string | null>(null);
+  const [pageSettingsTitle, setPageSettingsTitle] = useState("");
+  const [pageSettingsMode, setPageSettingsMode] = useState<DashboardPageMode>("dashboard");
+  const [pageSettingsUrl, setPageSettingsUrl] = useState("");
   const [deletePageId, setDeletePageId] = useState<string | null>(null);
   const lastContentScrollAt = useRef(0);
   const activePageIndex = Math.max(0, dashboardPages.findIndex((page) => page.id === activePageId));
@@ -99,18 +102,24 @@ export function DashboardScreen() {
       dashboardPages.map((page) => ({
         ...config,
         title: page.title,
+        mode: page.mode,
+        url: page.url,
         widgets: page.widgets,
         activePageId: page.id,
       })),
     [config, dashboardPages]
   );
-  const renameTargetPage = useMemo(
-    () => dashboardPages.find((page) => page.id === renamePageId) || null,
-    [dashboardPages, renamePageId]
+  const pageSettingsTargetPage = useMemo(
+    () => dashboardPages.find((page) => page.id === pageSettingsPageId) || null,
+    [dashboardPages, pageSettingsPageId]
   );
   const deleteTargetPage = useMemo(
     () => dashboardPages.find((page) => page.id === deletePageId) || null,
     [dashboardPages, deletePageId]
+  );
+  const activeDashboardPage = useMemo(
+    () => dashboardPages.find((page) => page.id === activePageId) || null,
+    [dashboardPages, activePageId]
   );
 
   useEffect(() => {
@@ -383,6 +392,9 @@ export function DashboardScreen() {
   }, [config.uiSounds, dashboardPages]);
 
   const addWidgetByType = (type: WidgetType) => {
+    if (normalizeDashboardPageMode(activeDashboardPage?.mode) === "url") {
+      return;
+    }
     const widget = buildWidgetTemplate(type, config.widgets.length, { columns: config.grid.columns });
     const existingIds = new Set(config.widgets.map((entry) => entry.id));
     if (existingIds.has(widget.id)) {
@@ -483,30 +495,42 @@ export function DashboardScreen() {
     updateWidget(widgetId, partial);
   };
 
-  const closeRenameDialog = () => {
-    setRenamePageId(null);
-    setRenamePageTitle("");
+  const closePageSettingsDialog = () => {
+    setPageSettingsPageId(null);
+    setPageSettingsTitle("");
+    setPageSettingsMode("dashboard");
+    setPageSettingsUrl("");
   };
 
-  const openRenameDialog = (pageId: string) => {
+  const openPageSettingsDialog = (pageId: string) => {
     const page = dashboardPages.find((entry) => entry.id === pageId);
     if (!page) {
       return;
     }
-    setRenamePageId(pageId);
-    setRenamePageTitle(page.title);
+    const pageMode = normalizeDashboardPageMode(page.mode);
+    setPageSettingsPageId(pageId);
+    setPageSettingsTitle(page.title);
+    setPageSettingsMode(pageMode);
+    setPageSettingsUrl(page.url || "");
   };
 
-  const submitRenameDialog = () => {
-    if (!renamePageId) {
+  const submitPageSettingsDialog = () => {
+    if (!pageSettingsPageId) {
       return;
     }
-    const nextTitle = renamePageTitle.trim();
+    const nextTitle = pageSettingsTitle.trim();
     if (!nextTitle) {
       return;
     }
-    renameDashboardPage(renamePageId, nextTitle);
-    closeRenameDialog();
+    if (pageSettingsMode === "url" && !normalizeUrl(pageSettingsUrl)) {
+      return;
+    }
+    updateDashboardPage(pageSettingsPageId, {
+      title: nextTitle,
+      mode: pageSettingsMode,
+      url: pageSettingsMode === "url" ? pageSettingsUrl : "",
+    });
+    closePageSettingsDialog();
   };
 
   const closeDeleteDialog = () => {
@@ -844,7 +868,7 @@ export function DashboardScreen() {
           moveDashboardPage(pageId, direction);
         }}
         onRenamePage={(pageId) => {
-          openRenameDialog(pageId);
+          openPageSettingsDialog(pageId);
         }}
         onDeletePage={(pageId) => {
           openDeleteDialog(pageId);
@@ -866,74 +890,80 @@ export function DashboardScreen() {
           const isVisible = pageIndex === visiblePageIndex;
           const isActive = pageIndex === activePageIndex;
           const shouldRenderContent = minimizePagePreload ? isVisible || isActive : isNearViewport || isActive;
+          const pageMode = normalizeDashboardPageMode(pageConfig.mode);
+          const isUrlPage = pageMode === "url";
 
           return (
             <View key={pageConfig.activePageId} style={[styles.page, { width }]}>
               {shouldRenderContent ? (
-                <ScrollView
-                  contentContainerStyle={styles.scrollContent}
-                  scrollEnabled={!scrollFocusWidgetId}
-                  style={styles.pageScroll}
-                  onScroll={handlePageContentScroll(pageConfig.activePageId)}
-                  onMomentumScrollEnd={handleContentScrollEnd}
-                  onScrollEndDrag={handleContentScrollEnd}
-                  onTouchStart={handlePageTouchStart(pageConfig.activePageId)}
-                  onTouchMove={handlePageTouchMove(pageConfig.activePageId)}
-                  onTouchEnd={handlePageTouchEnd(pageConfig.activePageId)}
-                >
-                  <GridCanvas
-                    client={client}
-                    config={pageConfig}
-                    isActivePage={isActive}
-                    isLayoutMode={layoutMode}
-                    onCameraFullscreenSwipeClose={() => {
-                      pullRefreshBlockedUntilRef.current = Date.now() + 2500;
-                      pullGestureRef.current = {
-                        pageId: null,
-                        startX: null,
-                        startY: null,
-                        lastX: null,
-                        lastY: null,
-                        armed: false,
-                        startedAt: 0,
-                        movedAt: 0,
-                      };
-                    }}
-                    onCameraFullscreenVisibilityChange={(widgetId, open) => {
-                      fullscreenCameraMapRef.current[widgetId] = open;
-                      if (!open) {
+                isUrlPage ? (
+                  <UrlSidePage title={pageConfig.title} url={pageConfig.url || ""} />
+                ) : (
+                  <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    scrollEnabled={!scrollFocusWidgetId}
+                    style={styles.pageScroll}
+                    onScroll={handlePageContentScroll(pageConfig.activePageId)}
+                    onMomentumScrollEnd={handleContentScrollEnd}
+                    onScrollEndDrag={handleContentScrollEnd}
+                    onTouchStart={handlePageTouchStart(pageConfig.activePageId)}
+                    onTouchMove={handlePageTouchMove(pageConfig.activePageId)}
+                    onTouchEnd={handlePageTouchEnd(pageConfig.activePageId)}
+                  >
+                    <GridCanvas
+                      client={client}
+                      config={pageConfig}
+                      isActivePage={isActive}
+                      isLayoutMode={layoutMode}
+                      onCameraFullscreenSwipeClose={() => {
                         pullRefreshBlockedUntilRef.current = Date.now() + 2500;
-                      }
-                      pullGestureRef.current = {
-                        pageId: null,
-                        startX: null,
-                        startY: null,
-                        lastX: null,
-                        lastY: null,
-                        armed: false,
-                        startedAt: 0,
-                        movedAt: 0,
-                      };
-                    }}
-                    onEditWidget={setEditingWidgetId}
-                    onRemoveWidget={removeWidget}
-                    onUpdateWidget={handleUpdateWidget}
-                    onWriteState={writeStateTracked}
-                    onDragAcrossPageEdge={(direction, widgetId, position) =>
-                      handleDragAcrossPageEdge(pageConfig.activePageId, direction, widgetId, position)
-                    }
-                    onWidgetScrollFocusChange={(widgetId, active) => {
-                      setScrollFocusWidgetId((current) => {
-                        if (active) {
-                          return widgetId;
+                        pullGestureRef.current = {
+                          pageId: null,
+                          startX: null,
+                          startY: null,
+                          lastX: null,
+                          lastY: null,
+                          armed: false,
+                          startedAt: 0,
+                          movedAt: 0,
+                        };
+                      }}
+                      onCameraFullscreenVisibilityChange={(widgetId, open) => {
+                        fullscreenCameraMapRef.current[widgetId] = open;
+                        if (!open) {
+                          pullRefreshBlockedUntilRef.current = Date.now() + 2500;
                         }
-                        return current === widgetId ? null : current;
-                      });
-                    }}
-                    stateWrites={stateWrites}
-                    states={states}
-                  />
-                </ScrollView>
+                        pullGestureRef.current = {
+                          pageId: null,
+                          startX: null,
+                          startY: null,
+                          lastX: null,
+                          lastY: null,
+                          armed: false,
+                          startedAt: 0,
+                          movedAt: 0,
+                        };
+                      }}
+                      onEditWidget={setEditingWidgetId}
+                      onRemoveWidget={removeWidget}
+                      onUpdateWidget={handleUpdateWidget}
+                      onWriteState={writeStateTracked}
+                      onDragAcrossPageEdge={(direction, widgetId, position) =>
+                        handleDragAcrossPageEdge(pageConfig.activePageId, direction, widgetId, position)
+                      }
+                      onWidgetScrollFocusChange={(widgetId, active) => {
+                        setScrollFocusWidgetId((current) => {
+                          if (active) {
+                            return widgetId;
+                          }
+                          return current === widgetId ? null : current;
+                        });
+                      }}
+                      stateWrites={stateWrites}
+                      states={states}
+                    />
+                  </ScrollView>
+                )
               ) : (
                 <View style={styles.pagePlaceholder} />
               )}
@@ -943,6 +973,7 @@ export function DashboardScreen() {
       </ScrollView>
       <WidgetLibraryModal
         onCreateDashboard={createDashboardPage}
+        onCreateUrlPage={() => createDashboardPage("url")}
         onClose={() => setLibraryOpen(false)}
         onSelectType={addWidgetByType}
         visible={libraryOpen}
@@ -957,34 +988,86 @@ export function DashboardScreen() {
       <SettingsModal onClose={() => setSettingsOpen(false)} visible={settingsOpen} />
       <Modal
         animationType="fade"
-        onRequestClose={closeRenameDialog}
+        onRequestClose={closePageSettingsDialog}
         transparent
-        visible={Boolean(renameTargetPage)}
+        visible={Boolean(pageSettingsTargetPage)}
       >
         <View style={styles.renameBackdrop}>
           <View style={styles.renameCard}>
-            <Text style={styles.renameTitle}>Side-Page umbenennen</Text>
+            <Text style={styles.renameTitle}>Side-Page Einstellungen</Text>
             <Text style={styles.renameHint}>Titel fuer den Seiten-Button:</Text>
             <TextInput
               autoFocus
-              onChangeText={setRenamePageTitle}
-              onSubmitEditing={submitRenameDialog}
+              onChangeText={setPageSettingsTitle}
+              onSubmitEditing={submitPageSettingsDialog}
               placeholder="z. B. Wallbox, Garten, Uebersicht"
               placeholderTextColor={palette.textMuted}
               style={styles.renameInput}
-              value={renamePageTitle}
+              value={pageSettingsTitle}
             />
+            <Text style={styles.renameHint}>Seiten-Typ:</Text>
+            <View style={styles.pageModeRow}>
+              <Pressable
+                onPress={() => setPageSettingsMode("dashboard")}
+                style={[
+                  styles.pageModeButton,
+                  pageSettingsMode === "dashboard" ? styles.pageModeButtonActive : null,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.pageModeButtonLabel,
+                    pageSettingsMode === "dashboard" ? styles.pageModeButtonLabelActive : null,
+                  ]}
+                >
+                  Dashboard
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setPageSettingsMode("url")}
+                style={[
+                  styles.pageModeButton,
+                  pageSettingsMode === "url" ? styles.pageModeButtonActive : null,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.pageModeButtonLabel,
+                    pageSettingsMode === "url" ? styles.pageModeButtonLabelActive : null,
+                  ]}
+                >
+                  URL
+                </Text>
+              </Pressable>
+            </View>
+            {pageSettingsMode === "url" ? (
+              <>
+                <Text style={styles.renameHint}>URL der Seite:</Text>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onChangeText={setPageSettingsUrl}
+                  onSubmitEditing={submitPageSettingsDialog}
+                  placeholder="https://..."
+                  placeholderTextColor={palette.textMuted}
+                  style={styles.renameInput}
+                  value={pageSettingsUrl}
+                />
+              </>
+            ) : null}
             <View style={styles.renameActions}>
-              <Pressable onPress={closeRenameDialog} style={[styles.renameButton, styles.renameButtonSecondary]}>
+              <Pressable onPress={closePageSettingsDialog} style={[styles.renameButton, styles.renameButtonSecondary]}>
                 <Text style={styles.renameButtonSecondaryLabel}>Abbrechen</Text>
               </Pressable>
               <Pressable
-                disabled={!renamePageTitle.trim()}
-                onPress={submitRenameDialog}
+                disabled={!pageSettingsTitle.trim() || (pageSettingsMode === "url" && !normalizeUrl(pageSettingsUrl))}
+                onPress={submitPageSettingsDialog}
                 style={[
                   styles.renameButton,
                   styles.renameButtonPrimary,
-                  !renamePageTitle.trim() ? styles.renameButtonDisabled : null,
+                  !pageSettingsTitle.trim() || (pageSettingsMode === "url" && !normalizeUrl(pageSettingsUrl))
+                    ? styles.renameButtonDisabled
+                    : null,
                 ]}
               >
                 <Text style={styles.renameButtonPrimaryLabel}>Speichern</Text>
@@ -1019,6 +1102,58 @@ export function DashboardScreen() {
       </Modal>
     </View>
   );
+}
+
+function UrlSidePage({ title, url }: { title: string; url?: string }) {
+  const resolvedUrl = normalizeUrl(url);
+  if (!resolvedUrl) {
+    return (
+      <View style={styles.urlFallback}>
+        <Text style={styles.urlFallbackTitle}>URL fehlt</Text>
+        <Text style={styles.urlFallbackHint}>Trage in den Seiten-Einstellungen eine gueltige URL ein.</Text>
+      </View>
+    );
+  }
+
+  if (Platform.OS === "web") {
+    return createElement(
+      "div",
+      { style: webUrlPageWrapStyle },
+      createElement("iframe", {
+        src: resolvedUrl,
+        style: webUrlPageFrameStyle,
+        allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
+        allowFullScreen: true,
+        loading: "eager",
+        referrerPolicy: "no-referrer",
+      })
+    );
+  }
+
+  return (
+    <View style={styles.urlFallback}>
+      <Text style={styles.urlFallbackTitle}>{title || "URL-Seite"}</Text>
+      <Text style={styles.urlFallbackHint}>Diese Seite wird auf nativen Clients extern geoeffnet.</Text>
+      <Pressable onPress={() => void Linking.openURL(resolvedUrl)} style={[styles.renameButton, styles.renameButtonPrimary]}>
+        <Text style={styles.renameButtonPrimaryLabel}>URL oeffnen</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function normalizeDashboardPageMode(value: unknown): DashboardPageMode {
+  return value === "url" ? "url" : "dashboard";
+}
+
+function normalizeUrl(value?: string) {
+  const trimmed = (value || "").trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  return `https://${trimmed}`;
 }
 
 function extractTouchPoint(event: unknown) {
@@ -1141,6 +1276,31 @@ const styles = StyleSheet.create({
   pagePlaceholder: {
     flex: 1,
   },
+  urlFallback: {
+    flex: 1,
+    marginTop: 10,
+    marginHorizontal: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: "rgba(4, 10, 18, 0.9)",
+    padding: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  urlFallbackTitle: {
+    color: palette.text,
+    fontSize: 18,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  urlFallbackHint: {
+    color: palette.textMuted,
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 19,
+  },
   pageScroll: {
     flex: 1,
     ...(Platform.OS === "web"
@@ -1185,6 +1345,33 @@ const styles = StyleSheet.create({
     color: palette.text,
     paddingHorizontal: 12,
     paddingVertical: 10,
+  },
+  pageModeRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  pageModeButton: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pageModeButtonActive: {
+    borderColor: "rgba(77, 226, 177, 0.4)",
+    backgroundColor: "rgba(77, 226, 177, 0.15)",
+  },
+  pageModeButtonLabel: {
+    color: palette.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  pageModeButtonLabelActive: {
+    color: palette.text,
   },
   renameActions: {
     marginTop: 4,
@@ -1246,3 +1433,22 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 });
+
+const webUrlPageWrapStyle = {
+  width: "100%",
+  height: "100%",
+  paddingTop: "4px",
+  paddingBottom: "86px",
+  paddingLeft: "10px",
+  paddingRight: "10px",
+  boxSizing: "border-box",
+};
+
+const webUrlPageFrameStyle = {
+  width: "100%",
+  height: "100%",
+  border: "0",
+  borderRadius: "18px",
+  background: "rgba(4, 10, 18, 0.92)",
+  display: "block",
+};

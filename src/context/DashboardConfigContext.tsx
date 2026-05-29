@@ -6,7 +6,14 @@ import {
   useMemo,
   useState,
 } from "react";
-import { CameraWidgetConfig, DashboardPage, DashboardSettings, UiSoundSettings, WidgetConfig } from "../types/dashboard";
+import {
+  CameraWidgetConfig,
+  DashboardPage,
+  DashboardPageMode,
+  DashboardSettings,
+  UiSoundSettings,
+  WidgetConfig,
+} from "../types/dashboard";
 import { defaultConfig } from "../utils/defaultConfig";
 import { normalizeSoundSelection } from "../utils/lcarsSounds";
 import { buildMobileOverrideFromWidget, resolveMobileWidget, stripMobileWidgetMeta } from "../utils/mobileWidget";
@@ -31,9 +38,10 @@ type DashboardConfigContextValue = {
   moveWidgetToPage: (widgetId: string, targetPageId: string, position?: WidgetConfig["position"]) => void;
   copyWidgetToPage: (widgetId: string, targetPageId: string) => void;
   setActivePage: (pageId: string) => void;
-  createDashboardPage: () => void;
+  createDashboardPage: (mode?: DashboardPageMode) => void;
   moveDashboardPage: (pageId: string, direction: "left" | "right") => void;
   renameDashboardPage: (pageId: string, title: string) => void;
+  updateDashboardPage: (pageId: string, partial: { title?: string; mode?: DashboardPageMode; url?: string }) => void;
   deleteDashboardPage: (pageId: string) => void;
   refreshSavedDashboards: () => Promise<void>;
   saveNamedDashboard: (name: string) => Promise<{ ok: boolean; error?: string }>;
@@ -305,7 +313,7 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
       moveWidgetToPage(widgetId, targetPageId, position) {
         const pages = config.pages || [];
         const targetPage = pages.find((page) => page.id === targetPageId);
-        if (!targetPage) {
+        if (!targetPage || normalizeDashboardPageMode(targetPage.mode) === "url") {
           return;
         }
 
@@ -354,7 +362,7 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
       copyWidgetToPage(widgetId, targetPageId) {
         const pages = config.pages || [];
         const targetPage = pages.find((page) => page.id === targetPageId);
-        if (!targetPage) {
+        if (!targetPage || normalizeDashboardPageMode(targetPage.mode) === "url") {
           return;
         }
 
@@ -392,7 +400,7 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
           pages: nextPages,
           activePageId: activePage.id,
           title: activePage.title,
-          widgets: activePage.widgets,
+          widgets: getRuntimeWidgetsForPage(activePage),
         });
       },
       setActivePage(pageId) {
@@ -408,15 +416,18 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
           ...config,
           activePageId: nextPage.id,
           title: nextPage.title,
-          widgets: nextPage.widgets,
+          widgets: getRuntimeWidgetsForPage(nextPage),
         });
       },
-      createDashboardPage() {
+      createDashboardPage(mode = "dashboard") {
         const existingPages = config.pages || [];
         const suffix = existingPages.length + 1;
+        const pageMode = normalizeDashboardPageMode(mode);
         const nextPage: DashboardPage = {
           id: `dashboard-${Date.now()}`,
-          title: `Dashboard ${suffix}`,
+          title: pageMode === "url" ? `URL ${suffix}` : `Dashboard ${suffix}`,
+          mode: pageMode,
+          url: pageMode === "url" ? "https://" : "",
           widgets: [],
         };
 
@@ -425,7 +436,7 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
           pages: [...existingPages, nextPage],
           activePageId: nextPage.id,
           title: nextPage.title,
-          widgets: nextPage.widgets,
+          widgets: getRuntimeWidgetsForPage(nextPage),
         });
       },
       moveDashboardPage(pageId, direction) {
@@ -459,15 +470,10 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
           pages: nextPages,
           activePageId: activePage.id,
           title: activePage.title,
-          widgets: activePage.widgets,
+          widgets: getRuntimeWidgetsForPage(activePage),
         });
       },
-      renameDashboardPage(pageId, title) {
-        const nextTitle = title.trim();
-        if (!nextTitle) {
-          return;
-        }
-
+      updateDashboardPage(pageId, partial) {
         const pages = config.pages || [];
         let changed = false;
         const nextPages = pages.map((page) => {
@@ -475,7 +481,22 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
             return page;
           }
 
-          if (page.title === nextTitle) {
+          const nextTitle =
+            typeof partial.title === "string"
+              ? partial.title.trim() || page.title
+              : page.title;
+          const nextMode =
+            typeof partial.mode === "string"
+              ? normalizeDashboardPageMode(partial.mode)
+              : normalizeDashboardPageMode(page.mode);
+          const nextUrl =
+            typeof partial.url === "string"
+              ? partial.url.trim()
+              : typeof page.url === "string"
+                ? page.url.trim()
+                : "";
+
+          if (page.title === nextTitle && normalizeDashboardPageMode(page.mode) === nextMode && (page.url || "") === nextUrl) {
             return page;
           }
 
@@ -483,6 +504,8 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
           return {
             ...page,
             title: nextTitle,
+            mode: nextMode,
+            url: nextMode === "url" ? nextUrl : "",
           };
         });
 
@@ -502,7 +525,41 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
           pages: nextPages,
           activePageId: activePage.id,
           title: activePage.title,
-          widgets: activePage.widgets,
+          widgets: getRuntimeWidgetsForPage(activePage),
+        });
+      },
+      renameDashboardPage(pageId, title) {
+        const nextTitle = title.trim();
+        if (!nextTitle) {
+          return;
+        }
+        const pages = config.pages || [];
+        let changed = false;
+        const nextPages = pages.map((page) => {
+          if (page.id !== pageId || page.title === nextTitle) {
+            return page;
+          }
+          changed = true;
+          return {
+            ...page,
+            title: nextTitle,
+          };
+        });
+        if (!changed) {
+          return;
+        }
+        const activePage =
+          nextPages.find((page) => page.id === (config.activePageId || "")) ||
+          nextPages[0];
+        if (!activePage) {
+          return;
+        }
+        persist({
+          ...config,
+          pages: nextPages,
+          activePageId: activePage.id,
+          title: activePage.title,
+          widgets: getRuntimeWidgetsForPage(activePage),
         });
       },
       deleteDashboardPage(pageId) {
@@ -535,7 +592,7 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
           pages: nextPages,
           activePageId: activePage.id,
           title: activePage.title,
-          widgets: activePage.widgets,
+          widgets: getRuntimeWidgetsForPage(activePage),
         });
       },
       async refreshSavedDashboards() {
@@ -701,7 +758,7 @@ function buildMobileJsonSnapshot(input: DashboardSettings) {
     ...normalized,
     pages,
     activePageId: activePage?.id || normalized.activePageId,
-    widgets: activePage?.widgets || [],
+    widgets: getRuntimeWidgetsForPage(activePage) || [],
   };
 
   return JSON.stringify(mobileConfig, null, 2);
@@ -750,21 +807,25 @@ function applyMobileLayoutConfig(
     ...normalizedCurrent,
     pages: nextPages,
     activePageId: nextActivePage?.id || normalizedCurrent.activePageId,
-    widgets: nextActivePage?.widgets || [],
+    widgets: getRuntimeWidgetsForPage(nextActivePage) || [],
   };
 }
 
 function normalizeDashboardPages(input: DashboardSettings): DashboardSettings {
-  const basePages = Array.isArray(input.pages) && input.pages.length
+  const basePages: DashboardPage[] = Array.isArray(input.pages) && input.pages.length
     ? input.pages.map((page, index) => ({
         id: page.id || `dashboard-${index + 1}`,
         title: page.title || `Dashboard ${index + 1}`,
+        mode: normalizeDashboardPageMode(page.mode),
+        url: normalizeDashboardPageMode(page.mode) === "url" ? String(page.url || "").trim() : "",
         widgets: normalizeWidgetConfigList(page.widgets),
       }))
     : [
         {
           id: input.activePageId || "home",
           title: input.title || "Dashboard",
+          mode: "dashboard",
+          url: "",
           widgets: normalizeWidgetConfigList(input.widgets),
         },
       ];
@@ -776,7 +837,7 @@ function normalizeDashboardPages(input: DashboardSettings): DashboardSettings {
   return {
     ...input,
     title: activePage.title,
-    widgets: activePage.widgets,
+    widgets: getRuntimeWidgetsForPage(activePage),
     pages: basePages,
     activePageId: activePage.id,
   };
@@ -906,6 +967,17 @@ function normalizeWidgetConfigList(input: DashboardSettings["widgets"] | undefin
 
 function cloneWidgetConfig<T extends WidgetConfig>(widget: T): T {
   return JSON.parse(JSON.stringify(widget)) as T;
+}
+
+function normalizeDashboardPageMode(value: unknown): DashboardPageMode {
+  return value === "url" ? "url" : "dashboard";
+}
+
+function getRuntimeWidgetsForPage(page?: DashboardPage | null) {
+  if (!page) {
+    return [];
+  }
+  return normalizeDashboardPageMode(page.mode) === "url" ? [] : page.widgets;
 }
 
 function buildUniqueWidgetId(baseId: string, pages: DashboardPage[]) {

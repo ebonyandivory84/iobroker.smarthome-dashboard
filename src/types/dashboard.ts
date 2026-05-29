@@ -513,9 +513,13 @@ export type ThemeSettings = {
   };
 };
 
+export type DashboardPageMode = "dashboard" | "url";
+
 export type DashboardPage = {
   id: string;
   title: string;
+  mode?: DashboardPageMode;
+  url?: string;
   widgets: WidgetConfig[];
 };
 
