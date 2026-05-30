@@ -240,7 +240,8 @@ export function GridCanvas({
                   onCameraFullscreenSwipeClose,
                   onCameraFullscreenVisibilityChange,
                   onWidgetScrollFocusChange,
-                  isActivePage
+                  isActivePage,
+                  useLowPowerWebEffects
                 )}
               </WidgetFrame>
             </View>
@@ -1396,7 +1397,8 @@ function WebWidgetShell({
               undefined,
               undefined,
               onWidgetScrollFocusChange,
-              widgetRuntimeActive
+              widgetRuntimeActive,
+              lowPowerMode
             )
           : null}
       </View>
@@ -1435,7 +1437,8 @@ function renderWidget(
   onCameraFullscreenSwipeClose?: () => void,
   onCameraFullscreenVisibilityChange?: (widgetId: string, open: boolean) => void,
   onWidgetScrollFocusChange?: (widgetId: string, active: boolean) => void,
-  isActivePage: boolean = true
+  isActivePage: boolean = true,
+  lowPowerMode: boolean = false
 ) {
   const effectiveWidget = mergeWidgetInteractionSounds(widget, widgetTypeDefaults?.[widget.type]);
 
@@ -1515,7 +1518,15 @@ function renderWidget(
   }
 
   if (effectiveWidget.type === "solar") {
-    return <SolarWidget config={effectiveWidget} isActivePage={isActivePage} states={states} theme={theme} />;
+    return (
+      <SolarWidget
+        config={effectiveWidget}
+        isActivePage={isActivePage}
+        lowPowerMode={lowPowerMode}
+        states={states}
+        theme={theme}
+      />
+    );
   }
 
   if (effectiveWidget.type === "grafana") {
@@ -1578,7 +1589,15 @@ function renderWidget(
   }
 
   if (effectiveWidget.type === "heatingV2") {
-    return <HeatingWidgetV2 client={client} config={effectiveWidget} isActivePage={isActivePage} states={states} />;
+    return (
+      <HeatingWidgetV2
+        client={client}
+        config={effectiveWidget}
+        isActivePage={isActivePage}
+        lowPowerMode={lowPowerMode}
+        states={states}
+      />
+    );
   }
 
   return null;

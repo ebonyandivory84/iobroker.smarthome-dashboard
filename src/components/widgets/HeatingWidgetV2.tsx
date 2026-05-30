@@ -12,6 +12,7 @@ type HeatingWidgetProps = {
   client: IoBrokerClient;
   states: StateSnapshot;
   isActivePage?: boolean;
+  lowPowerMode?: boolean;
 };
 
 type HeatingMode = "standby" | "dhw" | "dhwAndHeating";
@@ -100,7 +101,13 @@ const DEFAULT_IDS = {
   compressorSensorPower: "viessmannapi.0.299550.0.features.heating.compressors.0.sensors.power.properties.value.value",
 } as const;
 
-export function HeatingWidgetV2({ config, client, states, isActivePage = true }: HeatingWidgetProps) {
+export function HeatingWidgetV2({
+  config,
+  client,
+  states,
+  isActivePage = true,
+  lowPowerMode = false,
+}: HeatingWidgetProps) {
   const documentVisible = useDocumentVisibility();
   const runtimeActive = isActivePage && documentVisible;
   const [widgetWidth, setWidgetWidth] = useState(0);
@@ -468,7 +475,7 @@ export function HeatingWidgetV2({ config, client, states, isActivePage = true }:
   const sliderEnd = config.appearance?.iconColor2 || "#5a85ef";
   const sliderThumbColor = config.appearance?.activeWidgetColor || "#f6c869";
   const oneTimeColor = config.appearance?.statColor || "rgba(246, 97, 98, 0.42)";
-  const backgroundBlur = Math.min(24, clampInt(config.backgroundImageBlur, 8, 0));
+  const backgroundBlur = lowPowerMode ? 0 : Math.min(24, clampInt(config.backgroundImageBlur, 8, 0));
   const oneTimeChargeIcon = normalizeOneTimeChargeIcon(config.oneTimeChargeIcon);
 
   const modeButtons: Array<{
@@ -593,7 +600,7 @@ export function HeatingWidgetV2({ config, client, states, isActivePage = true }:
     blinkAnimationRef.current?.stop();
     blinkAnimationRef.current = null;
 
-    if (!runtimeActive || !anyBlinkActive) {
+    if (!runtimeActive || lowPowerMode || !anyBlinkActive) {
       blinkPulse.setValue(0);
       return;
     }
@@ -621,12 +628,12 @@ export function HeatingWidgetV2({ config, client, states, isActivePage = true }:
     return () => {
       loop.stop();
     };
-  }, [anyBlinkActive, blinkPulse, runtimeActive]);
+  }, [anyBlinkActive, blinkPulse, lowPowerMode, runtimeActive]);
 
   useEffect(() => {
     detailsTickerAnimationRef.current?.stop();
     detailsTickerAnimationRef.current = null;
-    if (!runtimeActive || !showDetailsTicker || detailsTrackWidth <= 0 || detailsContentWidth <= 0) {
+    if (lowPowerMode || !runtimeActive || !showDetailsTicker || detailsTrackWidth <= 0 || detailsContentWidth <= 0) {
       detailsTickerOffset.setValue(0);
       return;
     }
@@ -663,7 +670,15 @@ export function HeatingWidgetV2({ config, client, states, isActivePage = true }:
     return () => {
       tickerLoop.stop();
     };
-  }, [detailsContentWidth, detailsTickerOffset, detailsTrackWidth, detailsTickerSpeedPxPerS, runtimeActive, showDetailsTicker]);
+  }, [
+    detailsContentWidth,
+    detailsTickerOffset,
+    detailsTrackWidth,
+    detailsTickerSpeedPxPerS,
+    lowPowerMode,
+    runtimeActive,
+    showDetailsTicker,
+  ]);
 
   return (
     <View
@@ -1087,19 +1102,34 @@ export function HeatingWidgetV2({ config, client, states, isActivePage = true }:
                   },
                 ]}
               >
-                <Text
-                  numberOfLines={1}
-                  onLayout={(event) => {
-                    const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
-                    setDetailsContentWidth((current) => (current === nextWidth ? current : nextWidth));
-                  }}
-                  style={[styles.detailsTickerText, { color: textColor }]}
-                >
-                  {detailsTickerLoopText}
-                </Text>
-                <Text numberOfLines={1} style={[styles.detailsTickerText, { color: textColor }]}>
-                  {detailsTickerLoopText}
-                </Text>
+                {lowPowerMode ? (
+                  <Text
+                    numberOfLines={1}
+                    onLayout={(event) => {
+                      const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
+                      setDetailsContentWidth((current) => (current === nextWidth ? current : nextWidth));
+                    }}
+                    style={[styles.detailsTickerText, { color: textColor }]}
+                  >
+                    {detailsTickerRenderText}
+                  </Text>
+                ) : (
+                  <>
+                    <Text
+                      numberOfLines={1}
+                      onLayout={(event) => {
+                        const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
+                        setDetailsContentWidth((current) => (current === nextWidth ? current : nextWidth));
+                      }}
+                      style={[styles.detailsTickerText, { color: textColor }]}
+                    >
+                      {detailsTickerLoopText}
+                    </Text>
+                    <Text numberOfLines={1} style={[styles.detailsTickerText, { color: textColor }]}>
+                      {detailsTickerLoopText}
+                    </Text>
+                  </>
+                )}
               </Animated.View>
             </View>
           </View>
