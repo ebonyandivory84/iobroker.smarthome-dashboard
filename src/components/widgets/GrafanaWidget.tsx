@@ -1,4 +1,4 @@
-import { createElement, useEffect, useMemo, useState } from "react";
+import { createElement, useState } from "react";
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useDocumentVisibility } from "../../hooks/useDocumentVisibility";
 import { GrafanaWidgetConfig } from "../../types/dashboard";
@@ -14,7 +14,6 @@ type GrafanaWidgetProps = {
 export function GrafanaWidget({ config, isActivePage = true, lowPowerMode = false }: GrafanaWidgetProps) {
   const documentVisible = useDocumentVisibility();
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
-  const [previewReady, setPreviewReady] = useState(false);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const resolvedUrl = normalizeGrafanaUrl(config.url);
@@ -22,30 +21,8 @@ export function GrafanaWidget({ config, isActivePage = true, lowPowerMode = fals
   const interactionsAllowed = config.allowInteractions !== false;
   const sandboxValue = interactionsAllowed ? undefined : "allow-same-origin allow-scripts";
   const runtimeActive = Platform.OS === "web" ? isActivePage && documentVisible : true;
-  const deferredMountMs = lowPowerMode ? 320 : 140;
-  const shouldRenderPreviewFrame = runtimeActive && previewReady;
-  const previewPlaceholderText = useMemo(
-    () =>
-      runtimeActive
-        ? "Grafana wird geladen..."
-        : "Grafana pausiert (inaktive Seite)",
-    [runtimeActive]
-  );
-
-  useEffect(() => {
-    if (!resolvedUrl) {
-      setPreviewReady(false);
-      return;
-    }
-    if (!runtimeActive) {
-      setPreviewReady(false);
-      return;
-    }
-    const timer = setTimeout(() => {
-      setPreviewReady(true);
-    }, deferredMountMs);
-    return () => clearTimeout(timer);
-  }, [deferredMountMs, resolvedUrl, runtimeActive]);
+  const shouldRenderPreviewFrame = runtimeActive;
+  void lowPowerMode;
 
   const openFullscreen = () => {
     if (!resolvedUrl) {
@@ -95,7 +72,7 @@ export function GrafanaWidget({ config, isActivePage = true, lowPowerMode = fals
               sandbox: sandboxValue,
               allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
               allowFullScreen: true,
-              loading: "lazy",
+              loading: "eager",
               referrerPolicy: "no-referrer",
             })
           : createElement(
@@ -105,7 +82,7 @@ export function GrafanaWidget({ config, isActivePage = true, lowPowerMode = fals
               createElement(
                 "span",
                 { style: { ...webPreviewPlaceholderTextStyle, color: mutedTextColor } },
-                previewPlaceholderText
+                "Grafana pausiert (inaktive Seite)"
               )
             ),
         createElement(
@@ -146,7 +123,7 @@ export function GrafanaWidget({ config, isActivePage = true, lowPowerMode = fals
               sandbox: sandboxValue,
               allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
               allowFullScreen: true,
-              loading: "lazy",
+              loading: "eager",
               referrerPolicy: "no-referrer",
             })}
           </View>
