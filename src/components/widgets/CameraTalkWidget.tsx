@@ -122,7 +122,7 @@ export function CameraTalkWidget({
   const previewFmp4Url = (config.fmp4Url || "").trim() || null;
   const fullscreenFmp4Url = (config.fullscreenFmp4Url || config.fmp4Url || "").trim() || null;
   const requestedPreviewSourceMode = config.previewSourceMode;
-  const requestedFullscreenSourceMode = config.fullscreenSourceMode || config.previewSourceMode;
+  const requestedFullscreenSourceMode = resolveRequestedFullscreenSourceMode(config, requestedPreviewSourceMode);
   const previewSourceMode = resolveSourceMode(
     requestedPreviewSourceMode,
     previewSnapshotBaseUrl,
@@ -153,21 +153,23 @@ export function CameraTalkWidget({
     flvUrl: fullscreenFlvUrl,
     fmp4Url: fullscreenFmp4Url,
   });
-  const preferPreviewOnTouchWeb = config.preferPreviewOnTouchWeb === true;
+  const previewRefreshMs = Math.max(100, config.refreshMs || 2000);
+  const configuredFullscreenRefreshMs = Math.max(100, config.fullscreenRefreshMs || config.refreshMs || 2000);
+  const hasDedicatedFullscreenConfig = hasDedicatedFullscreenConfiguration(config, previewSourceMode);
+  const preferPreviewOnTouchWeb = config.preferPreviewOnTouchWeb === true && !hasDedicatedFullscreenConfig;
   const usePreviewFeedInTouchFullscreen =
     Platform.OS === "web" && preferPreviewOnTouchWeb && isTouchCapableWebDevice();
   const fullscreenFeed = usePreviewFeedInTouchFullscreen ? previewFeed : fullscreenConfiguredFeed;
   const fullscreenRefreshMs = usePreviewFeedInTouchFullscreen
-    ? Math.max(100, config.refreshMs || 2000)
-    : Math.max(100, config.fullscreenRefreshMs || config.refreshMs || 2000);
+    ? previewRefreshMs
+    : configuredFullscreenRefreshMs;
   const hasDistinctFullscreenConfiguration =
-    !usePreviewFeedInTouchFullscreen &&
     (fullscreenSourceMode !== previewSourceMode ||
       fullscreenSnapshotBaseUrl !== previewSnapshotBaseUrl ||
       fullscreenMjpegUrl !== previewMjpegUrl ||
       fullscreenFlvUrl !== previewFlvUrl ||
       fullscreenFmp4Url !== previewFmp4Url ||
-      fullscreenRefreshMs !== Math.max(100, config.refreshMs || 2000));
+      configuredFullscreenRefreshMs !== previewRefreshMs);
   const useInPlaceFullscreen = Platform.OS === "web" && !hasDistinctFullscreenConfiguration;
   const showInPlaceFullscreen = useInPlaceFullscreen && (fullscreenOpen || webDocumentFullscreenActive);
   const showFixedFallbackFullscreen = showInPlaceFullscreen && !webDocumentFullscreenActive;
@@ -2276,6 +2278,65 @@ function resolveSourceMode(
   }
 
   return fallback;
+}
+
+function resolveRequestedFullscreenSourceMode(
+  config: CameraTalkWidgetConfig,
+  previewSourceMode: CameraTalkWidgetConfig["previewSourceMode"]
+) {
+  if (
+    config.fullscreenSourceMode === "snapshot" ||
+    config.fullscreenSourceMode === "mjpeg" ||
+    config.fullscreenSourceMode === "flv" ||
+    config.fullscreenSourceMode === "fmp4"
+  ) {
+    return config.fullscreenSourceMode;
+  }
+
+  if ((config.fullscreenFmp4Url || "").trim()) {
+    return "fmp4";
+  }
+  if ((config.fullscreenFlvUrl || "").trim()) {
+    return "flv";
+  }
+  if ((config.fullscreenMjpegUrl || "").trim()) {
+    return "mjpeg";
+  }
+  if ((config.fullscreenSnapshotUrl || "").trim()) {
+    return "snapshot";
+  }
+
+  return previewSourceMode;
+}
+
+function hasDedicatedFullscreenConfiguration(
+  config: CameraTalkWidgetConfig,
+  resolvedPreviewSourceMode: "snapshot" | "mjpeg" | "flv" | "fmp4"
+) {
+  if (
+    (config.fullscreenSourceMode === "snapshot" ||
+      config.fullscreenSourceMode === "mjpeg" ||
+      config.fullscreenSourceMode === "flv" ||
+      config.fullscreenSourceMode === "fmp4") &&
+    config.fullscreenSourceMode !== resolvedPreviewSourceMode
+  ) {
+    return true;
+  }
+
+  if (isFiniteNumber(config.fullscreenRefreshMs)) {
+    return true;
+  }
+
+  return Boolean(
+    (config.fullscreenSnapshotUrl || "").trim() ||
+      (config.fullscreenMjpegUrl || "").trim() ||
+      (config.fullscreenFlvUrl || "").trim() ||
+      (config.fullscreenFmp4Url || "").trim()
+  );
+}
+
+function isFiniteNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 function getWebStreamProxyUrls(targetUrl: string, streamType: "mjpeg" | "flv" | "fmp4") {
