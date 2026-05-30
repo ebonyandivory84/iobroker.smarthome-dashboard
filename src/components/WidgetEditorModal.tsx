@@ -196,7 +196,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         title: widget.title,
         showTitle: widget.showTitle === false ? "false" : "true",
         url: widget.url || "",
-        refreshMs: String(widget.refreshMs || 10000),
+        refreshMs: String(widget.refreshMs || 30000),
         allowInteractions: widget.allowInteractions === false ? "false" : "true",
         ...appearanceDraft,
       });
@@ -891,7 +891,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         title: draft.title,
         showTitle: draft.showTitle !== "false",
         url: draft.url || widget.url,
-        refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 10000, 1000),
+        refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 30000, 1000),
         allowInteractions: draft.allowInteractions !== "false",
         interactionSounds: buildStoredInteractionSounds(
           widget.type,

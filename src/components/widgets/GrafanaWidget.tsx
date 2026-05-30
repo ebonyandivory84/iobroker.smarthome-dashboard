@@ -1,21 +1,51 @@
-import { createElement, useState } from "react";
+import { createElement, useEffect, useMemo, useState } from "react";
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { useDocumentVisibility } from "../../hooks/useDocumentVisibility";
 import { GrafanaWidgetConfig } from "../../types/dashboard";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
 import { palette } from "../../utils/theme";
 
 type GrafanaWidgetProps = {
   config: GrafanaWidgetConfig;
+  isActivePage?: boolean;
+  lowPowerMode?: boolean;
 };
 
-export function GrafanaWidget({ config }: GrafanaWidgetProps) {
+export function GrafanaWidget({ config, isActivePage = true, lowPowerMode = false }: GrafanaWidgetProps) {
+  const documentVisible = useDocumentVisibility();
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const [previewReady, setPreviewReady] = useState(false);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const resolvedUrl = normalizeGrafanaUrl(config.url);
   const iframeUrl = applyGrafanaRefresh(resolvedUrl, config.refreshMs);
   const interactionsAllowed = config.allowInteractions !== false;
   const sandboxValue = interactionsAllowed ? undefined : "allow-same-origin allow-scripts";
+  const runtimeActive = Platform.OS === "web" ? isActivePage && documentVisible : true;
+  const deferredMountMs = lowPowerMode ? 320 : 140;
+  const shouldRenderPreviewFrame = runtimeActive && previewReady;
+  const previewPlaceholderText = useMemo(
+    () =>
+      runtimeActive
+        ? "Grafana wird geladen..."
+        : "Grafana pausiert (inaktive Seite)",
+    [runtimeActive]
+  );
+
+  useEffect(() => {
+    if (!resolvedUrl) {
+      setPreviewReady(false);
+      return;
+    }
+    if (!runtimeActive) {
+      setPreviewReady(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setPreviewReady(true);
+    }, deferredMountMs);
+    return () => clearTimeout(timer);
+  }, [deferredMountMs, resolvedUrl, runtimeActive]);
 
   const openFullscreen = () => {
     if (!resolvedUrl) {
@@ -58,15 +88,26 @@ export function GrafanaWidget({ config }: GrafanaWidgetProps) {
         {
           style: webFrameWrapStyle,
         },
-        createElement("iframe", {
-          src: iframeUrl,
-          style: webPreviewFrameStyle,
-          sandbox: sandboxValue,
-          allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
-          allowFullScreen: true,
-          loading: "eager",
-          referrerPolicy: "no-referrer",
-        }),
+        shouldRenderPreviewFrame
+          ? createElement("iframe", {
+              src: iframeUrl,
+              style: webPreviewFrameStyle,
+              sandbox: sandboxValue,
+              allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
+              allowFullScreen: true,
+              loading: "lazy",
+              referrerPolicy: "no-referrer",
+            })
+          : createElement(
+              "div",
+              { style: webPreviewPlaceholderStyle },
+              createElement("span", { style: webPreviewPlaceholderIconStyle }, "📈"),
+              createElement(
+                "span",
+                { style: { ...webPreviewPlaceholderTextStyle, color: mutedTextColor } },
+                previewPlaceholderText
+              )
+            ),
         createElement(
           "div",
           {
@@ -105,7 +146,7 @@ export function GrafanaWidget({ config }: GrafanaWidgetProps) {
               sandbox: sandboxValue,
               allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
               allowFullScreen: true,
-              loading: "eager",
+              loading: "lazy",
               referrerPolicy: "no-referrer",
             })}
           </View>
@@ -269,4 +310,26 @@ const webFullscreenOverlayButtonStyle = {
   background: "transparent",
   cursor: "zoom-in",
   padding: 0,
+};
+
+const webPreviewPlaceholderStyle = {
+  width: "100%",
+  height: "100%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "8px",
+  background: "rgba(3, 8, 16, 0.78)",
+  border: "1px solid rgba(255,255,255,0.06)",
+};
+
+const webPreviewPlaceholderIconStyle = {
+  fontSize: "28px",
+  lineHeight: "28px",
+  opacity: 0.88,
+};
+
+const webPreviewPlaceholderTextStyle = {
+  fontSize: "12px",
+  fontWeight: 700,
 };

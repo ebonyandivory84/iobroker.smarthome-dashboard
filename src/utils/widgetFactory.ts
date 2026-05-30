@@ -197,7 +197,7 @@ export function buildWidgetTemplate(
       type: "grafana",
       title: `Grafana ${suffix}`,
       url: "http://127.0.0.1:3000/d/example/example?viewPanel=1&kiosk",
-      refreshMs: 10000,
+      refreshMs: 30000,
       allowInteractions: true,
       position: {
         ...basePosition,

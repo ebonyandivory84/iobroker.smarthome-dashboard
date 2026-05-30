@@ -1530,7 +1530,7 @@ function renderWidget(
   }
 
   if (effectiveWidget.type === "grafana") {
-    return <GrafanaWidget config={effectiveWidget} />;
+    return <GrafanaWidget config={effectiveWidget} isActivePage={isActivePage} lowPowerMode={lowPowerMode} />;
   }
 
   if (effectiveWidget.type === "weather") {
