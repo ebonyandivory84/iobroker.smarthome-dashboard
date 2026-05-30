@@ -63,7 +63,7 @@ export function SolarWidget({
   const { dashboardPages, setActivePage } = useDashboardConfig();
   const documentVisible = useDocumentVisibility();
   const runtimeActive = isActivePage && documentVisible;
-  const flowAnimationEnabled = runtimeActive && !lowPowerMode;
+  const flowAnimationEnabled = runtimeActive;
   const resolvedTheme = resolveThemeSettings(theme);
   const widgetAppearance = config.appearance;
   const textColor = widgetAppearance?.textColor || palette.text;
@@ -275,6 +275,7 @@ export function SolarWidget({
           statTextScale={config.statTextScale}
           statCards={statCards}
           animateFlow={flowAnimationEnabled}
+          lowPowerMode={lowPowerMode}
         />
       </View>
 
@@ -313,6 +314,7 @@ function SolarFlowScene({
   statTextScale,
   statCards,
   animateFlow,
+  lowPowerMode,
 }: {
   pvDir: FlowDir;
   pvNow: number | null;
@@ -337,9 +339,11 @@ function SolarFlowScene({
   statTextScale?: number;
   statCards: Array<{ label: string; value: string }>;
   animateFlow: boolean;
+  lowPowerMode: boolean;
 }) {
   const progress = useRef(new Animated.Value(0)).current;
   const [sceneLayout, setSceneLayout] = useState({ width: SOLAR_SCENE_BASE_WIDTH, height: SOLAR_SCENE_BASE_HEIGHT });
+  const flowDurationMs = lowPowerMode ? 2400 : 1400;
 
   useEffect(() => {
     progress.stopAnimation();
@@ -350,14 +354,14 @@ function SolarFlowScene({
     const loop = Animated.loop(
       Animated.timing(progress, {
         toValue: 1,
-        duration: 1400,
+        duration: flowDurationMs,
         easing: Easing.linear,
         useNativeDriver: true,
       })
     );
     loop.start();
     return () => loop.stop();
-  }, [animateFlow, progress]);
+  }, [animateFlow, flowDurationMs, progress]);
 
   const fittedScene = useMemo(() => {
     const availableWidth = Math.max(1, sceneLayout.width);
@@ -456,6 +460,7 @@ function SolarFlowScene({
       <AnimatedFlowDot
         active={pvDir !== "idle"}
         animate={animateFlow}
+        lowPowerMode={lowPowerMode}
         axis="y"
         progress={progress}
         range={pvDir === "toHome" ? [0, Math.max(0, topLineHeight - flowDotSize)] : [Math.max(0, topLineHeight - flowDotSize), 0]}
@@ -466,6 +471,7 @@ function SolarFlowScene({
       <AnimatedFlowDot
         active={battDir !== "idle"}
         animate={animateFlow}
+        lowPowerMode={lowPowerMode}
         axis="x"
         progress={progress}
         range={battDir === "toHome" ? [0, Math.max(0, leftLineWidth - flowDotSize)] : [Math.max(0, leftLineWidth - flowDotSize), 0]}
@@ -476,6 +482,7 @@ function SolarFlowScene({
       <AnimatedFlowDot
         active={gridDir !== "idle"}
         animate={animateFlow}
+        lowPowerMode={lowPowerMode}
         axis="x"
         progress={progress}
         range={gridDir === "toHome" ? [Math.max(0, rightLineWidth - flowDotSize), 0] : [0, Math.max(0, rightLineWidth - flowDotSize)]}
@@ -486,6 +493,7 @@ function SolarFlowScene({
       <AnimatedFlowDot
         active={carDir !== "idle"}
         animate={animateFlow}
+        lowPowerMode={lowPowerMode}
         axis="y"
         progress={progress}
         range={
@@ -677,6 +685,7 @@ function SolarFlowScene({
 function AnimatedFlowDot({
   active,
   animate,
+  lowPowerMode,
   progress,
   axis,
   range,
@@ -686,6 +695,7 @@ function AnimatedFlowDot({
 }: {
   active: boolean;
   animate: boolean;
+  lowPowerMode: boolean;
   progress: Animated.Value;
   axis: "x" | "y";
   range: [number, number];
@@ -726,6 +736,7 @@ function AnimatedFlowDot({
     <Animated.View
       style={[
         styles.flowDot,
+        lowPowerMode ? styles.flowDotLowPower : null,
         baseStyle,
         {
           width: size,
@@ -1447,6 +1458,11 @@ const styles = StyleSheet.create({
     shadowColor: palette.accentWarm,
     shadowOpacity: 0.8,
     shadowRadius: 12,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  flowDotLowPower: {
+    shadowOpacity: 0,
+    shadowRadius: 0,
     shadowOffset: { width: 0, height: 0 },
   },
   nodePosition: {
