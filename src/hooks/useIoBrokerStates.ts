@@ -216,6 +216,31 @@ export function useIoBrokerStates() {
   );
   const shouldUseStatePushWebSocket = Platform.OS === "web" && Boolean(statePushWsUrl);
   const watchRequestIdRef = useRef(0);
+  const socketRef = useRef<WebSocket | null>(null);
+  const watchedStateIdsRef = useRef<string[]>(watchedStateIds);
+
+  const sendWatchStateIds = (socket: WebSocket | null, stateIds: string[]) => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    watchRequestIdRef.current += 1;
+    const watchPayload = {
+      type: "watch",
+      requestId: `watch-${watchRequestIdRef.current}`,
+      stateIds,
+    };
+
+    try {
+      socket.send(JSON.stringify(watchPayload));
+    } catch (watchError) {
+      setError(watchError instanceof Error ? watchError.message : "State watch update failed");
+    }
+  };
+
+  useEffect(() => {
+    watchedStateIdsRef.current = watchedStateIds;
+  }, [watchedStateIds]);
 
   useEffect(() => {
     if (!shouldUseStatePushWebSocket || !documentVisible || !statePushWsUrl) {
@@ -229,11 +254,12 @@ export function useIoBrokerStates() {
     let socket: WebSocket | null = null;
 
     const applyIncomingStateBatch = (incoming: StateSnapshot) => {
+      const activeStateIds = watchedStateIdsRef.current;
       let nextSnapshot = incoming;
       setStates((current) => {
-        const normalized = buildWatchedStateSnapshot(current, incoming, watchedStateIds);
+        const normalized = buildWatchedStateSnapshot(current, incoming, activeStateIds);
         nextSnapshot = normalized;
-        return areStateSnapshotsEqual(current, normalized, watchedStateIds) ? current : normalized;
+        return areStateSnapshotsEqual(current, normalized, activeStateIds) ? current : normalized;
       });
       setStateWrites((current) => resolveStateWriteFeedback(current, nextSnapshot));
       setError(null);
@@ -268,6 +294,7 @@ export function useIoBrokerStates() {
 
       try {
         socket = new WebSocket(statePushWsUrl);
+        socketRef.current = socket;
       } catch (connectError) {
         setWsConnected(false);
         setError(connectError instanceof Error ? connectError.message : "State push websocket connection failed");
@@ -283,13 +310,7 @@ export function useIoBrokerStates() {
         setWsConnected(true);
         setIsOnline(true);
         setError(null);
-        watchRequestIdRef.current += 1;
-        const watchPayload = {
-          type: "watch",
-          requestId: `watch-${watchRequestIdRef.current}`,
-          stateIds: watchedStateIds,
-        };
-        socket.send(JSON.stringify(watchPayload));
+        sendWatchStateIds(socket, watchedStateIdsRef.current);
       };
 
       socket.onmessage = (event) => {
@@ -316,6 +337,9 @@ export function useIoBrokerStates() {
         if (!active) {
           return;
         }
+        if (socketRef.current === socket) {
+          socketRef.current = null;
+        }
         setWsConnected(false);
         scheduleReconnect();
       };
@@ -323,6 +347,9 @@ export function useIoBrokerStates() {
       socket.onerror = () => {
         if (!active) {
           return;
+        }
+        if (socketRef.current === socket) {
+          socketRef.current = null;
         }
         setWsConnected(false);
       };
@@ -341,8 +368,19 @@ export function useIoBrokerStates() {
           // Ignore best-effort socket close errors.
         }
       }
+      if (socketRef.current === socket) {
+        socketRef.current = null;
+      }
     };
-  }, [documentVisible, shouldUseStatePushWebSocket, statePushWsUrl, watchedStateIds]);
+  }, [documentVisible, shouldUseStatePushWebSocket, statePushWsUrl]);
+
+  useEffect(() => {
+    if (!shouldUseStatePushWebSocket || !documentVisible || !wsConnected) {
+      return;
+    }
+
+    sendWatchStateIds(socketRef.current, watchedStateIds);
+  }, [documentVisible, shouldUseStatePushWebSocket, watchedStateIds, wsConnected]);
 
   useEffect(() => {
     if (!documentVisible) {
