@@ -356,7 +356,7 @@ function SolarFlowScene({
         toValue: 1,
         duration: flowDurationMs,
         easing: Easing.linear,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== "web",
       })
     );
     loop.start();
