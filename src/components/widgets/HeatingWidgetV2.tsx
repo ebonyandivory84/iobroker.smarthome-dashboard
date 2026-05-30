@@ -12,7 +12,6 @@ type HeatingWidgetProps = {
   client: IoBrokerClient;
   states: StateSnapshot;
   isActivePage?: boolean;
-  lowPowerMode?: boolean;
 };
 
 type HeatingMode = "standby" | "dhw" | "dhwAndHeating";
@@ -101,13 +100,7 @@ const DEFAULT_IDS = {
   compressorSensorPower: "viessmannapi.0.299550.0.features.heating.compressors.0.sensors.power.properties.value.value",
 } as const;
 
-export function HeatingWidgetV2({
-  config,
-  client,
-  states,
-  isActivePage = true,
-  lowPowerMode = false,
-}: HeatingWidgetProps) {
+export function HeatingWidgetV2({ config, client, states, isActivePage = true }: HeatingWidgetProps) {
   const documentVisible = useDocumentVisibility();
   const runtimeActive = isActivePage && documentVisible;
   const [widgetWidth, setWidgetWidth] = useState(0);
@@ -475,7 +468,7 @@ export function HeatingWidgetV2({
   const sliderEnd = config.appearance?.iconColor2 || "#5a85ef";
   const sliderThumbColor = config.appearance?.activeWidgetColor || "#f6c869";
   const oneTimeColor = config.appearance?.statColor || "rgba(246, 97, 98, 0.42)";
-  const backgroundBlur = lowPowerMode ? 0 : Math.min(24, clampInt(config.backgroundImageBlur, 8, 0));
+  const backgroundBlur = Math.min(24, clampInt(config.backgroundImageBlur, 8, 0));
   const oneTimeChargeIcon = normalizeOneTimeChargeIcon(config.oneTimeChargeIcon);
 
   const modeButtons: Array<{
@@ -581,11 +574,6 @@ export function HeatingWidgetV2({
   const detailsTickerText = showDetailsTicker ? detailsSegments.join(DETAILS_TICKER_SEPARATOR) : "";
   const detailsTickerRenderText = detailsTickerText.replace(/ /g, "\u00a0");
   const detailsTickerLoopText = `${detailsTickerRenderText}${DETAILS_TICKER_LOOP_SEPARATOR}`;
-  const detailsTickerEstimatedWidthPx = Math.max(220, Math.round(detailsTickerRenderText.length * 7.2));
-  const detailsTickerCssDurationMs = Math.max(8000, Math.round((detailsTickerEstimatedWidthPx / detailsTickerSpeedPxPerS) * 1000));
-  const detailsTickerCssDurationResolvedMs = lowPowerMode
-    ? Math.round(detailsTickerCssDurationMs * 1.35)
-    : detailsTickerCssDurationMs;
 
   const liveBadgeText = error ? "Fehler" : writePending ? "Sync" : "";
   const footerStatusText = error ? error : writePending ? "Synchronisiere..." : "";
@@ -602,29 +590,10 @@ export function HeatingWidgetV2({
   );
 
   useEffect(() => {
-    if (Platform.OS !== "web" || typeof document === "undefined") {
-      return;
-    }
-    const styleId = "smarthome-heatingv2-ticker-keyframes";
-    if (document.getElementById(styleId)) {
-      return;
-    }
-    const styleEl = document.createElement("style");
-    styleEl.id = styleId;
-    styleEl.textContent = `
-      @keyframes smarthomeHeatingV2TickerMove {
-        from { transform: translate3d(0, 0, 0); }
-        to { transform: translate3d(-50%, 0, 0); }
-      }
-    `;
-    document.head.appendChild(styleEl);
-  }, []);
-
-  useEffect(() => {
     blinkAnimationRef.current?.stop();
     blinkAnimationRef.current = null;
 
-    if (!runtimeActive || lowPowerMode || !anyBlinkActive) {
+    if (!runtimeActive || !anyBlinkActive) {
       blinkPulse.setValue(0);
       return;
     }
@@ -652,19 +621,12 @@ export function HeatingWidgetV2({
     return () => {
       loop.stop();
     };
-  }, [anyBlinkActive, blinkPulse, lowPowerMode, runtimeActive]);
+  }, [anyBlinkActive, blinkPulse, runtimeActive]);
 
   useEffect(() => {
     detailsTickerAnimationRef.current?.stop();
     detailsTickerAnimationRef.current = null;
-    if (
-      Platform.OS === "web" ||
-      lowPowerMode ||
-      !runtimeActive ||
-      !showDetailsTicker ||
-      detailsTrackWidth <= 0 ||
-      detailsContentWidth <= 0
-    ) {
+    if (!runtimeActive || !showDetailsTicker || detailsTrackWidth <= 0 || detailsContentWidth <= 0) {
       detailsTickerOffset.setValue(0);
       return;
     }
@@ -701,16 +663,7 @@ export function HeatingWidgetV2({
     return () => {
       tickerLoop.stop();
     };
-  }, [
-    detailsContentWidth,
-    detailsTickerOffset,
-    detailsTrackWidth,
-    detailsTickerSpeedPxPerS,
-    Platform.OS,
-    lowPowerMode,
-    runtimeActive,
-    showDetailsTicker,
-  ]);
+  }, [detailsContentWidth, detailsTickerOffset, detailsTrackWidth, detailsTickerSpeedPxPerS, runtimeActive, showDetailsTicker]);
 
   return (
     <View
@@ -1126,82 +1079,28 @@ export function HeatingWidgetV2({
               }}
               style={[styles.detailsTickerTrack, { borderColor: panelBorder, backgroundColor: panelColor }]}
             >
-              {Platform.OS === "web"
-                ? createElement(
-                    "div",
-                    {
-                      style: {
-                        ...webDetailsTickerMoverStyle,
-                        animationDuration: `${detailsTickerCssDurationResolvedMs}ms`,
-                        animationPlayState: runtimeActive ? "running" : "paused",
-                      },
-                    },
-                    createElement(
-                      "div",
-                      {
-                        style: webDetailsTickerInnerStyle,
-                      },
-                      createElement(
-                        "span",
-                        {
-                          style: {
-                            ...webDetailsTickerTextStyle,
-                            color: textColor,
-                          },
-                        },
-                        detailsTickerLoopText
-                      ),
-                      createElement(
-                        "span",
-                        {
-                          style: {
-                            ...webDetailsTickerTextStyle,
-                            color: textColor,
-                          },
-                        },
-                        detailsTickerLoopText
-                      )
-                    )
-                  )
-                : (
-                    <Animated.View
-                      style={[
-                        styles.detailsTickerMover,
-                        {
-                          transform: [{ translateX: detailsTickerOffset }],
-                        },
-                      ]}
-                    >
-                      {lowPowerMode ? (
-                        <Text
-                          numberOfLines={1}
-                          onLayout={(event) => {
-                            const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
-                            setDetailsContentWidth((current) => (current === nextWidth ? current : nextWidth));
-                          }}
-                          style={[styles.detailsTickerText, { color: textColor }]}
-                        >
-                          {detailsTickerRenderText}
-                        </Text>
-                      ) : (
-                        <>
-                          <Text
-                            numberOfLines={1}
-                            onLayout={(event) => {
-                              const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
-                              setDetailsContentWidth((current) => (current === nextWidth ? current : nextWidth));
-                            }}
-                            style={[styles.detailsTickerText, { color: textColor }]}
-                          >
-                            {detailsTickerLoopText}
-                          </Text>
-                          <Text numberOfLines={1} style={[styles.detailsTickerText, { color: textColor }]}>
-                            {detailsTickerLoopText}
-                          </Text>
-                        </>
-                      )}
-                    </Animated.View>
-                  )}
+              <Animated.View
+                style={[
+                  styles.detailsTickerMover,
+                  {
+                    transform: [{ translateX: detailsTickerOffset }],
+                  },
+                ]}
+              >
+                <Text
+                  numberOfLines={1}
+                  onLayout={(event) => {
+                    const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
+                    setDetailsContentWidth((current) => (current === nextWidth ? current : nextWidth));
+                  }}
+                  style={[styles.detailsTickerText, { color: textColor }]}
+                >
+                  {detailsTickerLoopText}
+                </Text>
+                <Text numberOfLines={1} style={[styles.detailsTickerText, { color: textColor }]}>
+                  {detailsTickerLoopText}
+                </Text>
+              </Animated.View>
             </View>
           </View>
         ) : null}
@@ -1911,35 +1810,4 @@ const webSliderStyle: Record<string, string | number> = {
   appearance: "none",
   backgroundColor: "rgba(255,255,255,0.08)",
   borderRadius: 999,
-};
-
-const webDetailsTickerMoverStyle: Record<string, string | number> = {
-  position: "absolute",
-  left: 0,
-  top: 0,
-  bottom: 0,
-  display: "flex",
-  alignItems: "center",
-  willChange: "transform",
-  animationName: "smarthomeHeatingV2TickerMove",
-  animationTimingFunction: "linear",
-  animationIterationCount: "infinite",
-  animationFillMode: "both",
-  transform: "translate3d(0, 0, 0)",
-};
-
-const webDetailsTickerInnerStyle: Record<string, string | number> = {
-  display: "flex",
-  alignItems: "center",
-  whiteSpace: "pre",
-  transform: "translateZ(0)",
-  backfaceVisibility: "hidden",
-};
-
-const webDetailsTickerTextStyle: Record<string, string | number> = {
-  fontSize: "12px",
-  lineHeight: "16px",
-  fontWeight: 700,
-  whiteSpace: "pre",
-  flexShrink: 0,
 };

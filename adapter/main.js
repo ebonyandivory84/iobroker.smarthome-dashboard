@@ -51,8 +51,6 @@ const CAMERA_SNAPSHOT_MIN_REFRESH_MS = 400;
 const CAMERA_SNAPSHOT_MAX_REFRESH_MS = 60000;
 const LOG_PUSH_MAX_ENTRIES_PER_CLIENT = 200;
 const SCRIPT_PUSH_MAX_ENTRIES_PER_CLIENT = 1000;
-const WEB_STATIC_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
-const WIDGET_ASSET_MAX_AGE_SECONDS = 10 * 60;
 
 const LOG_LEVEL_ORDER = {
   silly: 0,
@@ -693,15 +691,7 @@ async function main(adapter) {
     res.json({ ok: true });
   });
 
-  app.use(
-    "/smarthome-dashboard/widget-assets",
-    express.static(widgetAssetsRoot, {
-      etag: true,
-      lastModified: true,
-      maxAge: WIDGET_ASSET_MAX_AGE_SECONDS * 1000,
-      setHeaders: setWidgetAssetCacheHeaders,
-    })
-  );
+  app.use("/smarthome-dashboard/widget-assets", express.static(widgetAssetsRoot));
 
   if (devServerUrl) {
     const target = devServerUrl.replace(/\/+$/, "");
@@ -733,39 +723,12 @@ async function main(adapter) {
       })
     );
   } else {
-    app.use(
-      "/assets",
-      express.static(path.join(webRoot, "assets"), {
-        etag: true,
-        lastModified: true,
-        maxAge: WEB_STATIC_MAX_AGE_SECONDS * 1000,
-        immutable: true,
-        setHeaders: setWebStaticCacheHeaders,
-      })
-    );
-    app.use(
-      "/_expo",
-      express.static(path.join(webRoot, "_expo"), {
-        etag: true,
-        lastModified: true,
-        maxAge: WEB_STATIC_MAX_AGE_SECONDS * 1000,
-        immutable: true,
-        setHeaders: setWebStaticCacheHeaders,
-      })
-    );
+    app.use("/assets", express.static(path.join(webRoot, "assets")));
+    app.use("/_expo", express.static(path.join(webRoot, "_expo")));
     app.get(["/smarthome-dashboard", "/smarthome-dashboard/"], (req, res, next) => {
       sendWebShell(webRoot, res, next);
     });
-    app.use(
-      "/smarthome-dashboard",
-      express.static(webRoot, {
-        etag: true,
-        lastModified: true,
-        maxAge: WEB_STATIC_MAX_AGE_SECONDS * 1000,
-        immutable: true,
-        setHeaders: setWebStaticCacheHeaders,
-      })
-    );
+    app.use("/smarthome-dashboard", express.static(webRoot));
     app.get("/smarthome-dashboard/*", (req, res, next) => {
       sendWebShell(webRoot, res, next);
     });
@@ -2676,47 +2639,10 @@ async function sendWebShell(webRoot, res, next) {
     }
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.setHeader("Cache-Control", "no-cache");
     res.send(webShellCache);
   } catch (error) {
     next(error);
   }
-}
-
-function setWidgetAssetCacheHeaders(res, filePath) {
-  const ext = path.extname(String(filePath || "")).toLowerCase();
-  if (ext === ".map") {
-    res.setHeader("Cache-Control", "public, max-age=300");
-    return;
-  }
-
-  if (ext === ".html") {
-    res.setHeader("Cache-Control", "no-cache");
-    return;
-  }
-
-  res.setHeader(
-    "Cache-Control",
-    `public, max-age=${WIDGET_ASSET_MAX_AGE_SECONDS}, stale-while-revalidate=${WEB_STATIC_MAX_AGE_SECONDS}`
-  );
-}
-
-function setWebStaticCacheHeaders(res, filePath) {
-  const ext = path.extname(String(filePath || "")).toLowerCase();
-  if (ext === ".html") {
-    res.setHeader("Cache-Control", "no-cache");
-    return;
-  }
-
-  if (ext === ".map") {
-    res.setHeader("Cache-Control", "public, max-age=300");
-    return;
-  }
-
-  res.setHeader(
-    "Cache-Control",
-    `public, max-age=${WEB_STATIC_MAX_AGE_SECONDS}, immutable`
-  );
 }
 
 function injectStandaloneMeta(html) {

@@ -6,8 +6,6 @@ import { palette } from "../../utils/theme";
 
 type GrafanaWidgetProps = {
   config: GrafanaWidgetConfig;
-  isActivePage?: boolean;
-  lowPowerMode?: boolean;
 };
 
 export function GrafanaWidget({ config }: GrafanaWidgetProps) {

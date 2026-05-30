@@ -112,7 +112,6 @@ export function buildWidgetTemplate(
       flvUrl: "",
       fmp4Url: "",
       refreshMs: 2000,
-      preferPreviewOnTouchWeb: false,
       audioEnabled: false,
       position: {
         ...basePosition,
@@ -133,7 +132,6 @@ export function buildWidgetTemplate(
       flvUrl: "",
       fmp4Url: "",
       refreshMs: 2000,
-      preferPreviewOnTouchWeb: false,
       audioEnabled: false,
       talkbackWebrtcUrl: "",
       talkbackPushToTalk: true,
@@ -161,7 +159,6 @@ export function buildWidgetTemplate(
       flvUrl: "",
       fmp4Url: "",
       refreshMs: 2000,
-      preferPreviewOnTouchWeb: false,
       audioEnabled: false,
       talkbackWebrtcUrl: "",
       talkbackPushToTalk: true,

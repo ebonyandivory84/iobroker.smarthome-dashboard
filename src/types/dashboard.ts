@@ -117,7 +117,6 @@ export type CameraWidgetConfig = WidgetBase & {
   fullscreenFmp4Url?: string;
   refreshMs?: number;
   fullscreenRefreshMs?: number;
-  preferPreviewOnTouchWeb?: boolean;
   audioEnabled?: boolean;
   snapshotAspectRatio?: number;
   maximizeStateId?: string;

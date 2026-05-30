@@ -44,7 +44,6 @@ export function DashboardScreen() {
   const pullRefreshInFlightRef = useRef(false);
   const edgeTransferCooldownRef = useRef(0);
   const fullscreenCameraMapRef = useRef<Record<string, boolean>>({});
-  const pendingActivePageRafRef = useRef<number | null>(null);
   const pullGestureRef = useRef<{
     pageId: string | null;
     startX: number | null;
@@ -603,36 +602,6 @@ export function DashboardScreen() {
     return dashboardPages[nextIndex] || null;
   };
 
-  const queueActivePageSwitch = (pageId: string) => {
-    if (!pageId) {
-      return;
-    }
-
-    if (pendingActivePageRafRef.current !== null && Platform.OS === "web" && typeof window !== "undefined") {
-      window.cancelAnimationFrame(pendingActivePageRafRef.current);
-      pendingActivePageRafRef.current = null;
-    }
-
-    if (Platform.OS === "web" && typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
-      pendingActivePageRafRef.current = window.requestAnimationFrame(() => {
-        pendingActivePageRafRef.current = null;
-        setActivePage(pageId);
-      });
-      return;
-    }
-
-    setActivePage(pageId);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (pendingActivePageRafRef.current !== null && Platform.OS === "web" && typeof window !== "undefined") {
-        window.cancelAnimationFrame(pendingActivePageRafRef.current);
-        pendingActivePageRafRef.current = null;
-      }
-    };
-  }, []);
-
   const handlePageScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     horizontalOffsetRef.current = offsetX;
@@ -650,7 +619,7 @@ export function DashboardScreen() {
       }
       committedPageIdRef.current = nextPage.id;
       setVisiblePageId(nextPage.id);
-      queueActivePageSwitch(nextPage.id);
+      setActivePage(nextPage.id);
     }
   };
 
@@ -892,7 +861,7 @@ export function DashboardScreen() {
             horizontalPagerRef.current?.scrollTo({ x: width * nextIndex, animated: false });
           }
           setVisiblePageId(pageId);
-          queueActivePageSwitch(pageId);
+          setActivePage(pageId);
         }}
         onToggleLayoutMode={() => setLayoutMode((current) => !current)}
         onMovePage={(pageId, direction) => {

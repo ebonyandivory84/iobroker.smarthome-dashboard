@@ -240,8 +240,7 @@ export function GridCanvas({
                   onCameraFullscreenSwipeClose,
                   onCameraFullscreenVisibilityChange,
                   onWidgetScrollFocusChange,
-                  isActivePage,
-                  useLowPowerWebEffects
+                  isActivePage
                 )}
               </WidgetFrame>
             </View>
@@ -1397,8 +1396,7 @@ function WebWidgetShell({
               undefined,
               undefined,
               onWidgetScrollFocusChange,
-              widgetRuntimeActive,
-              lowPowerMode
+              widgetRuntimeActive
             )
           : null}
       </View>
@@ -1437,8 +1435,7 @@ function renderWidget(
   onCameraFullscreenSwipeClose?: () => void,
   onCameraFullscreenVisibilityChange?: (widgetId: string, open: boolean) => void,
   onWidgetScrollFocusChange?: (widgetId: string, active: boolean) => void,
-  isActivePage: boolean = true,
-  lowPowerMode: boolean = false
+  isActivePage: boolean = true
 ) {
   const effectiveWidget = mergeWidgetInteractionSounds(widget, widgetTypeDefaults?.[widget.type]);
 
@@ -1518,19 +1515,11 @@ function renderWidget(
   }
 
   if (effectiveWidget.type === "solar") {
-    return (
-      <SolarWidget
-        config={effectiveWidget}
-        isActivePage={isActivePage}
-        lowPowerMode={lowPowerMode}
-        states={states}
-        theme={theme}
-      />
-    );
+    return <SolarWidget config={effectiveWidget} isActivePage={isActivePage} states={states} theme={theme} />;
   }
 
   if (effectiveWidget.type === "grafana") {
-    return <GrafanaWidget config={effectiveWidget} isActivePage={isActivePage} lowPowerMode={lowPowerMode} />;
+    return <GrafanaWidget config={effectiveWidget} />;
   }
 
   if (effectiveWidget.type === "weather") {
@@ -1589,15 +1578,7 @@ function renderWidget(
   }
 
   if (effectiveWidget.type === "heatingV2") {
-    return (
-      <HeatingWidgetV2
-        client={client}
-        config={effectiveWidget}
-        isActivePage={isActivePage}
-        lowPowerMode={lowPowerMode}
-        states={states}
-      />
-    );
+    return <HeatingWidgetV2 client={client} config={effectiveWidget} isActivePage={isActivePage} states={states} />;
   }
 
   return null;
