@@ -581,6 +581,11 @@ export function HeatingWidgetV2({
   const detailsTickerText = showDetailsTicker ? detailsSegments.join(DETAILS_TICKER_SEPARATOR) : "";
   const detailsTickerRenderText = detailsTickerText.replace(/ /g, "\u00a0");
   const detailsTickerLoopText = `${detailsTickerRenderText}${DETAILS_TICKER_LOOP_SEPARATOR}`;
+  const detailsTickerEstimatedWidthPx = Math.max(220, Math.round(detailsTickerRenderText.length * 7.2));
+  const detailsTickerCssDurationMs = Math.max(
+    8000,
+    Math.round((detailsTickerEstimatedWidthPx / detailsTickerSpeedPxPerS) * 1000)
+  );
 
   const liveBadgeText = error ? "Fehler" : writePending ? "Sync" : "";
   const footerStatusText = error ? error : writePending ? "Synchronisiere..." : "";
@@ -595,6 +600,25 @@ export function HeatingWidgetV2({
       ),
     [widgetHeight, widgetWidth]
   );
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") {
+      return;
+    }
+    const styleId = "smarthome-heatingv2-ticker-keyframes";
+    if (document.getElementById(styleId)) {
+      return;
+    }
+    const styleEl = document.createElement("style");
+    styleEl.id = styleId;
+    styleEl.textContent = `
+      @keyframes smarthomeHeatingV2TickerMove {
+        from { transform: translate3d(0, 0, 0); }
+        to { transform: translate3d(-50%, 0, 0); }
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }, []);
 
   useEffect(() => {
     blinkAnimationRef.current?.stop();
@@ -633,7 +657,14 @@ export function HeatingWidgetV2({
   useEffect(() => {
     detailsTickerAnimationRef.current?.stop();
     detailsTickerAnimationRef.current = null;
-    if (lowPowerMode || !runtimeActive || !showDetailsTicker || detailsTrackWidth <= 0 || detailsContentWidth <= 0) {
+    if (
+      Platform.OS === "web" ||
+      lowPowerMode ||
+      !runtimeActive ||
+      !showDetailsTicker ||
+      detailsTrackWidth <= 0 ||
+      detailsContentWidth <= 0
+    ) {
       detailsTickerOffset.setValue(0);
       return;
     }
@@ -675,6 +706,7 @@ export function HeatingWidgetV2({
     detailsTickerOffset,
     detailsTrackWidth,
     detailsTickerSpeedPxPerS,
+    Platform.OS,
     lowPowerMode,
     runtimeActive,
     showDetailsTicker,
@@ -1094,43 +1126,81 @@ export function HeatingWidgetV2({
               }}
               style={[styles.detailsTickerTrack, { borderColor: panelBorder, backgroundColor: panelColor }]}
             >
-              <Animated.View
-                style={[
-                  styles.detailsTickerMover,
-                  {
-                    transform: [{ translateX: detailsTickerOffset }],
-                  },
-                ]}
-              >
-                {lowPowerMode ? (
-                  <Text
-                    numberOfLines={1}
-                    onLayout={(event) => {
-                      const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
-                      setDetailsContentWidth((current) => (current === nextWidth ? current : nextWidth));
-                    }}
-                    style={[styles.detailsTickerText, { color: textColor }]}
-                  >
-                    {detailsTickerRenderText}
-                  </Text>
-                ) : (
-                  <>
-                    <Text
-                      numberOfLines={1}
-                      onLayout={(event) => {
-                        const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
-                        setDetailsContentWidth((current) => (current === nextWidth ? current : nextWidth));
-                      }}
-                      style={[styles.detailsTickerText, { color: textColor }]}
+              {Platform.OS === "web" && !lowPowerMode
+                ? createElement(
+                    "div",
+                    {
+                      style: {
+                        ...webDetailsTickerMoverStyle,
+                        animationDuration: `${detailsTickerCssDurationMs}ms`,
+                      },
+                    },
+                    createElement(
+                      "div",
+                      {
+                        style: webDetailsTickerInnerStyle,
+                      },
+                      createElement(
+                        "span",
+                        {
+                          style: {
+                            ...webDetailsTickerTextStyle,
+                            color: textColor,
+                          },
+                        },
+                        detailsTickerLoopText
+                      ),
+                      createElement(
+                        "span",
+                        {
+                          style: {
+                            ...webDetailsTickerTextStyle,
+                            color: textColor,
+                          },
+                        },
+                        detailsTickerLoopText
+                      )
+                    )
+                  )
+                : (
+                    <Animated.View
+                      style={[
+                        styles.detailsTickerMover,
+                        {
+                          transform: [{ translateX: detailsTickerOffset }],
+                        },
+                      ]}
                     >
-                      {detailsTickerLoopText}
-                    </Text>
-                    <Text numberOfLines={1} style={[styles.detailsTickerText, { color: textColor }]}>
-                      {detailsTickerLoopText}
-                    </Text>
-                  </>
-                )}
-              </Animated.View>
+                      {lowPowerMode ? (
+                        <Text
+                          numberOfLines={1}
+                          onLayout={(event) => {
+                            const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
+                            setDetailsContentWidth((current) => (current === nextWidth ? current : nextWidth));
+                          }}
+                          style={[styles.detailsTickerText, { color: textColor }]}
+                        >
+                          {detailsTickerRenderText}
+                        </Text>
+                      ) : (
+                        <>
+                          <Text
+                            numberOfLines={1}
+                            onLayout={(event) => {
+                              const nextWidth = Math.max(0, Math.round(event.nativeEvent.layout.width));
+                              setDetailsContentWidth((current) => (current === nextWidth ? current : nextWidth));
+                            }}
+                            style={[styles.detailsTickerText, { color: textColor }]}
+                          >
+                            {detailsTickerLoopText}
+                          </Text>
+                          <Text numberOfLines={1} style={[styles.detailsTickerText, { color: textColor }]}>
+                            {detailsTickerLoopText}
+                          </Text>
+                        </>
+                      )}
+                    </Animated.View>
+                  )}
             </View>
           </View>
         ) : null}
@@ -1840,4 +1910,35 @@ const webSliderStyle: Record<string, string | number> = {
   appearance: "none",
   backgroundColor: "rgba(255,255,255,0.08)",
   borderRadius: 999,
+};
+
+const webDetailsTickerMoverStyle: Record<string, string | number> = {
+  position: "absolute",
+  left: 0,
+  top: 0,
+  bottom: 0,
+  display: "flex",
+  alignItems: "center",
+  willChange: "transform",
+  animationName: "smarthomeHeatingV2TickerMove",
+  animationTimingFunction: "linear",
+  animationIterationCount: "infinite",
+  animationFillMode: "both",
+  transform: "translate3d(0, 0, 0)",
+};
+
+const webDetailsTickerInnerStyle: Record<string, string | number> = {
+  display: "flex",
+  alignItems: "center",
+  whiteSpace: "pre",
+  transform: "translateZ(0)",
+  backfaceVisibility: "hidden",
+};
+
+const webDetailsTickerTextStyle: Record<string, string | number> = {
+  fontSize: "12px",
+  lineHeight: "16px",
+  fontWeight: 700,
+  whiteSpace: "pre",
+  flexShrink: 0,
 };
