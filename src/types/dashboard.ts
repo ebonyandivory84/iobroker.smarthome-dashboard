@@ -146,8 +146,6 @@ export type GrafanaWidgetConfig = WidgetBase & {
   manualHeightOverride?: boolean;
   url: string;
   refreshMs?: number;
-  renderMode?: "liveIframe" | "cachedImage";
-  cacheRefreshMs?: number;
   allowInteractions?: boolean;
 };
 

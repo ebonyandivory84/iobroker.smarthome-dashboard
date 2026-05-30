@@ -1,6 +1,5 @@
-import { createElement, useEffect, useMemo, useState } from "react";
+import { createElement, useState } from "react";
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { useDocumentVisibility } from "../../hooks/useDocumentVisibility";
 import { GrafanaWidgetConfig } from "../../types/dashboard";
 import { playConfiguredUiSound } from "../../utils/uiSounds";
 import { palette } from "../../utils/theme";
@@ -11,89 +10,14 @@ type GrafanaWidgetProps = {
   lowPowerMode?: boolean;
 };
 
-type GrafanaSessionWarmState = {
-  warming: boolean;
-  ready: boolean;
-  waiters: Array<() => void>;
-};
-
-const GRAFANA_SESSION_WARMUP_TIMEOUT_MS = 2600;
-const GRAFANA_IFRAME_STAGGER_MS = 180;
-const GRAFANA_IFRAME_STAGGER_MAX_MS = 1400;
-const GRAFANA_CACHE_REFRESH_DEFAULT_MS = 300000;
-const GRAFANA_CACHE_REFRESH_MIN_MS = 60000;
-const GRAFANA_CACHE_REFRESH_MAX_MS = 24 * 60 * 60 * 1000;
-const grafanaSessionWarmStateByKey = new Map<string, GrafanaSessionWarmState>();
-let nextGrafanaIframeSlotAt = 0;
-
-export function GrafanaWidget({ config, isActivePage = true, lowPowerMode = false }: GrafanaWidgetProps) {
-  const documentVisible = useDocumentVisibility();
+export function GrafanaWidget({ config }: GrafanaWidgetProps) {
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
-  const [previewReady, setPreviewReady] = useState(Platform.OS !== "web");
-  const [cacheReloadToken, setCacheReloadToken] = useState(0);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const resolvedUrl = normalizeGrafanaUrl(config.url);
-  const renderMode = resolveGrafanaRenderMode(config.renderMode, lowPowerMode);
-  const useCachedImage = renderMode === "cachedImage";
-  const cacheRefreshMs = normalizeGrafanaCacheRefreshMs(config.cacheRefreshMs ?? GRAFANA_CACHE_REFRESH_DEFAULT_MS);
   const iframeUrl = applyGrafanaRefresh(resolvedUrl, config.refreshMs);
-  const previewCachedImageUrl = useMemo(
-    () => buildGrafanaCachedImageUrl(resolvedUrl, cacheRefreshMs, false, cacheReloadToken),
-    [cacheRefreshMs, cacheReloadToken, resolvedUrl]
-  );
-  const fullscreenCachedImageUrl = useMemo(
-    () => buildGrafanaCachedImageUrl(resolvedUrl, cacheRefreshMs, true, cacheReloadToken),
-    [cacheRefreshMs, cacheReloadToken, resolvedUrl]
-  );
-  const interactionsAllowed = !useCachedImage && config.allowInteractions !== false;
+  const interactionsAllowed = config.allowInteractions !== false;
   const sandboxValue = interactionsAllowed ? undefined : "allow-same-origin allow-scripts";
-  const runtimeActive = Platform.OS === "web" ? isActivePage && documentVisible : true;
-  const shouldRenderPreviewFrame = runtimeActive && previewReady;
-
-  useEffect(() => {
-    if (Platform.OS !== "web") {
-      setPreviewReady(true);
-      return;
-    }
-    if (!runtimeActive || !resolvedUrl) {
-      setPreviewReady(false);
-      return;
-    }
-    if (useCachedImage) {
-      setPreviewReady(true);
-      return;
-    }
-
-    let cancelled = false;
-    setPreviewReady(false);
-
-    void (async () => {
-      await warmGrafanaSession(resolvedUrl);
-      await reserveGrafanaIframeStartSlot();
-      if (!cancelled) {
-        setPreviewReady(true);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [resolvedUrl, runtimeActive, useCachedImage]);
-
-  useEffect(() => {
-    if (Platform.OS !== "web" || !useCachedImage || !runtimeActive || !resolvedUrl) {
-      return;
-    }
-
-    // Trigger an immediate refresh request once active, then keep cadence.
-    setCacheReloadToken((current) => current + 1);
-    const timer = setInterval(() => {
-      setCacheReloadToken((current) => current + 1);
-    }, cacheRefreshMs);
-
-    return () => clearInterval(timer);
-  }, [cacheRefreshMs, resolvedUrl, runtimeActive, useCachedImage]);
 
   const openFullscreen = () => {
     if (!resolvedUrl) {
@@ -136,38 +60,15 @@ export function GrafanaWidget({ config, isActivePage = true, lowPowerMode = fals
         {
           style: webFrameWrapStyle,
         },
-        shouldRenderPreviewFrame
-          ? useCachedImage
-            ? createElement("img", {
-                src: previewCachedImageUrl,
-                style: webPreviewImageStyle,
-                loading: "eager",
-                referrerPolicy: "no-referrer",
-                alt: config.title || "Grafana",
-              })
-            : createElement("iframe", {
-                src: iframeUrl,
-                style: webPreviewFrameStyle,
-                sandbox: sandboxValue,
-                allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
-                allowFullScreen: true,
-                loading: "eager",
-                referrerPolicy: "no-referrer",
-              })
-          : createElement(
-              "div",
-              { style: webPreviewPlaceholderStyle },
-              createElement("span", { style: webPreviewPlaceholderIconStyle }, "📈"),
-              createElement(
-                "span",
-                { style: { ...webPreviewPlaceholderTextStyle, color: mutedTextColor } },
-                runtimeActive
-                  ? useCachedImage
-                    ? "Grafana-Cache wird geladen..."
-                    : "Grafana wird initialisiert..."
-                  : "Grafana pausiert (inaktive Seite)"
-              )
-            ),
+        createElement("iframe", {
+          src: iframeUrl,
+          style: webPreviewFrameStyle,
+          sandbox: sandboxValue,
+          allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
+          allowFullScreen: true,
+          loading: "eager",
+          referrerPolicy: "no-referrer",
+        }),
         createElement(
           "div",
           {
@@ -197,26 +98,18 @@ export function GrafanaWidget({ config, isActivePage = true, lowPowerMode = fals
                 <Text style={[styles.modalButtonLabel, { color: textColor }]}>Schliessen</Text>
               </Pressable>
             </View>
-            {useCachedImage
-              ? createElement("img", {
-                  src: fullscreenCachedImageUrl,
-                  style: webFullscreenImageStyle,
-                  loading: "eager",
-                  referrerPolicy: "no-referrer",
-                  alt: config.title || "Grafana",
-                })
-              : createElement("iframe", {
-                  src: iframeUrl,
-                  style: {
-                    ...webFullscreenFrameStyle,
-                    pointerEvents: interactionsAllowed ? "auto" : "none",
-                  },
-                  sandbox: sandboxValue,
-                  allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
-                  allowFullScreen: true,
-                  loading: "eager",
-                  referrerPolicy: "no-referrer",
-                })}
+            {createElement("iframe", {
+              src: iframeUrl,
+              style: {
+                ...webFullscreenFrameStyle,
+                pointerEvents: interactionsAllowed ? "auto" : "none",
+              },
+              sandbox: sandboxValue,
+              allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
+              allowFullScreen: true,
+              loading: "eager",
+              referrerPolicy: "no-referrer",
+            })}
           </View>
         </View>
       </Modal>
@@ -240,182 +133,12 @@ function normalizeGrafanaUrl(value?: string) {
   return trimmed;
 }
 
-function buildGrafanaSessionKey(url: string) {
-  try {
-    const parsed = new URL(url);
-    const basePath = inferGrafanaBasePath(parsed.pathname);
-    return `${parsed.origin}${basePath}`;
-  } catch {
-    return "";
-  }
-}
-
-function buildGrafanaSessionWarmupUrl(url: string) {
-  try {
-    const parsed = new URL(url);
-    parsed.search = "";
-    parsed.hash = "";
-    parsed.pathname = inferGrafanaBasePath(parsed.pathname);
-    return parsed.toString();
-  } catch {
-    return url;
-  }
-}
-
-function inferGrafanaBasePath(pathname: string) {
-  const value = pathname || "/";
-  const markers = ["/d-solo/", "/d/", "/dashboard-solo/", "/dashboard/", "/explore", "/alerting", "/a/"];
-  let cutAt = -1;
-  for (const marker of markers) {
-    const idx = value.indexOf(marker);
-    if (idx >= 0 && (cutAt < 0 || idx < cutAt)) {
-      cutAt = idx;
-    }
-  }
-
-  const rawBase = cutAt >= 0 ? value.slice(0, cutAt) : value;
-  const normalized = rawBase.replace(/\/+$/, "");
-  return normalized || "/";
-}
-
-async function warmGrafanaSession(url: string) {
-  if (Platform.OS !== "web" || typeof window === "undefined" || typeof document === "undefined") {
-    return;
-  }
-
-  const key = buildGrafanaSessionKey(url);
-  if (!key) {
-    return;
-  }
-
-  let state = grafanaSessionWarmStateByKey.get(key);
-  if (!state) {
-    state = { warming: false, ready: false, waiters: [] };
-    grafanaSessionWarmStateByKey.set(key, state);
-  }
-  if (state.ready) {
-    return;
-  }
-
-  await new Promise<void>((resolve) => {
-    if (!state) {
-      resolve();
-      return;
-    }
-    state.waiters.push(resolve);
-    if (state.warming) {
-      return;
-    }
-    state.warming = true;
-
-    const iframe = document.createElement("iframe");
-    iframe.src = buildGrafanaSessionWarmupUrl(url);
-    iframe.setAttribute("aria-hidden", "true");
-    iframe.tabIndex = -1;
-    iframe.style.position = "fixed";
-    iframe.style.width = "1px";
-    iframe.style.height = "1px";
-    iframe.style.left = "-10000px";
-    iframe.style.top = "-10000px";
-    iframe.style.border = "0";
-    iframe.style.opacity = "0";
-    iframe.style.pointerEvents = "none";
-
-    let finished = false;
-    const finish = () => {
-      if (!state || finished) {
-        return;
-      }
-      finished = true;
-      state.warming = false;
-      state.ready = true;
-      if (iframe.parentNode) {
-        iframe.parentNode.removeChild(iframe);
-      }
-      const waiters = state.waiters.splice(0);
-      waiters.forEach((waiter) => waiter());
-    };
-
-    const timeout = window.setTimeout(finish, GRAFANA_SESSION_WARMUP_TIMEOUT_MS);
-    iframe.addEventListener(
-      "load",
-      () => {
-        clearTimeout(timeout);
-        finish();
-      },
-      { once: true }
-    );
-    iframe.addEventListener(
-      "error",
-      () => {
-        clearTimeout(timeout);
-        finish();
-      },
-      { once: true }
-    );
-
-    if (document.body) {
-      document.body.appendChild(iframe);
-    } else {
-      clearTimeout(timeout);
-      finish();
-    }
-  });
-}
-
-async function reserveGrafanaIframeStartSlot() {
-  if (Platform.OS !== "web" || typeof window === "undefined") {
-    return;
-  }
-
-  const now = Date.now();
-  const slotStart = Math.max(now, nextGrafanaIframeSlotAt);
-  nextGrafanaIframeSlotAt = slotStart + GRAFANA_IFRAME_STAGGER_MS;
-  const delayMs = Math.max(0, Math.min(GRAFANA_IFRAME_STAGGER_MAX_MS, slotStart - now));
-  if (!delayMs) {
-    return;
-  }
-
-  await new Promise<void>((resolve) => {
-    window.setTimeout(resolve, delayMs);
-  });
-}
-
 function normalizeRefreshMs(value?: number) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return 0;
   }
 
   return Math.max(0, Math.round(value));
-}
-
-function resolveGrafanaRenderMode(rawMode: GrafanaWidgetConfig["renderMode"], lowPowerMode: boolean) {
-  if (rawMode === "cachedImage" || rawMode === "liveIframe") {
-    return rawMode;
-  }
-  return lowPowerMode ? "cachedImage" : "liveIframe";
-}
-
-function normalizeGrafanaCacheRefreshMs(value?: number) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return GRAFANA_CACHE_REFRESH_DEFAULT_MS;
-  }
-
-  return Math.max(GRAFANA_CACHE_REFRESH_MIN_MS, Math.min(GRAFANA_CACHE_REFRESH_MAX_MS, Math.round(value)));
-}
-
-function buildGrafanaCachedImageUrl(url: string, refreshMs: number, fullscreen: boolean, nonce: number) {
-  if (!url) {
-    return "";
-  }
-
-  const params = new URLSearchParams();
-  params.set("url", url);
-  params.set("refreshMs", String(refreshMs));
-  params.set("width", fullscreen ? "1920" : "1280");
-  params.set("height", fullscreen ? "1080" : "720");
-  params.set("v", String(Math.max(0, nonce)));
-  return `/smarthome-dashboard/api/grafana-cached-image?${params.toString()}`;
 }
 
 function applyGrafanaRefresh(url: string, refreshMs?: number) {
@@ -532,16 +255,6 @@ const webPreviewFrameStyle = {
   pointerEvents: "none",
 };
 
-const webPreviewImageStyle = {
-  width: "100%",
-  height: "100%",
-  objectFit: "contain",
-  border: "0",
-  display: "block",
-  background: "transparent",
-  pointerEvents: "none",
-} as const;
-
 const webFullscreenFrameStyle = {
   width: "100%",
   height: "calc(100% - 56px)",
@@ -549,15 +262,6 @@ const webFullscreenFrameStyle = {
   display: "block",
   background: "transparent",
 };
-
-const webFullscreenImageStyle = {
-  width: "100%",
-  height: "calc(100% - 56px)",
-  objectFit: "contain",
-  border: "0",
-  display: "block",
-  background: "transparent",
-} as const;
 
 const webFullscreenOverlayButtonStyle = {
   position: "absolute",
@@ -567,26 +271,4 @@ const webFullscreenOverlayButtonStyle = {
   background: "transparent",
   cursor: "zoom-in",
   padding: 0,
-};
-
-const webPreviewPlaceholderStyle = {
-  width: "100%",
-  height: "100%",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: "8px",
-  background: "rgba(3, 8, 16, 0.78)",
-  border: "1px solid rgba(255,255,255,0.06)",
-};
-
-const webPreviewPlaceholderIconStyle = {
-  fontSize: "28px",
-  lineHeight: "28px",
-  opacity: 0.88,
-};
-
-const webPreviewPlaceholderTextStyle = {
-  fontSize: "12px",
-  fontWeight: 700,
 };
