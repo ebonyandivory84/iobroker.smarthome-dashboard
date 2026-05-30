@@ -1,4 +1,4 @@
-import { createElement, useState } from "react";
+import { createElement, useEffect, useState } from "react";
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useDocumentVisibility } from "../../hooks/useDocumentVisibility";
 import { GrafanaWidgetConfig } from "../../types/dashboard";
@@ -11,9 +11,22 @@ type GrafanaWidgetProps = {
   lowPowerMode?: boolean;
 };
 
+type GrafanaSessionWarmState = {
+  warming: boolean;
+  ready: boolean;
+  waiters: Array<() => void>;
+};
+
+const GRAFANA_SESSION_WARMUP_TIMEOUT_MS = 2600;
+const GRAFANA_IFRAME_STAGGER_MS = 180;
+const GRAFANA_IFRAME_STAGGER_MAX_MS = 1400;
+const grafanaSessionWarmStateByKey = new Map<string, GrafanaSessionWarmState>();
+let nextGrafanaIframeSlotAt = 0;
+
 export function GrafanaWidget({ config, isActivePage = true, lowPowerMode = false }: GrafanaWidgetProps) {
   const documentVisible = useDocumentVisibility();
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const [previewReady, setPreviewReady] = useState(Platform.OS !== "web");
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const resolvedUrl = normalizeGrafanaUrl(config.url);
@@ -21,8 +34,34 @@ export function GrafanaWidget({ config, isActivePage = true, lowPowerMode = fals
   const interactionsAllowed = config.allowInteractions !== false;
   const sandboxValue = interactionsAllowed ? undefined : "allow-same-origin allow-scripts";
   const runtimeActive = Platform.OS === "web" ? isActivePage && documentVisible : true;
-  const shouldRenderPreviewFrame = runtimeActive;
+  const shouldRenderPreviewFrame = runtimeActive && previewReady;
   void lowPowerMode;
+
+  useEffect(() => {
+    if (Platform.OS !== "web") {
+      setPreviewReady(true);
+      return;
+    }
+    if (!runtimeActive || !resolvedUrl) {
+      setPreviewReady(false);
+      return;
+    }
+
+    let cancelled = false;
+    setPreviewReady(false);
+
+    void (async () => {
+      await warmGrafanaSession(resolvedUrl);
+      await reserveGrafanaIframeStartSlot();
+      if (!cancelled) {
+        setPreviewReady(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resolvedUrl, runtimeActive]);
 
   const openFullscreen = () => {
     if (!resolvedUrl) {
@@ -82,7 +121,7 @@ export function GrafanaWidget({ config, isActivePage = true, lowPowerMode = fals
               createElement(
                 "span",
                 { style: { ...webPreviewPlaceholderTextStyle, color: mutedTextColor } },
-                "Grafana pausiert (inaktive Seite)"
+                runtimeActive ? "Grafana wird initialisiert..." : "Grafana pausiert (inaktive Seite)"
               )
             ),
         createElement(
@@ -147,6 +186,147 @@ function normalizeGrafanaUrl(value?: string) {
   }
 
   return trimmed;
+}
+
+function buildGrafanaSessionKey(url: string) {
+  try {
+    const parsed = new URL(url);
+    const basePath = inferGrafanaBasePath(parsed.pathname);
+    return `${parsed.origin}${basePath}`;
+  } catch {
+    return "";
+  }
+}
+
+function buildGrafanaSessionWarmupUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    parsed.search = "";
+    parsed.hash = "";
+    parsed.pathname = inferGrafanaBasePath(parsed.pathname);
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
+function inferGrafanaBasePath(pathname: string) {
+  const value = pathname || "/";
+  const markers = ["/d-solo/", "/d/", "/dashboard-solo/", "/dashboard/", "/explore", "/alerting", "/a/"];
+  let cutAt = -1;
+  for (const marker of markers) {
+    const idx = value.indexOf(marker);
+    if (idx >= 0 && (cutAt < 0 || idx < cutAt)) {
+      cutAt = idx;
+    }
+  }
+
+  const rawBase = cutAt >= 0 ? value.slice(0, cutAt) : value;
+  const normalized = rawBase.replace(/\/+$/, "");
+  return normalized || "/";
+}
+
+async function warmGrafanaSession(url: string) {
+  if (Platform.OS !== "web" || typeof window === "undefined" || typeof document === "undefined") {
+    return;
+  }
+
+  const key = buildGrafanaSessionKey(url);
+  if (!key) {
+    return;
+  }
+
+  let state = grafanaSessionWarmStateByKey.get(key);
+  if (!state) {
+    state = { warming: false, ready: false, waiters: [] };
+    grafanaSessionWarmStateByKey.set(key, state);
+  }
+  if (state.ready) {
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    if (!state) {
+      resolve();
+      return;
+    }
+    state.waiters.push(resolve);
+    if (state.warming) {
+      return;
+    }
+    state.warming = true;
+
+    const iframe = document.createElement("iframe");
+    iframe.src = buildGrafanaSessionWarmupUrl(url);
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.tabIndex = -1;
+    iframe.style.position = "fixed";
+    iframe.style.width = "1px";
+    iframe.style.height = "1px";
+    iframe.style.left = "-10000px";
+    iframe.style.top = "-10000px";
+    iframe.style.border = "0";
+    iframe.style.opacity = "0";
+    iframe.style.pointerEvents = "none";
+
+    let finished = false;
+    const finish = () => {
+      if (!state || finished) {
+        return;
+      }
+      finished = true;
+      state.warming = false;
+      state.ready = true;
+      if (iframe.parentNode) {
+        iframe.parentNode.removeChild(iframe);
+      }
+      const waiters = state.waiters.splice(0);
+      waiters.forEach((waiter) => waiter());
+    };
+
+    const timeout = window.setTimeout(finish, GRAFANA_SESSION_WARMUP_TIMEOUT_MS);
+    iframe.addEventListener(
+      "load",
+      () => {
+        clearTimeout(timeout);
+        finish();
+      },
+      { once: true }
+    );
+    iframe.addEventListener(
+      "error",
+      () => {
+        clearTimeout(timeout);
+        finish();
+      },
+      { once: true }
+    );
+
+    if (document.body) {
+      document.body.appendChild(iframe);
+    } else {
+      clearTimeout(timeout);
+      finish();
+    }
+  });
+}
+
+async function reserveGrafanaIframeStartSlot() {
+  if (Platform.OS !== "web" || typeof window === "undefined") {
+    return;
+  }
+
+  const now = Date.now();
+  const slotStart = Math.max(now, nextGrafanaIframeSlotAt);
+  nextGrafanaIframeSlotAt = slotStart + GRAFANA_IFRAME_STAGGER_MS;
+  const delayMs = Math.max(0, Math.min(GRAFANA_IFRAME_STAGGER_MAX_MS, slotStart - now));
+  if (!delayMs) {
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    window.setTimeout(resolve, delayMs);
+  });
 }
 
 function normalizeRefreshMs(value?: number) {
