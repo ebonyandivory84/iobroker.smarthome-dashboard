@@ -404,19 +404,22 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
         });
       },
       setActivePage(pageId) {
-        if (!pageId || pageId === config.activePageId) {
-          return;
-        }
-        const nextPage = (config.pages || []).find((page) => page.id === pageId);
-        if (!nextPage) {
-          return;
-        }
+        setConfig((current) => {
+          if (!pageId || pageId === current.activePageId) {
+            return current;
+          }
 
-        persist({
-          ...config,
-          activePageId: nextPage.id,
-          title: nextPage.title,
-          widgets: getRuntimeWidgetsForPage(nextPage),
+          const nextPage = (current.pages || []).find((page) => page.id === pageId);
+          if (!nextPage) {
+            return current;
+          }
+
+          return {
+            ...current,
+            activePageId: nextPage.id,
+            title: nextPage.title,
+            widgets: getRuntimeWidgetsForPage(nextPage),
+          };
         });
       },
       createDashboardPage(mode = "dashboard") {
