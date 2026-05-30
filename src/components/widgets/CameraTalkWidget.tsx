@@ -153,7 +153,7 @@ export function CameraTalkWidget({
     flvUrl: fullscreenFlvUrl,
     fmp4Url: fullscreenFmp4Url,
   });
-  const preferPreviewOnTouchWeb = config.preferPreviewOnTouchWeb !== false;
+  const preferPreviewOnTouchWeb = config.preferPreviewOnTouchWeb === true;
   const usePreviewFeedInTouchFullscreen =
     Platform.OS === "web" && preferPreviewOnTouchWeb && isTouchCapableWebDevice();
   const fullscreenFeed = usePreviewFeedInTouchFullscreen ? previewFeed : fullscreenConfiguredFeed;

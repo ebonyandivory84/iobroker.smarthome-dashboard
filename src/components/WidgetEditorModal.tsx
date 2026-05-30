@@ -140,7 +140,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         fullscreenFmp4Url: widget.fullscreenFmp4Url || widget.fmp4Url || "",
         refreshMs: String(widget.refreshMs || 2000),
         fullscreenRefreshMs: String(widget.fullscreenRefreshMs || widget.refreshMs || 2000),
-        preferPreviewOnTouchWeb: widget.preferPreviewOnTouchWeb === false ? "false" : "true",
+        preferPreviewOnTouchWeb: widget.preferPreviewOnTouchWeb === true ? "true" : "false",
         audioEnabled: widget.audioEnabled === true ? "true" : "false",
         maximizeStateId: widget.maximizeStateId || "",
         maximizeTriggerFormat: widget.maximizeTriggerFormat || "boolean",
@@ -850,7 +850,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         fullscreenFmp4Url,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 2000, 250),
         fullscreenRefreshMs: clampInt(draft.fullscreenRefreshMs, widget.fullscreenRefreshMs || widget.refreshMs || 2000, 250),
-        preferPreviewOnTouchWeb: draft.preferPreviewOnTouchWeb !== "false",
+        preferPreviewOnTouchWeb: draft.preferPreviewOnTouchWeb === "true",
         audioEnabled: draft.audioEnabled === "true",
         manualHeightOverride: cameraSourceChanged ? false : widget.manualHeightOverride,
         snapshotAspectRatio: cameraSourceChanged ? undefined : widget.snapshotAspectRatio,
@@ -1836,7 +1836,7 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                 <Field label="Touch-Tablet: Vollbild mit Miniatur-Stream">
                   <ChoiceRow
                     options={["true", "false"]}
-                    value={draft.preferPreviewOnTouchWeb || "true"}
+                    value={draft.preferPreviewOnTouchWeb || "false"}
                     onSelect={(value) => setDraft((current) => ({ ...current, preferPreviewOnTouchWeb: value }))}
                   />
                   <Text style={styles.mappingHint}>
