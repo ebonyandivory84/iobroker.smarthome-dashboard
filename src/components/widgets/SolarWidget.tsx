@@ -26,6 +26,7 @@ type SolarWidgetProps = {
   states: StateSnapshot;
   theme?: ThemeSettings;
   isActivePage?: boolean;
+  lowPowerMode?: boolean;
 };
 
 type FlowDir = "toHome" | "fromHome" | "idle";
@@ -52,10 +53,17 @@ const SOLAR_DEFAULT_STAT_LABELS = [
   "Stat 6",
 ];
 
-export function SolarWidget({ config, states, theme, isActivePage = true }: SolarWidgetProps) {
+export function SolarWidget({
+  config,
+  states,
+  theme,
+  isActivePage = true,
+  lowPowerMode = false,
+}: SolarWidgetProps) {
   const { dashboardPages, setActivePage } = useDashboardConfig();
   const documentVisible = useDocumentVisibility();
   const runtimeActive = isActivePage && documentVisible;
+  const flowAnimationEnabled = runtimeActive;
   const resolvedTheme = resolveThemeSettings(theme);
   const widgetAppearance = config.appearance;
   const textColor = widgetAppearance?.textColor || palette.text;
@@ -178,7 +186,7 @@ export function SolarWidget({ config, states, theme, isActivePage = true }: Sola
     wallboxCarRangeRaw === null ? null : Math.max(0, Math.round(wallboxCarRangeRaw));
   const carPowerDisplayW =
     wallboxChargePowerW === null ? null : Math.max(0, wallboxChargePowerW);
-  const backgroundBlur = clamp(config.backgroundImageBlur ?? 8, 0, 24);
+  const backgroundBlur = lowPowerMode ? 0 : clamp(config.backgroundImageBlur ?? 8, 0, 24);
   const compactWidget = widgetLayout.width > 0 && (widgetLayout.width < 520 || widgetLayout.height < 420);
   const veryCompactWidget = widgetLayout.width > 0 && (widgetLayout.width < 420 || widgetLayout.height < 340);
   const statCards = useMemo(
@@ -266,7 +274,8 @@ export function SolarWidget({ config, states, theme, isActivePage = true }: Sola
           nodeLayout={config.nodeLayout}
           statTextScale={config.statTextScale}
           statCards={statCards}
-          runtimeActive={runtimeActive}
+          animateFlow={flowAnimationEnabled}
+          lowPowerMode={lowPowerMode}
         />
       </View>
 
@@ -304,7 +313,8 @@ function SolarFlowScene({
   nodeLayout,
   statTextScale,
   statCards,
-  runtimeActive,
+  animateFlow,
+  lowPowerMode,
 }: {
   pvDir: FlowDir;
   pvNow: number | null;
@@ -328,28 +338,54 @@ function SolarFlowScene({
   nodeLayout?: Partial<SolarLayoutConfig>;
   statTextScale?: number;
   statCards: Array<{ label: string; value: string }>;
-  runtimeActive: boolean;
+  animateFlow: boolean;
+  lowPowerMode: boolean;
 }) {
   const progress = useRef(new Animated.Value(0)).current;
   const [sceneLayout, setSceneLayout] = useState({ width: SOLAR_SCENE_BASE_WIDTH, height: SOLAR_SCENE_BASE_HEIGHT });
+  const flowDurationMs = lowPowerMode ? 2400 : 1400;
+  const isWeb = Platform.OS === "web";
+
+  useEffect(() => {
+    if (!isWeb || typeof document === "undefined") {
+      return;
+    }
+    const styleId = "smarthome-solar-flow-keyframes";
+    if (document.getElementById(styleId)) {
+      return;
+    }
+    const styleEl = document.createElement("style");
+    styleEl.id = styleId;
+    styleEl.textContent = `
+      @keyframes smarthomeSolarFlowX {
+        from { transform: translate3d(var(--flow-x-from, 0px), 0, 0); }
+        to { transform: translate3d(var(--flow-x-to, 0px), 0, 0); }
+      }
+      @keyframes smarthomeSolarFlowY {
+        from { transform: translate3d(0, var(--flow-y-from, 0px), 0); }
+        to { transform: translate3d(0, var(--flow-y-to, 0px), 0); }
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }, [isWeb]);
 
   useEffect(() => {
     progress.stopAnimation();
-    if (!runtimeActive) {
+    if (isWeb || !animateFlow) {
       progress.setValue(0);
       return;
     }
     const loop = Animated.loop(
       Animated.timing(progress, {
         toValue: 1,
-        duration: 1400,
+        duration: flowDurationMs,
         easing: Easing.linear,
-        useNativeDriver: false,
+        useNativeDriver: Platform.OS !== "web",
       })
     );
     loop.start();
     return () => loop.stop();
-  }, [progress, runtimeActive]);
+  }, [animateFlow, flowDurationMs, isWeb, progress]);
 
   const fittedScene = useMemo(() => {
     const availableWidth = Math.max(1, sceneLayout.width);
@@ -447,6 +483,9 @@ function SolarFlowScene({
 
       <AnimatedFlowDot
         active={pvDir !== "idle"}
+        animate={animateFlow}
+        lowPowerMode={lowPowerMode}
+        durationMs={flowDurationMs}
         axis="y"
         progress={progress}
         range={pvDir === "toHome" ? [0, Math.max(0, topLineHeight - flowDotSize)] : [Math.max(0, topLineHeight - flowDotSize), 0]}
@@ -456,6 +495,9 @@ function SolarFlowScene({
       />
       <AnimatedFlowDot
         active={battDir !== "idle"}
+        animate={animateFlow}
+        lowPowerMode={lowPowerMode}
+        durationMs={flowDurationMs}
         axis="x"
         progress={progress}
         range={battDir === "toHome" ? [0, Math.max(0, leftLineWidth - flowDotSize)] : [Math.max(0, leftLineWidth - flowDotSize), 0]}
@@ -465,6 +507,9 @@ function SolarFlowScene({
       />
       <AnimatedFlowDot
         active={gridDir !== "idle"}
+        animate={animateFlow}
+        lowPowerMode={lowPowerMode}
+        durationMs={flowDurationMs}
         axis="x"
         progress={progress}
         range={gridDir === "toHome" ? [Math.max(0, rightLineWidth - flowDotSize), 0] : [0, Math.max(0, rightLineWidth - flowDotSize)]}
@@ -474,6 +519,9 @@ function SolarFlowScene({
       />
       <AnimatedFlowDot
         active={carDir !== "idle"}
+        animate={animateFlow}
+        lowPowerMode={lowPowerMode}
+        durationMs={flowDurationMs}
         axis="y"
         progress={progress}
         range={
@@ -664,6 +712,9 @@ function SolarFlowScene({
 
 function AnimatedFlowDot({
   active,
+  animate,
+  lowPowerMode,
+  durationMs,
   progress,
   axis,
   range,
@@ -672,6 +723,9 @@ function AnimatedFlowDot({
   baseStyle,
 }: {
   active: boolean;
+  animate: boolean;
+  lowPowerMode: boolean;
+  durationMs: number;
   progress: Animated.Value;
   axis: "x" | "y";
   range: [number, number];
@@ -683,6 +737,74 @@ function AnimatedFlowDot({
     return null;
   }
 
+  if (Platform.OS === "web") {
+    const staticOffset = (range[0] + range[1]) / 2;
+    const webBaseStyle = (baseStyle || {}) as Record<string, string | number>;
+    const baseVisualStyle: Record<string, string | number> = {
+      ...webFlowDotStyle,
+      ...(lowPowerMode ? webFlowDotLowPowerStyle : null),
+      ...webBaseStyle,
+      width: `${size}px`,
+      height: `${size}px`,
+      borderRadius: `${size / 2}px`,
+      opacity: clamp(0.35 + strength * 0.65, 0.35, 1),
+    };
+
+    if (!animate) {
+      return createElement("div", {
+        style: {
+          ...baseVisualStyle,
+          transform: axis === "x" ? `translate3d(${staticOffset}px, 0, 0)` : `translate3d(0, ${staticOffset}px, 0)`,
+        },
+      });
+    }
+
+    const variableStyle: Record<string, string> =
+      axis === "x"
+        ? {
+            ["--flow-x-from" as any]: `${range[0]}px`,
+            ["--flow-x-to" as any]: `${range[1]}px`,
+          }
+        : {
+            ["--flow-y-from" as any]: `${range[0]}px`,
+            ["--flow-y-to" as any]: `${range[1]}px`,
+          };
+
+    return createElement("div", {
+      style: {
+        ...baseVisualStyle,
+        ...variableStyle,
+        animationName: axis === "x" ? "smarthomeSolarFlowX" : "smarthomeSolarFlowY",
+        animationDuration: `${Math.max(900, Math.round(durationMs))}ms`,
+        animationTimingFunction: "linear",
+        animationIterationCount: "infinite",
+        animationFillMode: "both",
+        willChange: "transform",
+        transform: "translate3d(0, 0, 0)",
+      },
+    });
+  }
+
+  if (!animate) {
+    const staticOffset = (range[0] + range[1]) / 2;
+    const transform = axis === "x" ? [{ translateX: staticOffset }] : [{ translateY: staticOffset }];
+    return (
+      <View
+        style={[
+          styles.flowDot,
+          baseStyle,
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            opacity: clamp(0.3 + strength * 0.45, 0.3, 0.75),
+            transform,
+          },
+        ]}
+      />
+    );
+  }
+
   const transform =
     axis === "x"
       ? [{ translateX: progress.interpolate({ inputRange: [0, 1], outputRange: range }) }]
@@ -692,6 +814,7 @@ function AnimatedFlowDot({
     <Animated.View
       style={[
         styles.flowDot,
+        lowPowerMode ? styles.flowDotLowPower : null,
         baseStyle,
         {
           width: size,
@@ -1415,6 +1538,11 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 0 },
   },
+  flowDotLowPower: {
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+  },
   nodePosition: {
     position: "absolute",
   },
@@ -1613,3 +1741,15 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 });
+
+const webFlowDotStyle: Record<string, string | number> = {
+  position: "absolute",
+  background: "#f7c65f",
+  boxShadow: "0 0 10px rgba(247, 198, 95, 0.8)",
+  transform: "translate3d(0, 0, 0)",
+  backfaceVisibility: "hidden",
+};
+
+const webFlowDotLowPowerStyle: Record<string, string | number> = {
+  boxShadow: "none",
+};
