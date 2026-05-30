@@ -582,10 +582,10 @@ export function HeatingWidgetV2({
   const detailsTickerRenderText = detailsTickerText.replace(/ /g, "\u00a0");
   const detailsTickerLoopText = `${detailsTickerRenderText}${DETAILS_TICKER_LOOP_SEPARATOR}`;
   const detailsTickerEstimatedWidthPx = Math.max(220, Math.round(detailsTickerRenderText.length * 7.2));
-  const detailsTickerCssDurationMs = Math.max(
-    8000,
-    Math.round((detailsTickerEstimatedWidthPx / detailsTickerSpeedPxPerS) * 1000)
-  );
+  const detailsTickerCssDurationMs = Math.max(8000, Math.round((detailsTickerEstimatedWidthPx / detailsTickerSpeedPxPerS) * 1000));
+  const detailsTickerCssDurationResolvedMs = lowPowerMode
+    ? Math.round(detailsTickerCssDurationMs * 1.35)
+    : detailsTickerCssDurationMs;
 
   const liveBadgeText = error ? "Fehler" : writePending ? "Sync" : "";
   const footerStatusText = error ? error : writePending ? "Synchronisiere..." : "";
@@ -1126,13 +1126,14 @@ export function HeatingWidgetV2({
               }}
               style={[styles.detailsTickerTrack, { borderColor: panelBorder, backgroundColor: panelColor }]}
             >
-              {Platform.OS === "web" && !lowPowerMode
+              {Platform.OS === "web"
                 ? createElement(
                     "div",
                     {
                       style: {
                         ...webDetailsTickerMoverStyle,
-                        animationDuration: `${detailsTickerCssDurationMs}ms`,
+                        animationDuration: `${detailsTickerCssDurationResolvedMs}ms`,
+                        animationPlayState: runtimeActive ? "running" : "paused",
                       },
                     },
                     createElement(
