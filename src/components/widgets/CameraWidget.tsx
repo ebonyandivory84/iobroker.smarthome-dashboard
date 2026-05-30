@@ -124,20 +124,28 @@ export function CameraWidget({
     flvUrl: previewFlvUrl,
     fmp4Url: previewFmp4Url,
   });
-  const fullscreenFeed = resolveCameraFeed({
+  const fullscreenConfiguredFeed = resolveCameraFeed({
     sourceMode: fullscreenSourceMode,
     snapshotUrl: fullscreenSnapshotBaseUrl,
     mjpegUrl: fullscreenMjpegUrl,
     flvUrl: fullscreenFlvUrl,
     fmp4Url: fullscreenFmp4Url,
   });
+  const preferPreviewOnTouchWeb = config.preferPreviewOnTouchWeb !== false;
+  const usePreviewFeedInTouchFullscreen =
+    Platform.OS === "web" && preferPreviewOnTouchWeb && isTouchCapableWebDevice();
+  const fullscreenFeed = usePreviewFeedInTouchFullscreen ? previewFeed : fullscreenConfiguredFeed;
+  const fullscreenRefreshMs = usePreviewFeedInTouchFullscreen
+    ? Math.max(100, config.refreshMs || 2000)
+    : Math.max(100, config.fullscreenRefreshMs || config.refreshMs || 2000);
   const hasDistinctFullscreenConfiguration =
-    fullscreenSourceMode !== previewSourceMode ||
-    fullscreenSnapshotBaseUrl !== previewSnapshotBaseUrl ||
-    fullscreenMjpegUrl !== previewMjpegUrl ||
-    fullscreenFlvUrl !== previewFlvUrl ||
-    fullscreenFmp4Url !== previewFmp4Url ||
-    Math.max(100, config.fullscreenRefreshMs || config.refreshMs || 2000) !== Math.max(100, config.refreshMs || 2000);
+    !usePreviewFeedInTouchFullscreen &&
+    (fullscreenSourceMode !== previewSourceMode ||
+      fullscreenSnapshotBaseUrl !== previewSnapshotBaseUrl ||
+      fullscreenMjpegUrl !== previewMjpegUrl ||
+      fullscreenFlvUrl !== previewFlvUrl ||
+      fullscreenFmp4Url !== previewFmp4Url ||
+      fullscreenRefreshMs !== Math.max(100, config.refreshMs || 2000));
   const useInPlaceFullscreen = Platform.OS === "web" && !hasDistinctFullscreenConfiguration;
   const showInPlaceFullscreen = useInPlaceFullscreen && (fullscreenOpen || webDocumentFullscreenActive);
   const showFixedFallbackFullscreen = showInPlaceFullscreen && !webDocumentFullscreenActive;
@@ -199,9 +207,7 @@ export function CameraWidget({
     previewFmp4Sources[Math.min(previewFmp4SourceIndex, Math.max(0, previewFmp4Sources.length - 1))] || null;
   const currentFullscreenFmp4Src =
     fullscreenFmp4Sources[Math.min(fullscreenFmp4SourceIndex, Math.max(0, fullscreenFmp4Sources.length - 1))] || null;
-  const activeRefreshMs = fullscreenOpen
-    ? Math.max(100, config.fullscreenRefreshMs || config.refreshMs || 2000)
-    : Math.max(100, config.refreshMs || 2000);
+  const activeRefreshMs = fullscreenOpen ? fullscreenRefreshMs : Math.max(100, config.refreshMs || 2000);
   const shouldUseSnapshotWebSocket =
     Platform.OS === "web" &&
     runtimeActive &&
@@ -2525,6 +2531,16 @@ function getTouchMidpoint(touches: ArrayLike<{ pageX?: number; pageY?: number }>
     return null;
   }
   return { x, y };
+}
+
+function isTouchCapableWebDevice() {
+  if (Platform.OS !== "web" || typeof window === "undefined") {
+    return false;
+  }
+
+  const maxTouchPoints = typeof navigator !== "undefined" ? Number(navigator.maxTouchPoints || 0) : 0;
+  const coarsePointer = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+  return maxTouchPoints > 0 || coarsePointer;
 }
 
 const baseWebLayerStyle = {
