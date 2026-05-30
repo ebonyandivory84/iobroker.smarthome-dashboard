@@ -198,6 +198,8 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         showTitle: widget.showTitle === false ? "false" : "true",
         url: widget.url || "",
         refreshMs: String(widget.refreshMs || 30000),
+        renderMode: widget.renderMode === "cachedImage" ? "cachedImage" : "liveIframe",
+        cacheRefreshMs: String(widget.cacheRefreshMs || 300000),
         allowInteractions: widget.allowInteractions === false ? "false" : "true",
         ...appearanceDraft,
       });
@@ -889,11 +891,14 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
         appearance,
       });
     } else if (widget.type === "grafana") {
+      const renderMode = draft.renderMode === "cachedImage" ? "cachedImage" : "liveIframe";
       onSave(widget.id, {
         title: draft.title,
         showTitle: draft.showTitle !== "false",
         url: draft.url || widget.url,
         refreshMs: clampInt(draft.refreshMs, widget.refreshMs || 30000, 1000),
+        renderMode,
+        cacheRefreshMs: clampInt(draft.cacheRefreshMs, widget.cacheRefreshMs || 300000, 60000),
         allowInteractions: draft.allowInteractions !== "false",
         interactionSounds: buildStoredInteractionSounds(
           widget.type,
@@ -2165,6 +2170,16 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={draft.url || ""}
                   />
                 </Field>
+                <Field label="Darstellung">
+                  <ChoiceRow
+                    options={["liveIframe", "cachedImage"]}
+                    value={draft.renderMode || "liveIframe"}
+                    onSelect={(value) => setDraft((current) => ({ ...current, renderMode: value }))}
+                  />
+                  <Text style={styles.mappingHint}>
+                    `cachedImage` laedt die Grafik serverseitig im Adapter vor und zeigt nur das Bild an.
+                  </Text>
+                </Field>
                 <Field label="Refresh (ms)">
                   <TextInput
                     keyboardType="numeric"
@@ -2172,6 +2187,20 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     style={styles.input}
                     value={draft.refreshMs || ""}
                   />
+                  <Text style={styles.mappingHint}>
+                    `liveIframe`: Grafana-Refresh-Parameter. `cachedImage`: nur Fallback-Intervall der Anzeige.
+                  </Text>
+                </Field>
+                <Field label="Adapter Cache Refresh (ms)">
+                  <TextInput
+                    keyboardType="numeric"
+                    onChangeText={(value) => setDraft((current) => ({ ...current, cacheRefreshMs: value }))}
+                    style={styles.input}
+                    value={draft.cacheRefreshMs || "300000"}
+                  />
+                  <Text style={styles.mappingHint}>
+                    Empfohlen: 300000 (5 Minuten). Benoetigt fuer Grafana Render-URLs (`/render/d-solo/...`).
+                  </Text>
                 </Field>
                 <Field label="Interaktionen">
                   <ChoiceRow
@@ -2179,6 +2208,11 @@ export function WidgetEditorModal({ client, widget, visible, onClose, onSave }: 
                     value={draft.allowInteractions || "true"}
                     onSelect={(value) => setDraft((current) => ({ ...current, allowInteractions: value }))}
                   />
+                  {draft.renderMode === "cachedImage" ? (
+                    <Text style={styles.mappingHint}>
+                      Bei `cachedImage` sind Grafana-Interaktionen deaktiviert, da nur ein Bild angezeigt wird.
+                    </Text>
+                  ) : null}
                 </Field>
                 <Field label="Sounds bei Interaktion">
                   <Field label="Beim Tippen/Klicken">

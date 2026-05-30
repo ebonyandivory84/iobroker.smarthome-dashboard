@@ -53,6 +53,17 @@ const LOG_PUSH_MAX_ENTRIES_PER_CLIENT = 200;
 const SCRIPT_PUSH_MAX_ENTRIES_PER_CLIENT = 1000;
 const WEB_STATIC_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
 const WIDGET_ASSET_MAX_AGE_SECONDS = 10 * 60;
+const GRAFANA_CACHE_DEFAULT_REFRESH_MS = 5 * 60 * 1000;
+const GRAFANA_CACHE_MIN_REFRESH_MS = 60 * 1000;
+const GRAFANA_CACHE_MAX_REFRESH_MS = 24 * 60 * 60 * 1000;
+const GRAFANA_CACHE_STALE_TTL_MS = 2 * 60 * 60 * 1000;
+const GRAFANA_CACHE_MAX_ENTRIES = 120;
+const GRAFANA_FETCH_TIMEOUT_MS = 20 * 1000;
+const GRAFANA_DEFAULT_RENDER_WIDTH = 1280;
+const GRAFANA_DEFAULT_RENDER_HEIGHT = 720;
+const GRAFANA_MIN_RENDER_SIZE = 240;
+const GRAFANA_MAX_RENDER_SIZE = 4096;
+const grafanaImageCacheEntries = new Map();
 
 const LOG_LEVEL_ORDER = {
   silly: 0,
@@ -96,6 +107,7 @@ function startAdapter(options) {
             closeInstarTalkSession(token);
           }
           reolinkTalkSessions.clear();
+          stopGrafanaImageCache();
           callback();
         }
       );
@@ -373,6 +385,42 @@ async function main(adapter) {
       res.json(images);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Image list failed" });
+    }
+  });
+
+  app.get("/smarthome-dashboard/api/grafana-cached-image", async (req, res) => {
+    const targetUrl = typeof req.query?.url === "string" ? req.query.url.trim() : "";
+    if (!targetUrl) {
+      res.status(400).json({ error: "url missing" });
+      return;
+    }
+
+    try {
+      const refreshMs = normalizeGrafanaCacheRefreshMs(req.query?.refreshMs);
+      const renderWidth = normalizeGrafanaRenderSize(req.query?.width, GRAFANA_DEFAULT_RENDER_WIDTH);
+      const renderHeight = normalizeGrafanaRenderSize(req.query?.height, GRAFANA_DEFAULT_RENDER_HEIGHT);
+      const renderUrl = buildGrafanaRenderUrl(targetUrl, renderWidth, renderHeight);
+      const entry = ensureGrafanaImageCacheEntry(adapter, renderUrl, refreshMs);
+      entry.lastAccessedAt = Date.now();
+
+      const isExpired = !entry.lastUpdatedAt || Date.now() - entry.lastUpdatedAt >= entry.refreshMs;
+      if (!entry.buffer || isExpired) {
+        await refreshGrafanaImageCacheEntry(adapter, entry);
+      }
+
+      if (!entry.buffer) {
+        const detail = entry.lastError || "cache not ready";
+        res.status(502).json({ error: `Grafana cache miss: ${detail}` });
+        return;
+      }
+
+      res.setHeader("Content-Type", entry.contentType || "image/png");
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("X-Grafana-Cache-Age-Ms", String(Math.max(0, Date.now() - (entry.lastUpdatedAt || Date.now()))));
+      res.setHeader("X-Grafana-Render-Url", sanitizeCameraUrlForLog(entry.renderUrl));
+      res.send(entry.buffer);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Grafana image cache failed" });
     }
   });
 
@@ -2665,6 +2713,208 @@ async function writeSavedDashboards(adapter, dashboards) {
     val: JSON.stringify(dashboards, null, 2),
     ack: true,
   });
+}
+
+function stopGrafanaImageCache() {
+  for (const entry of Array.from(grafanaImageCacheEntries.values())) {
+    if (entry.timer) {
+      clearInterval(entry.timer);
+      entry.timer = null;
+    }
+  }
+  grafanaImageCacheEntries.clear();
+}
+
+function normalizeGrafanaCacheRefreshMs(rawValue) {
+  const parsed = Number.parseInt(String(rawValue || ""), 10);
+  if (!Number.isFinite(parsed)) {
+    return GRAFANA_CACHE_DEFAULT_REFRESH_MS;
+  }
+  return Math.max(GRAFANA_CACHE_MIN_REFRESH_MS, Math.min(GRAFANA_CACHE_MAX_REFRESH_MS, parsed));
+}
+
+function normalizeGrafanaRenderSize(rawValue, fallback) {
+  const parsed = Number.parseInt(String(rawValue || ""), 10);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.max(GRAFANA_MIN_RENDER_SIZE, Math.min(GRAFANA_MAX_RENDER_SIZE, parsed));
+}
+
+function buildGrafanaRenderUrl(rawUrl, renderWidth, renderHeight) {
+  const parsed = new URL(rawUrl);
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("Grafana URL must start with http:// or https://");
+  }
+
+  parsed.hash = "";
+
+  if (!parsed.pathname.includes("/render/")) {
+    if (parsed.pathname.includes("/d-solo/")) {
+      parsed.pathname = parsed.pathname.replace("/d-solo/", "/render/d-solo/");
+    } else if (parsed.pathname.includes("/dashboard-solo/")) {
+      parsed.pathname = parsed.pathname.replace("/dashboard-solo/", "/render/dashboard-solo/");
+    } else if (parsed.pathname.includes("/d/")) {
+      parsed.pathname = parsed.pathname.replace("/d/", "/render/d-solo/");
+    } else if (parsed.pathname.includes("/dashboard/")) {
+      parsed.pathname = parsed.pathname.replace("/dashboard/", "/render/dashboard-solo/");
+    }
+  }
+
+  parsed.searchParams.delete("refresh");
+  if (!parsed.searchParams.has("width")) {
+    parsed.searchParams.set("width", String(renderWidth));
+  }
+  if (!parsed.searchParams.has("height")) {
+    parsed.searchParams.set("height", String(renderHeight));
+  }
+
+  return parsed.toString();
+}
+
+function ensureGrafanaImageCacheEntry(adapter, renderUrl, refreshMs) {
+  const key = renderUrl;
+  const now = Date.now();
+  let entry = grafanaImageCacheEntries.get(key);
+
+  if (!entry) {
+    entry = {
+      key,
+      renderUrl,
+      refreshMs,
+      timer: null,
+      inFlight: null,
+      buffer: null,
+      contentType: "image/png",
+      lastUpdatedAt: 0,
+      lastAccessedAt: now,
+      lastError: "",
+      lastErrorAt: 0,
+    };
+    grafanaImageCacheEntries.set(key, entry);
+  } else {
+    entry.lastAccessedAt = now;
+    entry.renderUrl = renderUrl;
+    if (refreshMs < entry.refreshMs) {
+      entry.refreshMs = refreshMs;
+      if (entry.timer) {
+        clearInterval(entry.timer);
+        entry.timer = null;
+      }
+    }
+  }
+
+  if (!entry.timer) {
+    entry.timer = setInterval(() => {
+      void refreshGrafanaImageCacheEntry(adapter, entry).catch(() => undefined);
+    }, entry.refreshMs);
+    if (typeof entry.timer.unref === "function") {
+      entry.timer.unref();
+    }
+  }
+
+  trimGrafanaImageCacheEntries(adapter);
+  return entry;
+}
+
+async function refreshGrafanaImageCacheEntry(adapter, entry) {
+  if (!entry || typeof entry !== "object") {
+    throw new Error("Invalid grafana cache entry");
+  }
+  if (entry.inFlight) {
+    return entry.inFlight;
+  }
+
+  entry.inFlight = (async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), GRAFANA_FETCH_TIMEOUT_MS);
+    try {
+      const response = await fetch(entry.renderUrl, {
+        method: "GET",
+        cache: "no-store",
+        redirect: "follow",
+        signal: controller.signal,
+        headers: {
+          Accept: "image/*,*/*;q=0.8",
+          "User-Agent": "ioBroker-smart-dashboard-grafana-cache/1.0",
+        },
+        ...buildCameraFetchOptions(entry.renderUrl),
+      });
+
+      if (!response.ok) {
+        throw new Error(`upstream ${response.status}`);
+      }
+
+      const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+      if (!contentType.startsWith("image/")) {
+        const bodyPreview = String(await response.text())
+          .replace(/\s+/g, " ")
+          .slice(0, 180);
+        throw new Error(
+          `unexpected content-type ${contentType || "unknown"} (tip: use Grafana render URL /render/d-solo/...): ${bodyPreview}`
+        );
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (!buffer.length) {
+        throw new Error("empty image response");
+      }
+
+      entry.buffer = buffer;
+      entry.contentType = contentType || "image/png";
+      entry.lastUpdatedAt = Date.now();
+      entry.lastError = "";
+      entry.lastErrorAt = 0;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      entry.lastError = message;
+      entry.lastErrorAt = Date.now();
+      if (!entry.lastUpdatedAt || Date.now() - entry.lastUpdatedAt > 30 * 1000) {
+        adapter.log.warn(`[grafana-cache] refresh failed ${sanitizeCameraUrlForLog(entry.renderUrl)}: ${message}`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+      entry.inFlight = null;
+    }
+  })();
+
+  return entry.inFlight;
+}
+
+function trimGrafanaImageCacheEntries(adapter) {
+  const now = Date.now();
+
+  for (const [key, entry] of Array.from(grafanaImageCacheEntries.entries())) {
+    if (entry.inFlight) {
+      continue;
+    }
+    if (now - (entry.lastAccessedAt || 0) <= GRAFANA_CACHE_STALE_TTL_MS) {
+      continue;
+    }
+    if (entry.timer) {
+      clearInterval(entry.timer);
+      entry.timer = null;
+    }
+    grafanaImageCacheEntries.delete(key);
+  }
+
+  if (grafanaImageCacheEntries.size <= GRAFANA_CACHE_MAX_ENTRIES) {
+    return;
+  }
+
+  const oldestEntries = Array.from(grafanaImageCacheEntries.values()).sort(
+    (a, b) => (a.lastAccessedAt || 0) - (b.lastAccessedAt || 0)
+  );
+  const toDelete = oldestEntries.slice(0, Math.max(0, grafanaImageCacheEntries.size - GRAFANA_CACHE_MAX_ENTRIES));
+  for (const entry of toDelete) {
+    if (entry.timer) {
+      clearInterval(entry.timer);
+      entry.timer = null;
+    }
+    grafanaImageCacheEntries.delete(entry.key);
+    adapter.log.debug?.(`[grafana-cache] evicted ${sanitizeCameraUrlForLog(entry.renderUrl)}`);
+  }
 }
 
 async function sendWebShell(webRoot, res, next) {

@@ -201,6 +201,8 @@ export function buildWidgetTemplate(
       title: `Grafana ${suffix}`,
       url: "http://127.0.0.1:3000/d/example/example?viewPanel=1&kiosk",
       refreshMs: 30000,
+      renderMode: "liveIframe",
+      cacheRefreshMs: 300000,
       allowInteractions: true,
       position: {
         ...basePosition,
