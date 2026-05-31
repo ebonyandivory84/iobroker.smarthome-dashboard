@@ -41,7 +41,10 @@ type DashboardConfigContextValue = {
   createDashboardPage: (mode?: DashboardPageMode) => void;
   moveDashboardPage: (pageId: string, direction: "left" | "right") => void;
   renameDashboardPage: (pageId: string, title: string) => void;
-  updateDashboardPage: (pageId: string, partial: { title?: string; mode?: DashboardPageMode; url?: string }) => void;
+  updateDashboardPage: (
+    pageId: string,
+    partial: { title?: string; mode?: DashboardPageMode; url?: string; urlZoomPercent?: number }
+  ) => void;
   deleteDashboardPage: (pageId: string) => void;
   refreshSavedDashboards: () => Promise<void>;
   saveNamedDashboard: (name: string) => Promise<{ ok: boolean; error?: string }>;
@@ -428,6 +431,7 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
           title: pageMode === "url" ? `URL ${suffix}` : `Dashboard ${suffix}`,
           mode: pageMode,
           url: pageMode === "url" ? "https://" : "",
+          urlZoomPercent: 100,
           widgets: [],
         };
 
@@ -495,8 +499,16 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
               : typeof page.url === "string"
                 ? page.url.trim()
                 : "";
+          const nextUrlZoomPercent = normalizeUrlZoomPercent(
+            typeof partial.urlZoomPercent === "number" ? partial.urlZoomPercent : page.urlZoomPercent
+          );
 
-          if (page.title === nextTitle && normalizeDashboardPageMode(page.mode) === nextMode && (page.url || "") === nextUrl) {
+          if (
+            page.title === nextTitle &&
+            normalizeDashboardPageMode(page.mode) === nextMode &&
+            (page.url || "") === nextUrl &&
+            normalizeUrlZoomPercent(page.urlZoomPercent) === nextUrlZoomPercent
+          ) {
             return page;
           }
 
@@ -506,6 +518,7 @@ export function DashboardConfigProvider({ children }: PropsWithChildren) {
             title: nextTitle,
             mode: nextMode,
             url: nextMode === "url" ? nextUrl : "",
+            urlZoomPercent: nextUrlZoomPercent,
           };
         });
 
@@ -813,11 +826,12 @@ function applyMobileLayoutConfig(
 
 function normalizeDashboardPages(input: DashboardSettings): DashboardSettings {
   const basePages: DashboardPage[] = Array.isArray(input.pages) && input.pages.length
-    ? input.pages.map((page, index) => ({
+      ? input.pages.map((page, index) => ({
         id: page.id || `dashboard-${index + 1}`,
         title: page.title || `Dashboard ${index + 1}`,
         mode: normalizeDashboardPageMode(page.mode),
         url: normalizeDashboardPageMode(page.mode) === "url" ? String(page.url || "").trim() : "",
+        urlZoomPercent: normalizeUrlZoomPercent(page.urlZoomPercent),
         widgets: normalizeWidgetConfigList(page.widgets),
       }))
     : [
@@ -826,6 +840,7 @@ function normalizeDashboardPages(input: DashboardSettings): DashboardSettings {
           title: input.title || "Dashboard",
           mode: "dashboard",
           url: "",
+          urlZoomPercent: 100,
           widgets: normalizeWidgetConfigList(input.widgets),
         },
       ];
@@ -971,6 +986,13 @@ function cloneWidgetConfig<T extends WidgetConfig>(widget: T): T {
 
 function normalizeDashboardPageMode(value: unknown): DashboardPageMode {
   return value === "url" ? "url" : "dashboard";
+}
+
+function normalizeUrlZoomPercent(value: unknown) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 100;
+  }
+  return Math.max(50, Math.min(150, Math.round(value)));
 }
 
 function getRuntimeWidgetsForPage(page?: DashboardPage | null) {

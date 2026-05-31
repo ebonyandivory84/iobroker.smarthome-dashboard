@@ -520,6 +520,7 @@ export type DashboardPage = {
   title: string;
   mode?: DashboardPageMode;
   url?: string;
+  urlZoomPercent?: number;
   widgets: WidgetConfig[];
 };
 

@@ -91,6 +91,7 @@ export function DashboardScreen() {
   const [pageSettingsTitle, setPageSettingsTitle] = useState("");
   const [pageSettingsMode, setPageSettingsMode] = useState<DashboardPageMode>("dashboard");
   const [pageSettingsUrl, setPageSettingsUrl] = useState("");
+  const [pageSettingsUrlZoom, setPageSettingsUrlZoom] = useState("100");
   const [deletePageId, setDeletePageId] = useState<string | null>(null);
   const lastContentScrollAt = useRef(0);
   const activePageIndex = Math.max(0, dashboardPages.findIndex((page) => page.id === activePageId));
@@ -104,6 +105,7 @@ export function DashboardScreen() {
         title: page.title,
         mode: page.mode,
         url: page.url,
+        urlZoomPercent: page.urlZoomPercent,
         widgets: page.widgets,
         activePageId: page.id,
       })),
@@ -500,6 +502,7 @@ export function DashboardScreen() {
     setPageSettingsTitle("");
     setPageSettingsMode("dashboard");
     setPageSettingsUrl("");
+    setPageSettingsUrlZoom("100");
   };
 
   const openPageSettingsDialog = (pageId: string) => {
@@ -512,6 +515,7 @@ export function DashboardScreen() {
     setPageSettingsTitle(page.title);
     setPageSettingsMode(pageMode);
     setPageSettingsUrl(page.url || "");
+    setPageSettingsUrlZoom(String(normalizeUrlZoomPercent(page.urlZoomPercent)));
   };
 
   const submitPageSettingsDialog = () => {
@@ -529,6 +533,7 @@ export function DashboardScreen() {
       title: nextTitle,
       mode: pageSettingsMode,
       url: pageSettingsMode === "url" ? pageSettingsUrl : "",
+      urlZoomPercent: pageSettingsMode === "url" ? parseUrlZoomPercent(pageSettingsUrlZoom) : 100,
     });
     closePageSettingsDialog();
   };
@@ -897,7 +902,11 @@ export function DashboardScreen() {
             <View key={pageConfig.activePageId} style={[styles.page, { width }]}>
               {shouldRenderContent ? (
                 isUrlPage ? (
-                  <UrlSidePage title={pageConfig.title} url={pageConfig.url || ""} />
+                  <UrlSidePage
+                    title={pageConfig.title}
+                    url={pageConfig.url || ""}
+                    urlZoomPercent={normalizeUrlZoomPercent(pageConfig.urlZoomPercent)}
+                  />
                 ) : (
                   <ScrollView
                     contentContainerStyle={styles.scrollContent}
@@ -1053,6 +1062,17 @@ export function DashboardScreen() {
                   style={styles.renameInput}
                   value={pageSettingsUrl}
                 />
+                <Text style={styles.renameHint}>Zoom (%):</Text>
+                <TextInput
+                  keyboardType="numeric"
+                  onChangeText={setPageSettingsUrlZoom}
+                  onSubmitEditing={submitPageSettingsDialog}
+                  placeholder="100"
+                  placeholderTextColor={palette.textMuted}
+                  style={styles.renameInput}
+                  value={pageSettingsUrlZoom}
+                />
+                <Text style={styles.renameHint}>Empfohlen fuer zu grosse Seiten: 80-95%</Text>
               </>
             ) : null}
             <View style={styles.renameActions}>
@@ -1104,7 +1124,7 @@ export function DashboardScreen() {
   );
 }
 
-function UrlSidePage({ title, url }: { title: string; url?: string }) {
+function UrlSidePage({ title, url, urlZoomPercent = 100 }: { title: string; url?: string; urlZoomPercent?: number }) {
   const resolvedUrl = normalizeUrl(url);
   if (!resolvedUrl) {
     return (
@@ -1116,12 +1136,13 @@ function UrlSidePage({ title, url }: { title: string; url?: string }) {
   }
 
   if (Platform.OS === "web") {
+    const zoomScale = normalizeUrlZoomPercent(urlZoomPercent) / 100;
     return createElement(
       "div",
       { style: webUrlPageWrapStyle },
       createElement("iframe", {
         src: resolvedUrl,
-        style: webUrlPageFrameStyle,
+        style: buildWebUrlPageFrameStyle(zoomScale),
         allow: "fullscreen; autoplay; clipboard-read; clipboard-write",
         allowFullScreen: true,
         loading: "eager",
@@ -1154,6 +1175,22 @@ function normalizeUrl(value?: string) {
     return trimmed;
   }
   return `https://${trimmed}`;
+}
+
+function normalizeUrlZoomPercent(value: unknown) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 100;
+  }
+  return Math.max(50, Math.min(150, Math.round(value)));
+}
+
+function parseUrlZoomPercent(value: string) {
+  const normalized = value.replace(",", ".").trim();
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) {
+    return 100;
+  }
+  return normalizeUrlZoomPercent(parsed);
 }
 
 function extractTouchPoint(event: unknown) {
@@ -1442,13 +1479,21 @@ const webUrlPageWrapStyle = {
   paddingLeft: "10px",
   paddingRight: "10px",
   boxSizing: "border-box",
+  overflow: "hidden",
 };
 
-const webUrlPageFrameStyle = {
-  width: "100%",
-  height: "100%",
-  border: "0",
-  borderRadius: "18px",
-  background: "rgba(4, 10, 18, 0.92)",
-  display: "block",
-};
+function buildWebUrlPageFrameStyle(zoomScale: number) {
+  const safeScale = Math.max(0.5, Math.min(1.5, Number.isFinite(zoomScale) ? zoomScale : 1));
+  const normalizedPercent = `${(100 / safeScale).toFixed(3)}%`;
+
+  return {
+    width: normalizedPercent,
+    height: normalizedPercent,
+    border: "0",
+    borderRadius: "18px",
+    background: "rgba(4, 10, 18, 0.92)",
+    display: "block",
+    transform: `scale(${safeScale})`,
+    transformOrigin: "top left",
+  };
+}
