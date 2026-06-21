@@ -873,7 +873,7 @@ export function CameraWidget({
                     ? createElement("img", {
                         alt: isVisible ? config.title || "Camera snapshot" : "",
                         "aria-hidden": !isVisible,
-                        decoding: "async",
+                        decoding: "sync",
                         draggable: false,
                         key: `preview-web-layer-${layer}`,
                         loading: "eager",
@@ -1146,7 +1146,7 @@ export function CameraWidget({
                 ? createElement("img", {
                     alt: isVisible ? config.title || "Camera snapshot fullscreen" : "",
                     "aria-hidden": !isVisible,
-                    decoding: "async",
+                    decoding: "sync",
                     draggable: false,
                     key: `fullscreen-web-layer-${layer}`,
                     loading: "eager",
