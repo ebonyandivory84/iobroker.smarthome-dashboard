@@ -212,7 +212,9 @@ export function CameraWidget({
     refreshMs: activeRefreshMs,
     snapshotUrl: activeSnapshotBaseUrl,
   });
-  const liveSnapshotWsDataUrl = snapshotWsConnected ? snapshotWsDataUrl : null;
+  // Keep the last known frame even during brief WS reconnects (hook does not reset snapshotDataUrl on disconnect).
+  // Nulling on disconnect causes a layer reset and visible flicker every ~900ms reconnect cycle.
+  const liveSnapshotWsDataUrl = snapshotWsDataUrl ?? null;
   const fullscreenMjpegHasFallback = fullscreenMjpegSourceIndex + 1 < fullscreenMjpegSources.length;
   const previewSupportsAudio = previewFeed?.kind === "flv" || previewFeed?.kind === "fmp4";
   const fullscreenSupportsAudio = fullscreenFeed?.kind === "flv" || fullscreenFeed?.kind === "fmp4";

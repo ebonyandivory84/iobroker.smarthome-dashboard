@@ -201,6 +201,9 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
               ))}
             </View>
 
+            {/* Tab Content — flex:1 keeps tab bar at fixed position regardless of content size */}
+            <View style={styles.tabContent}>
+
             {/* Tab: Allgemein */}
             {activeTab === "general" && (
               <>
@@ -420,6 +423,8 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
+            </View>{/* end tabContent */}
+
             {/* Footer */}
             <View style={styles.footer}>
               <Pressable
@@ -469,15 +474,18 @@ const styles = StyleSheet.create({
   },
   modalScrollContent: {
     flexGrow: 1,
-    justifyContent: "center",
   },
   card: {
+    flex: 1,
     marginVertical: 18,
     borderRadius: 22,
     backgroundColor: palette.panelStrong,
     borderWidth: 1,
     borderColor: palette.border,
     padding: 18,
+  },
+  tabContent: {
+    flex: 1,
   },
   header: {
     flexDirection: "row",
