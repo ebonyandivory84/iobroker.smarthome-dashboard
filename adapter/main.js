@@ -734,6 +734,17 @@ async function main(adapter) {
     });
   }
 
+  const REOLINK_SESSION_TTL = 2 * 60 * 60 * 1000;
+  setInterval(() => {
+    const cutoff = Date.now() - REOLINK_SESSION_TTL;
+    for (const [token, s] of reolinkTalkSessions) {
+      if (s.startedAt < cutoff) {
+        reolinkTalkSessions.delete(token);
+        adapter.log.info(`[reolink-talk] expired session cleaned up token=${token.slice(0, 8)}...`);
+      }
+    }
+  }, 60 * 60 * 1000);
+
   const port = Number(adapter.config.port) || 8109;
   const server = app.listen(port, () => {
     if (devServerUrl) {
@@ -2701,12 +2712,6 @@ async function refreshObjectEntries(adapter) {
           row.value.common &&
           typeof row.value.common.role === "string"
             ? row.value.common.role
-            : undefined,
-        valueType:
-          row.value &&
-          row.value.common &&
-          typeof row.value.common.type === "string"
-            ? row.value.common.type
             : undefined,
       }));
       objectEntriesCacheTimestamp = Date.now();
