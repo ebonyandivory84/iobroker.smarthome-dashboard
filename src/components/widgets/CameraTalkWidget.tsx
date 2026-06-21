@@ -1712,9 +1712,10 @@ export function CameraTalkWidget({
                     ? createElement("img", {
                         alt: isVisible ? config.title || "Camera snapshot" : "",
                         "aria-hidden": !isVisible,
-                        decoding: "async",
+                        decoding: "sync",
                         draggable: false,
                         key: `preview-web-layer-${layer}`,
+
                         loading: "eager",
                         onError: () => {
                           if (!isLoadingTarget) {
@@ -1942,7 +1943,7 @@ export function CameraTalkWidget({
                 ? createElement("img", {
                     alt: isVisible ? config.title || "Camera snapshot fullscreen" : "",
                     "aria-hidden": !isVisible,
-                    decoding: "async",
+                    decoding: "sync",
                     draggable: false,
                     key: `fullscreen-web-layer-${layer}`,
                     loading: "eager",
