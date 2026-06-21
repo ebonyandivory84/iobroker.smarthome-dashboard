@@ -1052,6 +1052,7 @@ export function WallboxWidget({ config, client, states, isActivePage = true }: W
             })
           : null}
 
+        <View style={styles.scaleWrapper}>
         <View style={[styles.scaledContent, { transform: [{ scale: contentScale }] }]}>
           <View style={styles.header}>
           {config.showTitle !== false ? (
@@ -1418,6 +1419,7 @@ export function WallboxWidget({ config, client, states, isActivePage = true }: W
               {footerStatusText}
             </Text>
           ) : null}
+        </View>
         </View>
       </View>
     </View>
@@ -2009,14 +2011,20 @@ const styles = StyleSheet.create({
     borderRadius: 0,
     borderWidth: 0,
     overflow: "hidden",
+    position: "relative",
+  },
+  scaleWrapper: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  scaledContent: {
+    width: WALLBOX_BASE_CONTENT_WIDTH,
+    height: WALLBOX_BASE_CONTENT_HEIGHT,
     paddingHorizontal: 14,
     paddingTop: 14,
     paddingBottom: 10,
-    gap: 11,
-    position: "relative",
-  },
-  scaledContent: {
-    flex: 1,
     gap: 11,
     zIndex: 2,
     position: "relative",

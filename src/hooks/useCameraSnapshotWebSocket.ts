@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
 
 const CAMERA_SNAPSHOT_WS_PATH = "/smarthome-dashboard/ws-camera-snapshot";
@@ -14,9 +14,19 @@ type UseCameraSnapshotWebSocketInput = {
 export function useCameraSnapshotWebSocket({ enabled, snapshotUrl, refreshMs }: UseCameraSnapshotWebSocketInput) {
   const [connected, setConnected] = useState(false);
   const [snapshotDataUrl, setSnapshotDataUrl] = useState<string | null>(null);
-  const wsUrl = useMemo(() => buildCameraSnapshotWebSocketUrl(), []);
+  const refreshMsRef = useRef(refreshMs);
+  const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
+    refreshMsRef.current = refreshMs;
+    const socket = socketRef.current;
+    if (socket?.readyState === WebSocket.OPEN && snapshotUrl) {
+      socket.send(JSON.stringify({ type: "start", url: snapshotUrl, refreshMs: Math.max(400, Math.round(refreshMs)) }));
+    }
+  }, [refreshMs, snapshotUrl]);
+
+  useEffect(() => {
+    const wsUrl = buildCameraSnapshotWebSocketUrl();
     if (!enabled || !snapshotUrl || !wsUrl) {
       setConnected(false);
       setSnapshotDataUrl(null);
@@ -29,17 +39,13 @@ export function useCameraSnapshotWebSocket({ enabled, snapshotUrl, refreshMs }: 
     let socket: WebSocket | null = null;
 
     const clearReconnectTimer = () => {
-      if (!reconnectTimer) {
-        return;
-      }
+      if (!reconnectTimer) return;
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
     };
 
     const scheduleReconnect = () => {
-      if (!active) {
-        return;
-      }
+      if (!active) return;
       clearReconnectTimer();
       const delay = Math.min(WS_RECONNECT_MAX_DELAY_MS, WS_RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttempt);
       reconnectAttempt = Math.min(reconnectAttempt + 1, 8);
@@ -50,24 +56,20 @@ export function useCameraSnapshotWebSocket({ enabled, snapshotUrl, refreshMs }: 
     };
 
     const sendStart = () => {
-      if (!socket || socket.readyState !== WebSocket.OPEN) {
-        return;
-      }
+      if (!socket || socket.readyState !== WebSocket.OPEN) return;
       const payload = {
         type: "start",
         url: snapshotUrl,
-        refreshMs: Math.max(400, Math.round(refreshMs || 2000)),
+        refreshMs: Math.max(400, Math.round(refreshMsRef.current || 2000)),
       };
       socket.send(JSON.stringify(payload));
     };
 
     const connect = () => {
-      if (!active) {
-        return;
-      }
-
+      if (!active) return;
       try {
         socket = new WebSocket(wsUrl);
+        socketRef.current = socket;
       } catch {
         setConnected(false);
         scheduleReconnect();
@@ -75,23 +77,17 @@ export function useCameraSnapshotWebSocket({ enabled, snapshotUrl, refreshMs }: 
       }
 
       socket.onopen = () => {
-        if (!active || !socket) {
-          return;
-        }
+        if (!active || !socket) return;
         reconnectAttempt = 0;
         setConnected(true);
         sendStart();
       };
 
       socket.onmessage = (event) => {
-        if (!active) {
-          return;
-        }
+        if (!active) return;
         try {
           const payload = JSON.parse(String(event.data ?? ""));
-          if (payload?.type !== "snapshot" || typeof payload?.dataUrl !== "string") {
-            return;
-          }
+          if (payload?.type !== "snapshot" || typeof payload?.dataUrl !== "string") return;
           setSnapshotDataUrl(payload.dataUrl);
         } catch {
           // Ignore malformed websocket payloads.
@@ -99,17 +95,13 @@ export function useCameraSnapshotWebSocket({ enabled, snapshotUrl, refreshMs }: 
       };
 
       socket.onclose = () => {
-        if (!active) {
-          return;
-        }
+        if (!active) return;
         setConnected(false);
         scheduleReconnect();
       };
 
       socket.onerror = () => {
-        if (!active) {
-          return;
-        }
+        if (!active) return;
         setConnected(false);
       };
     };
@@ -118,6 +110,7 @@ export function useCameraSnapshotWebSocket({ enabled, snapshotUrl, refreshMs }: 
 
     return () => {
       active = false;
+      socketRef.current = null;
       setConnected(false);
       clearReconnectTimer();
       if (socket) {
@@ -128,25 +121,16 @@ export function useCameraSnapshotWebSocket({ enabled, snapshotUrl, refreshMs }: 
         }
       }
     };
-  }, [enabled, refreshMs, snapshotUrl, wsUrl]);
+  }, [enabled, snapshotUrl]);
 
-  return {
-    connected,
-    snapshotDataUrl,
-  };
+  return { connected, snapshotDataUrl };
 }
 
 function buildCameraSnapshotWebSocketUrl() {
-  if (Platform.OS !== "web" || typeof window === "undefined") {
-    return "";
-  }
-
+  if (Platform.OS !== "web" || typeof window === "undefined") return "";
   try {
     const baseUrl = window.location.origin || "";
-    if (!baseUrl) {
-      return "";
-    }
-
+    if (!baseUrl) return "";
     const url = new URL(baseUrl);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     url.pathname = CAMERA_SNAPSHOT_WS_PATH;

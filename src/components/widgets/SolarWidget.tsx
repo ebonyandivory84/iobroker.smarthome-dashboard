@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { createElement } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -87,12 +87,17 @@ export function SolarWidget({
       config.wallboxPhaseModeStateId,
     ]
   );
-  const getValue = (snapshot: StateSnapshot, key?: string) => {
-    if (!key) {
-      return null;
-    }
-    return snapshot[`${config.statePrefix}.${key}`];
-  };
+  // Stabilized with useCallback so `incomingSnapshot` useMemo does not recompute
+  // on every render (getValue was recreated each render and leaked into the closure).
+  const getValue = useCallback(
+    (snapshot: StateSnapshot, key?: string) => {
+      if (!key) {
+        return null;
+      }
+      return snapshot[`${config.statePrefix}.${key}`];
+    },
+    [config.statePrefix]
+  );
 
   const incomingSnapshot = useMemo(
     () => ({
@@ -119,12 +124,10 @@ export function SolarWidget({
 
   const [displaySnapshot, setDisplaySnapshot] = useState(incomingSnapshot);
 
+  // No transition mechanism depends on this delay — sync directly to avoid
+  // a second re-render 220ms after every state update (costly on weak SoCs).
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDisplaySnapshot(incomingSnapshot);
-    }, 220);
-
-    return () => clearTimeout(timer);
+    setDisplaySnapshot(incomingSnapshot);
   }, [incomingSnapshot]);
 
   const {
@@ -189,6 +192,12 @@ export function SolarWidget({
   const backgroundBlur = lowPowerMode ? 0 : clamp(config.backgroundImageBlur ?? 8, 0, 24);
   const compactWidget = widgetLayout.width > 0 && (widgetLayout.width < 520 || widgetLayout.height < 420);
   const veryCompactWidget = widgetLayout.width > 0 && (widgetLayout.width < 420 || widgetLayout.height < 340);
+  // `states` is broad — ideally we'd subscribe only to the specific stateIds from
+  // resolveSolarStatDefinitions(config). However, those IDs are dynamically derived
+  // from config.stats.cards at runtime, so narrowing the dependency here would
+  // require extracting them outside this memo (adds complexity). Left as-is with a
+  // note: if stat-card flicker becomes an issue, pre-extract stateIds and use a
+  // selector that picks only those keys from `states`.
   const statCards = useMemo(
     () => resolveSolarStatCards(config, states, daySelfKWh, dayConsumedKWh),
     [config, states, dayConsumedKWh, daySelfKWh]
@@ -779,7 +788,8 @@ function AnimatedFlowDot({
         animationTimingFunction: "linear",
         animationIterationCount: "infinite",
         animationFillMode: "both",
-        willChange: "transform",
+        // willChange: "transform" entfernt — erzeugt auf Mali-T860 zu viele GPU Compositing-Layers.
+        // translate3d(0,0,0) bleibt als initial compositing-layer hint.
         transform: "translate3d(0, 0, 0)",
       },
     });

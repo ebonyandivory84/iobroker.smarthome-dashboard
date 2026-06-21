@@ -61,7 +61,6 @@ export function CameraWidget({
   const [previewStreamDebug, setPreviewStreamDebug] = useState<string | null>(null);
   const [previewMjpegSession, setPreviewMjpegSession] = useState(0);
   const [fullscreenSession, setFullscreenSession] = useState(0);
-  const [previewFlvSession, setPreviewFlvSession] = useState(0);
   const [previewMjpegSourceIndex, setPreviewMjpegSourceIndex] = useState(0);
   const [fullscreenMjpegSourceIndex, setFullscreenMjpegSourceIndex] = useState(0);
   const [previewFlvSourceIndex, setPreviewFlvSourceIndex] = useState(0);
@@ -255,7 +254,7 @@ export function CameraWidget({
     }, delay);
   }, [clearPreviewMjpegReconnectTimer, previewFeed?.kind, previewMjpegSources.length]);
 
-  const closeFullscreen = () => {
+  const closeFullscreen = useCallback(() => {
     if (previewFeed?.kind === "mjpeg") {
       setPreviewStreamDebug(null);
     }
@@ -274,7 +273,7 @@ export function CameraWidget({
         });
       }
     }
-  };
+  }, [previewFeed?.kind]);
 
   const moveFullscreenMjpegToNextSource = useCallback(() => {
     if (!fullscreenMjpegHasFallback) {
@@ -285,7 +284,7 @@ export function CameraWidget({
     return true;
   }, [fullscreenMjpegHasFallback, fullscreenMjpegSources.length]);
 
-  const openFullscreen = () => {
+  const openFullscreen = useCallback(() => {
     webPinchingRef.current = false;
     webPinchStartDistanceRef.current = null;
     webPinchStartZoomRef.current = 1;
@@ -309,7 +308,7 @@ export function CameraWidget({
         });
       }
     }
-  };
+  }, [useInPlaceFullscreen]);
 
   const toggleAudio = useCallback(() => {
     playConfiguredUiSound(config.interactionSounds?.press, "toggle", `${config.id}:audio`);
@@ -461,11 +460,7 @@ export function CameraWidget({
     }, MAX_FULLSCREEN_DURATION_MS);
 
     return () => clearTimeout(timer);
-  }, [fullscreenOpen, pinned]);
-
-  useEffect(() => {
-    fullscreenVisibilityCallbackRef.current?.(fullscreenOpen);
-  }, [fullscreenOpen]);
+  }, [closeFullscreen, fullscreenOpen, pinned]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") {
@@ -721,7 +716,7 @@ export function CameraWidget({
     if (nextMatch && !previousMatch && !fullscreenOpen) {
       openFullscreen();
     }
-  }, [config, fullscreenOpen, maximizeStateValue]);
+  }, [config.maximizeStateId, config.maximizeTriggerFormat, config.maximizeTriggerValue, fullscreenOpen, maximizeStateValue]);
 
   const reportAspectRatio = useCallback((width: number, height: number) => {
     if (!onAspectRatioDetected || hasReportedAspectRatio.current || !width || !height) {
@@ -876,7 +871,7 @@ export function CameraWidget({
                     ? createElement("img", {
                         alt: isVisible ? config.title || "Camera snapshot" : "",
                         "aria-hidden": !isVisible,
-                        decoding: "sync",
+                        decoding: "async",
                         draggable: false,
                         key: `preview-web-layer-${layer}`,
                         loading: "eager",
@@ -944,7 +939,7 @@ export function CameraWidget({
               ? Platform.OS === "web"
                 ? createElement("img", {
                     alt: config.title || "Camera MJPEG",
-                    decoding: "sync",
+                    decoding: "async",
                     draggable: false,
                     key: `preview-mjpeg-${currentPreviewMjpegSrc || previewFeed.url}:${previewMjpegSession}`,
                     loading: "eager",
@@ -993,7 +988,7 @@ export function CameraWidget({
               ? Platform.OS === "web"
                 ? (
                     <WebFlvPlayer
-                      key={`preview-flv-${previewFeedKey}:${previewFlvSession}`}
+                      key={`preview-flv-${previewFeedKey}`}
                       fullScreen={showInPlaceFullscreen}
                       muted={previewMuted}
                       zoomScale={webFullscreenZoom}
@@ -1149,7 +1144,7 @@ export function CameraWidget({
                 ? createElement("img", {
                     alt: isVisible ? config.title || "Camera snapshot fullscreen" : "",
                     "aria-hidden": !isVisible,
-                    decoding: "sync",
+                    decoding: "async",
                     draggable: false,
                     key: `fullscreen-web-layer-${layer}`,
                     loading: "eager",
@@ -1202,7 +1197,7 @@ export function CameraWidget({
               ? Platform.OS === "web"
                 ? createElement("img", {
                     alt: config.title || "Camera MJPEG fullscreen",
-                    decoding: "sync",
+                    decoding: "async",
                     draggable: false,
                     key: `fullscreen-mjpeg-${currentFullscreenMjpegSrc || fullscreenFeed.url}:${fullscreenSession}`,
                     loading: "eager",
@@ -1687,6 +1682,10 @@ function WebFlvPlayer({
         {
           enableStashBuffer: false,
           lazyLoad: false,
+          autoCleanupSourceBuffer: true,
+          autoCleanupMinBackwardDuration: 5,
+          autoCleanupMaxBackwardDuration: 10,
+          fixAudioTimestampGap: false,
         }
       );
       playerRef.current = player;
@@ -1731,6 +1730,10 @@ function WebFlvPlayer({
         if (watchdogTimer) {
           clearTimeout(watchdogTimer);
           watchdogTimer = null;
+        }
+        if (retryTimer) {
+          clearInterval(retryTimer);
+          retryTimer = null;
         }
         setHasVideoFrame(true);
         clearStreamError();
@@ -2275,7 +2278,7 @@ const styles = StyleSheet.create({
   },
   fullscreenBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.96)",
+    backgroundColor: "#000",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -2407,7 +2410,7 @@ const webInPlaceFullscreenHostStyle =
         right: 0,
         bottom: 0,
         zIndex: 2400,
-        backgroundColor: "rgba(0,0,0,0.96)",
+        backgroundColor: "#000",
       } as any)
     : null;
 

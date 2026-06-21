@@ -109,6 +109,9 @@ export function CameraTalkWidget({
   const volumeTrackHeightRef = useRef(84);
   const volumeDragActiveRef = useRef(false);
   const volumeLastSentRef = useRef(0);
+  const instarFlushInProgressRef = useRef(false);
+  const instarStartSessionRef = useRef(0);
+  const instarIsStartingRef = useRef(false);
   const textColor = config.appearance?.textColor || palette.text;
   const mutedTextColor = config.appearance?.mutedTextColor || palette.textMuted;
   const titleFontSize = Math.max(11, Math.min(28, Math.round(config.titleFontSize || 14)));
@@ -301,72 +304,9 @@ export function CameraTalkWidget({
     }, delay);
   }, [clearPreviewMjpegReconnectTimer, previewFeed?.kind, previewMjpegSources.length]);
 
-  const closeFullscreen = () => {
-    if (previewFeed?.kind === "mjpeg") {
-      setPreviewStreamDebug(null);
-    }
-    fullscreenVisibilityCallbackRef.current?.(false);
-    setFullscreenOpen(false);
-    setPinned(false);
-    if (instarTalkbackEnabled) {
-      void stopInstarTalkback();
-    }
-    setTalkbackActive(false);
-    if (Platform.OS === "web" && typeof document !== "undefined") {
-      const webDocument = document as Document & {
-        webkitExitFullscreen?: () => Promise<void> | void;
-        webkitFullscreenElement?: Element | null;
-      };
-      const exitFullscreen = webDocument.exitFullscreen || webDocument.webkitExitFullscreen;
-      if (exitFullscreen && (webDocument.fullscreenElement || webDocument.webkitFullscreenElement)) {
-        void Promise.resolve(exitFullscreen.call(webDocument)).catch(() => {
-          // Ignore best-effort fullscreen exit errors.
-        });
-      }
-    }
-  };
-
-  const moveFullscreenMjpegToNextSource = useCallback(() => {
-    if (!fullscreenMjpegHasFallback) {
-      return false;
-    }
-    setFullscreenMjpegLoaded(false);
-    setFullscreenMjpegSourceIndex((current) => Math.min(fullscreenMjpegSources.length - 1, current + 1));
-    return true;
-  }, [fullscreenMjpegHasFallback, fullscreenMjpegSources.length]);
-
-  const openFullscreen = () => {
-    webPinchingRef.current = false;
-    webPinchStartDistanceRef.current = null;
-    webPinchStartZoomRef.current = 1;
-    webPanStartRef.current = null;
-    webFullscreenZoomRef.current = 1;
-    webFullscreenOffsetRef.current = { x: 0, y: 0 };
-    setWebFullscreenZoom(1);
-    setWebFullscreenOffset({ x: 0, y: 0 });
-    setFullscreenSession((current) => current + 1);
-    fullscreenVisibilityCallbackRef.current?.(true);
-    setPinned(false);
-    setFullscreenOpen(true);
-    if (Platform.OS === "web" && useInPlaceFullscreen) {
-      const host = inPlaceFullscreenHostRef.current as
-        | (Element & { webkitRequestFullscreen?: () => Promise<void> | void })
-        | null;
-      const requestFullscreen = host?.requestFullscreen || host?.webkitRequestFullscreen;
-      if (requestFullscreen) {
-        void Promise.resolve(requestFullscreen.call(host)).catch(() => {
-          // requestFullscreen may fail without user gesture (e.g. state-triggered maximize).
-        });
-      }
-    }
-  };
-
-  const toggleAudio = useCallback(() => {
-    playConfiguredUiSound(config.interactionSounds?.press, "toggle", `${config.id}:audio`);
-    setAudioEnabled((current) => !current);
-  }, [config.id, config.interactionSounds?.press]);
-
   const stopInstarTalkback = useCallback(async () => {
+    instarStartSessionRef.current += 1;
+    instarIsStartingRef.current = false;
     const token = instarTalkTokenRef.current;
     instarTalkTokenRef.current = null;
 
@@ -430,6 +370,71 @@ export function CameraTalkWidget({
     }
   }, [talkbackWebrtcUrl]);
 
+  const closeFullscreen = useCallback(() => {
+    if (previewFeed?.kind === "mjpeg") {
+      setPreviewStreamDebug(null);
+    }
+    fullscreenVisibilityCallbackRef.current?.(false);
+    setFullscreenOpen(false);
+    setPinned(false);
+    if (instarTalkbackEnabled) {
+      void stopInstarTalkback();
+    }
+    setTalkbackActive(false);
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      const webDocument = document as Document & {
+        webkitExitFullscreen?: () => Promise<void> | void;
+        webkitFullscreenElement?: Element | null;
+      };
+      const exitFullscreen = webDocument.exitFullscreen || webDocument.webkitExitFullscreen;
+      if (exitFullscreen && (webDocument.fullscreenElement || webDocument.webkitFullscreenElement)) {
+        void Promise.resolve(exitFullscreen.call(webDocument)).catch(() => {
+          // Ignore best-effort fullscreen exit errors.
+        });
+      }
+    }
+  }, [instarTalkbackEnabled, previewFeed?.kind, stopInstarTalkback]);
+
+  const moveFullscreenMjpegToNextSource = useCallback(() => {
+    if (!fullscreenMjpegHasFallback) {
+      return false;
+    }
+    setFullscreenMjpegLoaded(false);
+    setFullscreenMjpegSourceIndex((current) => Math.min(fullscreenMjpegSources.length - 1, current + 1));
+    return true;
+  }, [fullscreenMjpegHasFallback, fullscreenMjpegSources.length]);
+
+  const openFullscreen = useCallback(() => {
+    webPinchingRef.current = false;
+    webPinchStartDistanceRef.current = null;
+    webPinchStartZoomRef.current = 1;
+    webPanStartRef.current = null;
+    webFullscreenZoomRef.current = 1;
+    webFullscreenOffsetRef.current = { x: 0, y: 0 };
+    setWebFullscreenZoom(1);
+    setWebFullscreenOffset({ x: 0, y: 0 });
+    setFullscreenSession((current) => current + 1);
+    fullscreenVisibilityCallbackRef.current?.(true);
+    setPinned(false);
+    setFullscreenOpen(true);
+    if (Platform.OS === "web" && useInPlaceFullscreen) {
+      const host = inPlaceFullscreenHostRef.current as
+        | (Element & { webkitRequestFullscreen?: () => Promise<void> | void })
+        | null;
+      const requestFullscreen = host?.requestFullscreen || host?.webkitRequestFullscreen;
+      if (requestFullscreen) {
+        void Promise.resolve(requestFullscreen.call(host)).catch(() => {
+          // requestFullscreen may fail without user gesture (e.g. state-triggered maximize).
+        });
+      }
+    }
+  }, [useInPlaceFullscreen]);
+
+  const toggleAudio = useCallback(() => {
+    playConfiguredUiSound(config.interactionSounds?.press, "toggle", `${config.id}:audio`);
+    setAudioEnabled((current) => !current);
+  }, [config.id, config.interactionSounds?.press]);
+
   const startReolinkTalkback = useCallback(async () => {
     if (Platform.OS !== "web" || !reolinkTalkbackAvailable || !navigator.mediaDevices?.getUserMedia) {
       throw new Error("Reolink talkback unavailable");
@@ -474,7 +479,9 @@ export function CameraTalkWidget({
       offerToReceiveVideo: false,
     });
     await peer.setLocalDescription(offer);
+    if (reolinkTalkPeerRef.current !== peer) { peer.close(); return; }
     await waitForIceGathering(peer, 450);
+    if (reolinkTalkPeerRef.current !== peer) { peer.close(); return; }
 
     const endpoint = resolveGo2rtcWebrtcEndpoint(talkbackWebrtcUrl);
     const localSdp = peer.localDescription?.sdp || offer.sdp;
@@ -490,6 +497,7 @@ export function CameraTalkWidget({
       body: localSdp,
     });
     const answerSdp = await response.text();
+    if (reolinkTalkPeerRef.current !== peer) { peer.close(); return; }
     if (!response.ok || !answerSdp.trim()) {
       const detail = (answerSdp || "").trim().slice(0, 220);
       throw new Error(`Reolink WebRTC Handshake fehlgeschlagen (${response.status})${detail ? `: ${detail}` : ""}.`);
@@ -498,6 +506,7 @@ export function CameraTalkWidget({
       type: "answer",
       sdp: answerSdp,
     });
+    if (reolinkTalkPeerRef.current !== peer) { peer.close(); return; }
 
     const streamRouteUrl = resolveGo2rtcStreamsEndpoint(talkbackWebrtcUrl);
     const routeSource = resolveGo2rtcWebsocketSource(talkbackWebrtcUrl, source);
@@ -531,66 +540,94 @@ export function CameraTalkWidget({
     if (Platform.OS !== "web" || !instarTalkbackAvailable || !navigator.mediaDevices?.getUserMedia) {
       throw new Error("INSTAR talkback unavailable");
     }
-    await stopInstarTalkback();
-    setPreviewStreamDebug("INSTAR: starte Talkback...");
-    const startResponse = await fetch("/smarthome-dashboard/api/instar-talk/start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        cameraBaseUrl: instarBaseUrl,
-        username: instarUsername,
-        password: instarPassword,
-        allowInsecure: true,
-      }),
-    });
-    const startPayload = await startResponse.json().catch(() => ({}));
-    if (!startResponse.ok || !startPayload?.token) {
-      throw new Error(startPayload?.error || `INSTAR talk start failed (${startResponse.status})`);
+    if (instarIsStartingRef.current) {
+      return;
     }
-    instarTalkTokenRef.current = String(startPayload.token);
-    setPreviewStreamDebug("INSTAR: Session aktiv, Mikrofon wird angefordert...");
-
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 1,
-        echoCancellation: true,
-        noiseSuppression: true,
-      },
-      video: false,
-    });
-    instarTalkStreamRef.current = stream;
-    setPreviewStreamDebug("INSTAR: Mikrofon aktiv.");
-    const audioContext = new AudioContext();
-    instarTalkAudioContextRef.current = audioContext;
-    const source = audioContext.createMediaStreamSource(stream);
-    instarTalkSourceRef.current = source;
-    const processor = audioContext.createScriptProcessor(2048, 1, 1);
-    instarTalkProcessorRef.current = processor;
-    processor.onaudioprocess = (event) => {
-      const input = event.inputBuffer.getChannelData(0);
-      const pcm = downsampleFloat32ToInt16(input, event.inputBuffer.sampleRate, 16000);
-      if (!pcm.length) {
+    instarIsStartingRef.current = true;
+    instarStartSessionRef.current += 1;
+    const sessionId = instarStartSessionRef.current;
+    try {
+      await stopInstarTalkback();
+      if (instarStartSessionRef.current !== sessionId) {
         return;
       }
-      instarTalkQueueRef.current.push(pcm);
-      instarTalkQueueBytesRef.current += pcm.length;
-    };
-
-    source.connect(processor);
-    processor.connect(audioContext.destination);
-
-    instarTalkFlushTimerRef.current = setInterval(() => {
-      void flushInstarTalkbackQueue(instarTalkTokenRef.current, instarTalkQueueRef, instarTalkQueueBytesRef).then((sent) => {
-        if (sent > 0) {
-          instarTalkSentBytesRef.current += sent;
-          const now = Date.now();
-          if (now - instarTalkLastDebugAtRef.current > 1000) {
-            instarTalkLastDebugAtRef.current = now;
-            setPreviewStreamDebug(`INSTAR: sende Audio (${instarTalkSentBytesRef.current} bytes)`);
-          }
-        }
+      setPreviewStreamDebug("INSTAR: starte Talkback...");
+      const startResponse = await fetch("/smarthome-dashboard/api/instar-talk/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cameraBaseUrl: instarBaseUrl,
+          username: instarUsername,
+          password: instarPassword,
+          allowInsecure: true,
+        }),
       });
-    }, 80);
+      const startPayload = await startResponse.json().catch(() => ({}));
+      if (!startResponse.ok || !startPayload?.token) {
+        throw new Error(startPayload?.error || `INSTAR talk start failed (${startResponse.status})`);
+      }
+      if (instarStartSessionRef.current !== sessionId) {
+        void fetch("/smarthome-dashboard/api/instar-talk/stop", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: String(startPayload.token) }),
+        }).catch(() => undefined);
+        return;
+      }
+      instarTalkTokenRef.current = String(startPayload.token);
+      setPreviewStreamDebug("INSTAR: Session aktiv, Mikrofon wird angefordert...");
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+        video: false,
+      });
+      if (instarStartSessionRef.current !== sessionId) {
+        stream.getTracks().forEach((t) => t.stop());
+        void stopInstarTalkback();
+        return;
+      }
+      instarTalkStreamRef.current = stream;
+      setPreviewStreamDebug("INSTAR: Mikrofon aktiv.");
+      const audioContext = new AudioContext({ sampleRate: 16000 });
+      instarTalkAudioContextRef.current = audioContext;
+      const source = audioContext.createMediaStreamSource(stream);
+      instarTalkSourceRef.current = source;
+      const processor = audioContext.createScriptProcessor(2048, 1, 1);
+      instarTalkProcessorRef.current = processor;
+      processor.onaudioprocess = (event) => {
+        const input = event.inputBuffer.getChannelData(0);
+        const pcm = downsampleFloat32ToInt16(input, event.inputBuffer.sampleRate, 16000);
+        if (!pcm.length) {
+          return;
+        }
+        instarTalkQueueRef.current.push(pcm);
+        instarTalkQueueBytesRef.current += pcm.length;
+      };
+
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+
+      instarTalkFlushTimerRef.current = setInterval(() => {
+        void flushInstarTalkbackQueue(instarTalkTokenRef.current, instarTalkQueueRef, instarTalkQueueBytesRef, instarFlushInProgressRef, () => {
+          void stopInstarTalkback();
+        }).then((sent) => {
+          if (sent > 0) {
+            instarTalkSentBytesRef.current += sent;
+            const now = Date.now();
+            if (now - instarTalkLastDebugAtRef.current > 1000) {
+              instarTalkLastDebugAtRef.current = now;
+              setPreviewStreamDebug(`INSTAR: sende Audio (${instarTalkSentBytesRef.current} bytes)`);
+            }
+          }
+        });
+      }, 80);
+    } finally {
+      instarIsStartingRef.current = false;
+    }
   }, [instarBaseUrl, instarPassword, instarTalkbackAvailable, instarUsername, stopInstarTalkback]);
 
   const callInstarControl = useCallback(
@@ -942,8 +979,10 @@ export function CameraTalkWidget({
     if (fullscreenOpen) {
       return;
     }
+    void stopInstarTalkback();
+    void stopReolinkTalkback();
     setTalkbackActive(false);
-  }, [fullscreenOpen]);
+  }, [fullscreenOpen, stopInstarTalkback, stopReolinkTalkback]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || !talkbackPressToHold || !talkbackActive) {
@@ -1088,10 +1127,6 @@ export function CameraTalkWidget({
 
     return () => clearTimeout(timer);
   }, [fullscreenOpen, pinned]);
-
-  useEffect(() => {
-    fullscreenVisibilityCallbackRef.current?.(fullscreenOpen);
-  }, [fullscreenOpen]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") {
@@ -1677,7 +1712,7 @@ export function CameraTalkWidget({
                     ? createElement("img", {
                         alt: isVisible ? config.title || "Camera snapshot" : "",
                         "aria-hidden": !isVisible,
-                        decoding: "sync",
+                        decoding: "async",
                         draggable: false,
                         key: `preview-web-layer-${layer}`,
                         loading: "eager",
@@ -1745,7 +1780,7 @@ export function CameraTalkWidget({
               ? Platform.OS === "web"
                 ? createElement("img", {
                     alt: config.title || "Camera MJPEG",
-                    decoding: "sync",
+                    decoding: "async",
                     draggable: false,
                     key: `preview-mjpeg-${currentPreviewMjpegSrc || previewFeed.url}:${previewMjpegSession}`,
                     loading: "eager",
@@ -1907,7 +1942,7 @@ export function CameraTalkWidget({
                 ? createElement("img", {
                     alt: isVisible ? config.title || "Camera snapshot fullscreen" : "",
                     "aria-hidden": !isVisible,
-                    decoding: "sync",
+                    decoding: "async",
                     draggable: false,
                     key: `fullscreen-web-layer-${layer}`,
                     loading: "eager",
@@ -1960,7 +1995,7 @@ export function CameraTalkWidget({
               ? Platform.OS === "web"
                 ? createElement("img", {
                     alt: config.title || "Camera MJPEG fullscreen",
-                    decoding: "sync",
+                    decoding: "async",
                     draggable: false,
                     key: `fullscreen-mjpeg-${currentFullscreenMjpegSrc || fullscreenFeed.url}:${fullscreenSession}`,
                     loading: "eager",
@@ -2155,42 +2190,59 @@ function downsampleFloat32ToInt16(input: Float32Array, sourceRate: number, targe
 async function flushInstarTalkbackQueue(
   token: string | null,
   queueRef: { current: Uint8Array[] },
-  queueBytesRef: { current: number }
+  queueBytesRef: { current: number },
+  isFlushingRef: { current: boolean },
+  onAuthError: () => void
 ) {
   if (!token || !queueRef.current.length || queueBytesRef.current <= 0) {
     return 0;
   }
-
-  const bytes = queueBytesRef.current;
-  const merged = new Uint8Array(bytes);
-  let offset = 0;
-  for (const chunk of queueRef.current) {
-    merged.set(chunk, offset);
-    offset += chunk.length;
-  }
-  queueRef.current = [];
-  queueBytesRef.current = 0;
-
-  let binary = "";
-  for (let i = 0; i < merged.length; i += 1) {
-    binary += String.fromCharCode(merged[i]);
-  }
-  const base64 = typeof btoa === "function" ? btoa(binary) : "";
-  if (!base64) {
+  if (isFlushingRef.current) {
     return 0;
   }
+  isFlushingRef.current = true;
+  try {
+    const bytes = queueBytesRef.current;
+    const merged = new Uint8Array(bytes);
+    let offset = 0;
+    for (const chunk of queueRef.current) {
+      merged.set(chunk, offset);
+      offset += chunk.length;
+    }
+    queueRef.current = [];
+    queueBytesRef.current = 0;
 
-  const response = await fetch("/smarthome-dashboard/api/instar-talk/chunk", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token, pcmBase64: base64 }),
-  }).catch(() => null);
-  if (!response || !response.ok) {
-    return 0;
+    let binary = "";
+    const CHUNK = 8192;
+    for (let i = 0; i < merged.length; i += CHUNK) {
+      binary += String.fromCharCode.apply(null, merged.subarray(i, i + CHUNK) as unknown as number[]);
+    }
+    const base64 = typeof btoa === "function" ? btoa(binary) : "";
+    if (!base64) {
+      return 0;
+    }
+
+    const response = await fetch("/smarthome-dashboard/api/instar-talk/chunk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, pcmBase64: base64 }),
+    }).catch(() => null);
+    if (!response) {
+      return 0;
+    }
+    if (response.status === 401 || response.status === 403) {
+      onAuthError();
+      return 0;
+    }
+    if (!response.ok) {
+      return 0;
+    }
+    const payload = await response.json().catch(() => ({}));
+    const sent = Number(payload?.sent || 0);
+    return Number.isFinite(sent) ? sent : 0;
+  } finally {
+    isFlushingRef.current = false;
   }
-  const payload = await response.json().catch(() => ({}));
-  const sent = Number(payload?.sent || 0);
-  return Number.isFinite(sent) ? sent : 0;
 }
 
 function resolveCameraFeed(input: {
@@ -2524,6 +2576,10 @@ function WebFlvPlayer({
         {
           enableStashBuffer: false,
           lazyLoad: false,
+          autoCleanupSourceBuffer: true,
+          autoCleanupMinBackwardDuration: 5,
+          autoCleanupMaxBackwardDuration: 10,
+          fixAudioTimestampGap: false,
         }
       );
       playerRef.current = player;
@@ -3112,7 +3168,7 @@ const styles = StyleSheet.create({
   },
   fullscreenBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.96)",
+    backgroundColor: "rgba(0,0,0,1)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -3363,7 +3419,7 @@ const webInPlaceFullscreenHostStyle =
         right: 0,
         bottom: 0,
         zIndex: 2400,
-        backgroundColor: "rgba(0,0,0,0.96)",
+        backgroundColor: "rgba(0,0,0,1)",
       } as any)
     : null;
 
